@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HyperGal</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: light-dark(#fafafa, #0a0a0c);
+        --fg: light-dark(#111, #eee);
+        --muted: light-dark(#666, #888);
+        --thumb-bg: light-dark(#eee, #1a1a1f);
+      }
+      html, body { margin: 0; background: var(--bg); color: var(--fg); }
+      body {
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        padding: 3rem 2rem;
+        max-width: 1200px;
+        margin-inline: auto;
+        min-height: 100vh;
+      }
+      header { margin-bottom: 3rem; }
+      h1 { font-weight: 500; font-size: 2rem; margin: 0 0 .25rem; letter-spacing: -.02em; }
+      .subtitle { color: var(--muted); margin: 0; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 2rem 1.5rem;
+      }
+      .piece {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+      }
+      .piece-thumb {
+        aspect-ratio: 1;
+        background: var(--thumb-bg);
+        border-radius: .5rem;
+        overflow: hidden;
+        margin-bottom: .6rem;
+        transition: transform .15s ease;
+      }
+      .piece:hover .piece-thumb { transform: translateY(-2px); }
+      .piece-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .piece-title { font-weight: 500; }
+      .piece-meta { font-size: .85rem; color: var(--muted); margin-top: .15rem; }
+      .empty {
+        color: var(--muted);
+        padding: 3rem 0;
+        text-align: center;
+      }
+      .empty code {
+        background: var(--thumb-bg);
+        padding: .1rem .35rem;
+        border-radius: .25rem;
+        font-size: .9em;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>HyperGal</h1>
+      <p class="subtitle">A digital gallery of self-contained pieces.</p>
+    </header>
+    <main id="gallery" class="grid"></main>
+    <script src="./manifest.js"></script>
+    <script>
+      (() => {
+        const gallery = document.getElementById('gallery');
+        const data = window.HYPERGAL_MANIFEST;
+        if (!data || !Array.isArray(data.pieces) || data.pieces.length === 0) {
+          gallery.replaceWith(emptyState());
+          return;
+        }
+        for (const p of data.pieces) gallery.append(pieceCard(p));
+
+        function pieceCard(p) {
+          const a = document.createElement('a');
+          a.className = 'piece';
+          a.href = `./pieces/${p.slug}/index.html`;
+
+          const thumb = document.createElement('div');
+          thumb.className = 'piece-thumb';
+          if (p.thumbnail) {
+            const img = document.createElement('img');
+            img.src = `./pieces/${p.slug}/${p.thumbnail}`;
+            img.alt = p.title || p.slug;
+            img.loading = 'lazy';
+            thumb.append(img);
+          }
+          a.append(thumb);
+
+          const title = document.createElement('div');
+          title.className = 'piece-title';
+          title.textContent = p.title || p.slug;
+          a.append(title);
+
+          const meta = document.createElement('div');
+          meta.className = 'piece-meta';
+          meta.textContent = [p.year, p.type].filter(Boolean).join(' · ');
+          a.append(meta);
+
+          return a;
+        }
+
+        function emptyState() {
+          const wrap = document.createElement('div');
+          wrap.className = 'empty';
+          wrap.innerHTML =
+            'No pieces yet. Copy <code>pieces/_template/</code> to start one, then run <code>node scripts/build-manifest.mjs</code>.';
+          return wrap;
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>drift · HyperGal</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0a0a12; overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; }
+      .caption {
+        position: fixed;
+        bottom: 1rem;
+        left: 1rem;
+        color: rgba(255, 255, 255, .45);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .8rem;
+        letter-spacing: .05em;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div class="caption">drift · 2026</div>
+    <script>
+      const canvas = document.getElementById('c');
+      const ctx = canvas.getContext('2d');
+      let dots = [];
+
+      function resize() {
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = innerWidth * dpr;
+        canvas.height = innerHeight * dpr;
+        canvas.style.width = innerWidth + 'px';
+        canvas.style.height = innerHeight + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      function seed() {
+        const count = Math.max(40, Math.floor((innerWidth * innerHeight) / 9000));
+        dots = Array.from({ length: count }, () => ({
+          x: Math.random() * innerWidth,
+          y: Math.random() * innerHeight,
+          vx: (Math.random() - 0.5) * 0.18,
+          vy: (Math.random() - 0.5) * 0.18,
+          r: Math.random() * 1.4 + 0.3,
+          hue: 200 + Math.random() * 80,
+        }));
+      }
+
+      function tick() {
+        ctx.fillStyle = 'rgba(10, 10, 18, 0.08)';
+        ctx.fillRect(0, 0, innerWidth, innerHeight);
+        for (const d of dots) {
+          d.x += d.vx;
+          d.y += d.vy;
+          if (d.x < 0) d.x += innerWidth;
+          else if (d.x > innerWidth) d.x -= innerWidth;
+          if (d.y < 0) d.y += innerHeight;
+          else if (d.y > innerHeight) d.y -= innerHeight;
+          ctx.beginPath();
+          ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${d.hue}, 55%, 72%, 0.8)`;
+          ctx.fill();
+        }
+        requestAnimationFrame(tick);
+      }
+
+      addEventListener('resize', () => { resize(); seed(); });
+      resize();
+      seed();
+      tick();
+    </script>
+  </body>
+</html>
