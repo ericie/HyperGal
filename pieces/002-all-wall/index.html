@@ -6,13 +6,51 @@
     <title>all-wall · HyperGal</title>
     <style>
       html, body { margin: 0; height: 100%; background: #111; overflow: hidden; }
-      #wall { position: fixed; inset: 0; }
+      #wall { position: fixed; inset: 0; perspective: 800px; }
       .tile {
         position: absolute;
         box-sizing: border-box;
+        transform-style: preserve-3d;
+        --brick-depth: 0px;
+      }
+      .face {
+        position: absolute;
+        box-sizing: border-box;
+      }
+      .face.front { inset: 0; background: var(--brick-color); }
+      .face.top, .face.bottom, .face.left, .face.right {
+        background: color-mix(in srgb, var(--brick-color), black 35%);
+      }
+      .face.top {
+        left: 0; right: 0;
+        height: var(--brick-depth);
+        top: calc(-1 * var(--brick-depth));
+        transform-origin: 50% 100%;
+        transform: rotateX(90deg);
+      }
+      .face.bottom {
+        left: 0; right: 0;
+        height: var(--brick-depth);
+        top: 100%;
+        transform-origin: 50% 0%;
+        transform: rotateX(-90deg);
+      }
+      .face.left {
+        top: 0; bottom: 0;
+        width: var(--brick-depth);
+        left: calc(-1 * var(--brick-depth));
+        transform-origin: 100% 50%;
+        transform: rotateY(-90deg);
+      }
+      .face.right {
+        top: 0; bottom: 0;
+        width: var(--brick-depth);
+        left: 100%;
+        transform-origin: 0% 50%;
+        transform: rotateY(90deg);
       }
       #wall.debug .tile {
-        box-shadow: inset 0 0 0 1px var(--bc);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
       }
       .caption {
         position: fixed;
@@ -35,162 +73,199 @@
     <script>
       const IMAGES = window.ALL_WALL_IMAGES || [];
 
-      const COLORS = [
-        '#2b2d42', // ink
-        '#ef233c', // red
-        '#edf2f4', // bone
-        '#8d99ae', // slate
-        '#ffb703', // amber
-        '#219ebc', // teal
-        '#fb8500', // orange
-        '#023047', // deep blue
+      // Curated [bgColor, brickColor] pairs that read well together
+      // (good contrast, complementary or analogous hues).
+      const PAIRS = [
+        ['#2b2d42', '#ef233c'], // ink + red
+        ['#023047', '#ffb703'], // deep blue + amber
+        ['#023047', '#edf2f4'], // deep blue + bone
+        ['#edf2f4', '#ef233c'], // bone + red
+        ['#edf2f4', '#2b2d42'], // bone + ink
+        ['#edf2f4', '#fb8500'], // bone + orange
+        ['#219ebc', '#fb8500'], // teal + orange (complementary)
+        ['#219ebc', '#ffb703'], // teal + amber
+        ['#2b2d42', '#ffb703'], // ink + amber
+        ['#2b2d42', '#edf2f4'], // ink + bone
+        ['#fb8500', '#023047'], // orange + deep blue
+        ['#ef233c', '#edf2f4'], // red + bone
       ];
 
-      // 8 distinct rectangle footprints in unit cells (w, h)
-      const SIZES = [
-        [1, 1],
-        [2, 1],
-        [1, 2],
-        [2, 2],
-        [3, 2],
-        [2, 3],
-        [3, 3],
-        [4, 3],
-      ];
-
-      const TARGET_CELL = 80; // px — desired cell size
+      const BRICK_W = 240;            // px — grid cell width
+      const BRICK_H = 80;             // px — grid cell height
+      const BRICK_GAP = 4;            // px — visual gap on every side of each brick
+      const INITIAL_ROWS = 4;         // bottom rows present at start
+      const FALL_PX_PER_SEC = 500;    // free-fall speed of a new brick (≈2s fall on a 1080-tall screen)
+      const SPAWN_INTERVAL_MS = 2000; // one brick at a time; scroll speed is derived from this
+      const INITIAL_DEPTH = 80;       // px — side-face depth at spawn; shrinks to 0 on landing
       const wall = document.getElementById('wall');
 
-      let cols, rows, cellW, cellH, grid;
-
-      function dimensions() {
-        cols = Math.max(8, Math.round(innerWidth / TARGET_CELL));
-        rows = Math.max(6, Math.round(innerHeight / TARGET_CELL));
-        cellW = innerWidth / cols;
-        cellH = innerHeight / rows;
+      function pick(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
       }
 
-      function emptyGrid() {
-        grid = Array.from({ length: rows }, () => new Array(cols).fill(-1));
+      function hexToRgba(hex, alpha) {
+        const n = parseInt(hex.slice(1), 16);
+        return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
       }
 
-      function canPlace(x, y, w, h) {
-        if (x + w > cols || y + h > rows) return false;
-        for (let dy = 0; dy < h; dy++) {
-          for (let dx = 0; dx < w; dx++) {
-            if (grid[y + dy][x + dx] !== -1) return false;
-          }
-        }
-        return true;
-      }
-
-      function mark(x, y, w, h, idx) {
-        for (let dy = 0; dy < h; dy++) {
-          for (let dx = 0; dx < w; dx++) {
-            grid[y + dy][x + dx] = idx;
-          }
-        }
-      }
-
-      function firstEmpty() {
-        for (let y = 0; y < rows; y++) {
-          for (let x = 0; x < cols; x++) {
-            if (grid[y][x] === -1) return [x, y];
-          }
-        }
-        return null;
-      }
-
-      // Place one oversized "hero" tile at a random spot, then greedy-fill
-      // around it. Hero spans ~65–85% of the grid in each axis.
-      function placeHero(placements) {
-        const heroW = Math.min(cols, Math.max(5, Math.floor(cols * (0.65 + Math.random() * 0.2))));
-        const heroH = Math.min(rows, Math.max(4, Math.floor(rows * (0.65 + Math.random() * 0.2))));
-        const heroX = Math.floor(Math.random() * (cols - heroW + 1));
-        const heroY = Math.floor(Math.random() * (rows - heroH + 1));
-        mark(heroX, heroY, heroW, heroH, 0);
-        placements.push({ x: heroX, y: heroY, w: heroW, h: heroH, idx: 0, hero: true });
-      }
-
-      // Greedy fill: at the topmost-leftmost empty cell, pick a size that
-      // fits, weighted toward larger ones for visual variety. 1×1 is always
-      // a fallback so the algorithm cannot wedge.
-      function pack() {
-        const placements = [];
-        placeHero(placements);
-        let cell;
-        while ((cell = firstEmpty())) {
-          const [x, y] = cell;
-          const candidates = [];
-          for (let i = 0; i < SIZES.length; i++) {
-            const [w, h] = SIZES[i];
-            if (canPlace(x, y, w, h)) {
-              candidates.push({ idx: i, w, h, weight: (w * h) * (w * h) });
-            }
-          }
-          const total = candidates.reduce((s, c) => s + c.weight, 0);
-          let r = Math.random() * total;
-          let pick = candidates[candidates.length - 1];
-          for (const c of candidates) {
-            r -= c.weight;
-            if (r <= 0) { pick = c; break; }
-          }
-          mark(x, y, pick.w, pick.h, pick.idx);
-          placements.push({ x, y, w: pick.w, h: pick.h, idx: pick.idx });
-        }
-        return placements;
-      }
-
-      function randomBorderColor() {
-        const r = Math.floor(Math.random() * 256);
-        const g = Math.floor(Math.random() * 256);
-        const b = Math.floor(Math.random() * 256);
-        return `rgb(${r}, ${g}, ${b})`;
-      }
-
-      // Fisher–Yates, returns a shuffled copy.
-      function shuffled(arr) {
-        const out = arr.slice();
-        for (let i = out.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [out[i], out[j]] = [out[j], out[i]];
-        }
-        return out;
-      }
-
-      function render(placements) {
-        wall.replaceChildren();
-        // Draw without replacement; if we run out (more tiles than images),
-        // refill from a fresh shuffle so any reuse is at least re-randomized.
-        let pool = shuffled(IMAGES);
-        const nextImage = () => {
-          if (!pool.length) pool = shuffled(IMAGES);
-          return pool.pop();
-        };
-        const frag = document.createDocumentFragment();
-        for (const p of placements) {
-          const el = document.createElement('div');
-          el.className = 'tile';
-          el.style.left   = (p.x * cellW) + 'px';
-          el.style.top    = (p.y * cellH) + 'px';
-          el.style.width  = (p.w * cellW) + 'px';
-          el.style.height = (p.h * cellH) + 'px';
-          el.style.backgroundColor = COLORS[Math.floor(Math.random() * COLORS.length)];
-          if (IMAGES.length) {
-            el.style.backgroundImage = `url("images/${nextImage()}")`;
-            el.style.backgroundRepeat = 'repeat';
-            el.style.backgroundBlendMode = 'multiply';
-          }
-          el.style.setProperty('--bc', randomBorderColor());
-          frag.appendChild(el);
-        }
-        wall.appendChild(frag);
-      }
+      // Bumped on every generate() so in-flight setTimeouts from a previous
+      // run can short-circuit instead of dropping bricks into the new wall.
+      let generation = 0;
 
       function generate() {
-        dimensions();
-        emptyGrid();
-        render(pack());
+        const myGen = ++generation;
+        wall.replaceChildren();
+
+        // Curated bg/brick color pair plus a random pattern. The pattern is
+        // softened by overlaying the bg color at 50% alpha on top of the
+        // multiply-blended pattern — halves the visible contrast.
+        const [bgColor, brickColor] = pick(PAIRS);
+        const bgPattern = pick(IMAGES);
+
+        wall.style.backgroundColor = bgColor;
+        if (bgPattern) {
+          const overlay = hexToRgba(bgColor, 0.5);
+          wall.style.backgroundImage =
+            `linear-gradient(${overlay}, ${overlay}), url("images/${bgPattern}")`;
+          wall.style.backgroundRepeat = 'no-repeat, repeat';
+          wall.style.backgroundBlendMode = 'normal, multiply';
+        } else {
+          wall.style.backgroundImage = '';
+        }
+
+        // Match the wall's downward speed to the row-fill rate so one row
+        // exits the bottom in exactly the time it takes to spawn a new row
+        // at the top. avgBricksPerRow averages the even-row count (stagger 0)
+        // and the odd-row count (stagger -BRICK_W/2, one extra brick).
+        const countEven = Math.ceil(innerWidth / BRICK_W);
+        const countOdd  = Math.ceil((innerWidth + BRICK_W / 2) / BRICK_W);
+        const avgBricksPerRow = (countEven + countOdd) / 2;
+        const rowFillMs = avgBricksPerRow * SPAWN_INTERVAL_MS;
+        const scrollPxPerSec = (BRICK_H * 1000) / rowFillMs;
+
+        // Each entry is a live brick. y is the live pixel position; falling
+        // means it's still descending faster than the rest of the wall.
+        const bricks = [];
+
+        function makeBrick(x, y, falling) {
+          const el = document.createElement('div');
+          el.className = 'tile';
+          el.style.left   = (x + BRICK_GAP / 2) + 'px';
+          el.style.top    = (y + BRICK_GAP / 2) + 'px';
+          el.style.width  = (BRICK_W - BRICK_GAP) + 'px';
+          el.style.height = (BRICK_H - BRICK_GAP) + 'px';
+          el.style.setProperty('--brick-color', brickColor);
+          for (const cls of ['front', 'top', 'bottom', 'left', 'right']) {
+            const face = document.createElement('div');
+            face.className = `face ${cls}`;
+            el.appendChild(face);
+          }
+          // Falling bricks spawn with a random Z spin and a random X/Y tilt
+          // (faux-3D against the wall's perspective). Everything eases back to
+          // 0 by the time it lands. Estimate landY now so we can interpolate
+          // rotation by fall progress.
+          const initialAngleZ = falling ? (Math.random() - 0.5) * 40 : 0;
+          const initialAngleX = falling ? (Math.random() - 0.5) * 80 : 0;
+          const initialAngleY = falling ? (Math.random() - 0.5) * 80 : 0;
+          let landYEstimate = 0;
+          if (falling) {
+            let topY = innerHeight;
+            for (const o of bricks) {
+              if (o.falling) continue;
+              if (o.x < x + BRICK_W && o.x + BRICK_W > x && o.y < topY) topY = o.y;
+            }
+            landYEstimate = topY - BRICK_H;
+            el.style.transform =
+              `rotateZ(${initialAngleZ}deg) rotateX(${initialAngleX}deg) rotateY(${initialAngleY}deg)`;
+            el.style.setProperty('--brick-depth', INITIAL_DEPTH + 'px');
+          }
+          wall.appendChild(el);
+          bricks.push({ el, x, y, falling, initialAngleZ, initialAngleX, initialAngleY, spawnY: y, landYEstimate });
+        }
+
+        // Lay the starting rows at the bottom of the viewport.
+        for (let r = 0; r < INITIAL_ROWS; r++) {
+          const y = innerHeight - (r + 1) * BRICK_H;
+          const stagger = r % 2 === 0 ? 0 : -BRICK_W / 2;
+          for (let x = stagger; x < innerWidth; x += BRICK_W) {
+            makeBrick(x, y, false);
+          }
+        }
+
+        let rowsAdded = 0;
+        let colInRow = 0;
+
+        function spawnNext() {
+          if (myGen !== generation) return;
+          const parity = (INITIAL_ROWS + rowsAdded) % 2;
+          const stagger = parity === 0 ? 0 : -BRICK_W / 2;
+          const x = stagger + colInRow * BRICK_W;
+          if (x >= innerWidth) {
+            rowsAdded++;
+            colInRow = 0;
+            spawnNext();
+            return;
+          }
+          makeBrick(x, -BRICK_H, true);
+          colInRow++;
+          setTimeout(spawnNext, SPAWN_INTERVAL_MS);
+        }
+
+        // Drive both the constant scroll and the per-brick fall in one rAF.
+        // A falling brick lands when its bottom edge reaches the topmost
+        // established brick that overlaps it in x. Adjacent bricks in the
+        // same row don't strictly overlap, so they each independently target
+        // the row below — landing them at the same y.
+        let lastTime = performance.now();
+        function tick(now) {
+          if (myGen !== generation) return;
+          const dt = Math.min(0.1, (now - lastTime) / 1000); // clamp tab-switch jumps
+          lastTime = now;
+
+          for (const b of bricks) {
+            if (!b.falling) b.y += scrollPxPerSec * dt;
+          }
+
+          for (const b of bricks) {
+            if (!b.falling) continue;
+            b.y += FALL_PX_PER_SEC * dt;
+            const bRight = b.x + BRICK_W;
+            let topY = Infinity;
+            for (const o of bricks) {
+              if (o.falling || o === b) continue;
+              if (o.x < bRight && o.x + BRICK_W > b.x && o.y < topY) topY = o.y;
+            }
+            const landY = topY - BRICK_H;
+            if (b.y >= landY) {
+              b.y = landY;
+              b.falling = false;
+              b.el.style.transform = ''; // snap flat on landing
+              b.el.style.setProperty('--brick-depth', '0px');
+            }
+          }
+
+          for (let i = bricks.length - 1; i >= 0; i--) {
+            const b = bricks[i];
+            b.el.style.top = (b.y + BRICK_GAP / 2) + 'px';
+            if (b.falling) {
+              const span = b.landYEstimate - b.spawnY;
+              const progress = span > 0 ? Math.min(1, (b.y - b.spawnY) / span) : 1;
+              const fade = 1 - progress;
+              b.el.style.transform =
+                `rotateZ(${b.initialAngleZ * fade}deg) rotateX(${b.initialAngleX * fade}deg) rotateY(${b.initialAngleY * fade}deg)`;
+              b.el.style.setProperty('--brick-depth', (INITIAL_DEPTH * fade) + 'px');
+            }
+            if (b.y >= innerHeight) {
+              b.el.remove();
+              bricks.splice(i, 1);
+            }
+          }
+
+          requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+
+        setTimeout(spawnNext, 400);
       }
 
       addEventListener('resize', generate);
