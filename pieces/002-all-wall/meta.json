@@ -1,0 +1,7 @@
+{
+  "title": "all-wall",
+  "year": 2026,
+  "type": "interactive",
+  "thumbnail": "thumbnail.svg",
+  "description": "Eight rectangles, eight colors, no gaps. A unit-cell grid is greedy-packed with weighted variety so the wall always fills itself. Click to reshuffle."
+}

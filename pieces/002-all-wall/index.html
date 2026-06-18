@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>all-wall · HyperGal</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #111; overflow: hidden; }
+      #wall { position: fixed; inset: 0; }
+      .tile {
+        position: absolute;
+        box-sizing: border-box;
+      }
+      #wall.debug .tile {
+        box-shadow: inset 0 0 0 1px var(--bc);
+      }
+      .caption {
+        position: fixed;
+        bottom: 1rem;
+        left: 1rem;
+        color: #fff;
+        mix-blend-mode: difference;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .8rem;
+        letter-spacing: .05em;
+        pointer-events: none;
+        z-index: 10;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="wall"></div>
+    <div class="caption">all-wall · 2026 · click to reshuffle</div>
+    <script src="images.js"></script>
+    <script>
+      const IMAGES = window.ALL_WALL_IMAGES || [];
+
+      const COLORS = [
+        '#2b2d42', // ink
+        '#ef233c', // red
+        '#edf2f4', // bone
+        '#8d99ae', // slate
+        '#ffb703', // amber
+        '#219ebc', // teal
+        '#fb8500', // orange
+        '#023047', // deep blue
+      ];
+
+      // 8 distinct rectangle footprints in unit cells (w, h)
+      const SIZES = [
+        [1, 1],
+        [2, 1],
+        [1, 2],
+        [2, 2],
+        [3, 2],
+        [2, 3],
+        [3, 3],
+        [4, 3],
+      ];
+
+      const TARGET_CELL = 80; // px — desired cell size
+      const wall = document.getElementById('wall');
+
+      let cols, rows, cellW, cellH, grid;
+
+      function dimensions() {
+        cols = Math.max(8, Math.round(innerWidth / TARGET_CELL));
+        rows = Math.max(6, Math.round(innerHeight / TARGET_CELL));
+        cellW = innerWidth / cols;
+        cellH = innerHeight / rows;
+      }
+
+      function emptyGrid() {
+        grid = Array.from({ length: rows }, () => new Array(cols).fill(-1));
+      }
+
+      function canPlace(x, y, w, h) {
+        if (x + w > cols || y + h > rows) return false;
+        for (let dy = 0; dy < h; dy++) {
+          for (let dx = 0; dx < w; dx++) {
+            if (grid[y + dy][x + dx] !== -1) return false;
+          }
+        }
+        return true;
+      }
+
+      function mark(x, y, w, h, idx) {
+        for (let dy = 0; dy < h; dy++) {
+          for (let dx = 0; dx < w; dx++) {
+            grid[y + dy][x + dx] = idx;
+          }
+        }
+      }
+
+      function firstEmpty() {
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < cols; x++) {
+            if (grid[y][x] === -1) return [x, y];
+          }
+        }
+        return null;
+      }
+
+      // Place one oversized "hero" tile at a random spot, then greedy-fill
+      // around it. Hero spans ~65–85% of the grid in each axis.
+      function placeHero(placements) {
+        const heroW = Math.min(cols, Math.max(5, Math.floor(cols * (0.65 + Math.random() * 0.2))));
+        const heroH = Math.min(rows, Math.max(4, Math.floor(rows * (0.65 + Math.random() * 0.2))));
+        const heroX = Math.floor(Math.random() * (cols - heroW + 1));
+        const heroY = Math.floor(Math.random() * (rows - heroH + 1));
+        mark(heroX, heroY, heroW, heroH, 0);
+        placements.push({ x: heroX, y: heroY, w: heroW, h: heroH, idx: 0, hero: true });
+      }
+
+      // Greedy fill: at the topmost-leftmost empty cell, pick a size that
+      // fits, weighted toward larger ones for visual variety. 1×1 is always
+      // a fallback so the algorithm cannot wedge.
+      function pack() {
+        const placements = [];
+        placeHero(placements);
+        let cell;
+        while ((cell = firstEmpty())) {
+          const [x, y] = cell;
+          const candidates = [];
+          for (let i = 0; i < SIZES.length; i++) {
+            const [w, h] = SIZES[i];
+            if (canPlace(x, y, w, h)) {
+              candidates.push({ idx: i, w, h, weight: (w * h) * (w * h) });
+            }
+          }
+          const total = candidates.reduce((s, c) => s + c.weight, 0);
+          let r = Math.random() * total;
+          let pick = candidates[candidates.length - 1];
+          for (const c of candidates) {
+            r -= c.weight;
+            if (r <= 0) { pick = c; break; }
+          }
+          mark(x, y, pick.w, pick.h, pick.idx);
+          placements.push({ x, y, w: pick.w, h: pick.h, idx: pick.idx });
+        }
+        return placements;
+      }
+
+      function randomBorderColor() {
+        const r = Math.floor(Math.random() * 256);
+        const g = Math.floor(Math.random() * 256);
+        const b = Math.floor(Math.random() * 256);
+        return `rgb(${r}, ${g}, ${b})`;
+      }
+
+      // Fisher–Yates, returns a shuffled copy.
+      function shuffled(arr) {
+        const out = arr.slice();
+        for (let i = out.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [out[i], out[j]] = [out[j], out[i]];
+        }
+        return out;
+      }
+
+      function render(placements) {
+        wall.replaceChildren();
+        // Draw without replacement; if we run out (more tiles than images),
+        // refill from a fresh shuffle so any reuse is at least re-randomized.
+        let pool = shuffled(IMAGES);
+        const nextImage = () => {
+          if (!pool.length) pool = shuffled(IMAGES);
+          return pool.pop();
+        };
+        const frag = document.createDocumentFragment();
+        for (const p of placements) {
+          const el = document.createElement('div');
+          el.className = 'tile';
+          el.style.left   = (p.x * cellW) + 'px';
+          el.style.top    = (p.y * cellH) + 'px';
+          el.style.width  = (p.w * cellW) + 'px';
+          el.style.height = (p.h * cellH) + 'px';
+          el.style.backgroundColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+          if (IMAGES.length) {
+            el.style.backgroundImage = `url("images/${nextImage()}")`;
+            el.style.backgroundRepeat = 'repeat';
+            el.style.backgroundBlendMode = 'multiply';
+          }
+          el.style.setProperty('--bc', randomBorderColor());
+          frag.appendChild(el);
+        }
+        wall.appendChild(frag);
+      }
+
+      function generate() {
+        dimensions();
+        emptyGrid();
+        render(pack());
+      }
+
+      addEventListener('resize', generate);
+      addEventListener('click', generate);
+      addEventListener('keydown', (e) => {
+        if (e.key === 'd' || e.key === 'D') wall.classList.toggle('debug');
+      });
+      generate();
+    </script>
+  </body>
+</html>

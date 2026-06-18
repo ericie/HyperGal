@@ -8,6 +8,14 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "A field of slowly drifting points on a low-contrast ground. Generative, runs forever."
+    },
+    {
+      "slug": "002-all-wall",
+      "title": "all-wall",
+      "year": 2026,
+      "type": "interactive",
+      "thumbnail": "thumbnail.svg",
+      "description": "Eight rectangles, eight colors, no gaps. A unit-cell grid is greedy-packed with weighted variety so the wall always fills itself. Click to reshuffle."
     }
   ]
 };
