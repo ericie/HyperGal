@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" shape-rendering="crispEdges">
+  <rect width="200" height="200" fill="#0b0c10"/>
+  <!-- wall: solid rows up top, ragged build-front along the bottom edge -->
+  <g>
+    <rect x="0"   y="0"  width="34" height="16" fill="#ef476f"/>
+    <rect x="34"  y="0"  width="34" height="16" fill="#ffd166"/>
+    <rect x="68"  y="0"  width="34" height="16" fill="#06d6a0"/>
+    <rect x="102" y="0"  width="34" height="16" fill="#118ab2"/>
+    <rect x="136" y="0"  width="34" height="16" fill="#f78c6b"/>
+    <rect x="170" y="0"  width="34" height="16" fill="#c792ea"/>
+
+    <rect x="0"   y="16" width="34" height="16" fill="#118ab2"/>
+    <rect x="34"  y="16" width="34" height="16" fill="#06d6a0"/>
+    <rect x="68"  y="16" width="34" height="16" fill="#c792ea"/>
+    <rect x="102" y="16" width="34" height="16" fill="#ffd166"/>
+    <rect x="136" y="16" width="34" height="16" fill="#ef476f"/>
+    <rect x="170" y="16" width="34" height="16" fill="#06d6a0"/>
+
+    <rect x="0"   y="32" width="34" height="16" fill="#ffd166"/>
+    <rect x="34"  y="32" width="34" height="32" fill="#ef476f"/>
+    <rect x="68"  y="32" width="34" height="16" fill="#118ab2"/>
+    <rect x="102" y="32" width="34" height="32" fill="#c792ea"/>
+    <rect x="136" y="32" width="34" height="16" fill="#06d6a0"/>
+    <rect x="170" y="32" width="34" height="32" fill="#f78c6b"/>
+
+    <rect x="0"   y="48" width="34" height="16" fill="#06d6a0"/>
+    <rect x="68"  y="48" width="34" height="16" fill="#ffd166"/>
+    <rect x="136" y="48" width="34" height="16" fill="#118ab2"/>
+  </g>
+
+  <!-- balls in flight, with short trails -->
+  <g>
+    <rect x="22"  y="92"  width="3" height="22" fill="#ffd166" opacity="0.35"/>
+    <circle cx="23.5" cy="90" r="5" fill="#ffd166"/>
+    <rect x="96"  y="104" width="3" height="26" fill="#06d6a0" opacity="0.35"/>
+    <circle cx="97.5" cy="102" r="5" fill="#06d6a0"/>
+    <rect x="150" y="118" width="3" height="20" fill="#ef476f" opacity="0.35"/>
+    <circle cx="151.5" cy="116" r="5" fill="#ef476f"/>
+  </g>
+
+  <!-- paddles on the floor -->
+  <g>
+    <rect x="6"   y="178" width="46" height="9" rx="4" fill="#ffd166"/>
+    <rect x="80"  y="178" width="46" height="9" rx="4" fill="#06d6a0"/>
+    <rect x="138" y="178" width="46" height="9" rx="4" fill="#ef476f"/>
+  </g>
+</svg>

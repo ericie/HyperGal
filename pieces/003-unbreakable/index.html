@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>unbreakable · HyperGal</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0c10; overflow: hidden; }
+      #stage { position: fixed; inset: 0; display: block; }
+      .caption {
+        position: fixed;
+        bottom: 1rem;
+        left: 1rem;
+        color: #fff;
+        mix-blend-mode: difference;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .8rem;
+        letter-spacing: .05em;
+        pointer-events: none;
+        z-index: 10;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div class="caption">unbreakable · 2026 · reverse breakout · click to reshuffle</div>
+    <script>
+      // unbreakable — a Breakout run in reverse.
+      //
+      // There is no player and no losing. A row of paddles patrols the floor;
+      // each one shadows a single ball and is physically incapable of missing.
+      // The balls fly UP and, where a normal game would chip a brick away, this
+      // one lays a brick down: every impact with the underside of the wall
+      // deposits a block in that column. The wall therefore grows DOWNWARD,
+      // toward the paddles — so the whole world is scrolled upward to keep it
+      // off them. The wall is never finished and never breached. Unbreakable.
+      //
+      // The only real subtlety is keeping the wall solid and roughly level while
+      // an unsynchronised swarm of balls feeds it. Two simple rules do that and
+      // need no feedback controller. The build-front of every column is hard-
+      // clamped to a band well above the paddles, so a column can neither run
+      // away downward (it stops depositing at the band's floor) nor empty out
+      // (it keeps depositing at the band's ceiling) — and the wall can never
+      // reach the paddles. On top of that, each ball steers its small sideways
+      // lean toward whichever nearby column has been starved longest, so the
+      // ragged front self-levels. A steady upward scroll carries finished bricks
+      // off the top. Together they hold the front in a hovering band forever.
+
+      const canvas = document.getElementById('stage');
+      const ctx = canvas.getContext('2d');
+
+      // ---- tunables -------------------------------------------------------
+      const COL_W_IDEAL = 52;     // px — target column / brick width (snapped to fit)
+      const BRICK_H = 24;         // px — brick height (one deposit)
+      const BALL_R = 7;           // px — ball radius
+      const SPEED = 600;          // px/s — constant ball speed magnitude
+      const MAX_VX_FRAC = 0.62;   // cap horizontal share of velocity (keeps balls vertical-ish)
+      const PADDLE_H = 12;        // px — paddle thickness
+      const PADDLE_PAD = 14;      // px — paddle overhang beyond a column on each side
+      const FLOOR_MARGIN = 46;    // px — gap from bottom edge to paddle line
+      const SETPOINT_FRAC = 0.30; // build-front hovers this far down from the top
+      const BAND_UP = 2;          // band reaches this many bricks above the setpoint
+      const BAND_DOWN = 4;        // ...and this many below — the live build zone
+      const SCROLL_PX = 9;        // px/s — steady upward creep of the whole wall
+      const BALLS_PER_COL = 0.55; // swarm size relative to column count
+
+      // Curated brick colors — saturated but not neon, reads on near-black.
+      const PALETTES = [
+        ['#ef476f', '#ffd166', '#06d6a0', '#118ab2', '#f78c6b', '#c792ea'],
+        ['#ff6b6b', '#ffd93d', '#6bcB77', '#4d96ff', '#ff9f45', '#b983ff'],
+        ['#e63946', '#f4a261', '#e9c46a', '#2a9d8f', '#457b9d', '#a8dadc'],
+        ['#f72585', '#b5179e', '#7209b7', '#4361ee', '#4cc9f0', '#52b788'],
+        ['#ffadad', '#ffd6a5', '#fdffb6', '#caffbf', '#9bf6ff', '#bdb2ff'],
+      ];
+
+      let W = 0, H = 0, dpr = 1;
+      let numCols = 0, colW = 0;
+      let paddleY = 0, setpointY = 0;
+      let frontMin = 0, frontMax = 0; // band the build-front is confined to
+
+      let palette = PALETTES[0];
+      let front = [];     // front[c] = screen-y of the wall's lowest brick bottom in column c
+      let bricks = [];    // {c, y, color} — y is the brick's top edge in screen space
+      let balls = [];     // {x, y, vx, vy, color, trail:[...], paddle:{x,w}}
+      let raf = 0;
+
+      const rand = (a, b) => a + Math.random() * (b - a);
+      const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+      const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+      const colOf = (x) => clamp((x / colW) | 0, 0, numCols - 1);
+
+      // Reflect a coordinate into [lo, hi] as if bouncing off both walls — used
+      // to predict where a constant-velocity ball will cross the paddle line.
+      function reflectInto(p, lo, hi) {
+        const span = hi - lo;
+        if (span <= 0) return lo;
+        let t = (p - lo) % (2 * span);
+        if (t < 0) t += 2 * span;
+        return lo + (t <= span ? t : 2 * span - t);
+      }
+
+      function launchVelocity() {
+        // Mostly-up with a modest, random sideways lean.
+        const vx = rand(-MAX_VX_FRAC, MAX_VX_FRAC) * SPEED;
+        const vy = -Math.sqrt(SPEED * SPEED - vx * vx);
+        return { vx, vy };
+      }
+
+      function reset() {
+        cancelAnimationFrame(raf);
+
+        dpr = Math.min(2, window.devicePixelRatio || 1);
+        W = window.innerWidth;
+        H = window.innerHeight;
+        canvas.width = Math.round(W * dpr);
+        canvas.height = Math.round(H * dpr);
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        numCols = Math.max(6, Math.round(W / COL_W_IDEAL));
+        colW = W / numCols;
+        paddleY = H - FLOOR_MARGIN;
+        setpointY = H * SETPOINT_FRAC;
+        // Keep the build-front in a band well above the paddles. This is the
+        // safety rail that makes the wall genuinely unbreakable: a column can
+        // never grow down far enough to trap a ball against the floor.
+        frontMin = setpointY - BAND_UP * BRICK_H;
+        frontMax = Math.min(setpointY + BAND_DOWN * BRICK_H, paddleY - BRICK_H * 4);
+        palette = pick(PALETTES);
+
+        // Seed a solid wall from the build-front up past the top edge, so the
+        // opening frame already reads as a finished wall rather than empty sky.
+        front = new Array(numCols);
+        bricks = [];
+        for (let c = 0; c < numCols; c++) {
+          const f = setpointY + rand(-BRICK_H, BRICK_H);
+          front[c] = f;
+          for (let y = f - BRICK_H; y > -BRICK_H * 2; y -= BRICK_H) {
+            bricks.push({ c, y, color: pick(palette) });
+          }
+        }
+
+        const n = clamp(Math.round(numCols * BALLS_PER_COL), 5, 64);
+        balls = [];
+        for (let i = 0; i < n; i++) {
+          const color = pick(palette);
+          const x = rand(colW, W - colW);
+          const { vx, vy } = launchVelocity();
+          balls.push({
+            x,
+            y: rand(setpointY + BRICK_H * 3, paddleY - BRICK_H),
+            vx, vy, color,
+            trail: [],
+            paddle: { x, w: colW + PADDLE_PAD * 2 },
+          });
+        }
+
+        lastT = performance.now();
+        raf = requestAnimationFrame(tick);
+      }
+
+      // Steer a ball toward the column whose front has drifted highest (the most
+      // starved), so deposits self-level into a flat, solid front. A little
+      // noise keeps the whole swarm from stampeding the same gap.
+      function levelingNudge(ball) {
+        let hungriest = 0, best = Infinity;
+        const here = colOf(ball.x);
+        for (let d = -6; d <= 6; d++) {
+          const c = here + d;
+          if (c < 0 || c >= numCols) continue;
+          if (front[c] < best) { best = front[c]; hungriest = c; }
+        }
+        const targetX = (hungriest + 0.5) * colW;
+        const dir = Math.sign(targetX - ball.x) || (Math.random() < 0.5 ? -1 : 1);
+        let vx = ball.vx * 0.55 + dir * SPEED * 0.32 + rand(-0.12, 0.12) * SPEED;
+        const maxVx = MAX_VX_FRAC * SPEED;
+        vx = clamp(vx, -maxVx, maxVx);
+        ball.vx = vx;
+        ball.vy = Math.sqrt(SPEED * SPEED - vx * vx); // heading down, out of the paddle
+      }
+
+      let lastT = 0;
+      function tick(now) {
+        // Clamp to a sane positive range: the upper bound absorbs tab-switch
+        // jumps, the lower bound guards against any non-monotonic timestamp.
+        const dt = Math.max(0, Math.min(1 / 30, (now - lastT) / 1000));
+        lastT = now;
+
+        // --- global scroll: a steady upward creep. The front can't run away
+        //     because it is hard-clamped to the band [frontMin, frontMax], and
+        //     deposits self-balance against the scroll (a starved column sits
+        //     at frontMin and keeps depositing; an over-served one tops out at
+        //     frontMax and skips). No feedback controller needed. -------------
+        const dy = SCROLL_PX * dt;
+        for (let c = 0; c < numCols; c++) front[c] = clamp(front[c] - dy, frontMin, frontMax);
+        for (let i = bricks.length - 1; i >= 0; i--) {
+          const b = bricks[i];
+          b.y -= dy;
+          if (b.y + BRICK_H < -BRICK_H) bricks.splice(i, 1); // cull off the top
+        }
+
+        // --- balls -------------------------------------------------------
+        const minX = BALL_R, maxX = W - BALL_R;
+        for (const ball of balls) {
+          ball.x += ball.vx * dt;
+          ball.y += ball.vy * dt;
+
+          // side walls
+          if (ball.x < minX) { ball.x = minX; ball.vx = Math.abs(ball.vx); }
+          else if (ball.x > maxX) { ball.x = maxX; ball.vx = -Math.abs(ball.vx); }
+
+          // wall underside: a rising ball reaches its column's front and lays
+          // a brick — unless the column has already filled the band to its
+          // ceiling, in which case it just bounces (no runaway growth).
+          if (ball.vy < 0) {
+            const c = colOf(ball.x);
+            if (ball.y - BALL_R <= front[c]) {
+              if (front[c] < frontMax) {
+                bricks.push({ c, y: front[c], color: ball.color });
+                front[c] += BRICK_H;               // wall grows downward
+              }
+              ball.y = front[c] + BALL_R;          // sit just under the front
+              ball.vy = Math.abs(ball.vy);          // bounce back down
+              ball.flash = 1;
+            }
+          }
+
+          // paddle line: the paddles never miss — a ball can never pass the
+          // floor. Clamp position unconditionally, and reflect when descending.
+          if (ball.y + BALL_R >= paddleY) {
+            ball.y = paddleY - BALL_R;
+            if (ball.vy > 0) {
+              levelingNudge(ball);                  // sets vx and a downward vy
+              ball.vy = -Math.abs(ball.vy);         // ...flipped back up
+            }
+          }
+
+          // paddle shadowing: glide to where the ball will cross the floor so
+          // it is always already there. Predict across side-wall bounces.
+          if (ball.vy > 0) {
+            const t = (paddleY - ball.y) / ball.vy;
+            const landRaw = ball.x + ball.vx * t;
+            ball.paddle.tx = reflectInto(landRaw, minX, maxX);
+          } else {
+            ball.paddle.tx = ball.x; // on the way up, drift under the ball
+          }
+          const ease = ball.vy > 0 ? 0.12 : 0.06;
+          ball.paddle.x += (ball.paddle.tx - ball.paddle.x) * Math.min(1, dt * 60 * ease);
+
+          // motion trail
+          ball.trail.push(ball.x, ball.y);
+          if (ball.trail.length > 14) ball.trail.splice(0, ball.trail.length - 14);
+          if (ball.flash) ball.flash = Math.max(0, ball.flash - dt * 4);
+        }
+
+        draw();
+        drawDebug();
+        raf = requestAnimationFrame(tick);
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#0b0c10';
+        ctx.fillRect(0, 0, W, H);
+
+        // bricks — flat fill with a lighter top bevel for a touch of relief
+        for (const b of bricks) {
+          const x = b.c * colW, y = b.y;
+          ctx.fillStyle = b.color;
+          ctx.fillRect(x + 1, y + 1, colW - 2, BRICK_H - 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.16)';
+          ctx.fillRect(x + 1, y + 1, colW - 2, 3);
+          ctx.fillStyle = 'rgba(0,0,0,0.22)';
+          ctx.fillRect(x + 1, y + BRICK_H - 3, colW - 2, 2);
+        }
+
+        // soft glow line along the live build-front
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let c = 0; c < numCols; c++) {
+          const x = c * colW, y = front[c];
+          if (c === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          ctx.lineTo(x + colW, y);
+        }
+        ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+        ctx.stroke();
+        ctx.restore();
+
+        // ball trails
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+        for (const ball of balls) {
+          const t = ball.trail;
+          for (let i = 2; i < t.length; i += 2) {
+            const a = (i / t.length) * 0.5;
+            ctx.strokeStyle = hexA(ball.color, a);
+            ctx.lineWidth = (i / t.length) * BALL_R * 1.6;
+            ctx.beginPath();
+            ctx.moveTo(t[i - 2], t[i - 1]);
+            ctx.lineTo(t[i], t[i + 1]);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+
+        // paddles — glowing capsules sliding along the floor
+        for (const ball of balls) {
+          const p = ball.paddle;
+          capsule(p.x - p.w / 2, paddleY - PADDLE_H / 2, p.w, PADDLE_H, PADDLE_H / 2);
+          ctx.save();
+          ctx.shadowColor = ball.color;
+          ctx.shadowBlur = 14;
+          ctx.fillStyle = hexA(ball.color, 0.85);
+          ctx.fill();
+          ctx.restore();
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          capsule(p.x - p.w / 2, paddleY - PADDLE_H / 2, p.w, 3, 1.5);
+          ctx.fill();
+        }
+
+        // balls — bright core with a colored halo
+        for (const ball of balls) {
+          ctx.save();
+          ctx.shadowColor = ball.color;
+          ctx.shadowBlur = 16 + (ball.flash || 0) * 18;
+          ctx.fillStyle = ball.color;
+          ctx.beginPath();
+          ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          ctx.fillStyle = 'rgba(255,255,255,0.9)';
+          ctx.beginPath();
+          ctx.arc(ball.x - BALL_R * 0.25, ball.y - BALL_R * 0.25, BALL_R * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      function capsule(x, y, w, h, r) {
+        r = Math.min(r, h / 2, w / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+      }
+
+      function hexA(hex, a) {
+        const n = parseInt(hex.slice(1), 16);
+        return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+      }
+
+      // --- optional debug overlay (?debug) ---------------------------------
+      const DEBUG = location.search.includes('debug');
+      function drawDebug() {
+        if (!DEBUG) return;
+        let on = 0, lo = Infinity, hi = -Infinity, below = 0, above = 0;
+        for (const b of balls) {
+          if (b.y > -20 && b.y < H + 20) on++;
+          if (b.y > paddleY + 40) below++;
+          if (b.y < -20) above++;
+        }
+        for (let c = 0; c < numCols; c++) { lo = Math.min(lo, front[c]); hi = Math.max(hi, front[c]); }
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.font = '13px ui-monospace, monospace';
+        const lines = [
+          `balls=${balls.length} onscreen=${on} above=${above} below=${below}`,
+          `bricks=${bricks.length} front lo=${lo.toFixed(0)} hi=${hi.toFixed(0)} setpoint=${setpointY.toFixed(0)}`,
+          `band=[${frontMin.toFixed(0)},${frontMax.toFixed(0)}] paddleY=${paddleY.toFixed(0)}`,
+        ];
+        lines.forEach((s, i) => ctx.fillText(s, 12, 24 + i * 18));
+      }
+
+      addEventListener('resize', reset);
+      addEventListener('click', reset);
+      reset();
+    </script>
+  </body>
+</html>
