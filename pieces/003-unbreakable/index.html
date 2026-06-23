@@ -27,24 +27,24 @@
     <script>
       // unbreakable — a Breakout run in reverse.
       //
-      // There is no player and no losing. A row of paddles patrols the floor;
-      // each one shadows a single ball and is physically incapable of missing.
-      // The balls fly UP and, where a normal game would chip a brick away, this
-      // one lays a brick down: every impact with the underside of the wall
-      // deposits a block in that column. The wall therefore grows DOWNWARD,
-      // toward the paddles — so the whole world is scrolled upward to keep it
-      // off them. The wall is never finished and never breached. Unbreakable.
+      // There is no player and no losing. A single paddle patrols the floor,
+      // shadowing the ball and physically incapable of missing. The ball flies
+      // UP and, where a normal game would chip a brick away, this one lays a
+      // brick down: every impact with the underside of the wall deposits a
+      // block in that column. The wall therefore grows DOWNWARD, toward the
+      // paddle — so the whole world is scrolled upward to keep it off the floor.
+      // The wall is never finished and never breached. Unbreakable.
       //
       // The only real subtlety is keeping the wall solid and roughly level while
-      // an unsynchronised swarm of balls feeds it. Two simple rules do that and
-      // need no feedback controller. The build-front of every column is hard-
-      // clamped to a band well above the paddles, so a column can neither run
-      // away downward (it stops depositing at the band's floor) nor empty out
-      // (it keeps depositing at the band's ceiling) — and the wall can never
-      // reach the paddles. On top of that, each ball steers its small sideways
-      // lean toward whichever nearby column has been starved longest, so the
-      // ragged front self-levels. A steady upward scroll carries finished bricks
-      // off the top. Together they hold the front in a hovering band forever.
+      // a single ball feeds it. Two simple rules do that and need no feedback
+      // controller. The build-front of every column is hard-clamped to a band
+      // well above the paddle, so a column can neither run away downward (it
+      // stops depositing at the band's floor) nor empty out (it keeps depositing
+      // at the band's ceiling) — and the wall can never reach the paddle. On top
+      // of that, the ball steers its small sideways lean toward whichever nearby
+      // column has been starved longest, so the ragged front self-levels. A
+      // steady upward scroll — slow enough that one ball keeps pace — carries
+      // finished bricks off the top, holding the front in a hovering band forever.
 
       const canvas = document.getElementById('stage');
       const ctx = canvas.getContext('2d');
@@ -61,8 +61,8 @@
       const SETPOINT_FRAC = 0.30; // build-front hovers this far down from the top
       const BAND_UP = 2;          // band reaches this many bricks above the setpoint
       const BAND_DOWN = 4;        // ...and this many below — the live build zone
-      const SCROLL_PX = 9;        // px/s — steady upward creep of the whole wall
-      const BALLS_PER_COL = 0.55; // swarm size relative to column count
+      const SCROLL_PX = 2;        // px/s — steady upward creep of the whole wall
+      const BALL_COUNT = 1;       // a single paddle, shadowing a single ball
 
       // Curated brick colors — saturated but not neon, reads on near-black.
       const PALETTES = [
@@ -141,7 +141,7 @@
           }
         }
 
-        const n = clamp(Math.round(numCols * BALLS_PER_COL), 5, 64);
+        const n = BALL_COUNT;
         balls = [];
         for (let i = 0; i < n; i++) {
           const color = pick(palette);
