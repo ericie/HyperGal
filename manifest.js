@@ -24,6 +24,22 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "Breakout in reverse. A single paddle that cannot miss bounces one ball upward; every impact lays a brick instead of breaking one, so the wall grows downward and a steady scroll carries it off the top. The build-front is clamped to a band far above the floor — so the wall can never reach the paddle — while the ball steers toward the most starved column to keep the front level. No player, no losing, no finish. Click to reshuffle."
+    },
+    {
+      "slug": "004-hunt-prey-paint",
+      "title": "hunt prey paint",
+      "year": 2026,
+      "type": "interactive",
+      "thumbnail": "thumbnail.svg",
+      "description": "An abstract ecosystem that paints itself in watercolour, then wipes the painting clean — forever. Over a quiet, Dune-like pixel terrain of slow plants that visibly fill in one pixel at a time, vector prey of many colours graze, grow quickly into larger bodies, and flee hunters with their own alertness and sprint speed. Hunters are black arrows that run prey down, fatten, and breed only by splitting in half. Death paints; old age renews. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats."
+    },
+    {
+      "slug": "005-only-invaders",
+      "title": "Only Invaders",
+      "year": 2026,
+      "type": "interactive",
+      "thumbnail": "thumbnail.svg",
+      "description": "Space Invaders after the invaders have vanished. Four defenders hold the top, right, bottom, and left edges, trading single shots, sudden volleys, and rare charged super bullets across an empty center. Every bullet is intercepted in midair; super bullets detonate in a white-screen shock that clears the field and resets the scores."
     }
   ]
 };

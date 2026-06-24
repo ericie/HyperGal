@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <radialGradient id="wc1" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#a86fd6" stop-opacity="0.75"/>
+      <stop offset="60%" stop-color="#7a4bb0" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#a86fd6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="wc2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#40b0c8" stop-opacity="0.7"/>
+      <stop offset="60%" stop-color="#2c7e93" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#40b0c8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="wc3" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e0648c" stop-opacity="0.72"/>
+      <stop offset="60%" stop-color="#b03f63" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#e0648c" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="wc4" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e8a13a" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#e8a13a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="200" height="200" fill="#c2a877"/>
+  <!-- watercolour death-blooms, in the colours of the fallen -->
+  <circle cx="56" cy="66" r="30" fill="url(#wc1)"/>
+  <circle cx="150" cy="140" r="26" fill="url(#wc2)"/>
+  <circle cx="120" cy="58" r="20" fill="url(#wc3)"/>
+  <circle cx="64" cy="150" r="18" fill="url(#wc4)"/>
+  <!-- quiet distributed-pixel terrain (Dune-like) -->
+  <g fill="#8a9a5c" opacity="0.4">
+    <rect x="20" y="24" width="4" height="4"/><rect x="36" y="40" width="4" height="4"/><rect x="28" y="48" width="4" height="4"/>
+    <rect x="88" y="22" width="4" height="4"/><rect x="104" y="34" width="4" height="4"/><rect x="96" y="30" width="4" height="4"/>
+    <rect x="160" y="36" width="4" height="4"/><rect x="176" y="28" width="4" height="4"/><rect x="168" y="48" width="4" height="4"/>
+    <rect x="40" y="104" width="4" height="4"/><rect x="32" y="116" width="4" height="4"/><rect x="48" y="120" width="4" height="4"/>
+    <rect x="112" y="100" width="4" height="4"/><rect x="100" y="112" width="4" height="4"/><rect x="120" y="116" width="4" height="4"/>
+    <rect x="172" y="100" width="4" height="4"/><rect x="184" y="112" width="4" height="4"/>
+    <rect x="24" y="168" width="4" height="4"/><rect x="40" y="180" width="4" height="4"/><rect x="92" y="172" width="4" height="4"/>
+    <rect x="104" y="184" width="4" height="4"/><rect x="160" y="176" width="4" height="4"/><rect x="176" y="184" width="4" height="4"/>
+    <rect x="132" y="64" width="4" height="4"/><rect x="64" y="72" width="4" height="4"/><rect x="148" y="120" width="4" height="4"/>
+  </g>
+  <!-- prey: varied-colour cells -->
+  <g>
+    <circle cx="86" cy="96" r="8.5" fill="#40b0c8" stroke="#173f48" stroke-width="1.4"/><circle cx="88" cy="96" r="3" fill="#0e2a30"/>
+    <circle cx="118" cy="128" r="6.5" fill="#e0648c" stroke="#5a2030" stroke-width="1.2"/><circle cx="120" cy="128" r="2.3" fill="#3a1420"/>
+    <circle cx="52" cy="150" r="5" fill="#a86fd6" stroke="#3c2a52" stroke-width="1.1"/><circle cx="53" cy="150" r="1.8" fill="#241634"/>
+    <circle cx="160" cy="108" r="6" fill="#5fb878" stroke="#244a30" stroke-width="1.2"/><circle cx="161" cy="108" r="2.1" fill="#143020"/>
+  </g>
+  <!-- hunter: a black arrow with a stem -->
+  <g transform="translate(138,150) rotate(150)" fill="none" stroke="#100e0c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-13 0 L13 0"/>
+    <path d="M5 -7 L13 0 L5 7"/>
+  </g>
+</svg>

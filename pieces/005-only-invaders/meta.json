@@ -1,0 +1,7 @@
+{
+  "title": "Only Invaders",
+  "year": 2026,
+  "type": "interactive",
+  "thumbnail": "thumbnail.svg",
+  "description": "Space Invaders after the invaders have vanished. Four defenders hold the top, right, bottom, and left edges, trading single shots, sudden volleys, and rare charged super bullets across an empty center. Every bullet is intercepted in midair; super bullets detonate in a white-screen shock that clears the field and resets the scores."
+}
