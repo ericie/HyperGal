@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Only Centipede · HyperGal</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #061016; overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; }
+      .caption {
+        position: fixed;
+        left: 50%;
+        bottom: 1rem;
+        transform: translateX(-50%);
+        color: rgba(229, 246, 255, .62);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .8rem;
+        letter-spacing: .04em;
+        text-align: center;
+        pointer-events: none;
+        text-shadow: 0 1px 0 #000;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div class="caption">Only Centipede · 2026 · click to reseed</div>
+    <script>
+      const canvas = document.getElementById('stage');
+      const ctx = canvas.getContext('2d');
+      const TAU = Math.PI * 2;
+
+      const COLORS = {
+        bg: '#061016',
+        grid: 'rgba(117, 178, 192, .08)',
+        rail: 'rgba(124, 247, 200, .20)',
+        top: '#ff6b9d',
+        bottom: '#7cf7c8',
+        bullet: '#ffe66d',
+        text: 'rgba(229,246,255,.86)',
+      };
+      const CENT_COLORS = ['#38ff5d', '#ff4fd8', '#ffc400', '#22c8ff', '#ff5a3d', '#aaff00', '#b66cff', '#ffffff', '#ff8a00', '#00ffd8'];
+      const MUSH_COLORS = ['#36d49f', '#31b8ff', '#ff9f5a', '#b889ff'];
+
+      const SEG_R = 8;
+      const SEG_GAP = 18;
+      const ROW_H = 22;
+      const TURN_SPEED_MULT = 1;
+      const MUSH_R = 13;
+      const MUSH_HP = 3;
+      const MUSH_DENT_LIMIT = 3;
+      const DEF_SPEED = 470;
+      const BULLET_SPEED = 780;
+      const START_MUSHROOMS = 34;
+      const MIN_CENT_SPEED = 188;
+      const MAX_CENT_SPEED = 258;
+      const RESPAWN_SEGMENT_THRESHOLD = 6;
+
+      let W = 0, H = 0, dpr = 1;
+      let now = 0, lastT = 0, raf = 0;
+      let centipedes = [];
+      let mushrooms = [];
+      let sparks = [];
+      let entryPulse = 0;
+      let lastEntrySide = -1;
+      let ids = 1;
+      let colorCursor = 0;
+      let rows = [];
+
+      const defenders = {
+        top: makeDefender('top', COLORS.top),
+        bottom: makeDefender('bottom', COLORS.bottom),
+      };
+
+      const rand = (a, b) => a + Math.random() * (b - a);
+      const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+      const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+      const dist2 = (a, b, x, y) => (a - x) * (a - x) + (b - y) * (b - y);
+
+      function makeDefender(side, color) {
+        return { side, color, x: 0, y: 0, targetX: 0, bullet: null, cooldown: 0, hits: 0 };
+      }
+
+      function reset() {
+        cancelAnimationFrame(raf);
+        dpr = Math.min(2, window.devicePixelRatio || 1);
+        W = innerWidth;
+        H = innerHeight;
+        canvas.width = Math.round(W * dpr);
+        canvas.height = Math.round(H * dpr);
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        defenders.top.x = W * .52;
+        defenders.bottom.x = W * .48;
+        defenders.top.y = Math.max(42, H * .075);
+        defenders.bottom.y = H - Math.max(42, H * .075);
+        for (const d of Object.values(defenders)) {
+          d.targetX = d.x;
+          d.bullet = null;
+          d.cooldown = rand(.04, .18);
+          d.hits = 0;
+        }
+
+        centipedes = [];
+        mushrooms = [];
+        sparks = [];
+        rows = makeRows();
+        now = 0;
+        lastT = performance.now();
+        ids = 1;
+        colorCursor = 0;
+        lastEntrySide = Math.random() < .5 ? -1 : 1;
+        seedMushrooms();
+        spawnCentipede(12);
+        raf = requestAnimationFrame(tick);
+      }
+
+      function safeY(y) {
+        return clamp(y, defenders.top.y + 62, defenders.bottom.y - 62);
+      }
+
+      function makeRows() {
+        const top = defenders.top.y + 76;
+        const bottom = defenders.bottom.y - 76;
+        const count = Math.max(8, Math.floor((bottom - top) / ROW_H) + 1);
+        const gap = count > 1 ? (bottom - top) / (count - 1) : ROW_H;
+        return Array.from({ length: count }, (_, i) => top + i * gap);
+      }
+
+      function nearestRowIndex(y) {
+        let best = 0, bestDist = Infinity;
+        for (let i = 0; i < rows.length; i++) {
+          const d = Math.abs(rows[i] - y);
+          if (d < bestDist) { bestDist = d; best = i; }
+        }
+        return best;
+      }
+
+      function rowY(index) {
+        return rows[clamp(index, 0, rows.length - 1)] || safeY(H / 2);
+      }
+
+      function snapY(y) {
+        return rowY(nearestRowIndex(y));
+      }
+
+      function isInsideField(x) {
+        return x >= 24 && x <= W - 24;
+      }
+
+      function nextCentipedeColor(except = null) {
+        const active = new Set(centipedes.map((c) => c.color));
+        for (let i = 0; i < CENT_COLORS.length; i++) {
+          const color = CENT_COLORS[(colorCursor + i) % CENT_COLORS.length];
+          if (color !== except && !active.has(color)) {
+            colorCursor = (colorCursor + i + 1) % CENT_COLORS.length;
+            return color;
+          }
+        }
+        const color = CENT_COLORS[colorCursor % CENT_COLORS.length];
+        colorCursor = (colorCursor + 1) % CENT_COLORS.length;
+        return color === except ? CENT_COLORS[colorCursor++ % CENT_COLORS.length] : color;
+      }
+
+      function activeSegmentCount() {
+        return centipedes.reduce((sum, c) => sum + c.segments.length, 0);
+      }
+
+      function balancedSpeed(speed) {
+        return clamp(speed, MIN_CENT_SPEED, MAX_CENT_SPEED);
+      }
+
+      function shouldSpawnCentipede() {
+        return activeSegmentCount() <= RESPAWN_SEGMENT_THRESHOLD;
+      }
+
+      function seedMushrooms() {
+        let tries = 0;
+        while (mushrooms.length < START_MUSHROOMS && tries++ < START_MUSHROOMS * 30) {
+          const x = rand(42, W - 42);
+          const y = rowY((Math.random() * rows.length) | 0);
+          if (mushrooms.some((m) => dist2(x, y, m.x, m.y) < (MUSH_R * 2.4) ** 2)) continue;
+          mushrooms.push(makeMushroom(x, y, pick(MUSH_COLORS)));
+        }
+      }
+
+      function makeMushroom(x, y, color) {
+        return {
+          x,
+          y,
+          hp: MUSH_HP,
+          color,
+          wobble: rand(0, TAU),
+          dents: [],
+          hitPulse: 0,
+          lean: rand(-.025, .025),
+        };
+      }
+
+      function spawnCentipede(length = Math.floor(rand(9, 14))) {
+        const dir = Math.random() < .72 ? -lastEntrySide : (Math.random() < .5 ? -1 : 1);
+        lastEntrySide = dir;
+        const color = nextCentipedeColor();
+        const rowIndex = nearestRowIndex(H / 2 + rand(-ROW_H * 4.5, ROW_H * 4.5));
+        const y = rowY(rowIndex);
+        const x = dir > 0 ? -SEG_GAP * 1.35 : W + SEG_GAP * 1.35;
+        const segments = [];
+        for (let i = 0; i < length; i++) {
+          segments.push({ x: x - dir * i * SEG_GAP, y });
+        }
+        centipedes.push(makeCentipede(segments, dir, color, rand(MIN_CENT_SPEED, MAX_CENT_SPEED), rowIndex));
+        entryPulse = 1;
+      }
+
+      function makeCentipede(segments, dir, color, speed, rowIndex) {
+        const c = {
+          id: ids++,
+          segments,
+          dir,
+          color,
+          speed: balancedSpeed(speed),
+          rowIndex: rowIndex ?? nearestRowIndex(segments[0]?.y ?? H / 2),
+          dropDir: Math.random() < .5 ? -1 : 1,
+          turnCooldown: 0,
+          collisionCooldown: 0,
+          hasEntered: isInsideField(segments[0]?.x ?? W / 2),
+          turn: null,
+        };
+        arrangeCentipede(c);
+        return c;
+      }
+
+      function tick(t) {
+        const dt = Math.max(0, Math.min(1 / 30, (t - lastT) / 1000));
+        lastT = t;
+        now += dt;
+        entryPulse = Math.max(0, entryPulse - dt * 1.4);
+        if (shouldSpawnCentipede()) {
+          spawnCentipede();
+        }
+
+        updateDefenders(dt);
+        updateCentipedes(dt);
+        updateMushrooms(dt);
+        updateSparks(dt);
+        draw();
+        raf = requestAnimationFrame(tick);
+      }
+
+      function updateDefenders(dt) {
+        for (const d of Object.values(defenders)) {
+          d.cooldown = Math.max(0, d.cooldown - dt);
+          const target = chooseTarget(d);
+          if (target !== null) d.targetX = target;
+          d.x += clamp(d.targetX - d.x, -DEF_SPEED * dt, DEF_SPEED * dt);
+          if (d.bullet) updateBullet(d, dt);
+          if (!d.bullet) {
+            if (Math.abs(d.targetX - d.x) < 9 && d.cooldown <= 0) fire(d);
+          }
+        }
+      }
+
+      function chooseTarget(d) {
+        let best = null, bestScore = Infinity;
+        const startY = d.y + (d.side === 'top' ? 18 : -18);
+        const bulletDir = d.side === 'top' ? 1 : -1;
+        for (const c of centipedes) {
+          for (let i = 0; i < c.segments.length; i++) {
+            const s = c.segments[i];
+            if ((s.y - startY) * bulletDir <= 0) continue;
+            const travel = Math.abs(s.y - startY) / BULLET_SPEED;
+            const lead = c.dir * c.speed * travel * (i === 0 ? 1 : .55);
+            const aimX = clamp(s.x + lead, 24, W - 24);
+            const guard = defenderDanger(d, s.y);
+            const distance = Math.abs(s.y - startY);
+            const kindBias = i === 0 ? -16 : rand(12, 60);
+            const score = Math.abs(aimX - d.x) * .58 + distance * .06 + kindBias - guard * 240;
+            if (score < bestScore) { bestScore = score; best = aimX; }
+          }
+        }
+        if (best !== null) return best;
+        if (mushrooms.length && Math.random() < .18) return pick(mushrooms).x;
+        return W / 2 + Math.sin(now * .8 + (d.side === 'top' ? 0 : Math.PI)) * W * .22;
+      }
+
+      function defenderDanger(d, y) {
+        if (d.side === 'top') return clamp((H * .5 - y) / (H * .5 - d.y), 0, 1);
+        return clamp((y - H * .5) / (d.y - H * .5), 0, 1);
+      }
+
+      function fire(d) {
+        const vy = d.side === 'top' ? BULLET_SPEED : -BULLET_SPEED;
+        d.bullet = {
+          x: d.x,
+          y: d.y + (d.side === 'top' ? 19 : -19),
+          px: d.x,
+          py: d.y,
+          vy,
+          owner: d.side,
+        };
+        d.cooldown = rand(.07, .2);
+      }
+
+      function updateBullet(d, dt) {
+        const b = d.bullet;
+        b.px = b.x;
+        b.py = b.y;
+        b.y += b.vy * dt;
+
+        for (let i = mushrooms.length - 1; i >= 0; i--) {
+          const m = mushrooms[i];
+          if (bulletHitsCircle(b, m.x, m.y, MUSH_R + 3)) {
+            hitMushroom(i, b.x, b.y, b.vy, 10);
+            d.bullet = null;
+            return;
+          }
+        }
+
+        for (let ci = centipedes.length - 1; ci >= 0; ci--) {
+          const c = centipedes[ci];
+          for (let si = 0; si < c.segments.length; si++) {
+            const s = c.segments[si];
+            if (bulletHitsCircle(b, s.x, s.y, SEG_R + 4)) {
+              if (hitCentipede(ci, si)) d.hits++;
+              d.bullet = null;
+              return;
+            }
+          }
+        }
+
+        if (b.y < -40 || b.y > H + 40) d.bullet = null;
+      }
+
+      function hitMushroom(index, x, y, vy, sparkCount = 10) {
+        const m = mushrooms[index];
+        if (!m) return false;
+        damageMushroom(m, x, y, vy);
+        pop(x, y, m.color, sparkCount);
+        if (m.hp <= 0) {
+          pop(m.x, m.y, m.color, 22);
+          mushrooms.splice(index, 1);
+          return true;
+        }
+        return false;
+      }
+
+      function bulletHitsCircle(b, x, y, r) {
+        const nearestY = clamp(y, Math.min(b.py, b.y), Math.max(b.py, b.y));
+        const dx = b.x - x;
+        const dy = nearestY - y;
+        return dx * dx + dy * dy < r * r;
+      }
+
+      function hitCentipede(ci, si) {
+        const c = centipedes[ci];
+        if (!c || !c.segments[si]) return false;
+        const hit = c.segments[si];
+        addMushroom(hit.x, hit.y, c.color);
+        pop(hit.x, hit.y, c.color, 28);
+
+        if (si === 0) {
+          return removeHeadCentipede(c, ci);
+        }
+
+        const headHalf = c.segments.slice(0, si);
+        const tailHalf = c.segments.slice(si + 1);
+        centipedes.splice(ci, 1);
+        if (headHalf.length) centipedes.push(makeCentipede(headHalf, c.dir, c.color, balancedSpeed(c.speed * rand(.97, 1.03)), nearestRowIndex(headHalf[0].y)));
+        if (tailHalf.length) centipedes.push(makeCentipede(tailHalf, -c.dir, nextCentipedeColor(c.color), balancedSpeed(c.speed * rand(.97, 1.03)), nearestRowIndex(tailHalf[0].y)));
+        return true;
+      }
+
+      function removeHeadCentipede(c, ci) {
+        if (c.segments.length <= 1) {
+          centipedes.splice(ci, 1);
+          return true;
+        }
+        c.segments.shift();
+        if (c.turn) {
+          c.turn.progress = Math.max(0, c.turn.progress - SEG_GAP);
+          c.turn.pathEnd = Math.max(c.turn.rowStep, c.turn.pathEnd - SEG_GAP);
+        }
+        c.rowIndex = nearestRowIndex(c.segments[0].y);
+        c.collisionCooldown = .18;
+        arrangeCentipede(c);
+        return true;
+      }
+
+      function addMushroom(x, y, color) {
+        x = clamp(x, 24, W - 24);
+        y = snapY(y);
+        const near = mushrooms.find((m) => dist2(x, y, m.x, m.y) < (MUSH_R * 1.2) ** 2);
+        if (near) {
+          near.hp = MUSH_HP;
+          near.color = color;
+          near.dents = [];
+          near.hitPulse = .45;
+          near.lean *= .25;
+          return;
+        }
+        mushrooms.push(makeMushroom(x, y, color));
+      }
+
+      function damageMushroom(m, x, y, vy) {
+        m.hp--;
+        let impact = clamp((x - m.x) / MUSH_R, -.82, .82);
+        if (Math.abs(impact) < .12) impact += rand(-.28, .28);
+        const fromTop = vy > 0;
+        m.dents.push({
+          x: impact * MUSH_R,
+          y: MUSH_R * (fromTop ? rand(-.66, -.25) : rand(.05, .36)),
+          r: rand(5.1, 7.2) + (MUSH_HP - m.hp) * .32,
+          sx: rand(.78, 1.28),
+          sy: rand(.56, .92),
+          a: rand(-1.2, 1.2),
+        });
+        if (m.dents.length > MUSH_DENT_LIMIT) m.dents.shift();
+        m.hitPulse = 1;
+        m.lean = clamp(m.lean + impact * .1 + rand(-.035, .035), -.3, .3);
+      }
+
+      function updateCentipedes(dt) {
+        for (const c of centipedes) {
+          if (!c.segments.length) continue;
+          c.turnCooldown = Math.max(0, c.turnCooldown - dt);
+          c.collisionCooldown = Math.max(0, c.collisionCooldown - dt);
+          const head = c.segments[0];
+          if (c.turn) {
+            c.turn.progress += c.speed * TURN_SPEED_MULT * dt;
+            if (c.turn.progress >= c.turn.pathEnd) {
+              c.turn.progress = c.turn.pathEnd;
+              arrangeCentipede(c);
+              c.rowIndex = c.turn.toRow;
+              c.dir = c.turn.newDir;
+              c.turn = null;
+            }
+            arrangeCentipede(c);
+            if (c.turn && c.turn.progress >= c.turn.rowStep && findMushroomAt(head.x, head.y) >= 0) {
+              c.rowIndex = c.turn.toRow;
+              c.dir = c.turn.newDir;
+              c.turn = null;
+              c.turnCooldown = 0;
+              turnCentipede(c);
+            }
+            continue;
+          }
+
+          head.y = rowY(c.rowIndex);
+          head.x += c.dir * c.speed * dt;
+          if (!c.hasEntered && isInsideField(head.x)) c.hasEntered = true;
+          let blocked = c.hasEntered && (head.x < 24 || head.x > W - 24);
+          const mushroomHit = findMushroomAt(head.x, head.y);
+          if (mushroomHit >= 0) blocked = true;
+          if (blocked) {
+            turnCentipede(c);
+          }
+
+          arrangeCentipede(c);
+        }
+        resolveCentipedeCollisions();
+        centipedes = centipedes.filter((c) => c.segments.length > 0);
+      }
+
+      function findMushroomAt(x, y) {
+        for (let i = 0; i < mushrooms.length; i++) {
+          const m = mushrooms[i];
+          if (dist2(x, y, m.x, m.y) < (MUSH_R + SEG_R + 1) ** 2) return i;
+        }
+        return -1;
+      }
+
+      function resolveCentipedeCollisions() {
+        for (let ai = 0; ai < centipedes.length; ai++) {
+          const attacker = centipedes[ai];
+          if (!attacker?.segments.length || attacker.collisionCooldown > 0) continue;
+          const head = attacker.segments[0];
+          for (let ti = 0; ti < centipedes.length; ti++) {
+            const target = centipedes[ti];
+            if (!target?.segments.length || target.id === attacker.id) continue;
+            for (let si = 0; si < target.segments.length; si++) {
+              const s = target.segments[si];
+              if (dist2(head.x, head.y, s.x, s.y) >= (SEG_R * 1.75) ** 2) continue;
+              const attackerId = attacker.id;
+              pop(head.x, head.y, attacker.color, 12);
+              hitCentipede(ti, si);
+              const survivor = centipedes.find((c) => c.id === attackerId);
+              if (survivor?.segments.length) {
+                survivor.collisionCooldown = .35;
+                if (!survivor.turn) turnCentipede(survivor);
+              }
+              return;
+            }
+          }
+        }
+      }
+
+      function arrangeCentipede(c) {
+        if (!c.segments.length) return;
+        const head = c.segments[0];
+        if (c.turn) {
+          for (let i = 0; i < c.segments.length; i++) {
+            const p = turnPoint(c.turn, c.turn.progress - i * SEG_GAP);
+            const s = c.segments[i];
+            s.x = p.x;
+            s.y = p.y;
+          }
+          return;
+        }
+
+        const y = rowY(c.rowIndex);
+        head.y = y;
+        for (let i = 1; i < c.segments.length; i++) {
+          c.segments[i].x = head.x - c.dir * i * SEG_GAP;
+          c.segments[i].y = y;
+        }
+      }
+
+      function turnCentipede(c) {
+        const h = c.segments[0];
+        const fromRow = c.rowIndex;
+        let toRow = fromRow + c.dropDir;
+        if (toRow < 0 || toRow >= rows.length) {
+          c.dropDir *= -1;
+          toRow = clamp(fromRow + c.dropDir, 0, rows.length - 1);
+        }
+        const oldDir = c.dir;
+        const newDir = -oldDir;
+        const rowStep = Math.abs(rowY(toRow) - rowY(fromRow));
+        c.turnCooldown = .22;
+        c.dir = newDir;
+        c.turn = {
+          fromRow,
+          toRow,
+          oldDir,
+          newDir,
+          x: clamp(h.x, 24, W - 24),
+          progress: 0,
+          rowStep,
+          pathEnd: rowStep + Math.max(0, c.segments.length - 1) * SEG_GAP + SEG_GAP * .18,
+        };
+        arrangeCentipede(c);
+        pop(h.x, h.y, c.color, 8);
+      }
+
+      function turnPoint(turn, progress) {
+        const fromY = rowY(turn.fromRow);
+        const toY = rowY(turn.toRow);
+        const rowDir = Math.sign(toY - fromY) || 1;
+        if (progress <= 0) return { x: turn.x + turn.oldDir * progress, y: fromY };
+        if (progress < turn.rowStep) return { x: turn.x, y: fromY + rowDir * progress };
+        return { x: turn.x + turn.newDir * (progress - turn.rowStep), y: toY };
+      }
+
+      function updateMushrooms(dt) {
+        for (const m of mushrooms) {
+          m.hitPulse = Math.max(0, m.hitPulse - dt * 5.4);
+          m.lean *= Math.pow(.82, dt);
+        }
+      }
+
+      function updateSparks(dt) {
+        for (let i = sparks.length - 1; i >= 0; i--) {
+          const s = sparks[i];
+          s.age += dt;
+          s.x += s.vx * dt;
+          s.y += s.vy * dt;
+          s.vx *= Math.pow(.18, dt);
+          s.vy *= Math.pow(.18, dt);
+          if (s.age >= s.life) sparks.splice(i, 1);
+        }
+      }
+
+      function pop(x, y, color, n) {
+        for (let i = 0; i < n; i++) {
+          const a = rand(0, TAU), sp = rand(32, 170);
+          sparks.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, age: 0, life: rand(.25, .72), color, r: rand(1.2, 3.2) });
+        }
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        drawField();
+        drawMushrooms();
+        drawEntryFlash();
+        drawCentipedes();
+        drawDefender(defenders.top);
+        drawDefender(defenders.bottom);
+        drawBullets();
+        drawSparks();
+        drawHud();
+      }
+
+      function drawField() {
+        ctx.fillStyle = COLORS.bg;
+        ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = COLORS.grid;
+        ctx.lineWidth = 1;
+        const gap = 46;
+        ctx.beginPath();
+        for (let x = (now * 10) % gap; x < W; x += gap) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+        for (let y = 0; y < H; y += gap) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+        ctx.stroke();
+        ctx.strokeStyle = COLORS.rail;
+        ctx.beginPath();
+        ctx.moveTo(0, defenders.top.y + 34); ctx.lineTo(W, defenders.top.y + 34);
+        ctx.moveTo(0, defenders.bottom.y - 34); ctx.lineTo(W, defenders.bottom.y - 34);
+        ctx.stroke();
+      }
+
+      function drawEntryFlash() {
+        if (entryPulse <= 0) return;
+        const pulse = entryPulse * entryPulse;
+        const x = lastEntrySide > 0 ? 0 : W;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = `rgba(255,230,109,${.1 + pulse * .45})`;
+        ctx.lineWidth = 2 + pulse * 7;
+        ctx.beginPath(); ctx.moveTo(x, defenders.top.y + 58); ctx.lineTo(x, defenders.bottom.y - 58); ctx.stroke();
+        ctx.fillStyle = `rgba(255,230,109,${pulse * .08})`;
+        ctx.fillRect(lastEntrySide > 0 ? 0 : W - 34, defenders.top.y + 58, 34, defenders.bottom.y - defenders.top.y - 116);
+        ctx.restore();
+      }
+
+      function drawMushrooms() {
+        for (const m of mushrooms) {
+          const damage = (MUSH_HP - m.hp) / MUSH_HP;
+          const pulse = m.hitPulse;
+          const wobble = Math.sin(now * 24 + m.wobble) * pulse * .08;
+          const squashX = 1 + pulse * .14 + damage * .07;
+          const squashY = 1 - pulse * .18 - damage * .14;
+          ctx.save();
+          ctx.translate(m.x, m.y + damage * 1.5);
+          ctx.rotate(m.lean + wobble);
+          ctx.scale(squashX, squashY);
+
+          const bend = (m.lean + Math.sin(m.wobble) * damage * .08) * MUSH_R * 2.5;
+          const stemH = MUSH_R * (1.04 - damage * .36);
+          ctx.fillStyle = shade(m.color, -38);
+          ctx.beginPath();
+          ctx.moveTo(-MUSH_R * .34, -1);
+          ctx.quadraticCurveTo(-MUSH_R * .22 + bend, stemH * .48, -MUSH_R * .28 + bend * .16, stemH);
+          ctx.lineTo(MUSH_R * .28 + bend * .16, stemH);
+          ctx.quadraticCurveTo(MUSH_R * .22 + bend, stemH * .48, MUSH_R * .34, -1);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = m.color;
+          ctx.shadowColor = hexA(m.color, .45);
+          ctx.shadowBlur = 5 + pulse * 8;
+          capPath(MUSH_R, damage, pulse, m.dents);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          ctx.save();
+          capPath(MUSH_R, damage, pulse, m.dents);
+          ctx.clip();
+          for (const dent of m.dents) {
+            const grow = 1 + damage * .34 + pulse * .12;
+            ctx.save();
+            ctx.translate(dent.x, dent.y);
+            ctx.rotate(dent.a);
+            ctx.scale(dent.sx * grow, dent.sy * grow);
+            ctx.fillStyle = 'rgba(3,9,13,.86)';
+            ctx.beginPath(); ctx.arc(0, 0, dent.r, 0, TAU); ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,.14)';
+            ctx.lineWidth = .9;
+            ctx.beginPath(); ctx.arc(0, 0, dent.r * .82, Math.PI * .05, Math.PI * .82); ctx.stroke();
+            ctx.restore();
+
+            ctx.strokeStyle = 'rgba(2,6,9,.46)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(dent.x, dent.y + dent.r * .2);
+            ctx.lineTo(dent.x + Math.sin(dent.a) * 6, dent.y + dent.r * (1.1 + damage));
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          ctx.strokeStyle = 'rgba(0,0,0,.55)';
+          ctx.lineWidth = 1.5;
+          capPath(MUSH_R, damage, pulse, m.dents);
+          ctx.stroke();
+
+          ctx.strokeStyle = 'rgba(255,255,255,.32)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(-MUSH_R * .55, -MUSH_R * (.42 - damage * .08));
+          ctx.quadraticCurveTo(0, -MUSH_R * (.76 - damage * .14), MUSH_R * .45, -MUSH_R * (.38 - damage * .05));
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      function capPath(r, damage, pulse, dents = []) {
+        const leftDent = clamp(dents.filter((d) => d.x < 0).reduce((sum, d) => sum + d.r, 0) / (r * 3.2), 0, .55);
+        const rightDent = clamp(dents.filter((d) => d.x >= 0).reduce((sum, d) => sum + d.r, 0) / (r * 3.2), 0, .55);
+        const sag = damage * r * .42 + pulse * r * .08;
+        const lip = r * (.42 + damage * .13);
+        const topPull = (rightDent - leftDent) * r * .13;
+        ctx.beginPath();
+        ctx.moveTo(-r * (.92 - leftDent * .12), lip + leftDent * r * .16);
+        ctx.bezierCurveTo(-r * (1.03 - leftDent * .08), r * .08 + sag * .2, -r * (.72 - leftDent * .18), -r * .86 + sag + leftDent * r * .16, -r * .18 + topPull, -r * .92 + sag * .35 + (leftDent + rightDent) * r * .05);
+        ctx.bezierCurveTo(r * .08 + topPull, -r * 1.04 + sag * .4 + (leftDent + rightDent) * r * .05, r * (.78 - rightDent * .18), -r * .82 + sag + rightDent * r * .16, r * (.96 - rightDent * .08), r * .08 + sag * .24);
+        ctx.lineTo(r * (.82 - rightDent * .14), lip + rightDent * r * .16);
+        ctx.quadraticCurveTo(0, r * (.58 + damage * .08), -r * .92, lip);
+        ctx.closePath();
+      }
+
+      function drawCentipedes() {
+        for (const c of centipedes) {
+          for (let i = c.segments.length - 1; i >= 0; i--) {
+            const s = c.segments[i];
+            drawCentipedeSegment(c, s, i);
+          }
+        }
+      }
+
+      function drawCentipedeSegment(c, s, i) {
+        const head = i === 0;
+        const x = pixelSnap(s.x);
+        const y = pixelSnap(s.y);
+        const legStep = ((Math.floor(now * 18) + i) & 1) ? 1 : -1;
+
+        ctx.save();
+        ctx.translate(x, y);
+
+        ctx.fillStyle = '#020508';
+        ctx.fillRect(-8, -7, 16, 14);
+        ctx.fillRect(-10, -5, 20, 10);
+
+        ctx.fillStyle = c.color;
+        ctx.fillRect(-6, -6, 12, 12);
+        ctx.fillRect(-8, -4, 16, 8);
+        ctx.fillRect(-4, -8, 8, 16);
+
+        ctx.fillStyle = shade(c.color, head ? 54 : 34);
+        ctx.fillRect(-5, -5, 3, 2);
+        ctx.fillRect(1, -5, 4, 2);
+        ctx.fillRect(-5, 3, 10, 2);
+
+        ctx.fillStyle = '#020508';
+        ctx.fillRect(-8, -7, 2, 3);
+        ctx.fillRect(6, -7, 2, 3);
+        ctx.fillRect(-8, 4, 2, 3);
+        ctx.fillRect(6, 4, 2, 3);
+
+        ctx.fillStyle = shade(c.color, -95);
+        ctx.fillRect(-10, -9 + legStep, 3, 2);
+        ctx.fillRect(7, -9 - legStep, 3, 2);
+        ctx.fillRect(-10, 7 - legStep, 3, 2);
+        ctx.fillRect(7, 7 + legStep, 3, 2);
+
+        if (head) {
+          const nose = c.dir > 0 ? 1 : -1;
+          ctx.fillStyle = '#020508';
+          ctx.fillRect(nose * 8 - (nose < 0 ? 4 : 0), -6, 4, 12);
+          ctx.fillStyle = shade(c.color, 44);
+          ctx.fillRect(nose * 8 - (nose < 0 ? 3 : -1), -4, 3, 8);
+          ctx.fillStyle = '#020508';
+          ctx.fillRect(nose * 4 - (nose < 0 ? 3 : 0), -4, 3, 3);
+          ctx.fillRect(nose * 4 - (nose < 0 ? 3 : 0), 1, 3, 3);
+          ctx.fillRect(-3, -1, 6, 2);
+        }
+        ctx.restore();
+      }
+
+      function drawDefender(d) {
+        ctx.save();
+        ctx.translate(d.x, d.y);
+        if (d.side === 'top') ctx.rotate(Math.PI);
+        ctx.shadowColor = d.color;
+        ctx.shadowBlur = 11;
+        ctx.fillStyle = d.color;
+        ctx.fillRect(-22, 6, 44, 7);
+        ctx.fillRect(-14, -2, 28, 8);
+        ctx.fillRect(-4, -18, 8, 17);
+        ctx.fillStyle = 'rgba(255,255,255,.82)';
+        ctx.fillRect(-17, 7, 34, 2);
+        ctx.restore();
+      }
+
+      function drawBullets() {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (const d of Object.values(defenders)) {
+          const b = d.bullet;
+          if (!b) continue;
+          ctx.strokeStyle = COLORS.bullet;
+          ctx.shadowColor = COLORS.bullet;
+          ctx.shadowBlur = 8;
+          ctx.lineWidth = 4;
+          ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(b.px, b.py); ctx.lineTo(b.x, b.y); ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawSparks() {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (const s of sparks) {
+          const a = 1 - s.age / s.life;
+          ctx.fillStyle = hexA(s.color, a);
+          ctx.fillRect(s.x - s.r / 2, s.y - s.r / 2, s.r, s.r);
+        }
+        ctx.restore();
+      }
+
+      function drawHud() {
+        ctx.font = '700 13px ui-monospace, SFMono-Regular, Menlo, monospace';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = COLORS.top;
+        ctx.fillText(`TOP ${String(defenders.top.hits).padStart(3, '0')}`, 18, 26);
+        ctx.fillStyle = COLORS.bottom;
+        ctx.fillText(`BOTTOM ${String(defenders.bottom.hits).padStart(3, '0')}`, 18, H - 26);
+        ctx.fillStyle = COLORS.text;
+        ctx.textAlign = 'right';
+        ctx.fillText(`SEGS ${String(activeSegmentCount()).padStart(2, '0')}`, W - 18, 26);
+        ctx.textAlign = 'left';
+      }
+
+      function shade(hex, d) {
+        const n = parseInt(hex.slice(1), 16);
+        const cl = (v) => v < 0 ? 0 : v > 255 ? 255 : v | 0;
+        return `rgb(${cl((n >> 16) + d)},${cl(((n >> 8) & 255) + d)},${cl((n & 255) + d)})`;
+      }
+
+      function pixelSnap(v) {
+        return Math.round(v / 2) * 2;
+      }
+
+      function hexA(hex, alpha) {
+        const n = parseInt(hex.slice(1), 16);
+        return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+      }
+
+      addEventListener('click', reset);
+      addEventListener('resize', reset);
+      reset();
+    </script>
+  </body>
+</html>
