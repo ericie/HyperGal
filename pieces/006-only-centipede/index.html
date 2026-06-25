@@ -256,7 +256,7 @@
           if (target !== null) d.targetX = target;
           d.x += clamp(d.targetX - d.x, -DEF_SPEED * dt, DEF_SPEED * dt);
           if (d.bullet) updateBullet(d, dt);
-          if (!d.bullet) {
+          if (!d.bullet && target !== null) {
             if (Math.abs(d.targetX - d.x) < 9 && d.cooldown <= 0) fire(d);
           }
         }
@@ -270,6 +270,7 @@
           for (let i = 0; i < c.segments.length; i++) {
             const s = c.segments[i];
             if ((s.y - startY) * bulletDir <= 0) continue;
+            if (!hasCrossedTowardDefender(d, s.y)) continue;
             const travel = Math.abs(s.y - startY) / BULLET_SPEED;
             const lead = c.dir * c.speed * travel * (i === 0 ? 1 : .55);
             const aimX = clamp(s.x + lead, 24, W - 24);
@@ -281,8 +282,22 @@
           }
         }
         if (best !== null) return best;
-        if (mushrooms.length && Math.random() < .18) return pick(mushrooms).x;
-        return W / 2 + Math.sin(now * .8 + (d.side === 'top' ? 0 : Math.PI)) * W * .22;
+        return chooseMushroomTarget(d);
+      }
+
+      function hasCrossedTowardDefender(d, y) {
+        return d.side === 'top' ? y <= H * .5 : y >= H * .5;
+      }
+
+      function chooseMushroomTarget(d) {
+        if (!mushrooms.length) return null;
+        let best = null, bestScore = Infinity;
+        for (const m of mushrooms) {
+          const sameHalf = hasCrossedTowardDefender(d, m.y);
+          const score = Math.abs(m.x - d.x) + (sameHalf ? 0 : 180) + rand(0, 28);
+          if (score < bestScore) { bestScore = score; best = m.x; }
+        }
+        return best;
       }
 
       function defenderDanger(d, y) {
@@ -368,7 +383,7 @@
         const tailHalf = c.segments.slice(si + 1);
         centipedes.splice(ci, 1);
         if (headHalf.length) centipedes.push(makeCentipede(headHalf, c.dir, c.color, balancedSpeed(c.speed * rand(.97, 1.03)), nearestRowIndex(headHalf[0].y)));
-        if (tailHalf.length) centipedes.push(makeCentipede(tailHalf, -c.dir, nextCentipedeColor(c.color), balancedSpeed(c.speed * rand(.97, 1.03)), nearestRowIndex(tailHalf[0].y)));
+        if (tailHalf.length) centipedes.push(makeCentipede(tailHalf, -c.dir, c.color, balancedSpeed(c.speed * rand(.97, 1.03)), nearestRowIndex(tailHalf[0].y)));
         return true;
       }
 
