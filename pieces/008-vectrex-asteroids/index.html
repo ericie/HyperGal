@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vectrex Asteroids · HyperGal</title>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #000;
+      }
+      .caption {
+        position: fixed;
+        left: 50%;
+        bottom: 1rem;
+        transform: translateX(-50%);
+        color: rgba(244, 255, 250, .48);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .78rem;
+        letter-spacing: .04em;
+        pointer-events: none;
+        text-shadow: 0 0 8px rgba(244, 255, 250, .55);
+      }
+      .crt {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 0 58%, rgba(255,255,255,.035) 59%, rgba(0,0,0,.78) 100%),
+          repeating-linear-gradient(0deg, rgba(255,255,255,.045) 0 1px, rgba(0,0,0,0) 1px 4px);
+        mix-blend-mode: screen;
+        opacity: .5;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div class="caption">Vectrex Asteroids · 2026</div>
+    <div class="crt"></div>
+    <script>
+      const canvas = document.getElementById('stage');
+      const ctx = canvas.getContext('2d');
+      const TAU = Math.PI * 2;
+
+      const MAX_BULLETS = 3;
+      const BULLET_SPEED = 620;
+      const SHIP_ACCEL = 280;
+      const SHIP_TURN = 4.7;
+      const SHIP_DRAG = 0.22;
+      const SHIP_R = 13;
+      const MAX_SHARDS_PER_ROCK = 58;
+      const LINE = 'rgba(244,255,250,';
+
+      let W = 0, H = 0, dpr = 1;
+      let last = 0, raf = 0, now = 0;
+      let ship, bullets, rocks, sparks, stars, score, gameOver;
+      const keys = new Set();
+
+      const rand = (a, b) => a + Math.random() * (b - a);
+      const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+      const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+      const wrap = (v, max) => { v %= max; return v < 0 ? v + max : v; };
+      const wrapDelta = (d, max) => d > max / 2 ? d - max : d < -max / 2 ? d + max : d;
+      const distWrap = (ax, ay, bx, by) => {
+        const dx = wrapDelta(ax - bx, W), dy = wrapDelta(ay - by, H);
+        return Math.hypot(dx, dy);
+      };
+
+      function resize() {
+        cancelAnimationFrame(raf);
+        dpr = Math.min(2, window.devicePixelRatio || 1);
+        W = innerWidth;
+        H = innerHeight;
+        canvas.width = Math.round(W * dpr);
+        canvas.height = Math.round(H * dpr);
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        reset();
+      }
+
+      function reset() {
+        bullets = [];
+        rocks = [];
+        sparks = [];
+        stars = makeStars();
+        score = 0;
+        now = 0;
+        gameOver = false;
+        ship = {
+          x: W / 2,
+          y: H / 2,
+          vx: 0,
+          vy: 0,
+          a: -Math.PI / 2,
+          alive: true,
+          lives: 3,
+          fireCd: 0,
+          invuln: 2.2,
+          deadFor: 0,
+        };
+        seedRocks();
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, W, H);
+        last = performance.now();
+        raf = requestAnimationFrame(frame);
+      }
+
+      function makeStars() {
+        const n = clamp(Math.floor(W * H / 18000), 24, 80);
+        return Array.from({ length: n }, () => ({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          a: rand(.08, .22),
+          p: Math.random() * TAU,
+        }));
+      }
+
+      function seedRocks() {
+        const count = clamp(Math.floor(Math.min(W, H) / 170) + 3, 4, 7);
+        for (let i = 0; i < count; i++) {
+          const side = (Math.random() * 4) | 0;
+          const x = side === 0 ? rand(0, W) : side === 1 ? W - 30 : side === 2 ? rand(0, W) : 30;
+          const y = side === 0 ? 30 : side === 1 ? rand(0, H) : side === 2 ? H - 30 : rand(0, H);
+          rocks.push(makeRock(x, y, rand(38, 64)));
+        }
+      }
+
+      function makeRock(x, y, radius) {
+        const hull = [];
+        const hullN = 11 + ((Math.random() * 5) | 0);
+        for (let i = 0; i < hullN; i++) {
+          const a = (i / hullN) * TAU;
+          const r = radius * rand(.74, 1.08);
+          hull.push([Math.cos(a) * r, Math.sin(a) * r]);
+        }
+
+        const bits = [];
+        const bitN = Math.round(radius / 5) + 4;
+        for (let i = 0; i < bitN; i++) {
+          const a = (i / bitN) * TAU + rand(-.18, .18);
+          const hr = i % 3 === 0 ? rand(0, radius * .25) : rand(radius * .25, radius * .82);
+          bits.push(makeShard(Math.cos(a) * hr, Math.sin(a) * hr, rand(radius * .09, radius * .16)));
+        }
+
+        return {
+          x, y,
+          vx: rand(-34, 34),
+          vy: rand(-34, 34),
+          rot: rand(0, TAU),
+          vr: rand(-.34, .34),
+          radius,
+          hull,
+          bits,
+          reformDelay: 0,
+          scatter: 0,
+        };
+      }
+
+      function makeShard(hx, hy, size) {
+        return {
+          hx, hy,
+          ox: hx + rand(-1, 1),
+          oy: hy + rand(-1, 1),
+          vx: 0,
+          vy: 0,
+          size,
+          angle: rand(0, TAU),
+          spin: rand(-.8, .8),
+          shape: shardShape(size),
+        };
+      }
+
+      function shardShape(size) {
+        const n = 4 + ((Math.random() * 4) | 0);
+        const pts = [];
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * TAU + rand(-.22, .22);
+          const r = size * rand(.48, 1.06);
+          pts.push([Math.cos(a) * r, Math.sin(a) * r]);
+        }
+        return pts;
+      }
+
+      function frame(t) {
+        const dt = Math.max(0, Math.min(1 / 30, (t - last) / 1000));
+        last = t;
+        now += dt;
+
+        updateShip(dt);
+        updateBullets(dt);
+        updateRocks(dt);
+        updateSparks(dt);
+        collideBullets();
+        collideShip();
+        draw();
+
+        raf = requestAnimationFrame(frame);
+      }
+
+      function updateShip(dt) {
+        if (gameOver) return;
+        if (!ship.alive) {
+          ship.deadFor -= dt;
+          if (ship.deadFor <= 0 && ship.lives > 0) respawnShip();
+          return;
+        }
+
+        if (keys.has('ArrowLeft') || keys.has('KeyA')) ship.a -= SHIP_TURN * dt;
+        if (keys.has('ArrowRight') || keys.has('KeyD')) ship.a += SHIP_TURN * dt;
+        if (keys.has('ArrowUp') || keys.has('KeyW')) {
+          ship.vx += Math.cos(ship.a) * SHIP_ACCEL * dt;
+          ship.vy += Math.sin(ship.a) * SHIP_ACCEL * dt;
+          if (Math.random() < .42) thrustSpark();
+        }
+
+        const drag = Math.pow(1 - SHIP_DRAG, dt);
+        ship.vx *= drag;
+        ship.vy *= drag;
+        ship.x = wrap(ship.x + ship.vx * dt, W);
+        ship.y = wrap(ship.y + ship.vy * dt, H);
+        ship.fireCd = Math.max(0, ship.fireCd - dt);
+        ship.invuln = Math.max(0, ship.invuln - dt);
+
+        if (keys.has('Space') && ship.fireCd <= 0) fire();
+      }
+
+      function respawnShip() {
+        ship.x = W / 2;
+        ship.y = H / 2;
+        ship.vx = 0;
+        ship.vy = 0;
+        ship.a = -Math.PI / 2;
+        ship.alive = true;
+        ship.invuln = 2;
+        ship.fireCd = .25;
+      }
+
+      function killShip() {
+        if (!ship.alive || ship.invuln > 0) return;
+        ship.alive = false;
+        ship.deadFor = 1.6;
+        ship.lives--;
+        burst(ship.x, ship.y, 34, 180);
+        if (ship.lives <= 0) {
+          gameOver = true;
+          ship.deadFor = Infinity;
+        }
+      }
+
+      function fire() {
+        if (!ship.alive || gameOver || bullets.length >= MAX_BULLETS) return;
+        const nx = Math.cos(ship.a), ny = Math.sin(ship.a);
+        bullets.push({
+          x: wrap(ship.x + nx * 17, W),
+          y: wrap(ship.y + ny * 17, H),
+          px: ship.x,
+          py: ship.y,
+          vx: ship.vx + nx * BULLET_SPEED,
+          vy: ship.vy + ny * BULLET_SPEED,
+          life: 1.08,
+        });
+        ship.fireCd = .17;
+      }
+
+      function updateBullets(dt) {
+        for (const b of bullets) {
+          b.px = b.x;
+          b.py = b.y;
+          b.x = wrap(b.x + b.vx * dt, W);
+          b.y = wrap(b.y + b.vy * dt, H);
+          b.life -= dt;
+        }
+        bullets = bullets.filter((b) => b.life > 0);
+      }
+
+      function updateRocks(dt) {
+        for (const r of rocks) {
+          r.x = wrap(r.x + r.vx * dt, W);
+          r.y = wrap(r.y + r.vy * dt, H);
+          r.rot += r.vr * dt;
+          r.reformDelay = Math.max(0, r.reformDelay - dt);
+          r.scatter = Math.max(0, r.scatter - dt * .34);
+
+          const spring = r.reformDelay > 0 ? .34 : 2.85;
+          const damp = Math.pow(r.reformDelay > 0 ? .68 : .055, dt);
+          for (const bit of r.bits) {
+            bit.vx += (bit.hx - bit.ox) * spring * dt;
+            bit.vy += (bit.hy - bit.oy) * spring * dt;
+            bit.vx *= damp;
+            bit.vy *= damp;
+            bit.ox += bit.vx * dt;
+            bit.oy += bit.vy * dt;
+            bit.angle += bit.spin * dt;
+            bit.spin *= Math.pow(.18, dt);
+          }
+        }
+      }
+
+      function updateSparks(dt) {
+        for (let i = sparks.length - 1; i >= 0; i--) {
+          const s = sparks[i];
+          s.age += dt;
+          s.x = wrap(s.x + s.vx * dt, W);
+          s.y = wrap(s.y + s.vy * dt, H);
+          s.vx *= Math.pow(.12, dt);
+          s.vy *= Math.pow(.12, dt);
+          if (s.age >= s.life) sparks.splice(i, 1);
+        }
+      }
+
+      function collideBullets() {
+        for (let bi = bullets.length - 1; bi >= 0; bi--) {
+          const b = bullets[bi];
+          let hit = null;
+          for (const rock of rocks) {
+            const d = distWrap(b.x, b.y, rock.x, rock.y);
+            if (d > rock.radius + 72) continue;
+            hit = nearestShardHit(rock, b.x, b.y, 5);
+            if (hit || d < rock.radius * .62) {
+              fractureRock(rock, b.x, b.y, hit);
+              bullets.splice(bi, 1);
+              score += 10;
+              break;
+            }
+          }
+        }
+      }
+
+      function collideShip() {
+        if (!ship.alive || ship.invuln > 0 || gameOver) return;
+        for (const rock of rocks) {
+          if (distWrap(ship.x, ship.y, rock.x, rock.y) > rock.radius + 60) continue;
+          for (const bit of rock.bits) {
+            const p = shardWorld(rock, bit);
+            if (distWrap(ship.x, ship.y, p.x, p.y) < SHIP_R + bit.size * .72) {
+              killShip();
+              return;
+            }
+          }
+        }
+      }
+
+      function nearestShardHit(rock, x, y, pad) {
+        let best = null;
+        let bestD = Infinity;
+        for (let i = 0; i < rock.bits.length; i++) {
+          const bit = rock.bits[i];
+          const p = shardWorld(rock, bit);
+          const d = distWrap(x, y, p.x, p.y);
+          if (d < bit.size + pad && d < bestD) {
+            bestD = d;
+            best = { bit, index: i };
+          }
+        }
+        return best;
+      }
+
+      function fractureRock(rock, x, y, hit) {
+        const local = worldToRock(rock, x, y);
+        rock.reformDelay = 1.35;
+        rock.scatter = 1;
+        rock.vx += clamp((rock.x - x) * .015, -10, 10);
+        rock.vy += clamp((rock.y - y) * .015, -10, 10);
+
+        if (!hit) hit = nearestLocalShard(rock, local.x, local.y);
+        if (hit && rock.bits.length < MAX_SHARDS_PER_ROCK && hit.bit.size > 4.2) {
+          splitShard(rock, hit.bit);
+        } else if (hit) {
+          hit.bit.size = Math.max(3.2, hit.bit.size * .94);
+          hit.bit.shape = shardShape(hit.bit.size);
+        }
+
+        for (const bit of rock.bits) {
+          const dx = bit.ox - local.x;
+          const dy = bit.oy - local.y;
+          const d = Math.hypot(dx, dy) || 1;
+          const force = rand(65, 190) / (1 + d * .012);
+          bit.vx += (dx / d) * force + rand(-28, 28);
+          bit.vy += (dy / d) * force + rand(-28, 28);
+          bit.spin += rand(-5.2, 5.2) / Math.max(1, bit.size * .18);
+        }
+        burst(x, y, 18, 115);
+      }
+
+      function splitShard(rock, bit) {
+        const side = Math.random() < .5 ? -1 : 1;
+        const a = Math.atan2(bit.hy, bit.hx) + Math.PI / 2;
+        const spread = Math.max(4, bit.size * .52);
+        bit.size *= .72;
+        bit.hx += Math.cos(a) * spread * side;
+        bit.hy += Math.sin(a) * spread * side;
+        bit.shape = shardShape(bit.size);
+        const child = makeShard(
+          bit.hx - Math.cos(a) * spread * side * 2,
+          bit.hy - Math.sin(a) * spread * side * 2,
+          bit.size * rand(.9, 1.08)
+        );
+        child.ox = bit.ox - Math.cos(a) * spread * side;
+        child.oy = bit.oy - Math.sin(a) * spread * side;
+        child.vx = bit.vx - Math.cos(a) * rand(35, 82) * side;
+        child.vy = bit.vy - Math.sin(a) * rand(35, 82) * side;
+        rock.bits.push(child);
+      }
+
+      function nearestLocalShard(rock, x, y) {
+        let best = null, bestD = Infinity;
+        for (let i = 0; i < rock.bits.length; i++) {
+          const bit = rock.bits[i];
+          const d = Math.hypot(bit.ox - x, bit.oy - y);
+          if (d < bestD) { bestD = d; best = { bit, index: i }; }
+        }
+        return best;
+      }
+
+      function worldToRock(rock, x, y) {
+        const dx = wrapDelta(x - rock.x, W);
+        const dy = wrapDelta(y - rock.y, H);
+        const ca = Math.cos(-rock.rot), sa = Math.sin(-rock.rot);
+        return { x: dx * ca - dy * sa, y: dx * sa + dy * ca };
+      }
+
+      function shardWorld(rock, bit) {
+        const ca = Math.cos(rock.rot), sa = Math.sin(rock.rot);
+        return {
+          x: wrap(rock.x + bit.ox * ca - bit.oy * sa, W),
+          y: wrap(rock.y + bit.ox * sa + bit.oy * ca, H),
+        };
+      }
+
+      function burst(x, y, n, speed) {
+        for (let i = 0; i < n; i++) {
+          const a = rand(0, TAU);
+          const s = rand(speed * .18, speed);
+          sparks.push({
+            x, y,
+            vx: Math.cos(a) * s,
+            vy: Math.sin(a) * s,
+            age: 0,
+            life: rand(.28, .9),
+            len: rand(5, 18),
+            a,
+          });
+        }
+      }
+
+      function thrustSpark() {
+        const a = ship.a + Math.PI + rand(-.42, .42);
+        sparks.push({
+          x: wrap(ship.x + Math.cos(ship.a + Math.PI) * 12, W),
+          y: wrap(ship.y + Math.sin(ship.a + Math.PI) * 12, H),
+          vx: ship.vx + Math.cos(a) * rand(45, 125),
+          vy: ship.vy + Math.sin(a) * rand(45, 125),
+          age: 0,
+          life: rand(.12, .28),
+          len: rand(4, 10),
+          a,
+        });
+      }
+
+      function draw() {
+        ctx.fillStyle = gameOver ? 'rgba(0,0,0,.12)' : 'rgba(0,0,0,.24)';
+        ctx.fillRect(0, 0, W, H);
+        drawStars();
+        drawRocks();
+        drawBullets();
+        drawSparks();
+        drawShip();
+        drawHud();
+      }
+
+      function drawStars() {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (const s of stars) {
+          const a = s.a * (.65 + Math.sin(now * 1.7 + s.p) * .35);
+          ctx.fillStyle = `${LINE}${a})`;
+          ctx.fillRect(s.x, s.y, 1, 1);
+        }
+        ctx.restore();
+      }
+
+      function drawRocks() {
+        for (const rock of rocks) {
+          const settled = 1 - rock.scatter;
+          if (settled > .05) {
+            const hull = rock.hull.map(([x, y]) => rotatePoint(rock.x, rock.y, x, y, rock.rot));
+            glowPath(hull, true, 1, .08 + settled * .18);
+          }
+          for (const bit of rock.bits) drawShard(rock, bit);
+        }
+      }
+
+      function drawShard(rock, bit) {
+        const pts = [];
+        const ca = Math.cos(rock.rot + bit.angle), sa = Math.sin(rock.rot + bit.angle);
+        const rc = Math.cos(rock.rot), rs = Math.sin(rock.rot);
+        const cx = rock.x + bit.ox * rc - bit.oy * rs;
+        const cy = rock.y + bit.ox * rs + bit.oy * rc;
+        for (const [px, py] of bit.shape) {
+          pts.push({
+            x: wrap(cx + px * ca - py * sa, W),
+            y: wrap(cy + px * sa + py * ca, H),
+          });
+        }
+        glowPath(pts, true, 1.15, .42 + rock.scatter * .25);
+      }
+
+      function rotatePoint(cx, cy, x, y, a) {
+        const ca = Math.cos(a), sa = Math.sin(a);
+        return { x: wrap(cx + x * ca - y * sa, W), y: wrap(cy + x * sa + y * ca, H) };
+      }
+
+      function drawShip() {
+        if (!ship.alive) return;
+        if (ship.invuln > 0 && Math.sin(now * 28) < -.28) return;
+        const nose = pointFromShip(17, 0);
+        const left = pointFromShip(-12, -9);
+        const notch = pointFromShip(-7, 0);
+        const right = pointFromShip(-12, 9);
+        glowPath([nose, left, notch, right], true, 1.35, .92);
+
+        if (keys.has('ArrowUp') || keys.has('KeyW')) {
+          const f1 = pointFromShip(-11, -5);
+          const f2 = pointFromShip(-23 - Math.sin(now * 64) * 4, 0);
+          const f3 = pointFromShip(-11, 5);
+          glowPath([f1, f2, f3], false, 1, .55);
+        }
+      }
+
+      function pointFromShip(forward, side) {
+        const ca = Math.cos(ship.a), sa = Math.sin(ship.a);
+        return {
+          x: wrap(ship.x + ca * forward - sa * side, W),
+          y: wrap(ship.y + sa * forward + ca * side, H),
+        };
+      }
+
+      function drawBullets() {
+        for (const b of bullets) {
+          const tail = {
+            x: wrap(b.x - b.vx * .022, W),
+            y: wrap(b.y - b.vy * .022, H),
+          };
+          glowPath([tail, { x: b.x, y: b.y }], false, 1.25, .9);
+        }
+      }
+
+      function drawSparks() {
+        for (const s of sparks) {
+          const p = clamp(s.age / s.life, 0, 1);
+          const a = (1 - p) * .72;
+          const x2 = wrap(s.x - Math.cos(s.a) * s.len * (1 - p), W);
+          const y2 = wrap(s.y - Math.sin(s.a) * s.len * (1 - p), H);
+          glowPath([{ x: s.x, y: s.y }, { x: x2, y: y2 }], false, 1, a);
+        }
+      }
+
+      function drawHud() {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.font = '13px ui-monospace, SFMono-Regular, Menlo, monospace';
+        ctx.textBaseline = 'top';
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = `${LINE}.82)`;
+        ctx.shadowColor = 'rgba(244,255,250,.65)';
+        ctx.shadowBlur = 7;
+        ctx.strokeText(String(score).padStart(5, '0'), 18, 18);
+        for (let i = 0; i < ship.lives; i++) drawLifeIcon(22 + i * 22, 45);
+        ctx.textAlign = 'right';
+        ctx.strokeText(`${bullets.length}/${MAX_BULLETS}`, W - 18, 18);
+        if (gameOver) {
+          ctx.textAlign = 'center';
+          ctx.font = '28px ui-monospace, SFMono-Regular, Menlo, monospace';
+          ctx.strokeText('NO SIGNAL', W / 2, H / 2 - 16);
+        }
+        ctx.restore();
+      }
+
+      function drawLifeIcon(x, y) {
+        glowPath([
+          { x, y: y - 8 },
+          { x: x - 8, y: y + 8 },
+          { x, y: y + 4 },
+          { x: x + 8, y: y + 8 },
+        ], true, .85, .62);
+      }
+
+      function glowPath(points, close, width, alpha) {
+        if (points.length < 2) return;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+
+        for (const pass of [
+          { w: width + 6, a: alpha * .08, blur: 15 },
+          { w: width + 2, a: alpha * .22, blur: 8 },
+          { w: width, a: alpha, blur: 2 },
+        ]) {
+          ctx.beginPath();
+          ctx.moveTo(points[0].x, points[0].y);
+          for (let i = 1; i < points.length; i++) {
+            const prev = points[i - 1], p = points[i];
+            const dx = wrapDelta(p.x - prev.x, W);
+            const dy = wrapDelta(p.y - prev.y, H);
+            ctx.lineTo(prev.x + dx, prev.y + dy);
+          }
+          if (close) ctx.closePath();
+          ctx.lineWidth = pass.w;
+          ctx.strokeStyle = `${LINE}${pass.a})`;
+          ctx.shadowColor = 'rgba(244,255,250,.8)';
+          ctx.shadowBlur = pass.blur;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      addEventListener('keydown', (e) => {
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'Space'].includes(e.code)) e.preventDefault();
+        keys.add(e.code);
+        if (gameOver && (e.code === 'Enter' || e.code === 'Space')) reset();
+      });
+      addEventListener('keyup', (e) => keys.delete(e.code));
+      addEventListener('click', () => {
+        if (gameOver) reset();
+        else fire();
+      });
+      addEventListener('resize', resize);
+
+      resize();
+    </script>
+  </body>
+</html>

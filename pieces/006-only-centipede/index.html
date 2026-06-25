@@ -457,7 +457,7 @@
               c.dir = c.turn.newDir;
               c.turn = null;
               c.turnCooldown = 0;
-              turnCentipede(c);
+              requestTurn(c, { force: true });
             }
             continue;
           }
@@ -465,12 +465,7 @@
           head.y = rowY(c.rowIndex);
           head.x += c.dir * c.speed * dt;
           if (!c.hasEntered && isInsideField(head.x)) c.hasEntered = true;
-          let blocked = c.hasEntered && (head.x < 24 || head.x > W - 24);
-          const mushroomHit = findMushroomAt(head.x, head.y);
-          if (mushroomHit >= 0) blocked = true;
-          if (blocked) {
-            turnCentipede(c);
-          }
+          handleTurnBlock(c, head);
 
           arrangeCentipede(c);
         }
@@ -484,6 +479,29 @@
           if (dist2(x, y, m.x, m.y) < (MUSH_R + SEG_R + 1) ** 2) return i;
         }
         return -1;
+      }
+
+      function handleTurnBlock(c, head) {
+        const edgeBlocked = c.hasEntered && (head.x < 24 || head.x > W - 24);
+        const mushroomHit = findMushroomAt(head.x, head.y);
+        if (!edgeBlocked && mushroomHit < 0) return false;
+
+        if (edgeBlocked) {
+          head.x = clamp(head.x, 24, W - 24);
+        } else {
+          const m = mushrooms[mushroomHit];
+          const clearance = MUSH_R + SEG_R + 3;
+          head.x = clamp(m.x - c.dir * clearance, 24, W - 24);
+        }
+
+        return requestTurn(c);
+      }
+
+      function requestTurn(c, options = {}) {
+        if (!c?.segments.length || c.turn) return false;
+        if (!options.force && c.turnCooldown > 0) return false;
+        turnCentipede(c);
+        return true;
       }
 
       function resolveCentipedeCollisions() {
@@ -503,7 +521,7 @@
               const survivor = centipedes.find((c) => c.id === attackerId);
               if (survivor?.segments.length) {
                 survivor.collisionCooldown = .35;
-                if (!survivor.turn) turnCentipede(survivor);
+                requestTurn(survivor, { force: true });
               }
               return;
             }
@@ -543,6 +561,12 @@
         const oldDir = c.dir;
         const newDir = -oldDir;
         const rowStep = Math.abs(rowY(toRow) - rowY(fromRow));
+        if (rowStep <= 0) {
+          c.dir = newDir;
+          c.turnCooldown = .22;
+          arrangeCentipede(c);
+          return;
+        }
         c.turnCooldown = .22;
         c.dir = newDir;
         c.turn = {

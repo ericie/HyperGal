@@ -1,11 +1,56 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" shape-rendering="crispEdges">
-  <rect x="0"   y="0"   width="80"  height="120" fill="#2b2d42"/>
-  <rect x="80"  y="0"   width="120" height="60"  fill="#ef233c"/>
-  <rect x="80"  y="60"  width="60"  height="60"  fill="#ffb703"/>
-  <rect x="140" y="60"  width="60"  height="60"  fill="#219ebc"/>
-  <rect x="0"   y="120" width="60"  height="80"  fill="#fb8500"/>
-  <rect x="60"  y="120" width="80"  height="40"  fill="#edf2f4"/>
-  <rect x="60"  y="160" width="40"  height="40"  fill="#8d99ae"/>
-  <rect x="100" y="160" width="40"  height="40"  fill="#023047"/>
-  <rect x="140" y="120" width="60"  height="80"  fill="#ef233c"/>
+  <defs>
+    <pattern id="ground" width="16" height="16" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="#023047"/>
+      <path d="M0 4H16M0 12H16M4 0V16M12 0V16" stroke="#021f2f" stroke-width="2" opacity=".75"/>
+      <path d="M0 0L16 16M16 0L0 16" stroke="#edf2f4" stroke-width="1" opacity=".14"/>
+    </pattern>
+    <linearGradient id="fallFace" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd166"/>
+      <stop offset="1" stop-color="#ffb703"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="200" height="200" fill="url(#ground)"/>
+  <rect width="200" height="200" fill="#023047" opacity=".46"/>
+
+  <g fill="#ffb703">
+    <rect x="2" y="124" width="56" height="18"/>
+    <rect x="62" y="124" width="56" height="18"/>
+    <rect x="122" y="124" width="56" height="18"/>
+    <rect x="-28" y="146" width="56" height="18"/>
+    <rect x="32" y="146" width="56" height="18"/>
+    <rect x="92" y="146" width="56" height="18"/>
+    <rect x="152" y="146" width="56" height="18"/>
+    <rect x="2" y="168" width="56" height="18"/>
+    <rect x="62" y="168" width="56" height="18"/>
+    <rect x="122" y="168" width="56" height="18"/>
+    <rect x="-28" y="190" width="56" height="18"/>
+    <rect x="32" y="190" width="56" height="18"/>
+    <rect x="92" y="190" width="56" height="18"/>
+    <rect x="152" y="190" width="56" height="18"/>
+  </g>
+
+  <g fill="#c98502" opacity=".7">
+    <rect x="2" y="140" width="56" height="2"/>
+    <rect x="62" y="140" width="56" height="2"/>
+    <rect x="122" y="140" width="56" height="2"/>
+    <rect x="-28" y="162" width="56" height="2"/>
+    <rect x="32" y="162" width="56" height="2"/>
+    <rect x="92" y="162" width="56" height="2"/>
+    <rect x="152" y="162" width="56" height="2"/>
+    <rect x="2" y="184" width="56" height="2"/>
+    <rect x="62" y="184" width="56" height="2"/>
+    <rect x="122" y="184" width="56" height="2"/>
+  </g>
+
+  <g transform="translate(84 45) rotate(-12)">
+    <polygon points="0,0 58,0 70,10 12,10" fill="#ffe08a"/>
+    <polygon points="58,0 70,10 70,28 58,18" fill="#bf8002"/>
+    <rect x="0" y="0" width="58" height="18" fill="url(#fallFace)"/>
+    <rect x="3" y="3" width="52" height="3" fill="#fff1bf" opacity=".45"/>
+    <rect x="3" y="15" width="52" height="2" fill="#8f5f00" opacity=".38"/>
+  </g>
+
+  <rect x="0" y="0" width="200" height="200" fill="none" stroke="#edf2f4" stroke-opacity=".28" stroke-width="2"/>
 </svg>

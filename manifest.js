@@ -15,7 +15,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "Eight rectangles, eight colors, no gaps. A unit-cell grid is greedy-packed with weighted variety so the wall always fills itself. Click to reshuffle."
+      "description": "A patterned wall of falling bricks. One color pair and one high-contrast textile tile seed each run; staggered rows scroll downward while new faux-3D bricks tumble in from above, flatten, and join the wall. Click to reshuffle."
     },
     {
       "slug": "003-unbreakable",
@@ -48,6 +48,22 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "A Centipede riff with small defenders at the top and bottom, one straight bullet each, and fast, hard-edged centipedes that enter from offscreen once the field is nearly cleared. Head shots remove the head and promote the next segment; body shots split the chain. Every hit segment becomes a three-shot mushroom that dents and deforms in the centipede's color."
+    },
+    {
+      "slug": "007-hydra",
+      "title": "hydra",
+      "year": 2026,
+      "type": "interactive",
+      "thumbnail": "thumbnail.svg",
+      "description": "Autonomous snake on an Apple //e amber CRT. A snake greedily hunts the nearest mouse, blind to its own body — so a long one curls into its own tail, and where it strikes itself it splits into two snakes that hunt on their own. The myth: cut the hydra and it doubles. The cull is the heads — when two snakes meet head-on, one dies. Eating lengthens, splitting divides, collisions thin the herd, and the count breathes forever with no player. Amber phosphor, scanlines, glow. Click to reseed."
+    },
+    {
+      "slug": "008-vectrex-asteroids",
+      "title": "Vectrex Asteroids",
+      "year": 2026,
+      "type": "interactive",
+      "thumbnail": "thumbnail.svg",
+      "description": "A black-and-white Vectrex-style Asteroids variant. The ship can keep only three shots alive at once. Asteroids never vanish: every hit fractures their matter into smaller vector shards, and the shards slowly pull back together until the rock reforms. The ship dies on contact."
     }
   ]
 };

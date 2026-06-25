@@ -157,7 +157,7 @@
       let decay = new Float32Array(0);    // transient wilt timer per tile
       let soilL, plantL, marksL;          // offscreen layers
       let prey = [], preds = [], pulses = [];
-      let soilTint = SOILS[0], flowers = FLOWER_SETS[0];
+      let soilTint = SOILS[0], flowers = FLOWER_SETS[0], flowerRGBs = FLOWER_SETS[0].map(hexRgb);
       let setIndex = 0;
       let last = 0, fps = 0, plantTimer = 0, WARM = 0;
       let plantPixCols = 0, plantPixRows = 0, plantCursor = 0, plantStride = 1;
@@ -175,6 +175,7 @@
       const foodAt = (x, y) => food[tileIdx(x, y)];
       function hash(i) { let h = i * 374761393 + 668265263; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967295; }
       function shade(hex, d) { const n = parseInt(hex.slice(1), 16); const cl = (v) => v < 0 ? 0 : v > 255 ? 255 : v | 0; return `rgb(${cl((n >> 16) + d)},${cl(((n >> 8) & 255) + d)},${cl((n & 255) + d)})`; }
+      function hexRgb(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
       const mix = (a, b, t) => [a[0] * (1 - t) + b[0] * t | 0, a[1] * (1 - t) + b[1] * t | 0, a[2] * (1 - t) + b[2] * t | 0];
       const sat = (c, s) => { const m = (c[0] + c[1] + c[2]) / 3; return [clamp(m + (c[0] - m) * s, 0, 255) | 0, clamp(m + (c[1] - m) * s, 0, 255) | 0, clamp(m + (c[2] - m) * s, 0, 255) | 0]; };
       const deepen = (c) => { const s = sat(c, 1.5); return [s[0] * 0.92 | 0, s[1] * 0.84 | 0, s[2] * 0.84 | 0]; };  // vivid, slightly deep stain
@@ -290,6 +291,19 @@
         const v = 0.9 + hash((px * 19349663) ^ (py * 83492791) >>> 0) * 0.2;
         c.fillStyle = `rgba(${base[0] * v | 0},${base[1] * v | 0},${base[2] * v | 0},${0.3 + 0.28 * f})`;
         c.fillRect(px, py, PXS, PXS);
+
+        const bloom = clamp((f - 0.62) / 0.38, 0, 1);
+        const seed = (((px / PXS) | 0) * 1597334677 ^ (((py / PXS) | 0) * 3812015801) ^ ((setIndex + 1) * 1013904223)) >>> 0;
+        if (bloom > 0 && hash(seed) < bloom * 0.16) {
+          const petal = flowerRGBs[(hash(seed ^ 0x9e3779b9) * flowerRGBs.length) | 0];
+          const heart = mix(petal, [255, 238, 162], 0.48);
+          const a = 0.42 + bloom * 0.34;
+          c.fillStyle = `rgba(${petal[0]},${petal[1]},${petal[2]},${a})`;
+          c.fillRect(px + 1, py, 1, PXS);
+          c.fillRect(px, py + 1, PXS, 1);
+          c.fillStyle = `rgba(${heart[0]},${heart[1]},${heart[2]},${Math.min(0.92, a + 0.18)})`;
+          c.fillRect(px + 1, py + 1, 1, 1);
+        }
       }
       function drawPlants(budget = PLANT_PIXEL_BUDGET) {
         const c = plantL.ctx, total = plantPixCols * plantPixRows;
@@ -697,6 +711,7 @@
       function reset() {
         soilTint = SOILS[setIndex % SOILS.length];
         flowers = FLOWER_SETS[setIndex % FLOWER_SETS.length];
+        flowerRGBs = flowers.map(hexRgb);
         for (let i = 0; i < food.length; i++) food[i] = chance(0.28) ? rand(0.15, 0.7) : 0;
         decay.fill(0);
         plantL.ctx.clearRect(0, 0, W, H);

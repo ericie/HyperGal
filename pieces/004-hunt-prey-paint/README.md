@@ -9,9 +9,10 @@ there are no corners to win or die in.
 - **Plants** — the food, drawn as a quiet **distributed-pixel terrain** in the
   spirit of the original *Dune*'s top-down landscape: a low-contrast dither over
   the sand whose density (not colour) tracks biomass, so growth reads as a subtle
-  thickening of the ground rather than a busy field of symbols. Plants grow more
-  slowly and the visible terrain is painted incrementally, one small pixel at a
-  time, so new groundcover fills in instead of popping on all at once.
+  thickening of the ground rather than a busy field of symbols. Lush patches
+  sprout tiny flowers from the active bloom palette. Plants grow more slowly and
+  the visible terrain is painted incrementally, one small pixel at a time, so new
+  groundcover fills in instead of popping on all at once.
 - **Prey** — vector grazers, each wearing one of many **colours**. They eat
   plants, **grow quickly into larger bodies**, and flee hunters. They must reach
   a visibly grown body before they can breed. Every prey is born with its own

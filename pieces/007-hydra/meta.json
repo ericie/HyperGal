@@ -1,0 +1,7 @@
+{
+  "title": "hydra",
+  "year": 2026,
+  "type": "interactive",
+  "thumbnail": "thumbnail.svg",
+  "description": "Autonomous snake on an Apple //e amber CRT. A snake greedily hunts the nearest mouse, blind to its own body — so a long one curls into its own tail, and where it strikes itself it splits into two snakes that hunt on their own. The myth: cut the hydra and it doubles. The cull is the heads — when two snakes meet head-on, one dies. Eating lengthens, splitting divides, collisions thin the herd, and the count breathes forever with no player. Amber phosphor, scanlines, glow. Click to reseed."
+}

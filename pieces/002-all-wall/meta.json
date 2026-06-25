@@ -3,5 +3,5 @@
   "year": 2026,
   "type": "interactive",
   "thumbnail": "thumbnail.svg",
-  "description": "Eight rectangles, eight colors, no gaps. A unit-cell grid is greedy-packed with weighted variety so the wall always fills itself. Click to reshuffle."
+  "description": "A patterned wall of falling bricks. One color pair and one high-contrast textile tile seed each run; staggered rows scroll downward while new faux-3D bricks tumble in from above, flatten, and join the wall. Click to reshuffle."
 }

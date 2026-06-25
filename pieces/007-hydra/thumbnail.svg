@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" shape-rendering="crispEdges">
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="200" height="200" fill="#0a0600"/>
+  <g filter="url(#glow)">
+    <g fill="#b8730c">
+      <rect x="24" y="92" width="14" height="14"/><rect x="40" y="92" width="14" height="14"/>
+      <rect x="56" y="92" width="14" height="14"/><rect x="56" y="76" width="14" height="14"/>
+      <rect x="56" y="60" width="14" height="14"/><rect x="72" y="60" width="14" height="14"/>
+      <rect x="120" y="120" width="14" height="14"/><rect x="120" y="136" width="14" height="14"/>
+      <rect x="136" y="136" width="14" height="14"/><rect x="152" y="136" width="14" height="14"/>
+      <rect x="152" y="120" width="14" height="14"/>
+    </g>
+    <g fill="#ffc23a">
+      <rect x="88" y="60" width="14" height="14"/>
+      <rect x="152" y="104" width="14" height="14"/>
+    </g>
+    <g fill="#ffe08a">
+      <rect x="124" y="64" width="8" height="8"/>
+      <rect x="40" y="148" width="8" height="8"/>
+      <rect x="168" y="40" width="8" height="8"/>
+    </g>
+  </g>
+  <g fill="#000" opacity="0.28">
+    <rect x="0" y="2" width="200" height="1.4"/><rect x="0" y="8" width="200" height="1.4"/>
+    <rect x="0" y="14" width="200" height="1.4"/><rect x="0" y="20" width="200" height="1.4"/>
+    <rect x="0" y="26" width="200" height="1.4"/><rect x="0" y="32" width="200" height="1.4"/>
+    <rect x="0" y="38" width="200" height="1.4"/><rect x="0" y="44" width="200" height="1.4"/>
+    <rect x="0" y="50" width="200" height="1.4"/><rect x="0" y="56" width="200" height="1.4"/>
+    <rect x="0" y="62" width="200" height="1.4"/><rect x="0" y="68" width="200" height="1.4"/>
+    <rect x="0" y="74" width="200" height="1.4"/><rect x="0" y="80" width="200" height="1.4"/>
+    <rect x="0" y="86" width="200" height="1.4"/><rect x="0" y="92" width="200" height="1.4"/>
+    <rect x="0" y="98" width="200" height="1.4"/><rect x="0" y="104" width="200" height="1.4"/>
+    <rect x="0" y="110" width="200" height="1.4"/><rect x="0" y="116" width="200" height="1.4"/>
+    <rect x="0" y="122" width="200" height="1.4"/><rect x="0" y="128" width="200" height="1.4"/>
+    <rect x="0" y="134" width="200" height="1.4"/><rect x="0" y="140" width="200" height="1.4"/>
+    <rect x="0" y="146" width="200" height="1.4"/><rect x="0" y="152" width="200" height="1.4"/>
+    <rect x="0" y="158" width="200" height="1.4"/><rect x="0" y="164" width="200" height="1.4"/>
+    <rect x="0" y="170" width="200" height="1.4"/><rect x="0" y="176" width="200" height="1.4"/>
+    <rect x="0" y="182" width="200" height="1.4"/><rect x="0" y="188" width="200" height="1.4"/>
+    <rect x="0" y="194" width="200" height="1.4"/>
+  </g>
+  <radialGradient id="vig" cx="50%" cy="50%" r="75%">
+    <stop offset="55%" stop-color="#000" stop-opacity="0"/>
+    <stop offset="100%" stop-color="#000" stop-opacity="0.55"/>
+  </radialGradient>
+  <rect width="200" height="200" fill="url(#vig)"/>
+</svg>
