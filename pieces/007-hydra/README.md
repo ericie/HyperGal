@@ -9,11 +9,11 @@ into two**, each piece becoming a snake that hunts on its own. Cut the hydra and
 it doubles.
 
 The cull is the **heads**: when two snakes try to move onto the same cell, one of
-them dies. (Crossing another snake's *body* is harmless — they just pass over
-each other; only heads meeting is fatal.) So:
+them dies. When a head strikes another snake's *body*, the hit snake splits as
+if its own head had struck that segment. So:
 
 - **mice** lengthen snakes,
-- **self-strikes** divide them,
+- **body strikes** divide the hit snake,
 - **head-on collisions** thin them,
 
 and the number of snakes breathes up and down forever without a player ever

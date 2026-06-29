@@ -60,13 +60,16 @@
       //   HUNTERS — angular vector predators. They chase the nearest prey they
       //             can see and eat it on contact.
       //
-      // Death paints the canvas:
-      //   · a prey that STARVES leaves a pale, bone-coloured stain.
-      //   · a prey that is KILLED leaves a blood stain.
-      //   · a predator that dies leaves a faint ash mark.
-      //   · a prey that reaches OLD AGE does the opposite — it is renewal. The
-      //     ground around it is wiped clean of every stain and flushed lush with
-      //     new growth. Living long enough is the only thing that heals the field.
+      // Death paints the canvas, in watercolour that seeps in and slowly soaks away:
+      //   · a prey that is KILLED leaves a body that the hunters PECK apart, a
+      //     watercolour bloodstain blooming in its colour as they feed.
+      //   · a STARVING animal spins down — slows, stops, circles tight and shrinks
+      //     to nothing; a starved prey then fertilises a patch of DEAD plants.
+      //   · a hunter that dies leaves a crosshatch mark.
+      //   · a spiny prey ages steadily toward white; when OLD AGE finally takes it,
+      //     it bursts, wipes the bloodstains around it, and flushes the ground.
+      //     The old are the only thing that heals the field.
+      //   · big prey are immune to smaller hunters, and giants move slowly.
       //
       // Populations are floored (a trickle of immigration if either side crashes)
       // and capped, so neither hunters nor prey can ever fully win: the system is
@@ -88,19 +91,19 @@
       // perpetual, marked, self-cleansing balance.
 
       // plants
-      let PLANT_GROWTH = 0.42;   // logistic regrow rate (the "growth" dial)
+      let PLANT_GROWTH = 0.32;   // logistic regrow rate (the "growth" dial)
       let PLANT_PROP   = 0.32;   // lush tiles seeding neighbours (the "prop" dial)
       const SPONT = 0.025;       // bare tiles spontaneously sprouting, per second
       const SENESCE = 0.03;      // chance/s a fully-bloomed tile flowers out and dies back (gentle)
       const EAT = 1.80;          // food a grazing prey removes per second (grazing visibly clears it)
-      const NUTR = 0.58;         // energy gained per unit of food eaten
+      const NUTR = 0.85;         // energy gained per unit of food eaten (well-fed grazers)
 
       // prey
-      const PREY0 = 30, MIN_PREY = 18, CAP_PREY = 160;
+      const PREY0 = 40, MIN_PREY = 16, CAP_PREY = 340;
       const PREY_AGE = [46, 82];     // lifespan range (seconds)
       const PREY_MATURE = 16;        // can reproduce after this age
-      const SIZE_AGE = 18;           // age at which a prey reaches full size
-      const MINR = 3.5, MAXR = 12;   // body radius, young -> old
+      const SIZE_AGE = 95;           // grows VERY slowly — only the rare, long-lived survivor turns giant
+      const MINR = 3.5, MAXR = 22;   // body radius, young -> old (giants)
       const METAB_PREY = 0.055;      // idle energy burn per second
       const FLEE_COST = 4.2;         // sprinting multiplies the burn this much
       const ALERT = [50, 140];       // per-prey predator-detection radius
@@ -111,12 +114,13 @@
       const PREY_DECEL = 2.5;        // how gently it coasts back down when safe
       const PREY_REP = 0.84;         // energy needed to breed
       const PREY_BREED_R = 10;       // must be visibly grown before breeding
+      const IMMUNE_RATIO = 2.0;      // a prey bigger than (hunter size × this) can't be taken
 
       // predators — they GROW by eating and SPLIT in half when fat (mitosis), and
       // burn energy by MOVING: a starving hunter sprints faster but spends faster.
-      const PRED0 = 8, MIN_PRED = 3, CAP_PRED = 36;
+      const PRED0 = 8, MIN_PRED = 4, CAP_PRED = 22;
       const PRED_AGE = [60, 96];     // hunters die of old age too
-      const PRED_SPEED = [135, 168]; // fast — closes a chase quickly; fastest prey still escape
+      const PRED_SPEED = [168, 205]; // fast — closes a chase quickly; fastest prey still escape
       const PRED_ACCEL = [3.0, 6.5]; // per-hunter: how hard it builds speed (snappier baseline)
       const PRED_TURN = [3.0, 6.0];  // per-hunter: rad/s it can swing its heading (snappier baseline)
       const CRUISE = 0.78;           // fraction of top speed when no prey is in sight (stays fast)
@@ -124,14 +128,18 @@
       const AGGRO_K = 1.0;           // prey-swarm aggression: up to this much extra turn/accel
       const AGGRO_REF = 12;          // a 'lot of prey' = this many in sight
       const BMR = 0.008;             // basal burn per second (standing still)
-      const MOVE_K = 0.00044;        // burn per px/s of speed — moving is what costs
-      const STARVE_BOOST = 0.4;      // a near-empty hunter moves this much faster
+      const MOVE_K = 0.00020;        // cheap movement — a fast hunter thrives, but the lifespan trade-off limits it
+      const STARVE_SLOW = 0.12;      // a near-empty hunter slows to this fraction of speed, then stalls
       const HREF = 1.0;              // energy reference for the hunger ramp
-      const KILL_GAIN = 0.46;        // base energy per kill, ×(prey size / 7) — big prey, big meal
-      const SIZE_W = 2.0;            // how strongly a hunter prefers prey near its own size
+      const KILL_GAIN = 0.78;        // total food a corpse holds, ×(prey size / 7) — torn off peck by peck
+      const SIZE_W = 0.8;            // mild preference for prey near its own size (not so picky it starves)
       const SPLIT_E = 1.9;           // energy at which a fat hunter divides in two
-      const PBASE = 3.0, PGROWK = 2.5, PMAX = 8;  // size = PBASE + energy*PGROWK; small darts, weak = smaller
+      const PBASE = 3.0, PGROWK = 2.8, PMAX = 8;  // size = PBASE + energy*PGROWK; small darts
       const SEP_K = 1.15;            // same-type bodies push apart at this × their radii
+      const DYING_DUR = 1.4;         // seconds a starving animal spends spinning down to nothing
+      const PECK_BITE = 0.15;        // energy a hunter tears off a corpse per peck (small bites = longer meal)
+      const GIANT_SIZE = 16;         // a prey this big is a 'giant' — spiny, immune, and pops when it dies
+      const CORPSE_LIFE = 16, HUSK_LIFE = 6; // a body lingers, then a spent husk fades over seconds
 
       // palettes
       const SOILS = ['#c2a877', '#bca06c', '#c9b282', '#b89a6a', '#c6ad7e'];
@@ -155,8 +163,11 @@
       let CELL = 20, gcols = 0, grows = 0;
       let food = new Float32Array(0);
       let decay = new Float32Array(0);    // transient wilt timer per tile
+      // coarse 'where is the blood, and what colour' grid — cheap to sample, so a
+      // hunter only trails when it stands IN blood, in that blood's own colour
+      const BCELL = 16; let bgW = 0, bgH = 0, bA = new Float32Array(0), bR = new Uint8Array(0), bG = new Uint8Array(0), bB = new Uint8Array(0);
       let soilL, plantL, marksL;          // offscreen layers
-      let prey = [], preds = [], pulses = [];
+      let prey = [], preds = [], pulses = [], corpses = [], oldBursts = [];
       let soilTint = SOILS[0], flowers = FLOWER_SETS[0], flowerRGBs = FLOWER_SETS[0].map(hexRgb);
       let setIndex = 0;
       let last = 0, fps = 0, plantTimer = 0, WARM = 0;
@@ -200,6 +211,8 @@
         gcols = Math.ceil(W / CELL); grows = Math.ceil(H / CELL);
         food = new Float32Array(gcols * grows);
         decay = new Float32Array(gcols * grows);
+        bgW = Math.ceil(W / BCELL); bgH = Math.ceil(H / BCELL);
+        bA = new Float32Array(bgW * bgH); bR = new Uint8Array(bgW * bgH); bG = new Uint8Array(bgW * bgH); bB = new Uint8Array(bgW * bgH);
 
         soilL = makeLayer(); plantL = makeLayer(); marksL = makeLayer();
         configurePlantPixels();
@@ -292,9 +305,9 @@
         c.fillStyle = `rgba(${base[0] * v | 0},${base[1] * v | 0},${base[2] * v | 0},${0.3 + 0.28 * f})`;
         c.fillRect(px, py, PXS, PXS);
 
-        const bloom = clamp((f - 0.62) / 0.38, 0, 1);
+        const bloom = clamp((f - 0.80) / 0.20, 0, 1);                   // only the very lushest tiles flower
         const seed = (((px / PXS) | 0) * 1597334677 ^ (((py / PXS) | 0) * 3812015801) ^ ((setIndex + 1) * 1013904223)) >>> 0;
-        if (bloom > 0 && hash(seed) < bloom * 0.16) {
+        if (bloom > 0 && hash(seed) < bloom * 0.05) {                   // and only a few of those — sparse
           const petal = flowerRGBs[(hash(seed ^ 0x9e3779b9) * flowerRGBs.length) | 0];
           const heart = mix(petal, [255, 238, 162], 0.48);
           const a = 0.42 + bloom * 0.34;
@@ -323,61 +336,103 @@
       // from a heavy centre, blobby uneven colour, a darker dried RIM (the tide-
       // line a watercolour pool leaves as it dries), and a gritty dirty-xerox
       // stipple. The colour is the dying creature's own.
-      const WHITE = [240, 238, 232];   // a starved prey bleeds white
+      const WHITE = [244, 240, 232];   // a starved prey bleeds white
+      const OLD_WHITE = [248, 246, 240];
       let seeps = [];
-      // A stain is a directional PAINT SMEAR: colour dragged along one axis, built
-      // from blobs strung down the smear (tapering at the ends), streaky dragged
-      // strokes, and a gritty stipple — so it reads like paint wiped across the
-      // ground rather than a round splat. Still seeps outward over time.
-      function genStain(x, y, rgb, scale, o) {
-        const baseR = o.baseR * scale;
-        const r0 = rgb[0] | 0, g0 = rgb[1] | 0, b0 = rgb[2] | 0;
-        const dk = [r0 * 0.5 | 0, g0 * 0.42 | 0, b0 * 0.42 | 0];
-        const sm = rand(0, TAU), ca = Math.cos(sm), sa = Math.sin(sm);
-        const LONG = baseR * 1.8, PERP = baseR * 0.58;
-        const place = (al, pe) => [x + ca * al - sa * pe, y + sa * al + ca * pe];
-        const vcol = () => { const v = rand(0.82, 1.16); return `${clamp(r0 * v, 0, 255) | 0},${clamp(g0 * v, 0, 255) | 0},${clamp(b0 * v, 0, 255) | 0}`; };
-        const P = [];
-        for (let k = 0; k < o.blobs; k++) {                            // body strung along the smear
-          const t = rand(-1, 1), al = t * LONG, pe = rand(-PERP, PERP) * (1 - Math.abs(t) * 0.5);
-          const [ox, oy] = place(al, pe);
-          const r = baseR * (0.55 - Math.abs(t) * 0.32) * rand(0.7, 1.3);
-          if (r < 1) continue;
-          const a = o.wash * rand(0.7, 1.3), col = vcol(), rad = Math.hypot(al, pe);
-          P.push({ rad, fn: (c) => { const g = c.createRadialGradient(ox, oy, 0, ox, oy, r); g.addColorStop(0, `rgba(${col},${a})`); g.addColorStop(1, `rgba(${col},0)`); c.fillStyle = g; c.beginPath(); c.arc(ox, oy, r, 0, TAU); c.fill(); } });
+      const gauss = () => (Math.random() + Math.random() + Math.random() + Math.random() - 2) * 0.72;
+      // Deform a closed polygon: split every edge and jitter the new midpoints, the
+      // jitter shrinking each pass — the recipe behind generative watercolour, an
+      // organic, crinkled, self-similar outline.
+      function deformPoly(pts, depth, variance, rough) {
+        let cur = pts;
+        for (let d = 0; d < depth; d++) {
+          const out = [];
+          for (let i = 0; i < cur.length; i++) {
+            const a = cur[i], b = cur[(i + 1) % cur.length];
+            out.push(a);
+            out.push({ x: (a.x + b.x) / 2 + gauss() * variance, y: (a.y + b.y) / 2 + gauss() * variance });
+          }
+          cur = out; variance *= rough;
         }
-        for (let k = 0; k < (o.streaks || 0); k++) {                   // dragged paint strokes
-          const pe = rand(-PERP, PERP), a0 = rand(-LONG, LONG * 0.2), a1 = a0 + rand(baseR * 0.8, LONG * 1.3);
-          const [x0, y0] = place(a0, pe), [x1, y1] = place(a1, pe + rand(-2.5, 2.5));
-          const a = o.wash * rand(1.0, 1.8), w = rand(1.2, baseR * 0.3), col = vcol(), rad = Math.hypot((a0 + a1) / 2, pe);
-          P.push({ rad, fn: (c) => { c.strokeStyle = `rgba(${col},${a})`; c.lineWidth = w; c.lineCap = 'round'; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); } });
-        }
-        for (let k = 0; k < o.grain; k++) {                            // dirty stipple along the smear
-          const al = rand(-LONG * 1.05, LONG * 1.05), pe = rand(-PERP * 1.25, PERP * 1.25);
-          const a = rand(0.06, 0.5) * (1 - Math.abs(al) / (LONG * 1.15));
-          if (a <= 0.02) continue;
-          const [ox, oy] = place(al, pe), col = Math.random() < 0.6 ? dk : [r0, g0, b0];
-          const sw = Math.random() < 0.5 ? 1 : 2, sh = Math.random() < 0.5 ? 1 : 2, rad = Math.hypot(al, pe);
-          P.push({ rad, fn: (c) => { c.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${a})`; c.fillRect(ox | 0, oy | 0, sw, sh); } });
-        }
-        P.sort((a, b) => a.rad - b.rad);
-        return { P, i: 0, age: 0, life: o.life || 1.2, maxR: LONG * 1.1 };
+        return cur;
       }
-      const paintStain = (x, y, rgb, scale, o) => seeps.push(genStain(x, y, rgb, scale, o));
+      // A watercolour stain is a STACK of many translucent, individually-wobbled
+      // copies of one organic blob. Where they all overlap the pigment piles up
+      // deep; toward the ragged edges only a few copies reach, so it feathers. The
+      // copies are revealed a few per frame — smallest first — so the colour SEEPS
+      // into the page, blooming outward and deepening over a couple of seconds.
+      function genWatercolor(x, y, rgb, scale, o) {
+        const baseR = o.baseR * scale, n = 6 + (Math.random() * 4 | 0);
+        const seed0 = [];
+        for (let i = 0; i < n; i++) { const a = i / n * TAU, rr = baseR * rand(0.55, 1.0); seed0.push({ x: x + Math.cos(a) * rr, y: y + Math.sin(a) * rr }); }
+        const base = deformPoly(seed0, 3, baseR * 0.5, 0.5);
+        const NL = o.layers || 30, layers = [];
+        for (let L = 0; L < NL; L++) {
+          const f = 0.42 + 0.58 * (L / (NL - 1));                      // each layer a little bigger → grows outward
+          const scaled = base.map(p => ({ x: x + (p.x - x) * f, y: y + (p.y - y) * f }));
+          const poly = deformPoly(scaled, 1, baseR * f * rand(0.05, 0.13), 0.6);
+          const v = rand(0.84, 1.13);
+          const style = `rgba(${clamp(rgb[0] * v, 0, 255) | 0},${clamp(rgb[1] * v, 0, 255) | 0},${clamp(rgb[2] * v, 0, 255) | 0},${o.wash})`;
+          layers.push((c) => { c.fillStyle = style; c.beginPath(); c.moveTo(poly[0].x, poly[0].y); for (let j = 1; j < poly.length; j++) c.lineTo(poly[j].x, poly[j].y); c.closePath(); c.fill(); });
+        }
+        return { layers, i: 0, age: 0, life: o.life || 1.8 };
+      }
+      function stampBlood(x, y, r, rgb, amt) {
+        const r2 = r * r, cx0 = Math.max(0, (x - r) / BCELL | 0), cx1 = Math.min(bgW - 1, (x + r) / BCELL | 0), cy0 = Math.max(0, (y - r) / BCELL | 0), cy1 = Math.min(bgH - 1, (y + r) / BCELL | 0);
+        for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) { const dx = cx * BCELL + BCELL / 2 - x, dy = cy * BCELL + BCELL / 2 - y; if (dx * dx + dy * dy < r2) { const i = cy * bgW + cx; bA[i] = Math.min(1, bA[i] + amt); bR[i] = rgb[0] | 0; bG[i] = rgb[1] | 0; bB[i] = rgb[2] | 0; } }
+      }
+      function clearBlood(x, y, r) {
+        const r2 = r * r, cx0 = Math.max(0, (x - r) / BCELL | 0), cx1 = Math.min(bgW - 1, (x + r) / BCELL | 0), cy0 = Math.max(0, (y - r) / BCELL | 0), cy1 = Math.min(bgH - 1, (y + r) / BCELL | 0);
+        for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) { const dx = cx * BCELL + BCELL / 2 - x, dy = cy * BCELL + BCELL / 2 - y; if (dx * dx + dy * dy < r2) bA[cy * bgW + cx] = 0; }
+      }
+      function decayBlood(dt) { const m = Math.max(0, 1 - 0.3 * dt); for (let i = 0; i < bA.length; i++) bA[i] *= m; }
+      function paintStain(x, y, rgb, scale, o) {
+        seeps.push(genWatercolor(x, y, rgb, scale, o));
+        stampBlood(x, y, o.baseR * scale * 1.15, rgb, clamp(o.wash * o.layers, 0.12, 1));
+      }
       function growSeeps(dt) {
         const c = marksL.ctx;
         for (let s = seeps.length - 1; s >= 0; s--) {
           const sp = seeps[s]; sp.age += dt;
-          const done = sp.age >= sp.life;
-          const reach = done ? Infinity : sp.maxR * (sp.age / sp.life);
-          while (sp.i < sp.P.length && sp.P[sp.i].rad <= reach) sp.P[sp.i++].fn(c);
-          if (done) seeps.splice(s, 1);
+          const target = Math.min(sp.layers.length, Math.ceil(sp.layers.length * sp.age / sp.life));
+          while (sp.i < target) sp.layers[sp.i++](c);
+          if (sp.age >= sp.life) { while (sp.i < sp.layers.length) sp.layers[sp.i++](c); seeps.splice(s, 1); }
         }
       }
-      function flushSeeps() { const c = marksL.ctx; for (const sp of seeps) while (sp.i < sp.P.length) sp.P[sp.i++].fn(c); seeps = []; }
+      function flushSeeps() { const c = marksL.ctx; for (const sp of seeps) while (sp.i < sp.layers.length) sp.layers[sp.i++](c); seeps = []; }
 
-      const paintKill   = (p) => paintStain(p.x, p.y, deepen(p.col), 0.6 + p.size / 7,  { baseR: 24, wash: 0.12, blobs: 22, streaks: 10, grain: 200, life: 1.3 });
-      const paintStarve = (p) => paintStain(p.x, p.y, WHITE,         0.6 + p.size / 8,  { baseR: 15, wash: 0.17, blobs: 15, streaks: 5,  grain: 90,  life: 1.1 });
+      const paintKill   = (p) => paintStain(p.x, p.y, deepen(p.col), 0.5 + p.size / 7, { baseR: 28, wash: 0.03, layers: 34, life: 2.4 });
+      const paintStarve = (p) => paintStain(p.x, p.y, WHITE,         0.5 + p.size / 9, { baseR: 15, wash: 0.07, layers: 24, life: 1.5 });
+
+      function mixRgb(a, b, t) {
+        t = clamp(t, 0, 1);
+        return [
+          a[0] + (b[0] - a[0]) * t | 0,
+          a[1] + (b[1] - a[1]) * t | 0,
+          a[2] + (b[2] - a[2]) * t | 0,
+        ];
+      }
+
+      function smooth01(t) {
+        t = clamp(t, 0, 1);
+        return t * t * (3 - 2 * t);
+      }
+
+      function spinyAgeProgress(p) {
+        if (p.size <= GIANT_SIZE) return 0;
+        const spinyAge = ((GIANT_SIZE - MINR) / (MAXR - MINR)) * SIZE_AGE;
+        return smooth01((p.age - spinyAge) / Math.max(1, p.maxAge - spinyAge));
+      }
+
+      function preyDisplayColor(p, dprog) {
+        const giant = p.size > GIANT_SIZE;
+        let col = giant ? mixRgb(p.col, OLD_WHITE, spinyAgeProgress(p)) : p.col;
+        if (p.dying && giant) {
+          const target = p.dmode === 'old' ? OLD_WHITE : [150, 148, 144];
+          col = mixRgb(col, target, dprog);
+        }
+        return col;
+      }
 
       // A hunter dies as CROSSHATCHING — two crossing sets of short, slightly
       // irregular pen strokes, like a quick hatch mark.
@@ -421,8 +476,88 @@
             if (dx * dx + dy * dy < r2) food[cy * gcols + cx] = Math.max(food[cy * gcols + cx], rand(0.5, 0.85));
           }
         }
+        clearBlood(x, y, r);
         pulses.push({ x, y, age: 0, life: 1.2, max: r * 1.45 });
         plantTimer = 1;  // force a plant redraw so the flush shows at once
+      }
+
+      // Where a prey starves, its body fertilises the ground: a patch fills in fast
+      // with DEAD plants (brown), which green up as the wilt fades — death feeding
+      // the next growth.
+      function fertilize(x, y, rad) {
+        const r = rad || (24 + rand(0, 9)), r2 = r * r;
+        for (let cy = 0; cy < grows; cy++) {
+          for (let cx = 0; cx < gcols; cx++) {
+            const tx = cx * CELL + CELL / 2, ty = cy * CELL + CELL / 2;
+            const dx = wrapd(tx - x, W), dy = wrapd(ty - y, H);
+            if (dx * dx + dy * dy < r2) { const i = cy * gcols + cx; food[i] = Math.max(food[i], rand(0.55, 0.95)); decay[i] = Math.max(decay[i], rand(0.9, 1.3)); }
+          }
+        }
+        pulses.push({ x, y, age: 0, life: 1.0, max: r * 1.2, dead: true });
+        plantTimer = 1;
+      }
+
+      // A starving GIANT doesn't shrink away — it greys over, slows, and POPS: a
+      // hard burst ring, a grey splat, and a wide fertile dead patch.
+      function popGiant(p) {
+        pulses.push({ x: p.x, y: p.y, age: 0, life: 0.55, max: p.size * 4.5, dead: true });
+        paintStain(p.x, p.y, [150, 148, 144], 1.0 + p.size / 16, { baseR: 30, wash: 0.05, layers: 26, life: 1.5 });
+        fertilize(p.x, p.y, 30 + p.size);
+      }
+
+      // A spiny elder pops as a pure BLOOD ERASER: it wipes the stains around it
+      // and leaves NOTHING of its own — no white mark, no blob, no bare patch.
+      function giantReset(p) {
+        const r = 56 + p.size * 2.6, c = marksL.ctx;
+        flushSeeps();                                          // settle any mid-seep stains first
+        c.save(); c.globalCompositeOperation = 'destination-out';
+        for (let k = 0; k < 7; k++) {
+          const ox = p.x + rand(-r * 0.4, r * 0.4), oy = p.y + rand(-r * 0.4, r * 0.4), rr = r * rand(0.7, 1.2);
+          const g = c.createRadialGradient(ox, oy, 0, ox, oy, rr);
+          g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.7, 'rgba(0,0,0,0.7)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+          c.fillStyle = g; c.beginPath(); c.arc(ox, oy, rr, 0, TAU); c.fill();
+        }
+        c.restore();
+        clearBlood(p.x, p.y, r);
+      }
+
+      function oldAgeBurst(x, y, r, size) {
+        const parts = [];
+        const n = 26 + (size * 1.2 | 0);
+        for (let i = 0; i < n; i++) {
+          const a = rand(0, TAU), speed = rand(r * 0.45, r * 1.15);
+          parts.push({
+            a,
+            speed,
+            spin: rand(-1.2, 1.2),
+            len: rand(8, 18 + size),
+            off: rand(0, r * 0.12),
+            width: rand(0.8, 1.7),
+          });
+        }
+        oldBursts.push({ x, y, age: 0, life: 0.9, r, parts });
+      }
+
+      // Corpses linger: an un-pecked body slowly rots, and a body picked clean
+      // leaves a husk that fades over a few seconds.
+      function updateCorpses(dt) {
+        for (let i = corpses.length - 1; i >= 0; i--) {
+          const cp = corpses[i]; cp.age += dt;
+          if (cp.spent) { cp.fade += dt; if (cp.fade >= HUSK_LIFE) corpses.splice(i, 1); }
+          else if (cp.age >= CORPSE_LIFE) { cp.spent = true; cp.fade = 0; }
+        }
+      }
+
+      // The slow spin-down a STARVING animal does: decelerate, stop, then meander a
+      // tight shrinking circle. Returns true once it has wound all the way down.
+      function deathSpiral(a, dt) {
+        a.dying += dt;
+        const dur = a.dyingDur || DYING_DUR, spin = a.spinRate || 7, crawl = a.crawl ?? 13;
+        if (a.dying / dur < 0.3) a.spd *= Math.max(0, 1 - 7 * dt);   // coast to a halt
+        else { a.heading += spin * dt; a.spd = crawl; }             // then turn (giants: slow, in place)
+        a.vx = Math.cos(a.heading) * a.spd; a.vy = Math.sin(a.heading) * a.spd;
+        a.x = wrapp(a.x + a.vx * dt, W); a.y = wrapp(a.y + a.vy * dt, H);
+        return a.dying >= dur;
       }
 
       // ---- agents ---------------------------------------------------------
@@ -441,13 +576,18 @@
       }
       function makePred(x, y, t) {
         t = t || {};
+        const speed = t.speed ?? rand(PRED_SPEED[0], PRED_SPEED[1]);
+        // the speed/lifespan trade-off that keeps the ecosystem stable: a faster
+        // hunter is more successful, but burns out and dies younger
+        const fast = clamp((speed - PRED_SPEED[0]) / (PRED_SPEED[1] - PRED_SPEED[0] || 1), -0.2, 1.3);
         return {
           x, y, vx: 0, vy: 0, spd: 0, heading: rand(0, TAU), wander: rand(0, TAU),
-          energy: t.energy ?? rand(0.6, 0.9), age: t.age ?? 0, maxAge: rand(PRED_AGE[0], PRED_AGE[1]),
-          size: PBASE, hunting: false,
-          speed: t.speed ?? rand(PRED_SPEED[0], PRED_SPEED[1]),
+          energy: t.energy ?? rand(0.6, 0.9), age: t.age ?? 0,
+          maxAge: rand(PRED_AGE[0], PRED_AGE[1]) * (1 - 0.55 * fast),
+          size: PBASE, hunting: false, speed,
           accel: t.accel ?? rand(PRED_ACCEL[0], PRED_ACCEL[1]),  // its own build-up
           turn: t.turn ?? rand(PRED_TURN[0], PRED_TURN[1]),      // its own agility
+          peckCd: 0, peckT: 0,                                   // corpse-pecking rhythm + jab
         };
       }
 
@@ -455,6 +595,8 @@
         const births = [];
         for (let i = prey.length - 1; i >= 0; i--) {
           const p = prey[i];
+          // already starving to death — spin down, then fertilise the ground
+          if (p.dying) { if (deathSpiral(p, dt)) { if (p.dmode === 'old') { giantReset(p); stats.old++; } else if (p.size > GIANT_SIZE) { popGiant(p); stats.starve++; } else { fertilize(p.x, p.y); stats.starve++; } prey.splice(i, 1); } continue; }
           // nearest predator (toroidal)
           let nd = Infinity, ndx = 0, ndy = 0;
           for (const h of preds) {
@@ -475,6 +617,7 @@
             let ax = Math.cos(p.wander) + gx * 2.2, ay = Math.sin(p.wander) + gy * 2.2;
             const m = Math.hypot(ax, ay) || 1; dvx = ax / m; dvy = ay / m; sp = p.graze;
           }
+          if (p.size > 12) sp *= clamp(1 - (p.size - 12) / 22, 0.4, 1);   // gigantic prey are slow
           // steer the heading toward the desired direction at a turn rate, then
           // accelerate (fleeing → snap hard up to sprint) or decelerate (safe →
           // coast gently back down to a graze)
@@ -485,6 +628,17 @@
           p.spd += (sp - p.spd) * Math.min(1, rate * dt);
           p.vx = Math.cos(p.heading) * p.spd; p.vy = Math.sin(p.heading) * p.spd;
           p.x = wrapp(p.x + p.vx * dt, W); p.y = wrapp(p.y + p.vy * dt, H);
+
+          // a spiny giant is a roaming eraser: it rubs out any blood or trail it walks over
+          if (p.size > GIANT_SIZE) {
+            const c = marksL.ctx, er = p.size * 1.1;
+            c.save(); c.globalCompositeOperation = 'destination-out';
+            const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, er);
+            g.addColorStop(0, 'rgba(0,0,0,0.7)'); g.addColorStop(0.65, 'rgba(0,0,0,0.32)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+            c.fillStyle = g; c.beginPath(); c.arc(p.x, p.y, er, 0, TAU); c.fill();
+            c.restore();
+            clearBlood(p.x, p.y, er);
+          }
 
           // graze the tile underfoot
           const ti = tileIdx(p.x, p.y);
@@ -497,8 +651,8 @@
           p.size = MINR + (MAXR - MINR) * clamp(p.age / SIZE_AGE, 0, 1);
 
           // death
-          if (p.energy <= 0) { paintStarve(p); prey.splice(i, 1); stats.starve++; continue; }
-          if (p.age >= p.maxAge) { renew(p.x, p.y, 32 + p.size * 3); prey.splice(i, 1); stats.old++; continue; }
+          if (p.energy <= 0) { p.dying = 1e-6; p.dmode = 'starve'; continue; }   // begin the starving spin-down
+          if (p.age >= p.maxAge) { if (p.size > GIANT_SIZE) { p.dying = 1e-6; p.dmode = 'old'; p.dyingDur = 3.4; p.spinRate = 2.2; p.crawl = 3; continue; } renew(p.x, p.y, 32 + p.size * 3); prey.splice(i, 1); stats.old++; continue; }
 
           // breed — each newborn takes a fresh random colour, so the field keeps
           // its full spread of hues instead of one lineage taking over
@@ -516,57 +670,97 @@
 
       function updatePreds(dt) {
         const births = [];
+        const D2 = DETECT * DETECT, D2C = (DETECT * 0.85) * (DETECT * 0.85);
         for (let i = preds.length - 1; i >= 0; i--) {
           const h = preds[i];
-          // pick a target in sight, preferring prey near its OWN size — a small
-          // hunter goes after small prey, a big one after big prey (a size-mismatch
-          // counts against a prey like extra distance would)
-          let best = Infinity, tgt = -1, ndx = 0, ndy = 0, dist = 0, nearby = 0;
-          const D2 = DETECT * DETECT;
-          for (let j = 0; j < prey.length; j++) {
-            const p = prey[j];
-            const dx = wrapd(p.x - h.x, W), dy = wrapd(p.y - h.y, H), d2 = dx * dx + dy * dy;
-            if (d2 > D2) continue;
-            nearby++;
-            const d = Math.sqrt(d2);
-            const score = d * (1 + SIZE_W * Math.abs(p.size - h.size) / (h.size + 2));
-            if (score < best) { best = score; tgt = j; ndx = dx; ndy = dy; dist = d; }
-          }
-          // surrounded by prey → much quicker to turn and pursue (the top speed
-          // itself stays capped, so the very fastest prey can still get away)
-          const aggro = 1 + AGGRO_K * Math.min(1, nearby / AGGRO_REF);
-          let dvx, dvy, baseSp;
-          if (tgt >= 0) {
-            const inv = 1 / (dist || 1); dvx = ndx * inv; dvy = ndy * inv; baseSp = h.speed; h.hunting = true;
-          } else {
-            h.wander += rand(-1, 1) * 2.4 * dt;
-            dvx = Math.cos(h.wander); dvy = Math.sin(h.wander); baseSp = h.speed * CRUISE; h.hunting = false;
-          }
-          // turn toward the target at its own agility, then accelerate toward top
-          // speed — a starving hunter pushes faster (desperate), and it pays in burn.
-          const hunger = clamp(1 - h.energy / HREF, 0, 1);
-          let dh = Math.atan2(dvy, dvx) - h.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh));
-          h.heading += clamp(dh, -h.turn * aggro * dt, h.turn * aggro * dt);
-          h.spd += (baseSp * (1 + STARVE_BOOST * hunger) - h.spd) * Math.min(1, h.accel * aggro * dt);
-          h.vx = Math.cos(h.heading) * h.spd; h.vy = Math.sin(h.heading) * h.spd;
-          h.x = wrapp(h.x + h.vx * dt, W); h.y = wrapp(h.y + h.vy * dt, H);
 
-          // catch — paint the prey's own colour where it fell
-          if (tgt >= 0 && tgt < prey.length) {
-            const tp = prey[tgt];
-            if (dist < tp.size + h.size * 0.5 + 11) {
-              paintKill(tp);
-              prey.splice(tgt, 1); stats.kill++;
-              h.energy += KILL_GAIN * (tp.size / 7);  // a bigger prey is a bigger meal
+          // starving to death — spin down, then fall as a crosshatch mark
+          if (h.dying) { if (deathSpiral(h, dt)) { paintHatch(h.x, h.y, 1); preds.splice(i, 1); stats.predDie++; } continue; }
+          if (h.peckT > 0) h.peckT -= dt;
+
+          // a fresh corpse nearby is free food — go peck it apart before chasing
+          let cTgt = -1, cbest = Infinity;
+          for (let j = 0; j < corpses.length; j++) {
+            const cp = corpses[j];
+            if (cp.spent) continue;
+            const dx = wrapd(cp.x - h.x, W), dy = wrapd(cp.y - h.y, H), d2 = dx * dx + dy * dy;
+            if (d2 < D2C && d2 < cbest) { cbest = d2; cTgt = j; }
+          }
+
+          let dvx, dvy, baseSp, aggro = 1;
+          if (cTgt >= 0) {
+            const cp = corpses[cTgt];
+            const dx = wrapd(cp.x - h.x, W), dy = wrapd(cp.y - h.y, H), cdist = Math.sqrt(cbest), inv = 1 / (cdist || 1);
+            dvx = dx * inv; dvy = dy * inv; h.hunting = true; baseSp = h.speed;
+            if (cdist < cp.size + h.size * 0.5 + 9) {            // settle in and feed
+              dvx = Math.cos(h.heading); dvy = Math.sin(h.heading); // hold heading — no spinning over the body
+              baseSp = h.speed * 0.04;                           // nearly still
+              h.peckCd -= dt;
+              if (h.peckCd <= 0) {                               // an unhurried peck: a bite, a little shrink, a little blood
+                const bite = Math.min(cp.food, PECK_BITE);
+                cp.food -= bite; h.energy += bite; cp.size *= 0.92;
+                paintStain(cp.x + rand(-3, 3), cp.y + rand(-3, 3), deepen(cp.col), 0.35 + cp.size / 12, { baseR: 11, wash: 0.04, layers: 9, life: 1.0 });
+                h.peckCd = 0.30; h.peckT = 0.2;
+                if (cp.food <= 0.02 || cp.size < 1.6) { cp.spent = true; cp.fade = 0; }   // picked clean — husk lingers
+              }
+            }
+          } else {
+            // pick a live target in sight, preferring prey near its OWN size
+            let best = Infinity, tgt = -1, ndx = 0, ndy = 0, dist = 0, nearby = 0;
+            for (let j = 0; j < prey.length; j++) {
+              const p = prey[j];
+              if (p.dying || p.size > h.size * IMMUNE_RATIO) continue;   // dying, or too big for this hunter
+              const dx = wrapd(p.x - h.x, W), dy = wrapd(p.y - h.y, H), d2 = dx * dx + dy * dy;
+              if (d2 > D2) continue;
+              nearby++;
+              const d = Math.sqrt(d2);
+              const score = d * (1 + SIZE_W * Math.abs(p.size - h.size) / (h.size + 2));
+              if (score < best) { best = score; tgt = j; ndx = dx; ndy = dy; dist = d; }
+            }
+            aggro = 1 + AGGRO_K * Math.min(1, nearby / AGGRO_REF);   // a swarm makes it quicker to turn/pursue
+            if (tgt >= 0) {
+              const inv = 1 / (dist || 1); dvx = ndx * inv; dvy = ndy * inv; baseSp = h.speed; h.hunting = true;
+              const tp = prey[tgt];
+              if (dist < tp.size + h.size * 0.5 + 11 && tp.size <= h.size * IMMUNE_RATIO) {  // caught — too-big prey are immune
+                corpses.push({ x: tp.x, y: tp.y, size: tp.size, col: tp.col, food: KILL_GAIN * (tp.size / 7), age: 0, spent: false, fade: 0 });
+                paintKill(tp); prey.splice(tgt, 1); stats.kill++;
+              }
+            } else {
+              h.wander += rand(-1, 1) * 2.4 * dt;
+              dvx = Math.cos(h.wander); dvy = Math.sin(h.wander); baseSp = h.speed * CRUISE; h.hunting = false;
             }
           }
+
+          // shared steering — a starving hunter goes SLUGGISH and grinds to a halt
+          const vigor = clamp(STARVE_SLOW + h.energy / HREF, STARVE_SLOW, 1);
+          let dh = Math.atan2(dvy, dvx) - h.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+          h.heading += clamp(dh, -h.turn * aggro * dt, h.turn * aggro * dt);
+          h.spd += (baseSp * vigor - h.spd) * Math.min(1, h.accel * aggro * dt);
+          h.vx = Math.cos(h.heading) * h.spd; h.vy = Math.sin(h.heading) * h.spd;
+          const ox = h.x, oy = h.y;
+          h.x = wrapp(h.x + h.vx * dt, W); h.y = wrapp(h.y + h.vy * dt, H);
+          // only when it is standing IN blood does a hunter pick up a trail — and
+          // that trail is the blood's OWN colour, tracked out as it leaves the pool
+          const bi = clamp(h.y / BCELL | 0, 0, bgH - 1) * bgW + clamp(h.x / BCELL | 0, 0, bgW - 1);
+          if (bA[bi] > 0.12) { h.bloody = 0.5; h.bcol = [bR[bi], bG[bi], bB[bi]]; }
+          if (h.bloody > 0) {
+            h.bloody -= dt;
+            const tdx = h.x - h.px, tdy = h.y - h.py;
+            if (h.px !== undefined && tdx * tdx + tdy * tdy < 3600) {
+              const mc = marksL.ctx;                            // the blood's own colour, but a faint smear
+              mc.strokeStyle = `rgba(${h.bcol[0]},${h.bcol[1]},${h.bcol[2]},${clamp(h.bloody * 0.28, 0.03, 0.15)})`;
+              mc.lineWidth = Math.max(1.4, h.size * 0.8); mc.lineCap = 'round';
+              mc.beginPath(); mc.moveTo(h.px, h.py); mc.lineTo(h.x, h.y); mc.stroke();
+            }
+          }
+          h.px = ox; h.py = oy;
 
           // size tracks accumulated energy (weak = small); energy burns with MOVEMENT
           h.size = clamp(PBASE + h.energy * PGROWK, PBASE, PMAX);
           h.energy -= (BMR + MOVE_K * Math.hypot(h.vx, h.vy)) * dt;
           h.age += dt;
 
-          if (h.energy <= 0) { paintHatch(h.x, h.y, 1); preds.splice(i, 1); stats.predDie++; continue; }
+          if (h.energy <= 0) { h.dying = 1e-6; continue; }       // starve -> spin down
           if (h.age >= h.maxAge) { paintHatch(h.x, h.y, 1.3); preds.splice(i, 1); stats.predDie++; continue; }
 
           // grow big -> divide in half: the only way new hunters are born
@@ -616,23 +810,60 @@
       }
 
       // ---- drawing agents -------------------------------------------------
+      function drawOldBursts() {
+        for (let i = oldBursts.length - 1; i >= 0; i--) {
+          const b = oldBursts[i];
+          b.age += 1 / 60;
+          const t = b.age / b.life;
+          if (t >= 1) { oldBursts.splice(i, 1); continue; }
+          const ease = 1 - Math.pow(1 - t, 3);
+          const a = Math.pow(1 - t, 1.35);
+          ctx.save();
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          for (const p of b.parts) {
+            const ang = p.a + p.spin * t;
+            const inner = p.off + p.speed * ease * 0.22;
+            const outer = p.off + p.speed * ease;
+            const x1 = b.x + Math.cos(ang) * inner;
+            const y1 = b.y + Math.sin(ang) * inner;
+            const x2 = b.x + Math.cos(ang) * (outer + p.len * (1 - t) * 0.35);
+            const y2 = b.y + Math.sin(ang) * (outer + p.len * (1 - t) * 0.35);
+            ctx.strokeStyle = `rgba(255,252,244,${0.62 * a})`;
+            ctx.lineWidth = p.width;
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+          }
+          ctx.restore();
+        }
+      }
+
       function drawAgents() {
         // renewal pulses
         for (let i = pulses.length - 1; i >= 0; i--) {
           const pl = pulses[i]; pl.age += 1 / 60;
           const t = pl.age / pl.life;
           if (t >= 1) { pulses.splice(i, 1); continue; }
+          const c1 = pl.white ? '248,246,240' : pl.dead ? '150,110,52' : '150,220,120', c2 = pl.white ? '255,255,252' : pl.dead ? '196,156,96' : '224,255,184';
           ctx.beginPath(); ctx.arc(pl.x, pl.y, pl.max * t, 0, TAU);
-          ctx.strokeStyle = `rgba(150,220,120,${(1 - t) * 0.6})`; ctx.lineWidth = 2.5; ctx.stroke();
+          ctx.strokeStyle = `rgba(${c1},${(1 - t) * 0.6})`; ctx.lineWidth = 2.5; ctx.stroke();
           ctx.beginPath(); ctx.arc(pl.x, pl.y, pl.max * t * 0.68, 0, TAU);
-          ctx.strokeStyle = `rgba(224,255,184,${(1 - t) * 0.4})`; ctx.lineWidth = 1.2; ctx.stroke();
+          ctx.strokeStyle = `rgba(${c2},${(1 - t) * 0.4})`; ctx.lineWidth = 1.2; ctx.stroke();
         }
-        // prey — vibrant cells in their own colour; a fleeing one trails a streak
-        // (a clear, motion-driven cue, not a mysterious ring)
+        drawOldBursts();
+        // corpses — the body lingers as a dark husk, shrinking peck by peck
+        for (const cp of corpses) {
+          const a = cp.spent ? clamp(1 - cp.fade / HUSK_LIFE, 0, 1) : 1, r = cp.size, [cr, cg, cb] = deepen(cp.col);
+          ctx.fillStyle = `rgba(${cr},${cg},${cb},${0.8 * a})`;
+          ctx.beginPath(); ctx.ellipse(cp.x, cp.y, r * 1.15, r * 0.92, 0, 0, TAU); ctx.fill();
+          ctx.strokeStyle = `rgba(${cr * 0.5 | 0},${cg * 0.5 | 0},${cb * 0.5 | 0},${0.7 * a})`; ctx.lineWidth = 1; ctx.stroke();
+        }
+        // prey — vibrant cells in their own colour; a fleeing one trails a streak.
+        // A starving one is spinning down: it shrinks toward nothing.
         for (const p of prey) {
-          // a starving prey SHRINKS (toward 40% of its grown size) — it stays solid,
-          // never fades. Its grown size still governs the stain it will leave.
-          const r = p.size * clamp(0.4 + 0.6 * p.energy, 0.4, 1), [cr, cg, cb] = p.col;
+          const giant = p.size > GIANT_SIZE, dprog = p.dying ? p.dying / (p.dyingDur || DYING_DUR) : 0;
+          const dscale = p.dying ? (giant ? 1 : Math.max(0, 1 - dprog)) : clamp(0.4 + 0.6 * p.energy, 0.4, 1);
+          const r = p.size * dscale;
+          let [cr, cg, cb] = preyDisplayColor(p, dprog);
           ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.heading);
           const spd = Math.hypot(p.vx, p.vy);
           if (p.fleeing && spd > 40) {                         // a darting streak behind it
@@ -644,15 +875,24 @@
             ctx.beginPath(); ctx.moveTo(0, -r * 0.7); ctx.lineTo(-len, 0); ctx.lineTo(0, r * 0.7); ctx.closePath(); ctx.fill();
           }
           ctx.fillStyle = `rgba(${cr},${cg},${cb},0.92)`;
-          ctx.beginPath(); ctx.ellipse(0, 0, r * 1.3, r, 0, 0, TAU); ctx.fill();
-          ctx.strokeStyle = `rgba(${cr * 0.38 | 0},${cg * 0.38 | 0},${cb * 0.38 | 0},0.88)`; ctx.lineWidth = 1.3; ctx.stroke();
+          ctx.strokeStyle = `rgba(${cr * 0.38 | 0},${cg * 0.38 | 0},${cb * 0.38 | 0},0.88)`; ctx.lineWidth = 1.3;
+          if (giant) {                                         // a giant is SPINY
+            const sp2 = 13;
+            ctx.beginPath();
+            for (let k = 0; k < sp2 * 2; k++) { const a = k / (sp2 * 2) * TAU, rad = (k & 1) ? r * 0.82 : r * 1.42, qx = Math.cos(a) * rad, qy = Math.sin(a) * rad; if (k === 0) ctx.moveTo(qx, qy); else ctx.lineTo(qx, qy); }
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+          } else {
+            ctx.beginPath(); ctx.ellipse(0, 0, r * 1.3, r, 0, 0, TAU); ctx.fill(); ctx.stroke();
+          }
           ctx.restore();
         }
         // hunters — drawn like a mouse cursor: a filled triangle with a stem,
         // always opaque; a weak one is simply SMALLER. Glints gold before it splits.
         for (const h of preds) {
-          const r = h.size, L = r * 3.0;
-          ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(h.heading);
+          const dscale = h.dying ? Math.max(0, 1 - h.dying / DYING_DUR) : 1;
+          const r = h.size * dscale, L = r * 3.0;
+          const jab = h.peckT > 0 ? Math.sin((1 - h.peckT / 0.2) * Math.PI) * r * 0.5 : 0;  // a small nod while feeding
+          ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(h.heading); ctx.translate(jab, 0);
           ctx.lineCap = 'round'; ctx.lineJoin = 'round';
           // stem
           ctx.strokeStyle = 'rgba(16,14,12,0.96)'; ctx.lineWidth = clamp(r * 0.5, 1.5, 4);
@@ -680,9 +920,14 @@
         updatePrey(dt);
         updatePreds(dt);
         separate(prey, false); separate(preds, true);
+        updateCorpses(dt);
         immigrate(dt);
 
         growSeeps(dt);                 // stains bloom outward over time
+        // ...and very slowly soak into the page, so the painting breathes instead
+        // of piling up forever (old-age renewal still wipes patches outright)
+        { const fc = marksL.ctx; fc.save(); fc.globalCompositeOperation = 'destination-out'; fc.fillStyle = `rgba(0,0,0,${0.22 * dt})`; fc.fillRect(0, 0, W, H); fc.restore(); }
+        decayBlood(dt);
 
         plantTimer -= dt;
         if (plantTimer <= 0) { drawPlants(); plantTimer = 0.04; }
@@ -713,10 +958,10 @@
         flowers = FLOWER_SETS[setIndex % FLOWER_SETS.length];
         flowerRGBs = flowers.map(hexRgb);
         for (let i = 0; i < food.length; i++) food[i] = chance(0.28) ? rand(0.15, 0.7) : 0;
-        decay.fill(0);
+        decay.fill(0); bA.fill(0);
         plantL.ctx.clearRect(0, 0, W, H);
         plantCursor = 0;
-        prey = []; preds = []; pulses = []; seeps = [];
+        prey = []; preds = []; pulses = []; seeps = []; corpses = []; oldBursts = [];
         for (let i = 0; i < PREY0; i++) prey.push(makePrey(rand(0, W), rand(0, H)));
         for (let i = 0; i < PRED0; i++) preds.push(makePred(rand(0, W), rand(0, H)));
         stats.starve = stats.kill = stats.old = stats.predDie = stats.splits = 0;
@@ -740,10 +985,12 @@
       // — instead of a sparse cold start. ?warm=120 warms by 120 seconds.
       function warmUp(seconds) {
         const wdt = 1 / 30;
+        const fc = marksL.ctx;
         for (let s = 0, n = (seconds / wdt) | 0; s < n; s++) {
-          stepPlants(wdt); updatePrey(wdt); updatePreds(wdt); separate(prey, false); separate(preds, true); immigrate(wdt); growSeeps(wdt);
+          stepPlants(wdt); updatePrey(wdt); updatePreds(wdt); separate(prey, false); separate(preds, true); updateCorpses(wdt); immigrate(wdt); growSeeps(wdt);
+          fc.save(); fc.globalCompositeOperation = 'destination-out'; fc.fillStyle = `rgba(0,0,0,${0.22 * wdt})`; fc.fillRect(0, 0, W, H); fc.restore(); decayBlood(wdt);   // same soak-away as live
         }
-        pulses.length = 0; flushSeeps(); drawPlants(plantPixCols * plantPixRows); plantTimer = 0.1;  // full paint, opens settled
+        pulses.length = 0; oldBursts.length = 0; flushSeeps(); drawPlants(plantPixCols * plantPixRows); plantTimer = 0.1;  // full paint, opens settled
       }
 
       // ---- boot -----------------------------------------------------------

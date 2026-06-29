@@ -14,11 +14,12 @@ there are no corners to win or die in.
   the visible terrain is painted incrementally, one small pixel at a time, so new
   groundcover fills in instead of popping on all at once.
 - **Prey** — vector grazers, each wearing one of many **colours**. They eat
-  plants, **grow quickly into larger bodies**, and flee hunters. They must reach
-  a visibly grown body before they can breed. Every prey is born with its own
-  **alertness** (how far off it spots a hunter) and **sprint speed**; a fleeing
-  one trails a streak in its own colour. A sprint outruns a hunter but burns
-  energy fast, so a hounded prey can run itself to starvation.
+  plants, grow into larger bodies, and flee hunters. Giant prey become spiny and
+  age continuously toward white. They must reach a visibly grown body before
+  they can breed. Every prey is born with its own **alertness** (how far off it
+  spots a hunter) and **sprint speed**; a fleeing one trails a streak in its own
+  colour. A sprint outruns a hunter but burns energy fast, so a hounded prey can
+  run itself to starvation.
 - **Hunters** — black **arrows** that run the nearest prey down and **grow** as
   they feed (a weakening hunter is simply *smaller*, never faded out). Their
   energy is spent by **moving**: a starving hunter sprints faster but burns out
@@ -35,9 +36,9 @@ The marks layer is painterly watercolour and persistent — it *is* the painting
 - a prey that is **killed** blooms a watercolour stain **in its own colour**;
 - a prey that **starves** leaves a pale, washed-out stain of that colour;
 - a hunter that dies leaves a dark ash mark;
-- a prey that reaches **old age** is the one redemption: it *renews*. The ground
-  around it is wiped clean of every stain and flushed lush with new growth.
-  Living long enough is the only thing that heals the field.
+- a spiny prey that reaches **old age** is the one redemption: it bursts white,
+  erases the bloodstains around it, and flushes the ground. Living long enough
+  is the only thing that heals the field.
 
 Both prey and hunters die of starvation and of old age. The painting fills with
 the watercolour marks of the hunt and is endlessly cleansed by the old —

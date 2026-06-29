@@ -3,17 +3,26 @@
 A black-and-white vector Asteroids variant for a Vectrex monitor that never
 really clears the field.
 
-The ship can keep up to three bullets alive at once. A bullet does not destroy an
-asteroid: it fractures the rock. The struck shard splits, every nearby shard gets
-thrown outward, and then the whole cloud slowly pulls itself back into the same
-rock. The matter is persistent. It only becomes finer, angrier, and harder to
-read before it reforms.
+The ship cruises by itself until a player takes the controls, pausing between
+attacks instead of firing constantly. It keeps up to three bullets alive at once.
+A bullet does not destroy an asteroid: it breaks the rock into two to five
+procedural pieces that burst away from the ship. The smallest rocks no longer
+divide; shots kick them away so they stay in play. Fragments drift, pull on
+nearby mass with slow gravity, bump instead of passing through each other, and
+eventually glom onto larger asteroids. Rocks must settle against each other
+before they weld into one integrated outline, and the final body keeps shoulders
+and bulges from the pieces that formed it while the seam between them dissolves.
+Large rocks can pull together into huge bodies.
+
+The matter is persistent. It only changes scale, direction, and ownership as the
+field slowly accretes.
 
 ## Controls
 
-- Left / right or A / D: rotate
-- Up or W: thrust
-- Space or click: fire
+- Autoplay starts immediately
+- Left / right or A / D: take over and rotate
+- Up or W: take over and thrust
+- Space or click: take over and fire
 - Enter or click after signal loss: restart
 
 ## Archival rule

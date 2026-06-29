@@ -30,11 +30,12 @@
       //
       // A snake hunts the nearest mouse. Its pathfinding is greedy and blind to
       // its own body, so a long snake chasing a mouse behind itself will curl
-      // into its own tail — and where it strikes itself it SPLITS into two snakes,
-      // each of which then hunts on its own. The myth: cut the hydra and it
-      // doubles. The cull is the heads: when two snakes' heads meet on the same
-      // cell, one of them dies. Eating mice lengthens; splits divide; collisions
-      // thin the herd — so the count breathes without a player ever touching it.
+      // into its own tail — and where it strikes a body, its own or another's,
+      // the hit snake SPLITS into two snakes, each of which then hunts on its
+      // own. The myth: cut the hydra and it doubles. The cull is the heads: when
+      // two snakes' heads meet on the same cell, one of them dies. Eating mice
+      // lengthens; splits divide; collisions thin the herd — so the count
+      // breathes without a player ever touching it.
       //
       // The look is a single amber phosphor on black: blocky cells, a soft glow,
       // scanlines and a little screen flicker, the way lo-res graphics smeared on
@@ -131,6 +132,28 @@
         }
       }
 
+      function bodyHitIndex(s, p, willPop) {
+        const lastIdx = s.body.length - 1;
+        for (let i = 1; i <= lastIdx; i++) {
+          if (i === lastIdx && willPop) continue;              // the tail is vacating this cell
+          if (s.body[i].x === p.x && s.body[i].y === p.y) return i;
+        }
+        return -1;
+      }
+
+      function splitSnakeAt(s, hitIdx, out) {
+        const hit = s.body[hitIdx];
+        const loop = s.body.slice(0, hitIdx + 1);              // head .. the segment it struck
+        const tail = s.body.slice(hitIdx + 1);                 // the rest
+        deaths.push({ x: hit.x, y: hit.y, t: 0, split: true });
+        if (loop.length >= MIN_LEN) out.push({ body: loop, dir: s.dir, grow: 0, prev: copyBody(loop) });
+        if (tail.length >= MIN_LEN) {
+          const tb = tail.slice().reverse();                   // new head at the far TAIL TIP...
+          const d = tb.length > 1 ? dirBetween(tb[0], tb[1]) : pick(DIRS);   // ...heading away from the cut
+          out.push({ body: tb, dir: d, grow: 0, prev: copyBody(tb) });
+        }
+      }
+
       // ---- one grid tick --------------------------------------------------
       function step() {
         if (snakes.length < MIN_SNAKES) snakes.push(makeSnake((4 + Math.random() * (GW - 8)) | 0, (4 + Math.random() * (GH - 8)) | 0, START_LEN));
@@ -153,39 +176,60 @@
           }
         }
 
-        // occupancy of every OTHER snake's body, for run-into-another-snake deaths
+        const plans = new Map();
+        for (const s of snakes) {
+          const nx = s.nx;
+          const mi = inB(nx.x, nx.y) ? mice.findIndex(m => m.x === nx.x && m.y === nx.y) : -1;
+          const mouse = mi >= 0 ? mice[mi] : null;
+          const ate = !!mouse;
+          const willPop = s.grow === 0 && !ate;
+          plans.set(s, { mouse, ate, willPop, selfHit: inB(nx.x, nx.y) ? bodyHitIndex(s, nx, willPop) : -1 });
+        }
+
+        // A head striking another snake's body cuts the hit snake, exactly like
+        // that snake's own head had struck the segment.
+        const cuts = new Map();
+        const cutters = new Set();
+        for (const attacker of snakes) {
+          if (attacker.dead) continue;
+          const plan = plans.get(attacker);
+          if (!inB(attacker.nx.x, attacker.nx.y) || plan.selfHit >= 0) continue;
+          for (const target of snakes) {
+            if (target === attacker || target.dead) continue;
+            const hitIdx = bodyHitIndex(target, attacker.nx, plans.get(target).willPop);
+            if (hitIdx < 0) continue;
+            const cut = cuts.get(target);
+            if (!cut || hitIdx < cut.hitIdx) cuts.set(target, { hitIdx });
+            cutters.add(attacker);
+            break;
+          }
+        }
+
         const out = [];
         for (const s of snakes) {
           if (s.dead) continue;
           const nx = s.nx;
           if (!inB(nx.x, nx.y)) { deaths.push({ x: cl(nx.x, GW), y: cl(nx.y, GH), t: 0 }); continue; }   // hit the wall
-          const mi = mice.findIndex(m => m.x === nx.x && m.y === nx.y);
-          const ate = mi >= 0;
-          const willPop = s.grow === 0 && !ate;
+          const plan = plans.get(s);
 
-          // run into OWN body -> split where it struck (another snake's body it
-          // simply crosses; only HEADS meeting is fatal, resolved above)
-          let hitIdx = -1, lastIdx = s.body.length - 1;
-          for (let i = 1; i <= lastIdx; i++) {
-            if (i === lastIdx && willPop) continue;            // the tail is vacating this cell
-            if (s.body[i].x === nx.x && s.body[i].y === nx.y) { hitIdx = i; break; }
-          }
-          if (hitIdx >= 0) {
-            const loop = s.body.slice(0, hitIdx + 1);          // head .. the segment it struck
-            const tail = s.body.slice(hitIdx + 1);             // the rest
-            deaths.push({ x: nx.x, y: nx.y, t: 0, split: true });
-            if (loop.length >= MIN_LEN) out.push({ body: loop, dir: s.dir, grow: 0, prev: copyBody(loop) });
-            if (tail.length >= MIN_LEN) {
-              const tb = tail.slice().reverse();               // new head at the far TAIL TIP...
-              const d = tb.length > 1 ? dirBetween(tb[0], tb[1]) : pick(DIRS);   // ...heading away from the cut
-              out.push({ body: tb, dir: d, grow: 0, prev: copyBody(tb) });
-            }
-            continue;
-          }
+          // run into OWN body -> split where it struck
+          if (plan.selfHit >= 0) { splitSnakeAt(s, plan.selfHit, out); continue; }
+
+          // get struck by another head -> split as though struck by its own head
+          const cut = cuts.get(s);
+          if (cut) { splitSnakeAt(s, cut.hitIdx, out); continue; }
+
+          // a cutting head stops at the strike instead of passing through
+          if (cutters.has(s)) { s.prev = s._pre; out.push(s); continue; }
 
           // ordinary move
           s.body.unshift(nx);
-          if (ate) { s.grow = Math.min(s.grow + GROW, Math.max(0, MAX_LEN - s.body.length)); mice.splice(mi, 1); spawnMouse(); }
+          if (plan.ate) {
+            s.grow = Math.min(s.grow + GROW, Math.max(0, MAX_LEN - s.body.length));
+            const mi = mice.indexOf(plan.mouse);
+            if (mi >= 0) mice.splice(mi, 1);
+            spawnMouse();
+          }
           if (s.grow > 0) s.grow--; else s.body.pop();
           s.prev = s._pre; out.push(s);
         }

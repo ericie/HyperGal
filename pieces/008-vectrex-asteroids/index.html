@@ -19,66 +19,58 @@
         height: 100%;
         background: #000;
       }
-      .caption {
-        position: fixed;
-        left: 50%;
-        bottom: 1rem;
-        transform: translateX(-50%);
-        color: rgba(244, 255, 250, .48);
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: .78rem;
-        letter-spacing: .04em;
-        pointer-events: none;
-        text-shadow: 0 0 8px rgba(244, 255, 250, .55);
-      }
-      .crt {
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        background:
-          radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 0 58%, rgba(255,255,255,.035) 59%, rgba(0,0,0,.78) 100%),
-          repeating-linear-gradient(0deg, rgba(255,255,255,.045) 0 1px, rgba(0,0,0,0) 1px 4px);
-        mix-blend-mode: screen;
-        opacity: .5;
-      }
     </style>
   </head>
   <body>
     <canvas id="stage"></canvas>
-    <div class="caption">Vectrex Asteroids · 2026</div>
-    <div class="crt"></div>
     <script>
       const canvas = document.getElementById('stage');
       const ctx = canvas.getContext('2d');
       const TAU = Math.PI * 2;
 
       const MAX_BULLETS = 3;
-      const BULLET_SPEED = 620;
-      const SHIP_ACCEL = 280;
-      const SHIP_TURN = 4.7;
-      const SHIP_DRAG = 0.22;
+      const BULLET_SPEED = 690;
+      const SHIP_ACCEL = 340;
+      const SHIP_TURN = 5.25;
+      const AUTO_TURN_GAIN = 1.75;
+      const SHIP_DRAG = 0.18;
       const SHIP_R = 13;
-      const MAX_SHARDS_PER_ROCK = 58;
+      const MAX_ROCKS = 64;
+      const MIN_ROCK_R = 5.5;
+      const MIN_SPLIT_R = 10.5;
+      const GRAVITY = 96;
+      const CAPTURE_PULL = 2.25;
+      const COLLISION_BOUNCE = .32;
+      const CONTACT_SKIN = .9;
+      const GLUE_SETTLE_TIME = .58;
+      const MERGE_TOUCH_PAD = 1.6;
+      const SEAM_DECAY = .42;
+      const ROCK_DRAG = 0.018;
       const LINE = 'rgba(244,255,250,';
 
       let W = 0, H = 0, dpr = 1;
-      let last = 0, raf = 0, now = 0;
-      let ship, bullets, rocks, sparks, stars, score, gameOver;
+      let last = 0, raf = 0, now = 0, rockSerial = 0;
+      let ship, bullets, rocks, sparks, stars, score, gameOver, playerControl;
+      let mergeContacts;
       const keys = new Set();
 
       const rand = (a, b) => a + Math.random() * (b - a);
       const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
-      const pick = (arr) => arr[(Math.random() * arr.length) | 0];
       const wrap = (v, max) => { v %= max; return v < 0 ? v + max : v; };
       const wrapDelta = (d, max) => d > max / 2 ? d - max : d < -max / 2 ? d + max : d;
       const distWrap = (ax, ay, bx, by) => {
         const dx = wrapDelta(ax - bx, W), dy = wrapDelta(ay - by, H);
         return Math.hypot(dx, dy);
       };
+      const normAngle = (a) => {
+        a = (a + Math.PI) % TAU;
+        if (a < 0) a += TAU;
+        return a - Math.PI;
+      };
 
       function resize() {
         cancelAnimationFrame(raf);
-        dpr = Math.min(2, window.devicePixelRatio || 1);
+        dpr = 1;
         W = innerWidth;
         H = innerHeight;
         canvas.width = Math.round(W * dpr);
@@ -94,9 +86,12 @@
         rocks = [];
         sparks = [];
         stars = makeStars();
+        mergeContacts = new Map();
+        rockSerial = 0;
         score = 0;
         now = 0;
         gameOver = false;
+        playerControl = false;
         ship = {
           x: W / 2,
           y: H / 2,
@@ -108,6 +103,12 @@
           fireCd: 0,
           invuln: 2.2,
           deadFor: 0,
+          lastShot: -Infinity,
+          nextAutoShot: 1.1,
+          autoPauseUntil: rand(.55, 1.45),
+          autoCruiseUntil: 0,
+          cruiseAngle: rand(-Math.PI, Math.PI),
+          thrusting: false,
         };
         seedRocks();
         ctx.fillStyle = '#000';
@@ -129,67 +130,269 @@
       function seedRocks() {
         const count = clamp(Math.floor(Math.min(W, H) / 170) + 3, 4, 7);
         for (let i = 0; i < count; i++) {
-          const side = (Math.random() * 4) | 0;
-          const x = side === 0 ? rand(0, W) : side === 1 ? W - 30 : side === 2 ? rand(0, W) : 30;
-          const y = side === 0 ? 30 : side === 1 ? rand(0, H) : side === 2 ? H - 30 : rand(0, H);
-          rocks.push(makeRock(x, y, rand(38, 64)));
+          const radius = rand(34, 62);
+          rocks.push(placeRock(radius));
         }
+        mergeTouchingRocks();
       }
 
-      function makeRock(x, y, radius) {
-        const hull = [];
-        const hullN = 11 + ((Math.random() * 5) | 0);
-        for (let i = 0; i < hullN; i++) {
-          const a = (i / hullN) * TAU;
-          const r = radius * rand(.74, 1.08);
-          hull.push([Math.cos(a) * r, Math.sin(a) * r]);
+      function placeRock(radius) {
+        let x = W / 2, y = H / 2;
+        for (let tries = 0; tries < 160; tries++) {
+          x = rand(radius + 34, Math.max(radius + 35, W - radius - 34));
+          y = rand(radius + 34, Math.max(radius + 35, H - radius - 34));
+          if (Math.hypot(x - W / 2, y - H / 2) < 180 + radius) continue;
+          let clear = true;
+          for (const rock of rocks) {
+            if (distWrap(x, y, rock.x, rock.y) < radius + rock.radius + 30) {
+              clear = false;
+              break;
+            }
+          }
+          if (clear) break;
         }
+        return makeRock(x, y, radius);
+      }
 
-        const bits = [];
-        const bitN = Math.round(radius / 5) + 4;
-        for (let i = 0; i < bitN; i++) {
-          const a = (i / bitN) * TAU + rand(-.18, .18);
-          const hr = i % 3 === 0 ? rand(0, radius * .25) : rand(radius * .25, radius * .82);
-          bits.push(makeShard(Math.cos(a) * hr, Math.sin(a) * hr, rand(radius * .09, radius * .16)));
-        }
-
+      function makeRock(x, y, radius, opts = {}) {
+        const maxRadius = opts.allowLarge ? Math.max(maxRockRadius(), radius) : maxRockRadius();
+        radius = clamp(radius, MIN_ROCK_R, maxRadius);
+        const baseHull = opts.lobes ? null : (opts.hull || makeHull(radius, opts.points || (9 + ((Math.random() * 6) | 0))));
+        const baseMass = opts.mass ?? radius * radius;
+        const lobes = opts.lobes
+          ? opts.lobes.map(copyLobe)
+          : [{ x: 0, y: 0, rot: 0, hull: copyHull(baseHull), mass: baseMass }];
+        const hull = opts.hull || (opts.lobes ? makeCompoundHull(lobes) : baseHull);
         return {
-          x, y,
-          vx: rand(-34, 34),
-          vy: rand(-34, 34),
-          rot: rand(0, TAU),
-          vr: rand(-.34, .34),
+          id: ++rockSerial,
+          x: wrap(x, W),
+          y: wrap(y, H),
+          vx: opts.vx ?? rand(-34, 34),
+          vy: opts.vy ?? rand(-34, 34),
+          rot: opts.rot ?? rand(0, TAU),
+          vr: opts.vr ?? rand(-.34, .34),
           radius,
+          mass: opts.mass ?? lobeMass(lobes),
           hull,
-          bits,
-          reformDelay: 0,
-          scatter: 0,
+          lobes,
+          bounds: opts.bounds ?? Math.max(radius, hullRadius(hull)),
+          crack: opts.crack ?? 0,
+          crackPhase: opts.crackPhase ?? rand(0, TAU),
+          mergeFlash: opts.mergeFlash ?? 0,
+          seams: opts.seams ? opts.seams.slice() : [],
         };
       }
 
-      function makeShard(hx, hy, size) {
+      function copyHull(hull) {
+        return hull.map(([x, y]) => [x, y]);
+      }
+
+      function copyLobe(lobe) {
         return {
-          hx, hy,
-          ox: hx + rand(-1, 1),
-          oy: hy + rand(-1, 1),
-          vx: 0,
-          vy: 0,
-          size,
-          angle: rand(0, TAU),
-          spin: rand(-.8, .8),
-          shape: shardShape(size),
+          x: lobe.x,
+          y: lobe.y,
+          rot: lobe.rot || 0,
+          hull: copyHull(lobe.hull),
+          mass: lobe.mass ?? Math.max(MIN_ROCK_R * MIN_ROCK_R, hullRadius(lobe.hull) ** 2),
         };
       }
 
-      function shardShape(size) {
-        const n = 4 + ((Math.random() * 4) | 0);
-        const pts = [];
+      function rockLobes(rock) {
+        return rock.lobes && rock.lobes.length
+          ? rock.lobes
+          : [{ x: 0, y: 0, rot: 0, hull: rock.hull, mass: rock.mass }];
+      }
+
+      function lobeMass(lobes) {
+        return lobes.reduce((sum, lobe) => sum + (lobe.mass || 0), 0);
+      }
+
+      function maxRockRadius() {
+        return Math.max(42, Math.min(W, H) * .36);
+      }
+
+      function makeHull(radius, n) {
+        return makeProceduralHull(radius, n, {
+          rough: rand(.18, .36),
+          squash: rand(.82, 1.18),
+          phase: rand(0, TAU),
+        });
+      }
+
+      function makeFragmentHull(radius, phase) {
+        return makeProceduralHull(radius, 4 + ((Math.random() * 5) | 0), {
+          rough: rand(.26, .48),
+          squash: rand(.72, 1.24),
+          phase: phase + rand(-.35, .35),
+          fragment: true,
+        });
+      }
+
+      function makeProceduralHull(radius, n, opts = {}) {
+        const weights = Array.from({ length: n }, () => rand(.45, 1.7));
+        const totalWeight = weights.reduce((sum, v) => sum + v, 0);
+        const phase = opts.phase ?? rand(0, TAU);
+        const warpA = rand(0, TAU);
+        const warpB = rand(0, TAU);
+        const squash = opts.squash ?? 1;
+        const tilt = rand(0, TAU);
+        const sx = squash;
+        const sy = 2 - squash;
+        const ca = Math.cos(tilt), sa = Math.sin(tilt);
+        const hull = [];
+        let a = phase;
         for (let i = 0; i < n; i++) {
-          const a = (i / n) * TAU + rand(-.22, .22);
-          const r = size * rand(.48, 1.06);
-          pts.push([Math.cos(a) * r, Math.sin(a) * r]);
+          a += (weights[i] / totalWeight) * TAU;
+          const wave = Math.sin(a * 2 + warpA) * opts.rough * .34 +
+            Math.sin(a * 5 + warpB) * opts.rough * .2;
+          const bite = Math.random() < (opts.fragment ? .26 : .16) ? rand(.52, .74) : 1;
+          const r = radius * clamp(rand(.74, 1.08) + wave, .52, 1.24) * bite;
+          const px = Math.cos(a) * r * sx;
+          const py = Math.sin(a) * r * sy;
+          hull.push([px * ca - py * sa, px * sa + py * ca]);
         }
-        return pts;
+        return hull;
+      }
+
+      function hullRadius(hull) {
+        let radius = MIN_ROCK_R;
+        for (const [x, y] of hull) radius = Math.max(radius, Math.hypot(x, y));
+        return radius;
+      }
+
+      function compoundBounds(lobes) {
+        let radius = MIN_ROCK_R;
+        for (const lobe of lobes) {
+          for (const p of lobeRockPoints(lobe)) {
+            radius = Math.max(radius, Math.hypot(p[0], p[1]));
+          }
+        }
+        return radius;
+      }
+
+      function makeCompoundHull(lobes) {
+        const pts = [];
+        for (const lobe of lobes) pts.push(...lobeRockPoints(lobe));
+        const base = convexHull(pts);
+        if (base.length <= 3) return base;
+
+        const n = clamp(Math.round(base.length * 1.55 + lobes.length * 2), 22, 54);
+        const phase = rand(0, TAU);
+        const radii = [];
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * TAU;
+          const ux = Math.cos(a), uy = Math.sin(a);
+          const ray = rayPolygonRadius(base, ux, uy);
+          const support = supportRadius(pts, ux, uy);
+          const r = Math.max(MIN_ROCK_R, ray || support);
+          const memory = lobeAngularMemory(lobes, a);
+          const carve = .82 + memory * .18;
+          const wobble = 1 +
+            Math.sin(a * 3 + phase) * .035 +
+            Math.sin(a * 7 - phase * .7) * .022 +
+            rand(-.018, .018);
+          radii.push(r * carve * wobble);
+        }
+
+        const smooth = smoothRing(radii, 1);
+        const hull = [];
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * TAU;
+          hull.push([Math.cos(a) * smooth[i], Math.sin(a) * smooth[i]]);
+        }
+        return hull;
+      }
+
+      function lobeAngularMemory(lobes, a) {
+        let best = 0;
+        for (const lobe of lobes) {
+          const d = Math.hypot(lobe.x, lobe.y);
+          const r = hullRadius(lobe.hull);
+          if (d < r * .28) {
+            best = Math.max(best, .72);
+            continue;
+          }
+          const diff = Math.abs(normAngle(a - Math.atan2(lobe.y, lobe.x)));
+          const width = clamp(Math.atan2(r * 1.05, d), .24, 1.05);
+          const weight = clamp(.52 + r / 74, .62, 1);
+          best = Math.max(best, Math.exp(-(diff * diff) / (width * width)) * weight);
+        }
+        return clamp(best, 0, 1);
+      }
+
+      function smoothRing(values, passes) {
+        let out = values.slice();
+        for (let p = 0; p < passes; p++) {
+          out = out.map((v, i) => {
+            const prev = out[(i - 1 + out.length) % out.length];
+            const next = out[(i + 1) % out.length];
+            return prev * .18 + v * .64 + next * .18;
+          });
+        }
+        return out;
+      }
+
+      function rayPolygonRadius(poly, ux, uy) {
+        let best = 0;
+        for (let i = 0; i < poly.length; i++) {
+          const a = poly[i];
+          const b = poly[(i + 1) % poly.length];
+          const ex = b[0] - a[0], ey = b[1] - a[1];
+          const den = ux * ey - uy * ex;
+          if (Math.abs(den) < .0001) continue;
+          const t = (a[0] * ey - a[1] * ex) / den;
+          const u = (a[0] * uy - a[1] * ux) / den;
+          if (t > 0 && u >= -.0001 && u <= 1.0001) best = Math.max(best, t);
+        }
+        return best;
+      }
+
+      function supportRadius(points, ux, uy) {
+        let best = MIN_ROCK_R;
+        for (const p of points) best = Math.max(best, p[0] * ux + p[1] * uy);
+        return best;
+      }
+
+      function lobeRockPoints(lobe) {
+        const ca = Math.cos(lobe.rot || 0), sa = Math.sin(lobe.rot || 0);
+        return lobe.hull.map(([x, y]) => [
+          lobe.x + x * ca - y * sa,
+          lobe.y + x * sa + y * ca,
+        ]);
+      }
+
+      function convexHull(points) {
+        if (points.length <= 3) return points.map(([x, y]) => [x, y]);
+        const sorted = points
+          .map(([x, y]) => ({ x, y }))
+          .sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+        const lower = [];
+        for (const p of sorted) {
+          while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+            lower.pop();
+          }
+          lower.push(p);
+        }
+        const upper = [];
+        for (let i = sorted.length - 1; i >= 0; i--) {
+          const p = sorted[i];
+          while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+            upper.pop();
+          }
+          upper.push(p);
+        }
+        lower.pop();
+        upper.pop();
+        return lower.concat(upper).map((p) => [p.x, p.y]);
+      }
+
+      function rockExtent(rock) {
+        return rock.bounds ?? rock.radius;
+      }
+
+      function rotateLocal(x, y, angle) {
+        const ca = Math.cos(angle), sa = Math.sin(angle);
+        return { x: x * ca - y * sa, y: x * sa + y * ca };
       }
 
       function frame(t) {
@@ -216,9 +419,11 @@
           return;
         }
 
-        if (keys.has('ArrowLeft') || keys.has('KeyA')) ship.a -= SHIP_TURN * dt;
-        if (keys.has('ArrowRight') || keys.has('KeyD')) ship.a += SHIP_TURN * dt;
-        if (keys.has('ArrowUp') || keys.has('KeyW')) {
+        const controls = playerControl ? playerControls() : autoControls();
+        ship.a = normAngle(ship.a + controls.turn * SHIP_TURN * dt);
+        ship.thrusting = controls.thrust;
+
+        if (controls.thrust) {
           ship.vx += Math.cos(ship.a) * SHIP_ACCEL * dt;
           ship.vy += Math.sin(ship.a) * SHIP_ACCEL * dt;
           if (Math.random() < .42) thrustSpark();
@@ -232,7 +437,144 @@
         ship.fireCd = Math.max(0, ship.fireCd - dt);
         ship.invuln = Math.max(0, ship.invuln - dt);
 
-        if (keys.has('Space') && ship.fireCd <= 0) fire();
+        if (!playerControl && controls.fire && controls.fireAngle != null && ship.fireCd <= 0) {
+          ship.a = controls.fireAngle;
+        }
+        if (controls.fire && ship.fireCd <= 0) fire();
+      }
+
+      function playerControls() {
+        return {
+          turn: (keys.has('ArrowRight') || keys.has('KeyD') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('KeyA') ? 1 : 0),
+          thrust: keys.has('ArrowUp') || keys.has('KeyW'),
+          fire: keys.has('Space'),
+        };
+      }
+
+      function autoControls() {
+        const danger = closestRock();
+        const target = targetRock();
+        const shot = autoShot();
+        updateAutoMood(danger);
+        let desired = ship.a;
+        let thrust = false;
+        let evading = false;
+        const speed = shipSpeed();
+        const pausing = now < ship.autoPauseUntil && (!danger || danger.clearance > 115);
+
+        if (pausing) {
+          desired = ship.cruiseAngle;
+        } else if (danger && danger.clearance < 30 + speed * .05) {
+          const rvx = danger.rock.vx - ship.vx;
+          const rvy = danger.rock.vy - ship.vy;
+          desired = Math.atan2(-(danger.dy + rvy * .65), -(danger.dx + rvx * .65));
+          evading = true;
+        } else if (danger && danger.clearance < 165 + speed * .08) {
+          const lead = leadRock(danger.rock, danger.dx, danger.dy, danger.dist);
+          desired = lead.angle;
+          const aim = Math.abs(normAngle(desired - ship.a));
+          thrust = aim < .42 && speed < 210 && danger.dist > 150;
+        } else if (target) {
+          desired = target.angle;
+          const aim = Math.abs(normAngle(desired - ship.a));
+          thrust = aim < .7 && speed < 185 && target.dist > 150 && now < ship.autoCruiseUntil;
+        } else {
+          desired = ship.cruiseAngle;
+          const aim = Math.abs(normAngle(desired - ship.a));
+          thrust = aim < .55 && speed < 145 && now < ship.autoCruiseUntil;
+        }
+
+        const delta = normAngle(desired - ship.a);
+        if (evading) thrust = Math.abs(delta) < 1.25 && speed < 330;
+        const patient = now - ship.lastShot > 2.4 && bullets.length < MAX_BULLETS;
+        const shotReady = now >= ship.nextAutoShot && ship.fireCd <= 0 && bullets.length < MAX_BULLETS;
+        const shoot = !pausing && shotReady && !!shot && (shot.aim < shot.cone || (patient && shot.aim < shot.cone * 1.18));
+        if (shoot) ship.nextAutoShot = now + rand(.55, 1.25);
+        return {
+          turn: clamp(delta * AUTO_TURN_GAIN, -1, 1),
+          thrust,
+          fire: shoot,
+          fireAngle: shoot ? shot.angle : null,
+        };
+      }
+
+      function updateAutoMood(danger) {
+        if (danger && danger.clearance < 105) {
+          ship.autoPauseUntil = Math.min(ship.autoPauseUntil || 0, now);
+          if (now >= ship.autoCruiseUntil) ship.autoCruiseUntil = now + rand(.65, 1.2);
+          return;
+        }
+        if (now >= (ship.autoCruiseUntil || 0)) {
+          ship.autoCruiseUntil = now + rand(1.6, 3.7);
+          ship.cruiseAngle = normAngle(ship.a + rand(-1.15, 1.15));
+          if (Math.random() < .58) ship.autoPauseUntil = now + rand(.45, 1.4);
+        }
+      }
+
+      function closestRock() {
+        let best = null;
+        for (const rock of rocks) {
+          const dx = wrapDelta(rock.x - ship.x, W);
+          const dy = wrapDelta(rock.y - ship.y, H);
+          const dist = Math.hypot(dx, dy);
+          const clearance = dist - rockExtent(rock) - SHIP_R;
+          if (!best || clearance < best.clearance) best = { rock, dx, dy, dist, clearance };
+        }
+        return best;
+      }
+
+      function targetRock() {
+        let best = null;
+        for (const rock of rocks) {
+          const dx = wrapDelta(rock.x - ship.x, W);
+          const dy = wrapDelta(rock.y - ship.y, H);
+          const dist = Math.hypot(dx, dy);
+          const lead = leadRock(rock, dx, dy, dist);
+          const forward = Math.cos(ship.a) * lead.x + Math.sin(ship.a) * lead.y;
+          const aim = Math.abs(normAngle(lead.angle - ship.a));
+          const smallBonus = canSplitRock(rock) ? 0 : 38;
+          const value = rockExtent(rock) * 2.7 + smallBonus + forward * .09 - dist * .08 - aim * 95;
+          if (!best || value > best.value) best = { rock, dx, dy, dist, angle: lead.angle, value };
+        }
+        return best;
+      }
+
+      function autoShot() {
+        let best = null;
+        for (const rock of rocks) {
+          const dx = wrapDelta(rock.x - ship.x, W);
+          const dy = wrapDelta(rock.y - ship.y, H);
+          const dist = Math.hypot(dx, dy);
+          if (dist > 920) continue;
+          const lead = leadRock(rock, dx, dy, dist);
+          const aim = Math.abs(normAngle(lead.angle - ship.a));
+          const closing = Math.cos(ship.a) * lead.x + Math.sin(ship.a) * lead.y;
+          if (closing < -rockExtent(rock)) continue;
+          const smallBonus = canSplitRock(rock) ? 0 : 56;
+          const cone = clamp(.32 + rockExtent(rock) * .0048 + (dist < 320 ? .14 : 0), .34, .7);
+          const value = (cone - aim) * 260 + rockExtent(rock) * 1.25 + smallBonus - dist * .018;
+          if (!best || value > best.value) best = { rock, aim, cone, angle: lead.angle, value };
+        }
+        return best;
+      }
+
+      function leadRock(rock, dx, dy, dist) {
+        const lead = clamp(dist / BULLET_SPEED, .05, .82);
+        const x = dx + rock.vx * lead;
+        const y = dy + rock.vy * lead;
+        return { x, y, angle: Math.atan2(y, x) };
+      }
+
+      function canSplitRock(rock) {
+        return maxSplitPieces(rock) >= 2;
+      }
+
+      function maxSplitPieces(rock) {
+        return Math.min(5, Math.floor(rock.mass / (MIN_SPLIT_R * MIN_SPLIT_R)));
+      }
+
+      function shipSpeed() {
+        return Math.hypot(ship.vx, ship.vy);
       }
 
       function respawnShip() {
@@ -244,6 +586,12 @@
         ship.alive = true;
         ship.invuln = 2;
         ship.fireCd = .25;
+        ship.lastShot = now;
+        ship.nextAutoShot = now + rand(.7, 1.6);
+        ship.autoPauseUntil = now + rand(.45, 1.15);
+        ship.autoCruiseUntil = now + rand(1.2, 2.5);
+        ship.cruiseAngle = rand(-Math.PI, Math.PI);
+        ship.thrusting = false;
       }
 
       function killShip() {
@@ -268,42 +616,364 @@
           py: ship.y,
           vx: ship.vx + nx * BULLET_SPEED,
           vy: ship.vy + ny * BULLET_SPEED,
-          life: 1.08,
+          life: .92,
+          wrapped: false,
         });
-        ship.fireCd = .17;
+        ship.lastShot = now;
+        ship.fireCd = playerControl ? .12 : .3;
       }
 
       function updateBullets(dt) {
         for (const b of bullets) {
           b.px = b.x;
           b.py = b.y;
-          b.x = wrap(b.x + b.vx * dt, W);
-          b.y = wrap(b.y + b.vy * dt, H);
+          const nx = b.x + b.vx * dt;
+          const ny = b.y + b.vy * dt;
+          b.wrapped = nx < 0 || nx >= W || ny < 0 || ny >= H;
+          b.x = wrap(nx, W);
+          b.y = wrap(ny, H);
           b.life -= dt;
         }
         bullets = bullets.filter((b) => b.life > 0);
       }
 
       function updateRocks(dt) {
+        applyRockGravity(dt);
+
         for (const r of rocks) {
+          const speed = Math.hypot(r.vx, r.vy);
+          if (speed > 210) {
+            r.vx = (r.vx / speed) * 210;
+            r.vy = (r.vy / speed) * 210;
+          }
           r.x = wrap(r.x + r.vx * dt, W);
           r.y = wrap(r.y + r.vy * dt, H);
           r.rot += r.vr * dt;
-          r.reformDelay = Math.max(0, r.reformDelay - dt);
-          r.scatter = Math.max(0, r.scatter - dt * .34);
+          r.crack = Math.max(0, r.crack - dt * .055);
+          r.mergeFlash = Math.max(0, r.mergeFlash - dt * 1.25);
+          for (const seam of r.seams) seam.life = Math.max(0, seam.life - dt * SEAM_DECAY);
+          r.seams = r.seams.filter((seam) => seam.life > .015);
 
-          const spring = r.reformDelay > 0 ? .34 : 2.85;
-          const damp = Math.pow(r.reformDelay > 0 ? .68 : .055, dt);
-          for (const bit of r.bits) {
-            bit.vx += (bit.hx - bit.ox) * spring * dt;
-            bit.vy += (bit.hy - bit.oy) * spring * dt;
-            bit.vx *= damp;
-            bit.vy *= damp;
-            bit.ox += bit.vx * dt;
-            bit.oy += bit.vy * dt;
-            bit.angle += bit.spin * dt;
-            bit.spin *= Math.pow(.18, dt);
+          const drag = Math.pow(1 - ROCK_DRAG, dt);
+          r.vx *= drag;
+          r.vy *= drag;
+          r.vr *= Math.pow(.6, dt);
+        }
+
+        resolveRockCollisions(dt);
+        mergeTouchingRocks(dt);
+        condenseOverflow();
+      }
+
+      function applyRockGravity(dt) {
+        for (let i = 0; i < rocks.length; i++) {
+          const a = rocks[i];
+          for (let j = i + 1; j < rocks.length; j++) {
+            const b = rocks[j];
+            const dx = wrapDelta(b.x - a.x, W);
+            const dy = wrapDelta(b.y - a.y, H);
+            const d2 = dx * dx + dy * dy;
+            if (d2 < 1) continue;
+            const d = Math.sqrt(d2);
+            const reach = clamp((rockExtent(a) + rockExtent(b)) * 3.55, 130, Math.min(W, H) * .5);
+            if (d > reach) continue;
+            const nx = dx / d, ny = dy / d;
+            const falloff = Math.pow(1 - d / reach, 1.55);
+            const pullA = (GRAVITY * b.mass * falloff) / (d2 + 14000);
+            const pullB = (GRAVITY * a.mass * falloff) / (d2 + 14000);
+            a.vx += nx * pullA * dt;
+            a.vy += ny * pullA * dt;
+            b.vx -= nx * pullB * dt;
+            b.vy -= ny * pullB * dt;
+            applyCapturePull(a, b, nx, ny, d, falloff, dt);
           }
+        }
+      }
+
+      function applyCapturePull(a, b, nx, ny, d, falloff, dt) {
+        const big = a.radius >= b.radius ? a : b;
+        const small = big === a ? b : a;
+        const ratio = big.radius / Math.max(1, small.radius);
+        if (ratio < 1.12) return;
+
+        const dir = big === a ? { x: nx, y: ny } : { x: -nx, y: -ny };
+        const bigFace = directionalRockRadius(big, dir.x, dir.y);
+        const smallFace = directionalRockRadius(small, -dir.x, -dir.y);
+        const gap = d - bigFace - smallFace;
+        const captureReach = Math.max(16, Math.min(54, smallFace * .78 + bigFace * .2));
+        if (gap > captureReach) return;
+
+        const sx = wrapDelta(small.x - big.x, W);
+        const sy = wrapDelta(small.y - big.y, H);
+        const attach = bigFace + smallFace * .62;
+        const targetX = dir.x * attach;
+        const targetY = dir.y * attach;
+        const capture = Math.pow(clamp(1 - gap / captureReach, 0, 1), 1.9) * Math.min(1.35, Math.sqrt(ratio));
+        const ex = targetX - sx;
+        const ey = targetY - sy;
+        const error = Math.hypot(ex, ey);
+        if (error < .01) return;
+        const pull = Math.min(error * CAPTURE_PULL * capture, 40 + 16 * capture);
+        const px = (ex / error) * pull;
+        const py = (ey / error) * pull;
+
+        small.vx += px * dt;
+        small.vy += py * dt;
+        big.vx -= px * dt * (small.mass / big.mass) * .045;
+        big.vy -= py * dt * (small.mass / big.mass) * .045;
+        small.vr += clamp((dir.x * small.vy - dir.y * small.vx) * .0014, -.045, .045) * falloff;
+      }
+
+      function resolveRockCollisions(dt) {
+        for (let pass = 0; pass < 2; pass++) {
+          for (let i = 0; i < rocks.length; i++) {
+            for (let j = i + 1; j < rocks.length; j++) {
+              const a = rocks[i], b = rocks[j];
+              const contact = rockContactInfo(a, b);
+              if (!contact || contact.gap > CONTACT_SKIN) continue;
+
+              const key = contactKey(a, b);
+              const settling = (mergeContacts.get(key) || 0) > 0;
+              const penetration = CONTACT_SKIN - contact.gap;
+              const invA = 1 / Math.max(1, a.mass);
+              const invB = 1 / Math.max(1, b.mass);
+              const invTotal = invA + invB;
+              const correction = penetration / invTotal;
+
+              a.x = wrap(a.x - contact.nx * correction * invA, W);
+              a.y = wrap(a.y - contact.ny * correction * invA, H);
+              b.x = wrap(b.x + contact.nx * correction * invB, W);
+              b.y = wrap(b.y + contact.ny * correction * invB, H);
+
+              const rvx = b.vx - a.vx;
+              const rvy = b.vy - a.vy;
+              const relN = rvx * contact.nx + rvy * contact.ny;
+              const bounce = settling ? .08 : COLLISION_BOUNCE;
+              if (relN < 0) {
+                const impulse = -(1 + bounce) * relN / invTotal;
+                a.vx -= impulse * invA * contact.nx;
+                a.vy -= impulse * invA * contact.ny;
+                b.vx += impulse * invB * contact.nx;
+                b.vy += impulse * invB * contact.ny;
+              }
+
+              const tx = -contact.ny, ty = contact.nx;
+              const relT = (b.vx - a.vx) * tx + (b.vy - a.vy) * ty;
+              const friction = (settling ? .18 : .07) * Math.min(1, dt * 60);
+              const tangentImpulse = clamp(relT * friction / invTotal, -22, 22);
+              a.vx += tangentImpulse * invA * tx;
+              a.vy += tangentImpulse * invA * ty;
+              b.vx -= tangentImpulse * invB * tx;
+              b.vy -= tangentImpulse * invB * ty;
+
+              a.vr += clamp((contact.nx * rvy - contact.ny * rvx) * invA * 3.4, -.045, .045);
+              b.vr -= clamp((contact.nx * rvy - contact.ny * rvx) * invB * 3.4, -.045, .045);
+            }
+          }
+        }
+      }
+
+      function mergeTouchingRocks(dt = 0, immediate = false) {
+        let merged = true;
+        let guard = 0;
+        const seen = new Set();
+        while (merged && guard++ < 32) {
+          merged = false;
+          outer:
+          for (let i = 0; i < rocks.length; i++) {
+            for (let j = i + 1; j < rocks.length; j++) {
+              const a = rocks[i], b = rocks[j];
+              if (rocksReadyToGlom(a, b, immediate ? 2 : MERGE_TOUCH_PAD)) {
+                const key = contactKey(a, b);
+                seen.add(key);
+                const rel = Math.hypot(a.vx - b.vx, a.vy - b.vy);
+                const settle = rel < 92 ? dt : dt * .35;
+                const held = immediate ? GLUE_SETTLE_TIME : (mergeContacts.get(key) || 0) + settle;
+                mergeContacts.set(key, held);
+                if (!immediate && held < GLUE_SETTLE_TIME) continue;
+                absorbRockPair(i, j);
+                merged = true;
+                break outer;
+              }
+            }
+          }
+        }
+        if (!immediate && dt > 0) {
+          for (const [key, held] of mergeContacts) {
+            if (seen.has(key)) continue;
+            const next = held - dt * .72;
+            if (next <= 0) mergeContacts.delete(key);
+            else mergeContacts.set(key, next);
+          }
+        }
+      }
+
+      function contactKey(a, b) {
+        return a.id < b.id ? `${a.id}:${b.id}` : `${b.id}:${a.id}`;
+      }
+
+      function rocksReadyToGlom(a, b, pad) {
+        const contact = rockContactInfo(a, b);
+        return !!contact && (contact.gap <= pad || rocksTouch(a, b, pad));
+      }
+
+      function rockContactInfo(a, b) {
+        const dx = wrapDelta(b.x - a.x, W);
+        const dy = wrapDelta(b.y - a.y, H);
+        const d = Math.hypot(dx, dy);
+        const nx = d > .001 ? dx / d : 1;
+        const ny = d > .001 ? dy / d : 0;
+        if (d > rockExtent(a) + rockExtent(b) + CONTACT_SKIN + 8) return null;
+        const aFace = directionalRockRadius(a, nx, ny);
+        const bFace = directionalRockRadius(b, -nx, -ny);
+        let gap = d - aFace - bFace;
+        if (gap > CONTACT_SKIN && rocksTouch(a, b, CONTACT_SKIN)) gap = 0;
+        return { dx, dy, d, nx, ny, gap, aFace, bFace };
+      }
+
+      function directionalRockRadius(rock, ux, uy) {
+        const local = rotateLocal(ux, uy, -rock.rot);
+        return Math.max(
+          MIN_ROCK_R,
+          rayPolygonRadius(rock.hull, local.x, local.y) ||
+            supportRadius(rock.hull, local.x, local.y)
+        );
+      }
+
+      function absorbRockPair(i, j) {
+        const a = rocks[i], b = rocks[j];
+        const total = a.mass + b.mass;
+        const dx = wrapDelta(b.x - a.x, W);
+        const dy = wrapDelta(b.y - a.y, H);
+        const x = wrap(a.x + dx * (b.mass / total), W);
+        const y = wrap(a.y + dy * (b.mass / total), H);
+        const aLocal = { x: wrapDelta(a.x - x, W), y: wrapDelta(a.y - y, H) };
+        const bLocal = { x: wrapDelta(b.x - x, W), y: wrapDelta(b.y - y, H) };
+        const lobes = compactMergedLobes([
+          ...carryLobes(a, x, y, 0),
+          ...carryLobes(b, x, y, 0),
+        ], Math.sqrt(total));
+        const radius = clamp(Math.sqrt(total), MIN_ROCK_R, maxRockRadius());
+        const hull = makeCompoundHull(lobes);
+        const bounds = Math.max(radius, hullRadius(hull));
+        const seams = [
+          ...carrySeams(a, x, y, 0),
+          ...carrySeams(b, x, y, 0),
+          makeMergeSeam(aLocal, rockExtent(a), bLocal, rockExtent(b)),
+        ].filter((seam) => seam.life > .02);
+        const merged = makeRock(x, y, radius, {
+          vx: (a.vx * a.mass + b.vx * b.mass) / total,
+          vy: (a.vy * a.mass + b.vy * b.mass) / total,
+          vr: (a.vr * a.mass + b.vr * b.mass) / total + rand(-.08, .08),
+          rot: 0,
+          lobes,
+          hull,
+          mass: total,
+          bounds,
+          crack: Math.max(a.crack, b.crack, .35),
+          mergeFlash: .58,
+          seams,
+        });
+        clearContactsFor(a, b);
+        burst(x, y, 11, 70);
+        rocks.splice(j, 1);
+        rocks.splice(i, 1);
+        rocks.push(merged);
+      }
+
+      function compactMergedLobes(lobes, radius) {
+        const bounds = compoundBounds(lobes);
+        const target = radius * (lobes.length <= 2 ? 1.68 : 1.56);
+        const scale = bounds > target ? clamp(target / bounds, .78, .97) : 1;
+        return lobes.map((lobe) => ({
+          ...lobe,
+          x: lobe.x * scale,
+          y: lobe.y * scale,
+        }));
+      }
+
+      function clearContactsFor(...dead) {
+        if (!mergeContacts) return;
+        const ids = new Set(dead.map((rock) => rock.id));
+        for (const key of mergeContacts.keys()) {
+          const [a, b] = key.split(':').map(Number);
+          if (ids.has(a) || ids.has(b)) mergeContacts.delete(key);
+        }
+      }
+
+      function carryLobes(rock, newX, newY, newRot) {
+        return rockLobes(rock).map((lobe) => {
+          const carried = lobePointToNewLocal(rock, lobe.x, lobe.y, newX, newY, newRot);
+          return {
+            x: carried.x,
+            y: carried.y,
+            rot: normAngle(rock.rot + (lobe.rot || 0) - newRot),
+            hull: copyHull(lobe.hull),
+            mass: lobe.mass ?? rock.mass,
+          };
+        });
+      }
+
+      function lobePointToNewLocal(rock, x, y, newX, newY, newRot) {
+        const world = rotateLocal(x, y, rock.rot);
+        const lx = wrapDelta(rock.x + world.x - newX, W);
+        const ly = wrapDelta(rock.y + world.y - newY, H);
+        return rotateLocal(lx, ly, -newRot);
+      }
+
+      function makeMergeSeam(a, ar, b, br) {
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const nx = dx / d, ny = dy / d;
+        const px = -ny, py = nx;
+        const boundary = clamp((d * d + ar * ar - br * br) / (2 * d), ar * .32, ar * 1.04);
+        const cx = a.x + nx * boundary;
+        const cy = a.y + ny * boundary;
+        const half = clamp(Math.min(ar, br) * .72, 6, 42);
+        return {
+          x1: cx + px * half,
+          y1: cy + py * half,
+          x2: cx - px * half,
+          y2: cy - py * half,
+          life: 1,
+        };
+      }
+
+      function carrySeams(rock, newX, newY, newRot) {
+        const seams = [];
+        for (const seam of rock.seams || []) {
+          if (seam.life <= .04) continue;
+          const p1 = seamPointToNewLocal(rock, seam.x1, seam.y1, newX, newY, newRot);
+          const p2 = seamPointToNewLocal(rock, seam.x2, seam.y2, newX, newY, newRot);
+          seams.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, life: seam.life * .78 });
+        }
+        return seams;
+      }
+
+      function seamPointToNewLocal(rock, x, y, newX, newY, newRot) {
+        const world = rotateLocal(x, y, rock.rot);
+        const lx = wrapDelta(rock.x + world.x - newX, W);
+        const ly = wrapDelta(rock.y + world.y - newY, H);
+        return rotateLocal(lx, ly, -newRot);
+      }
+
+      function condenseOverflow() {
+        while (rocks.length > MAX_ROCKS) {
+          let bestI = 0, bestJ = 1, best = Infinity;
+          for (let i = 0; i < rocks.length; i++) {
+            for (let j = i + 1; j < rocks.length; j++) {
+              const a = rocks[i], b = rocks[j];
+              const d = distWrap(a.x, a.y, b.x, b.y) - rockExtent(a) - rockExtent(b);
+              const score = d + Math.min(a.radius, b.radius) * .35;
+              if (score < best) {
+                best = score;
+                bestI = i;
+                bestJ = j;
+              }
+            }
+          }
+          absorbRockPair(bestI, bestJ);
         }
       }
 
@@ -322,13 +992,10 @@
       function collideBullets() {
         for (let bi = bullets.length - 1; bi >= 0; bi--) {
           const b = bullets[bi];
-          let hit = null;
-          for (const rock of rocks) {
-            const d = distWrap(b.x, b.y, rock.x, rock.y);
-            if (d > rock.radius + 72) continue;
-            hit = nearestShardHit(rock, b.x, b.y, 5);
-            if (hit || d < rock.radius * .62) {
-              fractureRock(rock, b.x, b.y, hit);
+          for (let ri = rocks.length - 1; ri >= 0; ri--) {
+            const rock = rocks[ri];
+            if (bulletHitsRock(b, rock)) {
+              fractureRock(ri, b.x, b.y);
               bullets.splice(bi, 1);
               score += 10;
               break;
@@ -340,102 +1007,273 @@
       function collideShip() {
         if (!ship.alive || ship.invuln > 0 || gameOver) return;
         for (const rock of rocks) {
-          if (distWrap(ship.x, ship.y, rock.x, rock.y) > rock.radius + 60) continue;
-          for (const bit of rock.bits) {
-            const p = shardWorld(rock, bit);
-            if (distWrap(ship.x, ship.y, p.x, p.y) < SHIP_R + bit.size * .72) {
-              killShip();
-              return;
-            }
+          if (distWrap(ship.x, ship.y, rock.x, rock.y) > SHIP_R + rockExtent(rock) + 2) continue;
+          if (pointHitsRock(ship.x, ship.y, rock, SHIP_R)) {
+            killShip();
+            return;
           }
         }
       }
 
-      function nearestShardHit(rock, x, y, pad) {
-        let best = null;
-        let bestD = Infinity;
-        for (let i = 0; i < rock.bits.length; i++) {
-          const bit = rock.bits[i];
-          const p = shardWorld(rock, bit);
-          const d = distWrap(x, y, p.x, p.y);
-          if (d < bit.size + pad && d < bestD) {
-            bestD = d;
-            best = { bit, index: i };
-          }
-        }
-        return best;
+      function bulletHitsRock(b, rock) {
+        if (b.wrapped) return pointHitsRock(b.x, b.y, rock, 3);
+        const extent = rockExtent(rock);
+        if (
+          distWrap(b.x, b.y, rock.x, rock.y) > extent + 34 &&
+          distWrap(b.px, b.py, rock.x, rock.y) > extent + 34
+        ) return false;
+        return segmentHitsRock(b.px, b.py, b.x, b.y, rock, 3);
       }
 
-      function fractureRock(rock, x, y, hit) {
-        const local = worldToRock(rock, x, y);
-        rock.reformDelay = 1.35;
-        rock.scatter = 1;
-        rock.vx += clamp((rock.x - x) * .015, -10, 10);
-        rock.vy += clamp((rock.y - y) * .015, -10, 10);
-
-        if (!hit) hit = nearestLocalShard(rock, local.x, local.y);
-        if (hit && rock.bits.length < MAX_SHARDS_PER_ROCK && hit.bit.size > 4.2) {
-          splitShard(rock, hit.bit);
-        } else if (hit) {
-          hit.bit.size = Math.max(3.2, hit.bit.size * .94);
-          hit.bit.shape = shardShape(hit.bit.size);
+      function pointHitsRock(x, y, rock, pad) {
+        const p = pointToRockLocal(rock, x, y);
+        if (rockLobes(rock).length > 1) {
+          return pointInPolygon(p, rock.hull) || pointPolygonDistance(p, rock.hull) <= pad;
         }
-
-        for (const bit of rock.bits) {
-          const dx = bit.ox - local.x;
-          const dy = bit.oy - local.y;
-          const d = Math.hypot(dx, dy) || 1;
-          const force = rand(65, 190) / (1 + d * .012);
-          bit.vx += (dx / d) * force + rand(-28, 28);
-          bit.vy += (dy / d) * force + rand(-28, 28);
-          bit.spin += rand(-5.2, 5.2) / Math.max(1, bit.size * .18);
+        for (const lobe of rockLobes(rock)) {
+          const lp = pointToLobeLocal(p, lobe);
+          if (pointInPolygon(lp, lobe.hull) || pointPolygonDistance(lp, lobe.hull) <= pad) return true;
         }
-        burst(x, y, 18, 115);
+        return false;
       }
 
-      function splitShard(rock, bit) {
-        const side = Math.random() < .5 ? -1 : 1;
-        const a = Math.atan2(bit.hy, bit.hx) + Math.PI / 2;
-        const spread = Math.max(4, bit.size * .52);
-        bit.size *= .72;
-        bit.hx += Math.cos(a) * spread * side;
-        bit.hy += Math.sin(a) * spread * side;
-        bit.shape = shardShape(bit.size);
-        const child = makeShard(
-          bit.hx - Math.cos(a) * spread * side * 2,
-          bit.hy - Math.sin(a) * spread * side * 2,
-          bit.size * rand(.9, 1.08)
-        );
-        child.ox = bit.ox - Math.cos(a) * spread * side;
-        child.oy = bit.oy - Math.sin(a) * spread * side;
-        child.vx = bit.vx - Math.cos(a) * rand(35, 82) * side;
-        child.vy = bit.vy - Math.sin(a) * rand(35, 82) * side;
-        rock.bits.push(child);
-      }
-
-      function nearestLocalShard(rock, x, y) {
-        let best = null, bestD = Infinity;
-        for (let i = 0; i < rock.bits.length; i++) {
-          const bit = rock.bits[i];
-          const d = Math.hypot(bit.ox - x, bit.oy - y);
-          if (d < bestD) { bestD = d; best = { bit, index: i }; }
+      function segmentHitsRock(x1, y1, x2, y2, rock, pad) {
+        const p1 = pointToRockLocal(rock, x1, y1);
+        const p2 = pointToRockLocal(rock, x2, y2);
+        if (rockLobes(rock).length > 1) {
+          return pointInPolygon(p1, rock.hull) ||
+            pointInPolygon(p2, rock.hull) ||
+            segmentPolygonDistance(p1, p2, rock.hull) <= pad;
         }
-        return best;
+        for (const lobe of rockLobes(rock)) {
+          const lp1 = pointToLobeLocal(p1, lobe);
+          const lp2 = pointToLobeLocal(p2, lobe);
+          if (
+            pointInPolygon(lp1, lobe.hull) ||
+            pointInPolygon(lp2, lobe.hull) ||
+            segmentPolygonDistance(lp1, lp2, lobe.hull) <= pad
+          ) return true;
+        }
+        return false;
       }
 
-      function worldToRock(rock, x, y) {
+      function pointToRockLocal(rock, x, y) {
         const dx = wrapDelta(x - rock.x, W);
         const dy = wrapDelta(y - rock.y, H);
-        const ca = Math.cos(-rock.rot), sa = Math.sin(-rock.rot);
-        return { x: dx * ca - dy * sa, y: dx * sa + dy * ca };
+        return rotateLocal(dx, dy, -rock.rot);
       }
 
-      function shardWorld(rock, bit) {
+      function pointToLobeLocal(p, lobe) {
+        return rotateLocal(p.x - lobe.x, p.y - lobe.y, -(lobe.rot || 0));
+      }
+
+      function pointInPolygon(p, poly) {
+        let inside = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+          const xi = poly[i][0], yi = poly[i][1];
+          const xj = poly[j][0], yj = poly[j][1];
+          const crosses = (yi > p.y) !== (yj > p.y) &&
+            p.x < ((xj - xi) * (p.y - yi)) / (yj - yi || .0001) + xi;
+          if (crosses) inside = !inside;
+        }
+        return inside;
+      }
+
+      function pointPolygonDistance(p, poly) {
+        let best = Infinity;
+        for (let i = 0; i < poly.length; i++) {
+          const a = poly[i];
+          const b = poly[(i + 1) % poly.length];
+          best = Math.min(best, pointSegmentDistance(p.x, p.y, a[0], a[1], b[0], b[1]));
+        }
+        return best;
+      }
+
+      function segmentPolygonDistance(p1, p2, poly) {
+        let best = Infinity;
+        for (let i = 0; i < poly.length; i++) {
+          const a = { x: poly[i][0], y: poly[i][1] };
+          const b = { x: poly[(i + 1) % poly.length][0], y: poly[(i + 1) % poly.length][1] };
+          if (segmentsIntersect(p1, p2, a, b)) return 0;
+          best = Math.min(best, segmentSegmentDistance(p1, p2, a, b));
+        }
+        return best;
+      }
+
+      function segmentsIntersect(a, b, c, d) {
+        const ab1 = cross(a, b, c);
+        const ab2 = cross(a, b, d);
+        const cd1 = cross(c, d, a);
+        const cd2 = cross(c, d, b);
+        const eps = .0001;
+        if (Math.abs(ab1) < eps && onSegment(a, c, b)) return true;
+        if (Math.abs(ab2) < eps && onSegment(a, d, b)) return true;
+        if (Math.abs(cd1) < eps && onSegment(c, a, d)) return true;
+        if (Math.abs(cd2) < eps && onSegment(c, b, d)) return true;
+        return (ab1 > 0) !== (ab2 > 0) && (cd1 > 0) !== (cd2 > 0);
+      }
+
+      function onSegment(a, b, c) {
+        return b.x >= Math.min(a.x, c.x) - .0001 &&
+          b.x <= Math.max(a.x, c.x) + .0001 &&
+          b.y >= Math.min(a.y, c.y) - .0001 &&
+          b.y <= Math.max(a.y, c.y) + .0001;
+      }
+
+      function segmentSegmentDistance(a, b, c, d) {
+        return Math.min(
+          pointSegmentDistance(a.x, a.y, c.x, c.y, d.x, d.y),
+          pointSegmentDistance(b.x, b.y, c.x, c.y, d.x, d.y),
+          pointSegmentDistance(c.x, c.y, a.x, a.y, b.x, b.y),
+          pointSegmentDistance(d.x, d.y, a.x, a.y, b.x, b.y)
+        );
+      }
+
+      function cross(a, b, c) {
+        return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+      }
+
+      function rocksTouch(a, b, pad) {
+        if (distWrap(a.x, a.y, b.x, b.y) > rockExtent(a) + rockExtent(b) + pad + 2) return false;
+        const dx = wrapDelta(b.x - a.x, W);
+        const dy = wrapDelta(b.y - a.y, H);
+        const aPolys = rockCollisionPolygonsRelative(a, 0, 0);
+        const bPolys = rockCollisionPolygonsRelative(b, dx, dy);
+        for (const aPts of aPolys) {
+          for (const bPts of bPolys) {
+            if (polygonDistance(aPts, bPts) <= pad) return true;
+          }
+        }
+        return false;
+      }
+
+      function rockCollisionPolygonsRelative(rock, ox, oy) {
+        if (rockLobes(rock).length > 1) return [rockHullPolygonRelative(rock, ox, oy)];
+        return rockLobePolygonsRelative(rock, ox, oy);
+      }
+
+      function rockHullPolygonRelative(rock, ox, oy) {
         const ca = Math.cos(rock.rot), sa = Math.sin(rock.rot);
-        return {
-          x: wrap(rock.x + bit.ox * ca - bit.oy * sa, W),
-          y: wrap(rock.y + bit.ox * sa + bit.oy * ca, H),
-        };
+        return rock.hull.map(([x, y]) => [ox + x * ca - y * sa, oy + x * sa + y * ca]);
+      }
+
+      function rockLobePolygonsRelative(rock, ox, oy) {
+        return rockLobes(rock).map((lobe) => lobePolygonRelative(rock, lobe, ox, oy));
+      }
+
+      function lobePolygonRelative(rock, lobe, ox, oy) {
+        const rca = Math.cos(rock.rot), rsa = Math.sin(rock.rot);
+        const cx = ox + lobe.x * rca - lobe.y * rsa;
+        const cy = oy + lobe.x * rsa + lobe.y * rca;
+        const a = rock.rot + (lobe.rot || 0);
+        const ca = Math.cos(a), sa = Math.sin(a);
+        return lobe.hull.map(([x, y]) => [cx + x * ca - y * sa, cy + x * sa + y * ca]);
+      }
+
+      function polygonDistance(aPts, bPts) {
+        for (const p of aPts) if (pointInPolygon({ x: p[0], y: p[1] }, bPts)) return 0;
+        for (const p of bPts) if (pointInPolygon({ x: p[0], y: p[1] }, aPts)) return 0;
+
+        let best = Infinity;
+        for (let i = 0; i < aPts.length; i++) {
+          const a1 = { x: aPts[i][0], y: aPts[i][1] };
+          const a2 = { x: aPts[(i + 1) % aPts.length][0], y: aPts[(i + 1) % aPts.length][1] };
+          for (let j = 0; j < bPts.length; j++) {
+            const b1 = { x: bPts[j][0], y: bPts[j][1] };
+            const b2 = { x: bPts[(j + 1) % bPts.length][0], y: bPts[(j + 1) % bPts.length][1] };
+            if (segmentsIntersect(a1, a2, b1, b2)) return 0;
+            best = Math.min(best, segmentSegmentDistance(a1, a2, b1, b2));
+          }
+        }
+        return best;
+      }
+
+      function segmentCircleDistanceWrapped(x1, y1, x2, y2, cx, cy) {
+        let best = Infinity;
+        for (const ox of [-W, 0, W]) {
+          for (const oy of [-H, 0, H]) {
+            best = Math.min(best, pointSegmentDistance(cx + ox, cy + oy, x1, y1, x2, y2));
+          }
+        }
+        return best;
+      }
+
+      function pointSegmentDistance(px, py, x1, y1, x2, y2) {
+        const dx = x2 - x1, dy = y2 - y1;
+        const l2 = dx * dx + dy * dy;
+        if (l2 <= .0001) return Math.hypot(px - x2, py - y2);
+        const t = clamp(((px - x1) * dx + (py - y1) * dy) / l2, 0, 1);
+        return Math.hypot(px - (x1 + dx * t), py - (y1 + dy * t));
+      }
+
+      function fractureRock(index, x, y) {
+        const rock = rocks[index];
+        if (!rock) return;
+        const splitN = splitCountForRock(rock);
+        if (splitN < 2) {
+          shoveSmallRock(index, x, y);
+          return;
+        }
+
+        const away = angleAwayFromShip(rock.x, rock.y);
+        const childMass = rock.mass / splitN;
+        const childR = Math.max(MIN_ROCK_R, Math.sqrt(childMass));
+        const orbit = childR * (1.25 + splitN * .12) + 4;
+        const kick = clamp(285 - rock.radius * .42, 115, 255);
+        const fan = splitN === 2 ? 1.05 : clamp(.52 * splitN, 1.35, 2.65);
+        const step = splitN === 1 ? 0 : fan / (splitN - 1);
+        const children = [];
+
+        for (let i = 0; i < splitN; i++) {
+          const a = away - fan / 2 + step * i + rand(-.16, .16);
+          const tangent = a + Math.PI / 2;
+          const child = makeRock(
+            rock.x + Math.cos(a) * orbit * rand(.78, 1.18),
+            rock.y + Math.sin(a) * orbit * rand(.78, 1.18),
+            childR,
+            {
+              hull: makeFragmentHull(childR, a),
+              mass: childMass,
+              vx: rock.vx * .5 + Math.cos(a) * kick + Math.cos(tangent) * rand(-44, 44),
+              vy: rock.vy * .5 + Math.sin(a) * kick + Math.sin(tangent) * rand(-44, 44),
+              vr: rock.vr + rand(-2.2, 2.2),
+              crack: 1,
+              mergeFlash: .22,
+            }
+          );
+          children.push(child);
+        }
+
+        rocks.splice(index, 1, ...children);
+        burstDirected(x, y, 13 + splitN * 4, 150, away, .9);
+        mergeTouchingRocks();
+        condenseOverflow();
+      }
+
+      function splitCountForRock(rock) {
+        const maxPieces = maxSplitPieces(rock);
+        if (maxPieces < 2) return 0;
+        return 2 + ((Math.random() * (maxPieces - 1)) | 0);
+      }
+
+      function shoveSmallRock(index, x, y) {
+        const rock = rocks[index];
+        const away = angleAwayFromShip(rock.x, rock.y);
+        const side = away + Math.PI / 2;
+        const kick = clamp(330 - rock.radius * 3.2, 150, 285);
+        rock.vx += Math.cos(away) * kick + Math.cos(side) * rand(-38, 38);
+        rock.vy += Math.sin(away) * kick + Math.sin(side) * rand(-38, 38);
+        rock.vr += rand(-3.2, 3.2);
+        rock.crack = 1;
+        rock.mergeFlash = .46;
+        burstDirected(x, y, 12, 115, away, .7);
+      }
+
+      function angleAwayFromShip(x, y) {
+        const dx = wrapDelta(x - ship.x, W);
+        const dy = wrapDelta(y - ship.y, H);
+        if (Math.hypot(dx, dy) < 1) return rand(0, TAU);
+        return Math.atan2(dy, dx);
       }
 
       function burst(x, y, n, speed) {
@@ -449,6 +1287,22 @@
             age: 0,
             life: rand(.28, .9),
             len: rand(5, 18),
+            a,
+          });
+        }
+      }
+
+      function burstDirected(x, y, n, speed, angle, spread) {
+        for (let i = 0; i < n; i++) {
+          const a = angle + rand(-spread, spread);
+          const s = rand(speed * .24, speed);
+          sparks.push({
+            x, y,
+            vx: Math.cos(a) * s,
+            vy: Math.sin(a) * s,
+            age: 0,
+            life: rand(.25, .82),
+            len: rand(6, 20),
             a,
           });
         }
@@ -469,7 +1323,7 @@
       }
 
       function draw() {
-        ctx.fillStyle = gameOver ? 'rgba(0,0,0,.12)' : 'rgba(0,0,0,.24)';
+        ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, W, H);
         drawStars();
         drawRocks();
@@ -480,79 +1334,155 @@
       }
 
       function drawStars() {
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
         for (const s of stars) {
           const a = s.a * (.65 + Math.sin(now * 1.7 + s.p) * .35);
           ctx.fillStyle = `${LINE}${a})`;
           ctx.fillRect(s.x, s.y, 1, 1);
         }
-        ctx.restore();
       }
 
       function drawRocks() {
+        drawAttractionBridges();
         for (const rock of rocks) {
-          const settled = 1 - rock.scatter;
-          if (settled > .05) {
-            const hull = rock.hull.map(([x, y]) => rotatePoint(rock.x, rock.y, x, y, rock.rot));
-            glowPath(hull, true, 1, .08 + settled * .18);
+          drawWrappedObject(rock.x, rock.y, rockExtent(rock) + 12, (cx, cy) => drawRockAt(rock, cx, cy));
+        }
+      }
+
+      function drawRockAt(rock, cx, cy) {
+        drawHullAt(rock, cx, cy, .7 + rock.mergeFlash * .22);
+        if (rock.seams.length) drawSeamsAt(rock, cx, cy);
+        if (rock.crack > .02) drawCracksAt(rock, cx, cy);
+      }
+
+      function drawAttractionBridges() {
+        for (let i = 0; i < rocks.length; i++) {
+          for (let j = i + 1; j < rocks.length; j++) {
+            const a = rocks[i], b = rocks[j];
+            const big = a.radius >= b.radius ? a : b;
+            const small = big === a ? b : a;
+            const ratio = big.radius / Math.max(1, small.radius);
+            if (ratio < 1.12) continue;
+
+            const dx = wrapDelta(small.x - big.x, W);
+            const dy = wrapDelta(small.y - big.y, H);
+            const d = Math.hypot(dx, dy);
+            if (d <= 1) continue;
+            const bigExtent = rockExtent(big);
+            const smallExtent = rockExtent(small);
+            const gap = d - bigExtent - smallExtent;
+            if (gap < 0 || gap > 58) continue;
+
+            const nx = dx / d, ny = dy / d;
+            const px = -ny, py = nx;
+            const alpha = Math.pow(1 - gap / 58, 1.7) * .18;
+            const offset = Math.min(9, smallExtent * .22);
+            drawWrappedObject(big.x, big.y, d + smallExtent + 20, (bx, by) => {
+              const sx = bx + dx;
+              const sy = by + dy;
+              for (const side of [-1, 1]) {
+                const off = offset * side;
+                const p1 = {
+                  x: bx + nx * bigExtent + px * off,
+                  y: by + ny * bigExtent + py * off,
+                };
+                const p2 = {
+                  x: sx - nx * smallExtent + px * off * .38,
+                  y: sy - ny * smallExtent + py * off * .38,
+                };
+                strokePath([p1, p2], false, .75, alpha);
+              }
+            });
           }
-          for (const bit of rock.bits) drawShard(rock, bit);
         }
       }
 
-      function drawShard(rock, bit) {
-        const pts = [];
-        const ca = Math.cos(rock.rot + bit.angle), sa = Math.sin(rock.rot + bit.angle);
-        const rc = Math.cos(rock.rot), rs = Math.sin(rock.rot);
-        const cx = rock.x + bit.ox * rc - bit.oy * rs;
-        const cy = rock.y + bit.ox * rs + bit.oy * rc;
-        for (const [px, py] of bit.shape) {
-          pts.push({
-            x: wrap(cx + px * ca - py * sa, W),
-            y: wrap(cy + px * sa + py * ca, H),
-          });
-        }
-        glowPath(pts, true, 1.15, .42 + rock.scatter * .25);
+      function drawHullAt(rock, cx, cy, alpha) {
+        const ca = Math.cos(rock.rot), sa = Math.sin(rock.rot);
+        const pts = rock.hull.map(([x, y]) => ({
+          x: cx + x * ca - y * sa,
+          y: cy + x * sa + y * ca,
+        }));
+        strokePath(pts, true, 1.25, alpha);
       }
 
-      function rotatePoint(cx, cy, x, y, a) {
-        const ca = Math.cos(a), sa = Math.sin(a);
-        return { x: wrap(cx + x * ca - y * sa, W), y: wrap(cy + x * sa + y * ca, H) };
+      function drawSeamsAt(rock, cx, cy) {
+        const ca = Math.cos(rock.rot), sa = Math.sin(rock.rot);
+        for (const seam of rock.seams) {
+          const p1 = {
+            x: cx + seam.x1 * ca - seam.y1 * sa,
+            y: cy + seam.x1 * sa + seam.y1 * ca,
+          };
+          const p2 = {
+            x: cx + seam.x2 * ca - seam.y2 * sa,
+            y: cy + seam.x2 * sa + seam.y2 * ca,
+          };
+          drawDissolvingLine(p1, p2, seam.life);
+        }
+      }
+
+      function drawDissolvingLine(p1, p2, life) {
+        const alpha = Math.pow(life, 1.35) * .4;
+        if (life > .58) {
+          strokePath([p1, p2], false, .85, alpha);
+          return;
+        }
+        const keep = clamp(life / .58, 0, 1) * .42;
+        const a = lerpPoint(p1, p2, keep);
+        const b = lerpPoint(p2, p1, keep);
+        strokePath([p1, a], false, .85, alpha);
+        strokePath([p2, b], false, .85, alpha);
+      }
+
+      function lerpPoint(a, b, t) {
+        return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      }
+
+      function drawCracksAt(rock, cx, cy) {
+        const alpha = rock.crack * .36;
+        for (let i = 0; i < 3; i++) {
+          const a = rock.rot + rock.crackPhase + i * TAU / 3 + Math.sin(now * .45 + rock.radius) * .08;
+          const inner = pointFrom(cx, cy, a, rock.radius * .12, 0);
+          const outer = pointFrom(cx, cy, a, rock.radius * (.46 + i * .09), 0);
+          strokePath([inner, outer], false, .85, alpha);
+        }
       }
 
       function drawShip() {
         if (!ship.alive) return;
         if (ship.invuln > 0 && Math.sin(now * 28) < -.28) return;
-        const nose = pointFromShip(17, 0);
-        const left = pointFromShip(-12, -9);
-        const notch = pointFromShip(-7, 0);
-        const right = pointFromShip(-12, 9);
-        glowPath([nose, left, notch, right], true, 1.35, .92);
+        drawWrappedObject(ship.x, ship.y, 34, (cx, cy) => {
+          const nose = pointFrom(cx, cy, ship.a, 17, 0);
+          const left = pointFrom(cx, cy, ship.a, -12, -9);
+          const notch = pointFrom(cx, cy, ship.a, -7, 0);
+          const right = pointFrom(cx, cy, ship.a, -12, 9);
+          strokePath([nose, left, notch, right], true, 1.35, .95);
 
-        if (keys.has('ArrowUp') || keys.has('KeyW')) {
-          const f1 = pointFromShip(-11, -5);
-          const f2 = pointFromShip(-23 - Math.sin(now * 64) * 4, 0);
-          const f3 = pointFromShip(-11, 5);
-          glowPath([f1, f2, f3], false, 1, .55);
-        }
+          if (ship.thrusting) {
+            const f1 = pointFrom(cx, cy, ship.a, -11, -5);
+            const f2 = pointFrom(cx, cy, ship.a, -23 - Math.sin(now * 64) * 4, 0);
+            const f3 = pointFrom(cx, cy, ship.a, -11, 5);
+            strokePath([f1, f2, f3], false, 1, .62);
+          }
+        });
       }
 
-      function pointFromShip(forward, side) {
-        const ca = Math.cos(ship.a), sa = Math.sin(ship.a);
+      function pointFrom(x, y, angle, forward, side) {
+        const ca = Math.cos(angle), sa = Math.sin(angle);
         return {
-          x: wrap(ship.x + ca * forward - sa * side, W),
-          y: wrap(ship.y + sa * forward + ca * side, H),
+          x: x + ca * forward - sa * side,
+          y: y + sa * forward + ca * side,
         };
       }
 
       function drawBullets() {
         for (const b of bullets) {
-          const tail = {
-            x: wrap(b.x - b.vx * .022, W),
-            y: wrap(b.y - b.vy * .022, H),
-          };
-          glowPath([tail, { x: b.x, y: b.y }], false, 1.25, .9);
+          drawWrappedObject(b.x, b.y, 20, (x, y) => {
+            const tail = {
+              x: x - b.vx * .018,
+              y: y - b.vy * .018,
+            };
+            strokePath([tail, { x, y }], false, 1.25, .94);
+          });
         }
       }
 
@@ -560,35 +1490,33 @@
         for (const s of sparks) {
           const p = clamp(s.age / s.life, 0, 1);
           const a = (1 - p) * .72;
-          const x2 = wrap(s.x - Math.cos(s.a) * s.len * (1 - p), W);
-          const y2 = wrap(s.y - Math.sin(s.a) * s.len * (1 - p), H);
-          glowPath([{ x: s.x, y: s.y }, { x: x2, y: y2 }], false, 1, a);
+          drawWrappedObject(s.x, s.y, 20, (x, y) => {
+            const x2 = x - Math.cos(s.a) * s.len * (1 - p);
+            const y2 = y - Math.sin(s.a) * s.len * (1 - p);
+            strokePath([{ x, y }, { x: x2, y: y2 }], false, 1, a);
+          });
         }
       }
 
       function drawHud() {
         ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
         ctx.font = '13px ui-monospace, SFMono-Regular, Menlo, monospace';
         ctx.textBaseline = 'top';
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = `${LINE}.82)`;
-        ctx.shadowColor = 'rgba(244,255,250,.65)';
-        ctx.shadowBlur = 7;
-        ctx.strokeText(String(score).padStart(5, '0'), 18, 18);
+        ctx.fillStyle = `${LINE}.82)`;
+        ctx.fillText(String(score).padStart(5, '0'), 18, 18);
         for (let i = 0; i < ship.lives; i++) drawLifeIcon(22 + i * 22, 45);
         ctx.textAlign = 'right';
-        ctx.strokeText(`${bullets.length}/${MAX_BULLETS}`, W - 18, 18);
+        ctx.fillText(`${playerControl ? 'PILOT' : 'AUTO'} ${bullets.length}/${MAX_BULLETS}`, W - 18, 18);
         if (gameOver) {
           ctx.textAlign = 'center';
           ctx.font = '28px ui-monospace, SFMono-Regular, Menlo, monospace';
-          ctx.strokeText('NO SIGNAL', W / 2, H / 2 - 16);
+          ctx.fillText('NO SIGNAL', W / 2, H / 2 - 16);
         }
         ctx.restore();
       }
 
       function drawLifeIcon(x, y) {
-        glowPath([
+        strokePath([
           { x, y: y - 8 },
           { x: x - 8, y: y + 8 },
           { x, y: y + 4 },
@@ -596,45 +1524,54 @@
         ], true, .85, .62);
       }
 
-      function glowPath(points, close, width, alpha) {
+      function drawWrappedObject(x, y, r, drawAt) {
+        const xs = [0], ys = [0];
+        if (x < r) xs.push(W);
+        if (x > W - r) xs.push(-W);
+        if (y < r) ys.push(H);
+        if (y > H - r) ys.push(-H);
+        for (const ox of xs) for (const oy of ys) drawAt(x + ox, y + oy);
+      }
+
+      function strokePath(points, close, width, alpha) {
         if (points.length < 2) return;
         ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-
-        for (const pass of [
-          { w: width + 6, a: alpha * .08, blur: 15 },
-          { w: width + 2, a: alpha * .22, blur: 8 },
-          { w: width, a: alpha, blur: 2 },
-        ]) {
-          ctx.beginPath();
-          ctx.moveTo(points[0].x, points[0].y);
-          for (let i = 1; i < points.length; i++) {
-            const prev = points[i - 1], p = points[i];
-            const dx = wrapDelta(p.x - prev.x, W);
-            const dy = wrapDelta(p.y - prev.y, H);
-            ctx.lineTo(prev.x + dx, prev.y + dy);
-          }
-          if (close) ctx.closePath();
-          ctx.lineWidth = pass.w;
-          ctx.strokeStyle = `${LINE}${pass.a})`;
-          ctx.shadowColor = 'rgba(244,255,250,.8)';
-          ctx.shadowBlur = pass.blur;
-          ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+          ctx.lineTo(points[i].x, points[i].y);
         }
+        if (close) ctx.closePath();
+        ctx.lineWidth = width;
+        ctx.strokeStyle = `${LINE}${alpha})`;
+        ctx.stroke();
         ctx.restore();
+      }
+
+      function beginPlayerControl() {
+        playerControl = true;
       }
 
       addEventListener('keydown', (e) => {
         if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'Space'].includes(e.code)) e.preventDefault();
+        if (gameOver && (e.code === 'Enter' || e.code === 'Space')) {
+          reset();
+          return;
+        }
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'KeyA', 'KeyD', 'KeyW', 'Space'].includes(e.code)) {
+          beginPlayerControl();
+        }
         keys.add(e.code);
-        if (gameOver && (e.code === 'Enter' || e.code === 'Space')) reset();
       });
       addEventListener('keyup', (e) => keys.delete(e.code));
       addEventListener('click', () => {
         if (gameOver) reset();
-        else fire();
+        else {
+          beginPlayerControl();
+          fire();
+        }
       });
       addEventListener('resize', resize);
 

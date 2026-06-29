@@ -31,7 +31,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "An abstract ecosystem that paints itself in watercolour, then wipes the painting clean — forever. Over a quiet, Dune-like pixel terrain of slow plants that visibly fill in one pixel at a time, vector prey of many colours graze, grow quickly into larger bodies, and flee hunters with their own alertness and sprint speed. Hunters are black arrows that run prey down, fatten, and breed only by splitting in half. Death paints; old age renews. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats."
+      "description": "An abstract ecosystem that paints itself in watercolour, then wipes the painting clean forever. Over a quiet, Dune-like pixel terrain, vector prey graze, grow into spiny bodies that age toward white, and flee hunters with their own alertness and sprint speed. Hunters are black arrows that run prey down, fatten, and breed only by splitting in half. Death paints; old spiny prey burst white and erase nearby bloodstains. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats."
     },
     {
       "slug": "005-only-invaders",
@@ -55,7 +55,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "Autonomous snake on an Apple //e amber CRT. A snake greedily hunts the nearest mouse, blind to its own body — so a long one curls into its own tail, and where it strikes itself it splits into two snakes that hunt on their own. The myth: cut the hydra and it doubles. The cull is the heads — when two snakes meet head-on, one dies. Eating lengthens, splitting divides, collisions thin the herd, and the count breathes forever with no player. Amber phosphor, scanlines, glow. Click to reseed."
+      "description": "Autonomous snake on an Apple //e amber CRT. A snake greedily hunts the nearest mouse, blind to bodies — so a long one curls into its own tail, and any head that strikes a body splits the hit snake into two hunters. The myth: cut the hydra and it doubles. The cull is the heads — when two snakes meet head-on, one dies. Eating lengthens, body strikes divide, collisions thin the herd, and the count breathes forever with no player. Amber phosphor, scanlines, glow. Click to reseed."
     },
     {
       "slug": "008-vectrex-asteroids",
@@ -63,7 +63,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "A black-and-white Vectrex-style Asteroids variant. The ship can keep only three shots alive at once. Asteroids never vanish: every hit fractures their matter into smaller vector shards, and the shards slowly pull back together until the rock reforms. The ship dies on contact."
+      "description": "A black-and-white Vectrex-style Asteroids variant. The ship cruises and pauses until a player takes over, keeping only three shots alive at once. Bullets split asteroids into many generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Fragments drift together under stronger slow gravity, bump instead of passing through, settle before they glom, and weld into integrated asteroid outlines that retain bulges from their joined pieces. Any asteroid can kill the ship on contact."
     }
   ]
 };

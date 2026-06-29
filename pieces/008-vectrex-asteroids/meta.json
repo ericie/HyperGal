@@ -3,5 +3,5 @@
   "year": 2026,
   "type": "interactive",
   "thumbnail": "thumbnail.svg",
-  "description": "A black-and-white Vectrex-style Asteroids variant. The ship can keep only three shots alive at once. Asteroids never vanish: every hit fractures their matter into smaller vector shards, and the shards slowly pull back together until the rock reforms. The ship dies on contact."
+  "description": "A black-and-white Vectrex-style Asteroids variant. The ship cruises and pauses until a player takes over, keeping only three shots alive at once. Bullets split asteroids into many generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Fragments drift together under stronger slow gravity, bump instead of passing through, settle before they glom, and weld into integrated asteroid outlines that retain bulges from their joined pieces. Any asteroid can kill the ship on contact."
 }
