@@ -64,6 +64,14 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "A black-and-white Vectrex-style Asteroids variant. The ship cruises and pauses until a player takes over, keeping only three shots alive at once. Bullets split asteroids into many generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Fragments drift together under stronger slow gravity, bump instead of passing through, settle before they glom, and weld into integrated asteroid outlines that retain bulges from their joined pieces. Any asteroid can kill the ship on contact."
+    },
+    {
+      "slug": "011-switch-stack",
+      "title": "Switch Stack",
+      "year": 2026,
+      "type": "interactive",
+      "thumbnail": "thumbnail.svg",
+      "description": "A pure black-and-white scroll stack. Each row holds one or two boxes; as a box reaches the viewport midpoint, its binary dither has finished clearing from black to white and its block-letter state flips from ON to OFF."
     }
   ]
 };

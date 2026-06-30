@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Switch Stack · HyperGal</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #fff;
+        color: #000;
+        overflow-x: hidden;
+      }
+
+      body {
+        overscroll-behavior-y: none;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #fff;
+        image-rendering: pixelated;
+        touch-action: pan-y;
+      }
+
+      canvas:focus-visible {
+        outline: 8px solid #000;
+        outline-offset: -8px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="stage"
+      tabindex="0"
+      role="img"
+      aria-label="Switch Stack: a scrollable stack of black and white boxes changes from ON to OFF at the vertical midpoint."
+    ></canvas>
+
+    <script>
+      (() => {
+        const BLACK = '#000';
+        const WHITE = '#fff';
+        const CELL_COLS = 30;
+        const CELL_ROWS = 18;
+        const ROWS = [
+          { cols: 1, scale: 0.88, align: 0.5 },
+          { cols: 2 },
+          { cols: 2 },
+          { cols: 1, scale: 0.62, align: 0 },
+          { cols: 2 },
+          { cols: 1, scale: 0.76, align: 1 },
+          { cols: 2 },
+          { cols: 2 },
+          { cols: 1, scale: 0.68, align: 0.36 },
+          { cols: 2 },
+          { cols: 1, scale: 0.94, align: 0.5 },
+          { cols: 2 },
+          { cols: 2 },
+          { cols: 1, scale: 0.58, align: 1 },
+          { cols: 2 },
+          { cols: 1, scale: 0.78, align: 0.08 },
+          { cols: 2 },
+          { cols: 2 },
+          { cols: 1, scale: 0.72, align: 0.64 },
+        ];
+        const GLYPHS = {
+          O: ['11111', '10001', '10001', '10001', '10001', '10001', '11111'],
+          N: ['10001', '11001', '10101', '10011', '10001', '10001', '10001'],
+          F: ['11111', '10000', '10000', '11110', '10000', '10000', '10000'],
+        };
+
+        const canvas = document.getElementById('stage');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const reduceQuery =
+          typeof matchMedia === 'function'
+            ? matchMedia('(prefers-reduced-motion: reduce)')
+            : { matches: false };
+
+        let viewportW = 1;
+        let viewportH = 1;
+        let dpr = 1;
+        let boxes = [];
+        let needsRender = false;
+        let prefersReducedMotion = reduceQuery.matches;
+
+        const words = {
+          ON: makeWord('ON'),
+          OFF: makeWord('OFF'),
+        };
+
+        resize();
+        addEventListener('resize', resize, { passive: true });
+        addEventListener('scroll', requestRender, { passive: true });
+        if (typeof reduceQuery.addEventListener === 'function') {
+          reduceQuery.addEventListener('change', handleMotionPreference);
+        } else if (typeof reduceQuery.addListener === 'function') {
+          reduceQuery.addListener(handleMotionPreference);
+        }
+
+        function resize() {
+          viewportW = Math.max(1, innerWidth);
+          viewportH = Math.max(1, innerHeight);
+          dpr = Math.min(2, devicePixelRatio || 1);
+          canvas.width = Math.round(viewportW * dpr);
+          canvas.height = Math.round(viewportH * dpr);
+          canvas.style.width = `${viewportW}px`;
+          canvas.style.height = `${viewportH}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.imageSmoothingEnabled = false;
+          compose();
+          requestRender();
+        }
+
+        function compose() {
+          const margin = clamp(viewportW * 0.055, 18, 72);
+          const gap = Math.round(clamp(viewportW * 0.018, 12, 30));
+          const rowGap = Math.round(clamp(viewportH * 0.04, 22, 48));
+          const contentW = Math.round(Math.min(1160, viewportW - margin * 2));
+          const originX = Math.round((viewportW - contentW) / 2);
+          const topPad = Math.round(viewportH * 0.88);
+          const bottomPad = Math.round(viewportH * 0.78);
+          let y = topPad;
+          let id = 0;
+
+          boxes = [];
+          for (const row of ROWS) {
+            const cols = row.cols;
+            const rowContentW = cols === 1 ? Math.round(contentW * row.scale) : contentW;
+            const boxW = cols === 1 ? rowContentW : Math.round((contentW - gap) / 2);
+            const boxH =
+              cols === 1
+                ? Math.round(clamp(boxW * 0.44, 170, 350))
+                : Math.round(clamp(boxW * 0.64, 150, 330));
+            const rowW = cols === 1 ? boxW : boxW * 2 + gap;
+            const rowX = Math.round(originX + (contentW - rowW) * (cols === 1 ? row.align : 0.5));
+
+            for (let col = 0; col < cols; col += 1) {
+              boxes.push({
+                id,
+                x: rowX + col * (boxW + gap),
+                y,
+                w: boxW,
+                h: boxH,
+                order: makeDitherOrder(id),
+              });
+              id += 1;
+            }
+
+            y += boxH + rowGap;
+          }
+
+          document.body.style.height = `${y + bottomPad}px`;
+        }
+
+        function requestRender() {
+          if (needsRender) return;
+          needsRender = true;
+          requestAnimationFrame(render);
+        }
+
+        function render() {
+          needsRender = false;
+          const scrollY = pageYOffset || document.documentElement.scrollTop || 0;
+          const midpoint = Math.round(viewportH / 2);
+          const reach = clamp(viewportH * 0.62, 280, 680);
+
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = WHITE;
+          ctx.fillRect(0, 0, viewportW, viewportH);
+
+          for (const box of boxes) {
+            const y = Math.round(box.y - scrollY);
+            if (y > viewportH + 80 || y + box.h < -80) continue;
+            const centerY = y + box.h / 2;
+            const rawProgress = clamp((midpoint + reach - centerY) / reach, 0, 1);
+            const progress = prefersReducedMotion ? (centerY <= midpoint ? 1 : 0) : smootherStep(rawProgress);
+            drawBox(box, y, progress, centerY <= midpoint);
+          }
+
+          drawMidpoint(midpoint);
+        }
+
+        function handleMotionPreference(event) {
+          prefersReducedMotion = event.matches;
+          requestRender();
+        }
+
+        function drawBox(box, y, progress, isOff) {
+          const border = Math.round(clamp(Math.min(box.w, box.h) * 0.035, 5, 12));
+          const innerX = box.x + border;
+          const innerY = y + border;
+          const innerW = box.w - border * 2;
+          const innerH = box.h - border * 2;
+
+          ctx.fillStyle = BLACK;
+          ctx.fillRect(box.x, y, box.w, box.h);
+
+          if (progress >= 1) {
+            ctx.fillStyle = WHITE;
+            ctx.fillRect(innerX, innerY, innerW, innerH);
+          } else if (progress > 0) {
+            const whiteCells = Math.floor(progress * box.order.length);
+            const cellW = innerW / CELL_COLS;
+            const cellH = innerH / CELL_ROWS;
+            ctx.fillStyle = WHITE;
+
+            for (let i = 0; i < whiteCells; i += 1) {
+              const cell = box.order[i];
+              const x1 = Math.floor(innerX + cell.x * cellW);
+              const y1 = Math.floor(innerY + cell.y * cellH);
+              const x2 = Math.ceil(innerX + (cell.x + 1) * cellW);
+              const y2 = Math.ceil(innerY + (cell.y + 1) * cellH);
+              ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+            }
+          }
+
+          drawBorder(box.x, y, box.w, box.h, border);
+          if (progress < 0.52) {
+            drawWord(isOff ? words.OFF : words.ON, box.x, y, box.w, box.h, WHITE, BLACK);
+          } else {
+            drawWord(isOff ? words.OFF : words.ON, box.x, y, box.w, box.h, BLACK, WHITE);
+          }
+        }
+
+        function drawBorder(x, y, w, h, thickness) {
+          ctx.fillStyle = BLACK;
+          ctx.fillRect(x, y, w, thickness);
+          ctx.fillRect(x, y + h - thickness, w, thickness);
+          ctx.fillRect(x, y, thickness, h);
+          ctx.fillRect(x + w - thickness, y, thickness, h);
+        }
+
+        function drawWord(word, x, y, w, h, color, fieldColor) {
+          const maxCellW = Math.floor((w * 0.72) / word.cols);
+          const maxCellH = Math.floor((h * 0.42) / word.rows);
+          const cell = Math.max(5, Math.min(maxCellW, maxCellH));
+          const wordW = word.cols * cell;
+          const wordH = word.rows * cell;
+          const startX = Math.round(x + (w - wordW) / 2);
+          const startY = Math.round(y + (h - wordH) / 2);
+          const pad = Math.max(2, Math.round(cell * 0.24));
+
+          ctx.fillStyle = fieldColor;
+          ctx.fillRect(startX - pad, startY - pad, wordW + pad * 2, wordH + pad * 2);
+          ctx.fillStyle = color;
+          for (const dot of word.dots) {
+            ctx.fillRect(startX + dot.x * cell, startY + dot.y * cell, cell, cell);
+          }
+        }
+
+        function drawMidpoint(midpoint) {
+          const h = Math.round(clamp(viewportH * 0.012, 6, 14));
+          ctx.save();
+          ctx.globalCompositeOperation = 'difference';
+          ctx.fillStyle = WHITE;
+          ctx.fillRect(0, midpoint - Math.floor(h / 2), viewportW, h);
+          ctx.restore();
+        }
+
+        function makeWord(text) {
+          const chars = text.split('');
+          const rows = 7;
+          const cols = chars.length * 5 + Math.max(0, chars.length - 1);
+          const dots = [];
+          let offset = 0;
+
+          for (const char of chars) {
+            const glyph = GLYPHS[char];
+            for (let y = 0; y < rows; y += 1) {
+              for (let x = 0; x < 5; x += 1) {
+                if (glyph[y][x] === '1') dots.push({ x: offset + x, y });
+              }
+            }
+            offset += 6;
+          }
+
+          return { cols, rows, dots };
+        }
+
+        function makeDitherOrder(seed) {
+          const cells = [];
+          for (let y = 0; y < CELL_ROWS; y += 1) {
+            for (let x = 0; x < CELL_COLS; x += 1) {
+              const sweep = x / (CELL_COLS - 1) * 0.2 + y / (CELL_ROWS - 1) * 0.12;
+              const checker = ((x + y + seed) % 2) * 0.06;
+              cells.push({ x, y, rank: hash01(seed, x, y) * 0.74 + sweep + checker });
+            }
+          }
+          cells.sort((a, b) => a.rank - b.rank);
+          return cells;
+        }
+
+        function hash01(seed, x, y) {
+          let n = Math.imul(seed + 1, 374761393) ^ Math.imul(x + 11, 668265263) ^ Math.imul(y + 17, 2246822519);
+          n = Math.imul(n ^ (n >>> 13), 1274126177);
+          return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+        }
+
+        function smootherStep(value) {
+          const t = clamp(value, 0, 1);
+          return t * t * t * (t * (t * 6 - 15) + 10);
+        }
+
+        function clamp(value, min, max) {
+          return Math.max(min, Math.min(max, value));
+        }
+      })();
+    </script>
+  </body>
+</html>
