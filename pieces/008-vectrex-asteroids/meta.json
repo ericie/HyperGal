@@ -3,5 +3,5 @@
   "year": 2026,
   "type": "interactive",
   "thumbnail": "thumbnail.svg",
-  "description": "A black-and-white Vectrex-style Asteroids variant. The ship cruises and pauses until a player takes over, keeping only three shots alive at once. Bullets split asteroids into many generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Fragments drift together under stronger slow gravity, bump instead of passing through, settle before they glom, and weld into integrated asteroid outlines that retain bulges from their joined pieces. Any asteroid can kill the ship on contact."
+  "description": "A black-and-white Vectrex-style Asteroids variant. The ship mostly parks, bleeds off momentum, predicts asteroid paths, and fires tight two- or three-shot bursts one bullet at a time until a player takes over, thrusting mainly to dodge and keeping only three shots alive at once. Bullets split asteroids into deeper generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Heavier fragments accelerate slowly, drift together under stronger gravity, bump instead of passing through, settle before they glom, and weld into rough integrated asteroid outlines that retain shoulders, valleys, and bulges from their joined pieces. Any asteroid can kill the ship on contact."
 }

@@ -24,61 +24,85 @@
   </head>
   <body>
     <canvas id="stage"></canvas>
-    <div class="caption">hydra · 2026 · cut it and it doubles · click to reseed</div>
+    <div class="caption">hydra · 2026 · five snakes, one mouse · click to reseed</div>
     <script>
-      // hydra — autonomous snake, rendered like an Apple //e amber monitor.
+      // hydra — autonomous traditional Snake, rendered as a luminous fossil field.
       //
-      // A snake hunts the nearest mouse. Its pathfinding is greedy and blind to
-      // its own body, so a long snake chasing a mouse behind itself will curl
-      // into its own tail — and where it strikes a body, its own or another's,
-      // the hit snake SPLITS into two snakes, each of which then hunts on its
-      // own. The myth: cut the hydra and it doubles. The cull is the heads: when
-      // two snakes' heads meet on the same cell, one of them dies. Eating mice
-      // lengthens; splits divide; collisions thin the herd — so the count
-      // breathes without a player ever touching it.
+      // Five snakes hunt one mouse. Snakes enter with varied length and
+      // aggression, which tilt each one between chasing the mouse and preserving
+      // room around bodies. Edge, self, and other-snake contact kill one snake;
+      // its body becomes a layered stain and bone trace, then the mouse becomes
+      // the replacement snake.
       //
-      // The look is a single amber phosphor on black: blocky cells, a soft glow,
-      // scanlines and a little screen flicker, the way lo-res graphics smeared on
-      // an //e's amber CRT.
+      // The look is saturated snakes over a black arena: connected glowing
+      // bodies, organic colored residue, pale ribs, and a little screen grain.
 
       const canvas = document.getElementById('stage');
       const ctx = canvas.getContext('2d');
 
       // ---- tunables -------------------------------------------------------
-      const STEP = 0.085;        // seconds per snake move (the grid tick)
-      const GROW = 2;            // segments gained per mouse eaten
-      const MAX_LEN = 22;        // a snake stops growing here (no screen-hogging giant)
-      const MIN_LEN = 4;         // a split fragment shorter than this just dies
-      const MIN_SNAKES = 3;      // a fresh snake wanders in if the board thins out
-      const MAX_SNAKES = 10;     // cap; the shortest get culled above it
-      const IMPERFECT = 0.06;    // chance per tick a snake moves at random, not toward food
-      const START_SNAKES = 2, START_LEN = 6;
+      const STEP = 0.16;         // starting seconds per snake move
+      const MIN_STEP = 0.12;     // longest snakes still need to be readable
+      const SPEEDUP_PER_SEG = 0.003;
+      const GROW = 1;            // traditional Snake: one segment gained per mouse
+      const START_SNAKES = 5;
+      const START_LEN_MIN = 4;
+      const START_LEN_MAX = 9;
+      const MAX_POOLS = 80;      // keeps the visible corpse record bounded
+      const AGGRESSION_MIN = 0.28, AGGRESSION_MAX = 0.82;
+      const AGGRESSION_PER_SEG = 0.035;
+      const AGGRESSION_CAP = 0.96;
+      const BOX_SPACE_RATIO = 2.4; // opponent space must be tight relative to body length
+      const BOX_PRESSURE_RADIUS = 7;
+      const TURN_MARGIN = 5;     // keep moving straight unless a turn is clearly better
+      const EDGE_TURN_MARGIN = 1.5;
+      const OFF_ROUTE_TURN_MARGIN = 2.5;
+      const EDGE_RELIEF_WEIGHT = 6;
 
-      // amber phosphor palette (a single hue, by brightness) on black
+      // saturated snake palette on warm black
       const C_BG = '#0a0600';
-      const C_BODY = '#b8730c';
-      const C_HEAD = '#ffc23a';
       const C_MOUSE = '#ffe08a';
-      const C_DIM = '#5a3a08';
+      const C_BORDER = '#d98a16';
+      const C_BONE = '245,226,184';
+      const C_CLOT = '34,4,2';
       const GLOW = '#ff9a1e';
+      const SNAKE_PALETTE = [
+        { body: '#b8730c', head: '#ffc23a', glow: '#ff9a1e', ring: '255,194,58' },
+        { body: '#168f86', head: '#6fffe9', glow: '#24d8c8', ring: '111,255,233' },
+        { body: '#2f72c4', head: '#83c5ff', glow: '#4aa3ff', ring: '131,197,255' },
+        { body: '#7f4fc6', head: '#d7b3ff', glow: '#a879ff', ring: '215,179,255' },
+        { body: '#b83b72', head: '#ff8fc1', glow: '#ff5aa5', ring: '255,143,193' },
+        { body: '#579426', head: '#b7ff5a', glow: '#8ee82f', ring: '183,255,90' },
+        { body: '#b8472e', head: '#ff9d76', glow: '#ff6a3d', ring: '255,157,118' },
+        { body: '#b69420', head: '#fff07a', glow: '#ffd84a', ring: '255,240,122' },
+        { body: '#247da0', head: '#75e0ff', glow: '#27c0f0', ring: '117,224,255' },
+        { body: '#9c42b8', head: '#f2a6ff', glow: '#d458ff', ring: '242,166,255' },
+      ];
 
       // ---- state ----------------------------------------------------------
-      let W = 0, H = 0, dpr = 1, CELL = 18, GW = 0, GH = 0;
-      let snakes = [], mice = [], deaths = [];
-      let acc = 0, last = 0, frame = 0;
+      let W = 0, H = 0, dpr = 1, CELL = 18, GW = 0, GH = 0, OX = 0, OY = 0;
+      let snakes = [], mouse = null, pools = [];
+      let last = 0, frame = 0, colorCursor = 0;
 
       const DIRS = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
       const rand = (a, b) => a + Math.random() * (b - a);
       const pick = (a) => a[(Math.random() * a.length) | 0];
-      const inB = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH;   // inside the walls?
+      const inB = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH;
       const cl = (v, m) => v < 0 ? 0 : v >= m ? m - 1 : v;
       const tdist = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-      const dirBetween = (a, b) => { const dx = a.x - b.x, dy = a.y - b.y; if (Math.abs(dx) >= Math.abs(dy)) return { x: Math.sign(dx) || 1, y: 0 }; return { x: 0, y: Math.sign(dy) || 1 }; };
-      const cellFree = (x, y) => {
-        for (const s of snakes) for (const b of s.body) if (b.x === x && b.y === y) return false;
-        for (const m of mice) if (m.x === x && m.y === y) return false;
-        return true;
-      };
+      const borderDistance = (p) => Math.min(p.x, p.y, GW - 1 - p.x, GH - 1 - p.y);
+      const key = (p) => `${p.x},${p.y}`;
+      const rgba = (rgb, a) => `rgba(${rgb},${a})`;
+      const sameCell = (a, b) => !!a && !!b && a.x === b.x && a.y === b.y;
+      const sameDir = (a, b) => a.x === b.x && a.y === b.y;
+      const copyBody = (b) => b.map(p => ({ x: p.x, y: p.y }));
+      const snakeColor = (s) => SNAKE_PALETTE[s.colorIndex % SNAKE_PALETTE.length] || SNAKE_PALETTE[0];
+      const nextColorIndex = () => colorCursor++ % SNAKE_PALETTE.length;
+      const newStartLength = () => START_LEN_MIN + ((Math.random() * (START_LEN_MAX - START_LEN_MIN + 1)) | 0);
+      const newAggression = () => rand(AGGRESSION_MIN, AGGRESSION_MAX);
+      const effectiveAggression = (s) => Math.min(AGGRESSION_CAP, s.aggression + Math.max(0, s.body.length - START_LEN_MIN) * AGGRESSION_PER_SEG);
+      const moveInterval = (s) => Math.max(MIN_STEP, STEP - Math.max(0, s.body.length - START_LEN_MIN) * SPEEDUP_PER_SEG);
+      const occupiedBySnakes = (x, y, list = snakes) => list.some(s => s.body.some(p => p.x === x && p.y === y));
 
       // ---- sizing ---------------------------------------------------------
       function resize() {
@@ -87,229 +111,506 @@
         canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         CELL = Math.max(13, Math.round(Math.min(W, H) / 34));
-        GW = Math.floor(W / CELL); GH = Math.floor(H / CELL);
+        GW = Math.max(12, Math.floor((W - CELL * 3) / CELL));
+        GH = Math.max(12, Math.floor((H - CELL * 4) / CELL));
+        OX = Math.round((W - GW * CELL) / 2);
+        OY = Math.round((H - GH * CELL) / 2);
       }
 
       // ---- seeding --------------------------------------------------------
-      const copyBody = (b) => b.map(p => ({ x: p.x, y: p.y }));
-      function makeSnake(x, y, len) {
-        const dir = pick(DIRS); x = cl(x, GW); y = cl(y, GH);
-        const body = [];
-        for (let i = 0; i < len; i++) body.push({ x: cl(x - dir.x * i, GW), y: cl(y - dir.y * i, GH) });
-        return { body, dir, grow: 0, prev: copyBody(body) };
-      }
-      function spawnMouse() {
-        for (let t = 0; t < 200; t++) {
+      function randomFreeCell(list = snakes) {
+        for (let t = 0; t < 300; t++) {
           const x = (Math.random() * GW) | 0, y = (Math.random() * GH) | 0;
-          if (cellFree(x, y)) { mice.push({ x, y }); return; }
+          if (!occupiedBySnakes(x, y, list)) return { x, y };
         }
-        mice.push({ x: (Math.random() * GW) | 0, y: (Math.random() * GH) | 0 });
+        return { x: (Math.random() * GW) | 0, y: (Math.random() * GH) | 0 };
       }
+
+      function buildBody(x, y, len, dir) {
+        const body = [];
+        for (let i = 0; i < len; i++) body.push({ x: x - dir.x * i, y: y - dir.y * i });
+        return body;
+      }
+
+      function bodyFits(body, avoid = []) {
+        return body.every(p => inB(p.x, p.y) && !occupiedBySnakes(p.x, p.y, avoid));
+      }
+
+      function makeSnake(x, y, len, colorIndex, aggression = newAggression(), avoid = []) {
+        x = cl(x, GW); y = cl(y, GH);
+        for (let t = 0; t < 300; t++) {
+          const seed = t === 0 ? { x, y } : randomFreeCell(avoid);
+          const fits = DIRS.filter(d => bodyFits(buildBody(seed.x, seed.y, len, d), avoid));
+          if (!fits.length) continue;
+          const dir = pick(fits);
+          const body = buildBody(seed.x, seed.y, len, dir);
+          return { body, dir, grow: 0, prev: copyBody(body), colorIndex, aggression, moveAcc: 0 };
+        }
+        const dir = pick(DIRS);
+        const body = buildBody(x, y, Math.min(len, START_LEN_MIN), dir).filter(p => inB(p.x, p.y));
+        return { body, dir, grow: 0, prev: copyBody(body), colorIndex, aggression, moveAcc: 0 };
+      }
+
+      function spawnMouse(list = snakes) {
+        mouse = randomFreeCell(list);
+      }
+
+      function makeReplacement(avoid = snakes) {
+        const seed = mouse && !occupiedBySnakes(mouse.x, mouse.y, avoid) ? mouse : randomFreeCell(avoid);
+        return makeSnake(seed.x, seed.y, newStartLength(), nextColorIndex(), newAggression(), avoid);
+      }
+
       function reset() {
-        snakes = []; mice = []; deaths = [];
-        for (let i = 0; i < START_SNAKES; i++) snakes.push(makeSnake((4 + Math.random() * (GW - 8)) | 0, (4 + Math.random() * (GH - 8)) | 0, START_LEN));
-        const target = Math.max(3, Math.floor(GW * GH / 130));
-        for (let i = 0; i < target; i++) spawnMouse();
+        snakes = []; mouse = null; pools = []; colorCursor = 0;
+        for (let i = 0; i < START_SNAKES; i++) {
+          const start = randomFreeCell(snakes);
+          snakes.push(makeSnake(start.x, start.y, newStartLength(), nextColorIndex(), newAggression(), snakes));
+        }
+        spawnMouse();
       }
 
       // ---- snake brain ----------------------------------------------------
       function chooseDir(s) {
         const h = s.body[0];
         const opts = DIRS.filter(d => !(d.x === -s.dir.x && d.y === -s.dir.y));
-        let mt = null, bm = Infinity;
-        for (const m of mice) { const d = tdist(h, m); if (d < bm) { bm = d; mt = m; } }
-        if (mt && Math.random() > IMPERFECT) {
-          let bd = Infinity, chosen = s.dir;
-          for (const d of opts) {
-            const nx = { x: h.x + d.x, y: h.y + d.y };
-            if (!inB(nx.x, nx.y)) continue;                     // never aims at a wall
-            const dd = tdist(nx, mt) + Math.random() * 0.001;   // tiny jitter breaks ties
-            if (dd < bd) { bd = dd; chosen = d; }
+        let best = opts[0], bestScore = -Infinity, straightScore = -Infinity;
+        for (const d of opts) {
+          const score = scoreMove(s, d);
+          if (sameDir(d, s.dir)) straightScore = score;
+          if (score > bestScore) { best = d; bestScore = score; }
+        }
+        if (!sameDir(best, s.dir) && straightScore > -90000 && straightScore >= bestScore - turnMarginFor(s)) best = s.dir;
+        s.dir = best;
+      }
+
+      function turnMarginFor(s) {
+        const h = s.body[0];
+        const straight = { x: h.x + s.dir.x, y: h.y + s.dir.y };
+        if (!inB(straight.x, straight.y)) return 0;
+
+        let margin = TURN_MARGIN;
+        if (borderDistance(straight) <= 1) margin = Math.min(margin, EDGE_TURN_MARGIN);
+        if (mouse && tdist(straight, mouse) >= tdist(h, mouse)) margin = Math.min(margin, OFF_ROUTE_TURN_MARGIN);
+        return margin;
+      }
+
+      function futureBodyAfter(s, p, ate) {
+        const future = [p, ...s.body];
+        if (!ate && s.grow <= 0) future.pop();
+        return future;
+      }
+
+      function blockedCells(s, body, start) {
+        const blocked = new Set();
+        for (const p of body) blocked.add(key(p));
+        for (const other of snakes) {
+          if (other === s) continue;
+          for (const p of other.body) blocked.add(key(p));
+        }
+        blocked.delete(key(start));
+        return blocked;
+      }
+
+      function floodArea(s, start, body) {
+        const blocked = blockedCells(s, body, start);
+        const seen = new Set([key(start)]);
+        const q = [start];
+        for (let qi = 0; qi < q.length; qi++) {
+          const p = q[qi];
+          for (const d of DIRS) {
+            const n = { x: p.x + d.x, y: p.y + d.y };
+            const nk = key(n);
+            if (!inB(n.x, n.y) || blocked.has(nk) || seen.has(nk)) continue;
+            seen.add(nk); q.push(n);
           }
-          s.dir = chosen;
-        } else {
-          s.dir = pick(opts);
         }
+        return seen.size;
       }
 
-      function bodyHitIndex(s, p, willPop) {
-        const lastIdx = s.body.length - 1;
-        for (let i = 1; i <= lastIdx; i++) {
-          if (i === lastIdx && willPop) continue;              // the tail is vacating this cell
-          if (s.body[i].x === p.x && s.body[i].y === p.y) return i;
+      function pathDistanceToMouse(s, start, body) {
+        if (!mouse) return 0;
+        const blocked = blockedCells(s, body, start);
+        const seen = new Set([key(start)]);
+        const q = [{ p: start, dist: 0 }];
+        for (let qi = 0; qi < q.length; qi++) {
+          const cur = q[qi];
+          if (sameCell(cur.p, mouse)) return cur.dist;
+          for (const d of DIRS) {
+            const n = { x: cur.p.x + d.x, y: cur.p.y + d.y };
+            const nk = key(n);
+            if (!inB(n.x, n.y) || blocked.has(nk) || seen.has(nk)) continue;
+            seen.add(nk); q.push({ p: n, dist: cur.dist + 1 });
+          }
         }
-        return -1;
+        return Infinity;
       }
 
-      function splitSnakeAt(s, hitIdx, out) {
-        const hit = s.body[hitIdx];
-        const loop = s.body.slice(0, hitIdx + 1);              // head .. the segment it struck
-        const tail = s.body.slice(hitIdx + 1);                 // the rest
-        deaths.push({ x: hit.x, y: hit.y, t: 0, split: true });
-        if (loop.length >= MIN_LEN) out.push({ body: loop, dir: s.dir, grow: 0, prev: copyBody(loop) });
-        if (tail.length >= MIN_LEN) {
-          const tb = tail.slice().reverse();                   // new head at the far TAIL TIP...
-          const d = tb.length > 1 ? dirBetween(tb[0], tb[1]) : pick(DIRS);   // ...heading away from the cut
-          out.push({ body: tb, dir: d, grow: 0, prev: copyBody(tb) });
+      function nearestOtherDistance(s, p) {
+        let best = Infinity;
+        for (const other of snakes) {
+          if (other === s) continue;
+          for (const b of other.body) best = Math.min(best, tdist(p, b));
         }
+        return Number.isFinite(best) ? best : GW + GH;
+      }
+
+      function opponentEscapeArea(s, future, other) {
+        const start = other.body[0];
+        const blocked = new Set(future.map(key));
+        for (const rival of snakes) {
+          if (rival === s) continue;
+          const body = rival === other ? rival.body.slice(1) : rival.body;
+          for (const p of body) blocked.add(key(p));
+        }
+        blocked.delete(key(start));
+
+        const seen = new Set([key(start)]);
+        const q = [start];
+        for (let qi = 0; qi < q.length; qi++) {
+          const p = q[qi];
+          for (const d of DIRS) {
+            const n = { x: p.x + d.x, y: p.y + d.y };
+            const nk = key(n);
+            if (!inB(n.x, n.y) || blocked.has(nk) || seen.has(nk)) continue;
+            seen.add(nk); q.push(n);
+          }
+        }
+        return seen.size;
+      }
+
+      function boxingScore(s, nx, future) {
+        let score = 0;
+        for (const other of snakes) {
+          if (other === s) continue;
+
+          const currentEscape = opponentEscapeArea(s, s.body, other);
+          const escape = opponentEscapeArea(s, future, other);
+          const targetEscape = s.body.length * BOX_SPACE_RATIO;
+          const spacePressure = Math.max(0, targetEscape - escape);
+          if (spacePressure <= 0) continue;
+
+          const constriction = Math.max(0, currentEscape - escape);
+          const pressure = Math.max(0, BOX_PRESSURE_RADIUS - tdist(nx, other.body[0]));
+          const leverage = Math.min(2.4, s.body.length / Math.max(1, other.body.length));
+          score += leverage * (spacePressure * 5 + constriction * 12 + pressure * 7);
+        }
+        return score;
+      }
+
+      function scoreMove(s, d) {
+        const h = s.body[0];
+        const nx = { x: h.x + d.x, y: h.y + d.y };
+        const ate = sameCell(nx, mouse);
+        const mouseDist = mouse ? tdist(nx, mouse) : 0;
+        if (!inB(nx.x, nx.y) || hitSelf(s, nx) || hitOtherSnake(s, nx)) return -100000 - mouseDist;
+
+        const future = futureBodyAfter(s, nx, ate);
+        const area = floodArea(s, nx, future);
+        const path = pathDistanceToMouse(s, nx, future);
+        const bodyNeed = s.body.length + s.grow + (ate ? GROW : 0);
+        const crampedPenalty = Math.max(0, bodyNeed - area) * 45;
+        const pathScore = Number.isFinite(path) ? 140 - path * 7 : -mouseDist * 8 - 90;
+        const dangerScore = area * 3 + Math.min(8, nearestOtherDistance(s, nx)) * 16 - crampedPenalty;
+        const huntScore = pathScore + (ate ? 180 : 0);
+        const trapScore = boxingScore(s, nx, future);
+        const edgePressure = Math.max(0, 2 - borderDistance(h));
+        const edgeRelief = Math.max(0, borderDistance(nx) - borderDistance(h));
+        const edgeScore = edgePressure * edgeRelief * EDGE_RELIEF_WEIGHT;
+        const aggression = effectiveAggression(s);
+        return huntScore * aggression + dangerScore * (1 - aggression) + trapScore * (0.12 + aggression * 0.1) + edgeScore + Math.random() * 0.01;
+      }
+
+      function hitSelf(s, p) {
+        return s.body.slice(1).some(b => b.x === p.x && b.y === p.y);
+      }
+
+      function hitOtherSnake(s, p, moving = new Set()) {
+        return snakes.some(other => {
+          if (other === s) return false;
+          const body = moving.has(other) ? other.body.slice(1) : other.body;
+          return body.some(b => b.x === p.x && b.y === p.y);
+        });
+      }
+
+      function recordDeath(s) {
+        const colors = snakeColor(s);
+        pools.push({
+          body: copyBody(s.body),
+          color: colors.ring,
+          seed: Math.random() * 1000,
+          spread: rand(0.85, 1.25),
+        });
+        while (pools.length > MAX_POOLS) pools.shift();
       }
 
       // ---- one grid tick --------------------------------------------------
-      function step() {
-        if (snakes.length < MIN_SNAKES) snakes.push(makeSnake((4 + Math.random() * (GW - 8)) | 0, (4 + Math.random() * (GH - 8)) | 0, START_LEN));
-
-        for (const s of snakes) {
-          s._pre = copyBody(s.body);                           // where it was, for smooth tweening
-          chooseDir(s);
-          const h = s.body[0];
-          s.nx = { x: h.x + s.dir.x, y: h.y + s.dir.y };
-          s.dead = false;
-        }
-
-        // head-to-head: snakes aiming at the same cell — all but one die
-        const aim = new Map();
-        for (const s of snakes) { const k = s.nx.y * GW + s.nx.x; (aim.get(k) || aim.set(k, []).get(k)).push(s); }
-        for (const list of aim.values()) {
-          if (list.length > 1) {
-            const survivor = pick(list);
-            for (const s of list) if (s !== survivor) { s.dead = true; deaths.push({ x: s.body[0].x, y: s.body[0].y, t: 0 }); }
-          }
-        }
+      function step(movers = snakes) {
+        const current = snakes.slice();
+        const moving = movers.filter(s => current.includes(s));
+        const movingSet = new Set(moving);
+        if (!moving.length) return;
 
         const plans = new Map();
-        for (const s of snakes) {
-          const nx = s.nx;
-          const mi = inB(nx.x, nx.y) ? mice.findIndex(m => m.x === nx.x && m.y === nx.y) : -1;
-          const mouse = mi >= 0 ? mice[mi] : null;
-          const ate = !!mouse;
-          const willPop = s.grow === 0 && !ate;
-          plans.set(s, { mouse, ate, willPop, selfHit: inB(nx.x, nx.y) ? bodyHitIndex(s, nx, willPop) : -1 });
+        for (const s of moving) {
+          s.prev = copyBody(s.body);
+          chooseDir(s);
+          const h = s.body[0];
+          plans.set(s, { nx: { x: h.x + s.dir.x, y: h.y + s.dir.y } });
         }
 
-        // A head striking another snake's body cuts the hit snake, exactly like
-        // that snake's own head had struck the segment.
-        const cuts = new Map();
-        const cutters = new Set();
-        for (const attacker of snakes) {
-          if (attacker.dead) continue;
-          const plan = plans.get(attacker);
-          if (!inB(attacker.nx.x, attacker.nx.y) || plan.selfHit >= 0) continue;
-          for (const target of snakes) {
-            if (target === attacker || target.dead) continue;
-            const hitIdx = bodyHitIndex(target, attacker.nx, plans.get(target).willPop);
-            if (hitIdx < 0) continue;
-            const cut = cuts.get(target);
-            if (!cut || hitIdx < cut.hitIdx) cuts.set(target, { hitIdx });
-            cutters.add(attacker);
-            break;
+        const dead = new Set();
+        for (const s of moving) {
+          const { nx } = plans.get(s);
+          if (!inB(nx.x, nx.y) || hitSelf(s, nx) || hitOtherSnake(s, nx, movingSet)) dead.add(s);
+        }
+
+        for (let i = 0; i < moving.length; i++) {
+          for (let j = i + 1; j < moving.length; j++) {
+            const a = moving[i], b = moving[j];
+            if (dead.has(a) || dead.has(b)) continue;
+            const an = plans.get(a).nx, bn = plans.get(b).nx;
+            const aHead = a.body[0], bHead = b.body[0];
+            if (sameCell(an, bn) || (sameCell(an, bHead) && sameCell(bn, aHead))) dead.add(pick([a, b]));
           }
         }
 
-        const out = [];
-        for (const s of snakes) {
-          if (s.dead) continue;
-          const nx = s.nx;
-          if (!inB(nx.x, nx.y)) { deaths.push({ x: cl(nx.x, GW), y: cl(nx.y, GH), t: 0 }); continue; }   // hit the wall
-          const plan = plans.get(s);
-
-          // run into OWN body -> split where it struck
-          if (plan.selfHit >= 0) { splitSnakeAt(s, plan.selfHit, out); continue; }
-
-          // get struck by another head -> split as though struck by its own head
-          const cut = cuts.get(s);
-          if (cut) { splitSnakeAt(s, cut.hitIdx, out); continue; }
-
-          // a cutting head stops at the strike instead of passing through
-          if (cutters.has(s)) { s.prev = s._pre; out.push(s); continue; }
-
-          // ordinary move
+        const next = [];
+        let mouseEaten = false;
+        for (const s of current) {
+          if (dead.has(s)) continue;
+          if (!movingSet.has(s)) { next.push(s); continue; }
+          const { nx } = plans.get(s);
+          const ate = !dead.size && sameCell(nx, mouse);
           s.body.unshift(nx);
-          if (plan.ate) {
-            s.grow = Math.min(s.grow + GROW, Math.max(0, MAX_LEN - s.body.length));
-            const mi = mice.indexOf(plan.mouse);
-            if (mi >= 0) mice.splice(mi, 1);
-            spawnMouse();
-          }
+          if (ate) { s.grow += GROW; mouseEaten = true; }
           if (s.grow > 0) s.grow--; else s.body.pop();
-          s.prev = s._pre; out.push(s);
+          next.push(s);
         }
 
-        snakes = out;
-        // cap: cull the shortest
-        while (snakes.length > MAX_SNAKES) {
-          let si = 0; for (let i = 1; i < snakes.length; i++) if (snakes[i].body.length < snakes[si].body.length) si = i;
-          const d = snakes[si].body[0]; deaths.push({ x: d.x, y: d.y, t: 0 });
-          snakes.splice(si, 1);
+        for (const s of current) {
+          if (!dead.has(s)) continue;
+          recordDeath(s);
+          const replacement = makeReplacement(next);
+          next.push(replacement);
+          spawnMouse(next);
         }
-        // keep the mouse population up
-        const target = Math.max(3, Math.floor(GW * GH / 130));
-        while (mice.length < target) spawnMouse();
+
+        snakes = next.slice(0, START_SNAKES);
+        if (mouseEaten && !dead.size) spawnMouse(snakes);
       }
 
-      // ---- render (amber //e) ---------------------------------------------
-      function blockAt(cx, cy, color, inset, glow) {
+      // ---- render ---------------------------------------------------------
+      function blockAt(cx, cy, color, inset, glow, glowColor = GLOW) {
         const sz = CELL - 2 * (inset || 2);
-        if (glow) { ctx.shadowColor = GLOW; ctx.shadowBlur = glow; } else ctx.shadowBlur = 0;
+        if (glow) { ctx.shadowColor = glowColor; ctx.shadowBlur = glow; } else ctx.shadowBlur = 0;
         ctx.fillStyle = color;
         ctx.fillRect(cx - sz / 2, cy - sz / 2, sz, sz);
       }
 
-      function render() {
-        // warm-black ground + faint cell lattice (the lo-res grid)
+      function strokePath(points, color, width, glow, glowColor) {
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = glow;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = 'square';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.stroke();
         ctx.shadowBlur = 0;
-        ctx.fillStyle = C_BG; ctx.fillRect(0, 0, W, H);
+      }
 
-        // mice — steady bright blips
-        for (const m of mice) blockAt(m.x * CELL + CELL / 2, m.y * CELL + CELL / 2, C_MOUSE, CELL * 0.32, 10);
+      function cellCenter(p) {
+        return { x: OX + p.x * CELL + CELL / 2, y: OY + p.y * CELL + CELL / 2 };
+      }
 
-        // snakes — each segment tweened from where it was toward where it is, so
-        // the grid motion reads smooth
-        const alpha = Math.min(1, acc / STEP);
-        for (const s of snakes) {
-          for (let i = s.body.length - 1; i >= 0; i--) {
-            const cur = s.body[i], pre = (s.prev && s.prev[i]) || cur;
-            const cx = (pre.x + (cur.x - pre.x) * alpha) * CELL + CELL / 2;
-            const cy = (pre.y + (cur.y - pre.y) * alpha) * CELL + CELL / 2;
-            if (i === 0) {
-              blockAt(cx, cy, C_HEAD, 1.5, 14);
-              ctx.shadowBlur = 0; ctx.fillStyle = C_BG;          // two dark eyes facing travel
-              const ex = cx + s.dir.x * CELL * 0.18, ey = cy + s.dir.y * CELL * 0.18, e = Math.max(1, CELL * 0.1);
-              ctx.fillRect(ex - s.dir.y * CELL * 0.16 - e / 2, ey - s.dir.x * CELL * 0.16 - e / 2, e, e);
-              ctx.fillRect(ex + s.dir.y * CELL * 0.16 - e / 2, ey + s.dir.x * CELL * 0.16 - e / 2, e, e);
-            } else {
-              blockAt(cx, cy, C_BODY, 2, 6);
+      function hash01(seed, n) {
+        const x = Math.sin(seed * 12.9898 + n * 78.233) * 43758.5453;
+        return x - Math.floor(x);
+      }
+
+      function drawPoolPath(points, color, width, alpha, blur) {
+        if (points.length < 2) return;
+        ctx.shadowColor = rgba(color, alpha * 1.2);
+        ctx.shadowBlur = blur;
+        ctx.strokeStyle = rgba(color, alpha);
+        ctx.lineWidth = width;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+
+      function drawStain(pool, points, depth) {
+        const ageAlpha = 0.3 + depth * 0.28;
+        drawPoolPath(points, pool.color, CELL * (1.38 + pool.spread * 0.34), ageAlpha * 0.34, CELL * 0.8);
+        drawPoolPath(points, C_CLOT, CELL * (0.72 + pool.spread * 0.18), ageAlpha * 0.25, CELL * 0.32);
+
+        for (let i = 0; i < points.length; i++) {
+          const p = points[i];
+          const wobble = hash01(pool.seed, i);
+          const ox = (hash01(pool.seed + 17, i) - 0.5) * CELL * 0.5;
+          const oy = (hash01(pool.seed + 31, i) - 0.5) * CELL * 0.5;
+          const rx = CELL * (0.34 + wobble * 0.36) * pool.spread;
+          const ry = CELL * (0.24 + hash01(pool.seed + 43, i) * 0.32) * pool.spread;
+
+          ctx.shadowColor = rgba(pool.color, 0.42);
+          ctx.shadowBlur = CELL * 0.24;
+          ctx.fillStyle = rgba(pool.color, ageAlpha * (0.16 + wobble * 0.08));
+          ctx.beginPath();
+          ctx.ellipse(p.x + ox, p.y + oy, rx, ry, hash01(pool.seed + 59, i) * Math.PI, 0, Math.PI * 2);
+          ctx.fill();
+
+          if (i % 3 === 0) {
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = rgba(C_CLOT, ageAlpha * 0.3);
+            ctx.beginPath();
+            ctx.ellipse(p.x - ox * 0.35, p.y - oy * 0.35, rx * 0.45, ry * 0.38, -hash01(pool.seed + 71, i) * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          if (hash01(pool.seed + 127, i) > 0.62) {
+            const drops = 1 + ((hash01(pool.seed + 139, i) * 3) | 0);
+            for (let j = 0; j < drops; j++) {
+              const a = hash01(pool.seed + i * 13, j) * Math.PI * 2;
+              const r = CELL * (0.58 + hash01(pool.seed + i * 17, j) * 0.7);
+              const dr = CELL * (0.045 + hash01(pool.seed + i * 19, j) * 0.07);
+              ctx.fillStyle = rgba(pool.color, ageAlpha * 0.12);
+              ctx.beginPath();
+              ctx.ellipse(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, dr * 1.35, dr, a, 0, Math.PI * 2);
+              ctx.fill();
             }
           }
         }
-
-        // death flashes — a quick bright ring where a snake fell or split
         ctx.shadowBlur = 0;
-        for (let i = deaths.length - 1; i >= 0; i--) {
-          const d = deaths[i]; d.t += 1 / 60;
-          const t = d.t / 0.4;
-          if (t >= 1) { deaths.splice(i, 1); continue; }
-          ctx.strokeStyle = `rgba(255,200,90,${(1 - t) * 0.9})`;
-          ctx.lineWidth = 2;
+      }
+
+      function drawBones(pool, points, depth) {
+        if (points.length < 2) return;
+        const alpha = 0.18 + depth * 0.22;
+        ctx.shadowColor = rgba(C_BONE, 0.35);
+        ctx.shadowBlur = CELL * 0.16;
+        ctx.strokeStyle = rgba(C_BONE, alpha);
+        ctx.lineWidth = Math.max(1, CELL * 0.1);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.setLineDash([CELL * 0.34, CELL * 0.2]);
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        for (let i = 1; i < points.length - 1; i += 2) {
+          const prev = points[i - 1], cur = points[i], next = points[i + 1];
+          const dx = next.x - prev.x, dy = next.y - prev.y;
+          const len = Math.hypot(dx, dy) || 1;
+          const nx = -dy / len, ny = dx / len;
+          const rib = CELL * (0.2 + hash01(pool.seed + 101, i) * 0.17);
+          const notch = (hash01(pool.seed + 113, i) - 0.5) * CELL * 0.12;
+
+          ctx.strokeStyle = rgba(C_BONE, alpha * 0.82);
+          ctx.lineWidth = Math.max(1, CELL * 0.075);
           ctx.beginPath();
-          ctx.arc(d.x * CELL + CELL / 2, d.y * CELL + CELL / 2, CELL * (0.3 + t * 1.4), 0, Math.PI * 2);
+          ctx.moveTo(cur.x - nx * rib + dx / len * notch, cur.y - ny * rib + dy / len * notch);
+          ctx.lineTo(cur.x + nx * rib + dx / len * notch, cur.y + ny * rib + dy / len * notch);
           ctx.stroke();
-          if (d.split) { ctx.beginPath(); ctx.arc(d.x * CELL + CELL / 2, d.y * CELL + CELL / 2, CELL * (0.3 + t * 0.8), 0, Math.PI * 2); ctx.stroke(); }
+
+          ctx.fillStyle = rgba(C_BONE, alpha * 0.95);
+          ctx.beginPath();
+          ctx.ellipse(cur.x, cur.y, CELL * 0.08, CELL * 0.055, Math.atan2(dy, dx), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+      }
+
+      function drawPools() {
+        for (let i = 0; i < pools.length; i++) {
+          const pool = pools[i];
+          const depth = pools.length <= 1 ? 1 : i / (pools.length - 1);
+          const points = pool.body.map(cellCenter);
+          drawStain(pool, points, depth);
+        }
+        for (let i = 0; i < pools.length; i++) {
+          const pool = pools[i];
+          const depth = pools.length <= 1 ? 1 : i / (pools.length - 1);
+          drawBones(pool, pool.body.map(cellCenter), depth);
+        }
+        ctx.shadowBlur = 0;
+        ctx.setLineDash([]);
+      }
+
+      function drawBorder() {
+        ctx.shadowColor = GLOW;
+        ctx.shadowBlur = 8;
+        ctx.strokeStyle = C_BORDER;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(OX + 1, OY + 1, GW * CELL - 2, GH * CELL - 2);
+        ctx.shadowBlur = 0;
+      }
+
+      function render() {
+        // warm-black ground
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = C_BG; ctx.fillRect(0, 0, W, H);
+
+        drawPools();
+
+        // mouse — one steady bright blip
+        if (mouse) {
+          const m = cellCenter(mouse);
+          blockAt(m.x, m.y, C_MOUSE, CELL * 0.32, 10);
         }
 
-        // CRT: scanlines + a hair of flicker + a soft vignette
+        // snakes — each segment tweened from where it was toward where it is, so
+        // the grid motion reads smooth
+        for (const s of snakes) {
+          const alpha = Math.min(1, (s.moveAcc || 0) / moveInterval(s));
+          const colors = snakeColor(s);
+          const points = [];
+          for (let i = 0; i < s.body.length; i++) {
+            const cur = s.body[i], pre = (s.prev && s.prev[i]) || cur;
+            points.push({
+              x: OX + (pre.x + (cur.x - pre.x) * alpha) * CELL + CELL / 2,
+              y: OY + (pre.y + (cur.y - pre.y) * alpha) * CELL + CELL / 2,
+            });
+          }
+          const path = points.slice().reverse();
+          strokePath(path, colors.head, CELL * 0.92, 12, colors.glow);
+          strokePath(path, colors.body, CELL * 0.62, 5, colors.glow);
+          const head = points[0];
+          blockAt(head.x, head.y, colors.head, CELL * 0.14, 14, colors.glow);
+          ctx.shadowBlur = 0; ctx.fillStyle = C_BG;            // two dark eyes facing travel
+          const ex = head.x + s.dir.x * CELL * 0.18, ey = head.y + s.dir.y * CELL * 0.18, e = Math.max(1, CELL * 0.1);
+          ctx.fillRect(ex - s.dir.y * CELL * 0.16 - e / 2, ey - s.dir.x * CELL * 0.16 - e / 2, e, e);
+          ctx.fillRect(ex + s.dir.y * CELL * 0.16 - e / 2, ey + s.dir.x * CELL * 0.16 - e / 2, e, e);
+        }
+
+        // faint grain + a soft vignette
         ctx.shadowBlur = 0;
-        ctx.fillStyle = `rgba(0,0,0,${0.22 + Math.sin(frame * 0.7) * 0.03})`;
-        for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1.4);
+        ctx.fillStyle = `rgba(0,0,0,${0.13 + Math.sin(frame * 0.7) * 0.02})`;
+        for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1);
         const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
         vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)');
         ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+
+        drawBorder();
       }
 
       // ---- loop -----------------------------------------------------------
       function tick(t) {
         const dt = Math.min(0.1, (t - last) / 1000 || 0); last = t; frame++;
-        acc += dt;
-        while (acc >= STEP) { step(); acc -= STEP; }
+        for (const s of snakes) s.moveAcc = (s.moveAcc || 0) + dt;
+        for (let guard = 0; guard < 8; guard++) {
+          const movers = snakes.filter(s => (s.moveAcc || 0) >= moveInterval(s));
+          if (!movers.length) break;
+          for (const s of movers) s.moveAcc -= moveInterval(s);
+          step(movers);
+        }
         render();
         requestAnimationFrame(tick);
       }

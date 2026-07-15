@@ -1,53 +1,64 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
   <defs>
-    <radialGradient id="wc1" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#a86fd6" stop-opacity="0.75"/>
-      <stop offset="60%" stop-color="#7a4bb0" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="#a86fd6" stop-opacity="0"/>
+    <radialGradient id="redWash" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#e83038" stop-opacity="0.58"/>
+      <stop offset="65%" stop-color="#e83038" stop-opacity="0.24"/>
+      <stop offset="100%" stop-color="#e83038" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="wc2" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#40b0c8" stop-opacity="0.7"/>
-      <stop offset="60%" stop-color="#2c7e93" stop-opacity="0.3"/>
-      <stop offset="100%" stop-color="#40b0c8" stop-opacity="0"/>
+    <radialGradient id="blueWash" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#00a8e8" stop-opacity="0.55"/>
+      <stop offset="68%" stop-color="#2850c8" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#00a8e8" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="wc3" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#e0648c" stop-opacity="0.72"/>
-      <stop offset="60%" stop-color="#b03f63" stop-opacity="0.32"/>
-      <stop offset="100%" stop-color="#e0648c" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="wc4" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#e8a13a" stop-opacity="0.7"/>
-      <stop offset="100%" stop-color="#e8a13a" stop-opacity="0"/>
+    <radialGradient id="goldWash" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#f8b800" stop-opacity="0.50"/>
+      <stop offset="100%" stop-color="#f8b800" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="200" height="200" fill="#c2a877"/>
-  <!-- watercolour death-blooms, in the colours of the fallen -->
-  <circle cx="56" cy="66" r="30" fill="url(#wc1)"/>
-  <circle cx="150" cy="140" r="26" fill="url(#wc2)"/>
-  <circle cx="120" cy="58" r="20" fill="url(#wc3)"/>
-  <circle cx="64" cy="150" r="18" fill="url(#wc4)"/>
-  <!-- quiet distributed-pixel terrain (Dune-like) -->
-  <g fill="#8a9a5c" opacity="0.4">
-    <rect x="20" y="24" width="4" height="4"/><rect x="36" y="40" width="4" height="4"/><rect x="28" y="48" width="4" height="4"/>
-    <rect x="88" y="22" width="4" height="4"/><rect x="104" y="34" width="4" height="4"/><rect x="96" y="30" width="4" height="4"/>
-    <rect x="160" y="36" width="4" height="4"/><rect x="176" y="28" width="4" height="4"/><rect x="168" y="48" width="4" height="4"/>
-    <rect x="40" y="104" width="4" height="4"/><rect x="32" y="116" width="4" height="4"/><rect x="48" y="120" width="4" height="4"/>
-    <rect x="112" y="100" width="4" height="4"/><rect x="100" y="112" width="4" height="4"/><rect x="120" y="116" width="4" height="4"/>
-    <rect x="172" y="100" width="4" height="4"/><rect x="184" y="112" width="4" height="4"/>
-    <rect x="24" y="168" width="4" height="4"/><rect x="40" y="180" width="4" height="4"/><rect x="92" y="172" width="4" height="4"/>
-    <rect x="104" y="184" width="4" height="4"/><rect x="160" y="176" width="4" height="4"/><rect x="176" y="184" width="4" height="4"/>
-    <rect x="132" y="64" width="4" height="4"/><rect x="64" y="72" width="4" height="4"/><rect x="148" y="120" width="4" height="4"/>
+  <rect width="200" height="200" fill="#ddd6c4"/>
+
+  <!-- broken map scaffold -->
+  <g fill="none" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M10 38 H70 V26 H122 V54 H190" stroke="#12100e" stroke-opacity=".18" stroke-width="1"/>
+    <path d="M22 158 H84 V132 H120 V148 H176" stroke="#12100e" stroke-opacity=".16" stroke-width="1"/>
+    <path d="M42 12 V86 H30 V128 H54 V190" stroke="#00a8e8" stroke-opacity=".22" stroke-width="1.4"/>
+    <path d="M150 8 V68 H130 V104 H166 V190" stroke="#e83038" stroke-opacity=".20" stroke-width="1.2"/>
+    <path d="M8 108 H54 V92 H96 V112 H142 V96 H192" stroke="#7050d8" stroke-opacity=".18" stroke-width="1"/>
+    <path d="M104 20 A70 70 0 0 1 182 96" stroke="#12100e" stroke-opacity=".13" stroke-width="1"/>
+    <path d="M16 170 A88 88 0 0 0 112 188" stroke="#40b850" stroke-opacity=".20" stroke-width="1.2"/>
   </g>
-  <!-- prey: varied-colour cells -->
-  <g>
-    <circle cx="86" cy="96" r="8.5" fill="#40b0c8" stroke="#173f48" stroke-width="1.4"/><circle cx="88" cy="96" r="3" fill="#0e2a30"/>
-    <circle cx="118" cy="128" r="6.5" fill="#e0648c" stroke="#5a2030" stroke-width="1.2"/><circle cx="120" cy="128" r="2.3" fill="#3a1420"/>
-    <circle cx="52" cy="150" r="5" fill="#a86fd6" stroke="#3c2a52" stroke-width="1.1"/><circle cx="53" cy="150" r="1.8" fill="#241634"/>
-    <circle cx="160" cy="108" r="6" fill="#5fb878" stroke="#244a30" stroke-width="1.2"/><circle cx="161" cy="108" r="2.1" fill="#143020"/>
+
+  <!-- watercolour event fields -->
+  <path d="M38 54 C50 30 82 32 94 54 C106 76 88 98 58 96 C32 94 26 72 38 54Z" fill="url(#redWash)"/>
+  <path d="M118 118 C134 94 164 102 174 126 C184 148 164 170 136 162 C112 156 104 138 118 118Z" fill="url(#blueWash)"/>
+  <path d="M68 138 C80 122 104 126 112 146 C120 166 98 182 76 174 C58 168 56 152 68 138Z" fill="url(#goldWash)"/>
+
+  <!-- pixel terrain -->
+  <g fill="#3e6e56" opacity=".32">
+    <rect x="18" y="24" width="3" height="3"/><rect x="28" y="36" width="3" height="3"/><rect x="36" y="42" width="3" height="3"/>
+    <rect x="84" y="24" width="3" height="3"/><rect x="96" y="34" width="3" height="3"/><rect x="106" y="30" width="3" height="3"/>
+    <rect x="156" y="34" width="3" height="3"/><rect x="170" y="42" width="3" height="3"/><rect x="180" y="30" width="3" height="3"/>
+    <rect x="30" y="108" width="3" height="3"/><rect x="42" y="118" width="3" height="3"/><rect x="56" y="110" width="3" height="3"/>
+    <rect x="108" y="102" width="3" height="3"/><rect x="120" y="116" width="3" height="3"/><rect x="136" y="110" width="3" height="3"/>
+    <rect x="24" y="172" width="3" height="3"/><rect x="40" y="184" width="3" height="3"/><rect x="154" y="176" width="3" height="3"/>
+    <rect x="174" y="184" width="3" height="3"/><rect x="136" y="68" width="3" height="3"/><rect x="62" y="76" width="3" height="3"/>
   </g>
-  <!-- hunter: a black arrow with a stem -->
-  <g transform="translate(138,150) rotate(150)" fill="none" stroke="#100e0c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M-13 0 L13 0"/>
-    <path d="M5 -7 L13 0 L5 7"/>
+
+  <!-- blocky prey glyphs -->
+  <g stroke-linejoin="miter" stroke-width="1.4">
+    <g transform="translate(86 94)" fill="#00a8e8" stroke="#003848">
+      <rect x="-7" y="-7" width="14" height="14"/><rect x="-14" y="-7" width="7" height="14"/><rect x="7" y="-7" width="7" height="14"/><rect x="-7" y="-14" width="14" height="7"/><rect x="-7" y="7" width="14" height="7"/>
+    </g>
+    <g transform="translate(120 132)" fill="#e83038" stroke="#4c1014">
+      <rect x="-6" y="-6" width="12" height="12"/><rect x="-12" y="-6" width="6" height="12"/><rect x="6" y="-6" width="6" height="12"/><rect x="-6" y="-12" width="12" height="6"/><rect x="-6" y="6" width="12" height="6"/>
+    </g>
+    <g transform="translate(58 152)" fill="#7050d8" stroke="#201848">
+      <rect x="-5" y="-5" width="10" height="10"/><rect x="-10" y="-5" width="5" height="10"/><rect x="5" y="-5" width="5" height="10"/><rect x="-5" y="-10" width="10" height="5"/><rect x="-5" y="5" width="10" height="5"/>
+    </g>
+  </g>
+
+  <!-- compact arcade hunter -->
+  <g transform="translate(146 154) rotate(150)" fill="#0c0b0a" stroke="#f6eecd" stroke-opacity=".28" stroke-width="1">
+    <rect x="5" y="-5" width="10" height="10"/><rect x="0" y="-10" width="5" height="5"/><rect x="0" y="5" width="5" height="5"/><rect x="-5" y="-5" width="5" height="10"/><rect x="-10" y="0" width="5" height="5"/>
   </g>
 </svg>

@@ -1,0 +1,7 @@
+{
+  "title": "Happiness Hunter",
+  "year": 2026,
+  "type": "interactive",
+  "thumbnail": "thumbnail.svg",
+  "description": "A yellow arcade car hunts for the fastest lane in dense traffic. Other cars carry aggression and compassion values, signal unevenly, avoid obstacles, and sometimes let the hero merge. Each car the hero passes is +1; each car that passes the hero is -1."
+}

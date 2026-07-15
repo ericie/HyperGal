@@ -3,5 +3,5 @@
   "year": 2026,
   "type": "interactive",
   "thumbnail": "thumbnail.svg",
-  "description": "Autonomous snake on an Apple //e amber CRT. A snake greedily hunts the nearest mouse, blind to bodies — so a long one curls into its own tail, and any head that strikes a body splits the hit snake into two hunters. The myth: cut the hydra and it doubles. The cull is the heads — when two snakes meet head-on, one dies. Eating lengthens, body strikes divide, collisions thin the herd, and the count breathes forever with no player. Amber phosphor, scanlines, glow. Click to reseed."
+  "description": "Autonomous traditional Snake on a luminous black field. Five snakes with random starting lengths and aggression values hunt one mouse. Eating grows a snake; larger snakes move faster and become more aggressive, and any snake may box when another snake's available space is small relative to its own length. Touching the border, itself, or another snake kills one snake. A dead snake leaves layered color stain, darker clots, and pale bone memory, then the mouse becomes the replacement snake and the hunt begins again. Outlined bodies, clear arena border, glow. Click to reseed."
 }

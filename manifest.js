@@ -31,7 +31,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "An abstract ecosystem that paints itself in watercolour, then wipes the painting clean forever. Over a quiet, Dune-like pixel terrain, vector prey graze, grow into spiny bodies that age toward white, and flee hunters with their own alertness and sprint speed. Hunters are black arrows that run prey down, fatten, and breed only by splitting in half. Death paints; old spiny prey burst white and erase nearby bloodstains. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats."
+      "description": "An abstract ecosystem that paints itself in watercolour and cartographic linework, then wipes the painting clean forever. Over a pale NES-bright pixel terrain, blocky prey graze, grow into spiny square emblems that age toward white, and flee hunters with their own alertness and sprint speed. Compact black arcade hunters run prey down, fatten, and breed only by splitting in half. Death paints stains, route ticks, and line scaffolds; old spiny prey burst white and erase nearby bloodstains. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats."
     },
     {
       "slug": "005-only-invaders",
@@ -55,7 +55,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "Autonomous snake on an Apple //e amber CRT. A snake greedily hunts the nearest mouse, blind to bodies — so a long one curls into its own tail, and any head that strikes a body splits the hit snake into two hunters. The myth: cut the hydra and it doubles. The cull is the heads — when two snakes meet head-on, one dies. Eating lengthens, body strikes divide, collisions thin the herd, and the count breathes forever with no player. Amber phosphor, scanlines, glow. Click to reseed."
+      "description": "Autonomous traditional Snake on a luminous black field. Five snakes with random starting lengths and aggression values hunt one mouse. Eating grows a snake; larger snakes move faster and become more aggressive, and any snake may box when another snake's available space is small relative to its own length. Touching the border, itself, or another snake kills one snake. A dead snake leaves layered color stain, darker clots, and pale bone memory, then the mouse becomes the replacement snake and the hunt begins again. Outlined bodies, clear arena border, glow. Click to reseed."
     },
     {
       "slug": "008-vectrex-asteroids",
@@ -63,7 +63,23 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "A black-and-white Vectrex-style Asteroids variant. The ship cruises and pauses until a player takes over, keeping only three shots alive at once. Bullets split asteroids into many generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Fragments drift together under stronger slow gravity, bump instead of passing through, settle before they glom, and weld into integrated asteroid outlines that retain bulges from their joined pieces. Any asteroid can kill the ship on contact."
+      "description": "A black-and-white Vectrex-style Asteroids variant. The ship mostly parks, bleeds off momentum, predicts asteroid paths, and fires tight two- or three-shot bursts one bullet at a time until a player takes over, thrusting mainly to dodge and keeping only three shots alive at once. Bullets split asteroids into deeper generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Heavier fragments accelerate slowly, drift together under stronger gravity, bump instead of passing through, settle before they glom, and weld into rough integrated asteroid outlines that retain shoulders, valleys, and bulges from their joined pieces. Any asteroid can kill the ship on contact."
+    },
+    {
+      "slug": "009-mutual-command",
+      "title": "Mutual Command",
+      "year": 2026,
+      "type": "interactive",
+      "thumbnail": "thumbnail.svg",
+      "description": "A two-sided Missile Command riff. A north row and south row of pixel towns and batteries launch paired attacks while their defenses try to erase incoming missiles at roughly the same rate. Each side starts at 1000 points and loses score as cities, batteries, and ground are destroyed; when a side reaches zero, the ruined row is cleared and a fresh set of towns slides in from the side."
+    },
+    {
+      "slug": "010-obstacles-and-how-to-avoid-them",
+      "title": "Obstacles and How to Avoid Them",
+      "year": 2026,
+      "type": "interactive",
+      "thumbnail": "thumbnail.svg",
+      "description": "A full-window wall drawing of tight, city-like square obstacles and left-to-right field lines. Muted pigment blocks sit on a rough offset grid, sway up and down like objects riding a slow ocean, and make the lines continually redraw around their actual silhouettes. Click to reseed."
     },
     {
       "slug": "011-switch-stack",
@@ -72,6 +88,14 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "A pure black-and-white scroll stack. Each row holds one or two boxes; as a box reaches the viewport midpoint, its binary dither has finished clearing from black to white and its block-letter state flips from ON to OFF."
+    },
+    {
+      "slug": "012-happiness-hunter",
+      "title": "Happiness Hunter",
+      "year": 2026,
+      "type": "interactive",
+      "thumbnail": "thumbnail.svg",
+      "description": "A yellow arcade car hunts for the fastest lane in dense traffic. Other cars carry aggression and compassion values, signal unevenly, avoid obstacles, and sometimes let the hero merge. Each car the hero passes is +1; each car that passes the hero is -1."
     }
   ]
 };

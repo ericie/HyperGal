@@ -1,30 +1,28 @@
 # hydra
 
-An autonomous game of snake, painted like an Apple //e amber monitor.
+An autonomous game of traditional Snake, painted like a luminous fossil field.
 
-A snake hunts the nearest mouse. Its pathfinding is greedy and **blind to its own
-body**, so a long snake chasing a mouse that sits behind it will curl around and
-run into its own tail — and where the head strikes the body, the snake **splits
-into two**, each piece becoming a snake that hunts on its own. Cut the hydra and
-it doubles.
+There are five snakes and one mouse. New snakes enter with random starting
+lengths and aggression values: higher aggression makes one chase the mouse
+harder, lower aggression makes it preserve more space around its own body and
+the other snakes. As a snake grows, its effective aggression rises, and every
+snake may look for chances to box another snake in when its available space is
+small relative to the hunter's body length. The rule set stays small:
 
-The cull is the **heads**: when two snakes try to move onto the same cell, one of
-them dies. When a head strikes another snake's *body*, the hit snake splits as
-if its own head had struck that segment. So:
-
-- **mice** lengthen snakes,
-- **body strikes** divide the hit snake,
-- **head-on collisions** thin them,
-
-and the number of snakes breathes up and down forever without a player ever
-touching it. A fragment too short to be a snake simply dies; the field is capped
-so it never floods, and floored so it never empties.
+- touching the **mouse** grows the snake and creates a new mouse,
+- larger snakes move faster and become more aggressive,
+- touching the **border** kills the snake,
+- touching its **own body** anywhere kills the snake,
+- touching **another snake** kills one snake,
+- when the snake dies, its body remains as layered stain and bone memory,
+- the current mouse becomes the next snake, and the hunt starts again.
 
 ## The look
 
-A single **amber phosphor** on black, the way lo-res graphics smeared on an //e's
-CRT: blocky cells, a soft glow, blinking mice, a bright-eyed head, scanlines, a
-touch of flicker, and a soft vignette. Splits and deaths leave a quick amber ring.
+Bright saturated bodies on black: outlined continuous snakes, one blinking
+mouse, bright-eyed heads, a soft vignette, and a clear border around the arena.
+Deaths accumulate into translucent color stains, darker clots, and pale snake
+bones that layer under the living hunt.
 
 ## Interaction
 

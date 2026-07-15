@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mutual Command · HyperGal</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #03030a;
+        overflow: hidden;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #03030a;
+        image-rendering: pixelated;
+      }
+
+      .caption {
+        position: fixed;
+        left: 50%;
+        bottom: 0.95rem;
+        transform: translateX(-50%);
+        color: rgba(238, 246, 255, 0.62);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+        text-align: center;
+        pointer-events: none;
+        text-shadow: 0 1px 0 #000;
+        white-space: nowrap;
+      }
+
+      @media (max-width: 560px) {
+        .caption {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div class="caption">Mutual Command - 2026 - click to reseed</div>
+    <script>
+      const canvas = document.getElementById('stage');
+      const screen = canvas.getContext('2d', { alpha: false });
+      const buffer = document.createElement('canvas');
+      const ctx = buffer.getContext('2d', { alpha: false });
+
+      const TAU = Math.PI * 2;
+      const SIDES = ['top', 'bottom'];
+      const OPPOSITE = { top: 'bottom', bottom: 'top' };
+      const COLORS = {
+        bg: '#03030a',
+        bg2: '#080816',
+        stars: '#5e7cff',
+        top: '#ff4a76',
+        topCity: '#ff8b3d',
+        topSoft: 'rgba(255, 74, 118, .26)',
+        bottom: '#41f6c0',
+        bottomCity: '#28b7ff',
+        bottomSoft: 'rgba(65, 246, 192, .24)',
+        missileTop: '#ffdd5d',
+        missileBottom: '#8bfff0',
+        impact: '#fff2a2',
+        smoke: '#9a5bff',
+        black: '#03030a',
+      };
+
+      const GLYPHS = {
+        '0': ['111', '101', '101', '101', '101', '101', '111'],
+        '1': ['010', '110', '010', '010', '010', '010', '111'],
+        '2': ['111', '001', '001', '111', '100', '100', '111'],
+        '3': ['111', '001', '001', '111', '001', '001', '111'],
+        '4': ['101', '101', '101', '111', '001', '001', '001'],
+        '5': ['111', '100', '100', '111', '001', '001', '111'],
+        '6': ['111', '100', '100', '111', '101', '101', '111'],
+        '7': ['111', '001', '001', '010', '010', '010', '010'],
+        '8': ['111', '101', '101', '111', '101', '101', '111'],
+        '9': ['111', '101', '101', '111', '001', '001', '111'],
+        N: ['1001', '1101', '1011', '1001', '1001', '1001', '1001'],
+        O: ['111', '101', '101', '101', '101', '101', '111'],
+        R: ['1110', '1001', '1001', '1110', '1010', '1001', '1001'],
+        T: ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
+        H: ['1001', '1001', '1001', '1111', '1001', '1001', '1001'],
+        S: ['111', '100', '100', '111', '001', '001', '111'],
+        U: ['101', '101', '101', '101', '101', '101', '111'],
+        ' ': ['0', '0', '0', '0', '0', '0', '0'],
+      };
+
+      let W = 384;
+      let H = 240;
+      let cssW = 1;
+      let cssH = 1;
+      let dpr = 1;
+      let now = 0;
+      let lastT = 0;
+      let raf = 0;
+      let nextId = 1;
+      let nextExchangeAt = 0;
+      let screenShake = 0;
+      let whiteFlash = 0;
+      let stars = [];
+      let sides = {};
+      let missiles = [];
+      let interceptors = [];
+      let blasts = [];
+      let debris = [];
+      let queuedLaunches = [];
+      let spawnSide = -1;
+
+      const rand = (a, b) => a + Math.random() * (b - a);
+      const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+      const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+      function resize() {
+        cancelAnimationFrame(raf);
+        cssW = Math.max(1, window.innerWidth);
+        cssH = Math.max(1, window.innerHeight);
+        dpr = Math.min(2, window.devicePixelRatio || 1);
+        canvas.width = Math.round(cssW * dpr);
+        canvas.height = Math.round(cssH * dpr);
+        canvas.style.width = cssW + 'px';
+        canvas.style.height = cssH + 'px';
+        screen.setTransform(dpr, 0, 0, dpr, 0, 0);
+        screen.imageSmoothingEnabled = false;
+
+        const aspect = cssW / cssH;
+        if (aspect >= 1) {
+          W = Math.round(clamp(240 * aspect, 320, 560));
+          H = Math.round(W / aspect);
+        } else {
+          W = 240;
+          H = Math.round(clamp(W / aspect, 260, 560));
+        }
+        buffer.width = W;
+        buffer.height = H;
+        ctx.imageSmoothingEnabled = false;
+        reset();
+      }
+
+      function reset() {
+        cancelAnimationFrame(raf);
+        nextId = 1;
+        missiles = [];
+        interceptors = [];
+        blasts = [];
+        debris = [];
+        queuedLaunches = [];
+        spawnSide = Math.random() < 0.5 ? -1 : 1;
+        stars = makeStars();
+        sides = {
+          top: makeSide('top'),
+          bottom: makeSide('bottom'),
+        };
+        now = 0;
+        lastT = performance.now();
+        nextExchangeAt = 0.55;
+        screenShake = 0;
+        whiteFlash = 0;
+        raf = requestAnimationFrame(tick);
+      }
+
+      function makeStars() {
+        const count = clamp(Math.floor((W * H) / 1450), 36, 170);
+        return Array.from({ length: count }, () => ({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          a: rand(0.12, 0.72),
+          p: rand(0, TAU),
+        }));
+      }
+
+      function makeSide(key) {
+        const side = {
+          key,
+          label: key === 'top' ? 'NORTH' : 'SOUTH',
+          dir: key === 'top' ? 1 : -1,
+          color: key === 'top' ? COLORS.top : COLORS.bottom,
+          cityColor: key === 'top' ? COLORS.topCity : COLORS.bottomCity,
+          softColor: key === 'top' ? COLORS.topSoft : COLORS.bottomSoft,
+          missileColor: key === 'top' ? COLORS.missileTop : COLORS.missileBottom,
+          groundY: key === 'top' ? Math.max(29, Math.round(H * 0.115)) : H - Math.max(29, Math.round(H * 0.115)),
+          score: 1000,
+          displayScore: 1000,
+          offsetX: 0,
+          entryDir: 0,
+          replacing: false,
+          replaceTimer: 0,
+          slideBuilt: true,
+          invuln: 0,
+          structures: [],
+          batteries: [],
+        };
+        buildRow(side);
+        return side;
+      }
+
+      function buildRow(side) {
+        side.structures = [];
+        side.batteries = [];
+
+        const slotCount = clamp(Math.round(W / 48), 7, 11);
+        const margin = Math.max(23, Math.round(W * 0.07));
+        const span = Math.max(1, W - margin * 2);
+        const mid = Math.floor(slotCount / 2);
+        const batterySlots = new Set([1, mid, slotCount - 2]);
+
+        for (let i = 0; i < slotCount; i++) {
+          const x = margin + (span * i) / (slotCount - 1);
+          if (batterySlots.has(i)) {
+            const battery = makeBattery(side, x, i);
+            side.structures.push(battery);
+            side.batteries.push(battery);
+          } else {
+            side.structures.push(makeCity(side, x, i));
+          }
+        }
+      }
+
+      function makeBattery(side, x, index) {
+        return {
+          id: nextId++,
+          type: 'battery',
+          x,
+          w: 18,
+          maxHp: 3,
+          hp: 3,
+          alive: true,
+          flash: 0,
+          reload: rand(0.24, 0.72),
+          launchFlash: 0,
+          shape: index % 3,
+        };
+      }
+
+      function makeCity(side, x, index) {
+        const w = rand(18, 27);
+        const blockCount = 3 + ((Math.random() * 3) | 0);
+        const blocks = [];
+        let cursor = -w / 2;
+        for (let i = 0; i < blockCount; i++) {
+          const bw = i === blockCount - 1 ? w / 2 - cursor : rand(4, 7);
+          const bh = rand(8, 21) + (index % 2 ? 3 : 0);
+          blocks.push({ x: cursor, w: Math.max(3, bw - 1), h: bh });
+          cursor += bw;
+        }
+        return {
+          id: nextId++,
+          type: 'city',
+          x,
+          w,
+          maxHp: 4,
+          hp: 4,
+          alive: true,
+          flash: 0,
+          blocks,
+          rubbleSeed: Math.random() * 999,
+        };
+      }
+
+      function tick(t) {
+        const dt = Math.min(1 / 24, Math.max(0, (t - lastT) / 1000));
+        lastT = t;
+        now += dt;
+
+        updateSides(dt);
+        updateLaunchQueue();
+        updateMissiles(dt);
+        updateInterceptors(dt);
+        updateBlasts(dt);
+        updateDefense(dt);
+        updateDebris(dt);
+        screenShake = Math.max(0, screenShake - dt * 4.2);
+        whiteFlash = Math.max(0, whiteFlash - dt * 2.9);
+
+        draw();
+        raf = requestAnimationFrame(tick);
+      }
+
+      function updateSides(dt) {
+        for (const side of SIDES.map((key) => sides[key])) {
+          side.invuln = Math.max(0, side.invuln - dt);
+          if (side.displayScore > side.score) {
+            side.displayScore = Math.max(side.score, side.displayScore - dt * 520);
+          } else {
+            side.displayScore = side.score;
+          }
+          for (const structure of side.structures) {
+            structure.flash = Math.max(0, structure.flash - dt * 3);
+            if (structure.type === 'battery') {
+              structure.reload = Math.max(0, structure.reload - dt);
+              structure.launchFlash = Math.max(0, structure.launchFlash - dt * 4.8);
+            }
+          }
+          updateReplacement(side, dt);
+        }
+      }
+
+      function updateReplacement(side, dt) {
+        if (!side.replacing) return;
+
+        side.replaceTimer += dt;
+        if (!side.slideBuilt && side.replaceTimer > 0.58) {
+          buildRow(side);
+          side.score = 1000;
+          side.displayScore = 1000;
+          side.offsetX = side.entryDir * (W + 70);
+          side.slideBuilt = true;
+          side.invuln = 1.2;
+          pulseRow(side);
+        }
+
+        if (side.slideBuilt) {
+          const before = side.offsetX;
+          side.offsetX += (0 - side.offsetX) * Math.min(1, dt * 3.65);
+          if (Math.abs(side.offsetX) < 0.65 || Math.sign(before) !== Math.sign(side.offsetX)) {
+            side.offsetX = 0;
+            side.replacing = false;
+            side.invuln = 0.65;
+          }
+        }
+      }
+
+      function updateLaunchQueue() {
+        if (now >= nextExchangeAt) {
+          queueExchange();
+        }
+        for (let i = 0; i < queuedLaunches.length;) {
+          const item = queuedLaunches[i];
+          if (item.at > now) {
+            i++;
+            continue;
+          }
+          launchAttack(item.side);
+          queuedLaunches.splice(i, 1);
+        }
+      }
+
+      function queueExchange() {
+        const count = Math.random() > 0.72 ? 2 : 1;
+        const cadence = rand(0.16, 0.24);
+        for (let i = 0; i < count; i++) {
+          queuedLaunches.push({ side: 'top', at: now + i * cadence + rand(0, 0.06) });
+          queuedLaunches.push({ side: 'bottom', at: now + i * cadence + rand(0, 0.06) });
+        }
+        nextExchangeAt = now + rand(0.76, 1.24);
+      }
+
+      function launchAttack(sideKey) {
+        const side = sides[sideKey];
+        const targetSide = sides[OPPOSITE[sideKey]];
+        const launcher = pick(side.batteries.filter((b) => b.alive));
+        if (!launcher || side.replacing || targetSide.replacing) return;
+
+        const target = pickTargetPoint(targetSide);
+        const sx = launcher.x + side.offsetX;
+        const sy = side.groundY + side.dir * 13;
+        const dist = Math.hypot(target.x - sx, target.y - sy);
+        const speedScale = clamp(H / 240, 0.95, 2.15);
+        const speed = rand(21, 31) * speedScale;
+
+        launcher.launchFlash = 0.2;
+        missiles.push({
+          id: nextId++,
+          side: sideKey,
+          targetSide: targetSide.key,
+          sx,
+          sy,
+          tx: target.x,
+          ty: target.y,
+          x: sx,
+          y: sy,
+          t: 0,
+          duration: Math.max(1.4, dist / speed),
+          color: side.missileColor,
+          locks: 0,
+          dead: false,
+        });
+        spawnLaunchDust(sx, sy, side.dir, side.color);
+      }
+
+      function pickTargetPoint(side) {
+        const live = side.structures.filter((s) => s.alive);
+        let target = null;
+        if (live.length && Math.random() < 0.88) {
+          const weighted = [];
+          for (const structure of live) {
+            weighted.push(structure);
+            if (structure.type === 'battery') weighted.push(structure);
+          }
+          target = pick(weighted);
+        }
+        const x = target ? target.x + side.offsetX + rand(-target.w * 0.4, target.w * 0.4) : rand(20, W - 20);
+        const y = side.groundY + side.dir * rand(6, 21);
+        return { x, y };
+      }
+
+      function updateMissiles(dt) {
+        const impacts = [];
+        for (const missile of missiles) {
+          if (missile.dead) continue;
+          missile.t += dt / missile.duration;
+          const p = Math.min(1, missile.t);
+          missile.x = missile.sx + (missile.tx - missile.sx) * p;
+          missile.y = missile.sy + (missile.ty - missile.sy) * p;
+          if (p >= 1) {
+            missile.dead = true;
+            impacts.push(missile);
+          }
+        }
+        missiles = missiles.filter((m) => !m.dead);
+        for (const missile of impacts) {
+          missileImpact(missile);
+        }
+      }
+
+      function missileImpact(missile) {
+        const side = sides[missile.targetSide];
+        spawnBlast(missile.tx, missile.ty, COLORS.impact, rand(17, 24), null, 0.62);
+        spawnDebris(missile.tx, missile.ty, 18, COLORS.impact, 32);
+        screenShake = Math.max(screenShake, 2.8);
+        whiteFlash = Math.min(0.55, whiteFlash + 0.14);
+        damageArea(side, missile.tx, missile.ty, rand(17, 23));
+      }
+
+      function updateDefense(dt) {
+        for (const sideKey of SIDES) {
+          const side = sides[sideKey];
+          if (side.replacing) continue;
+          for (const battery of side.batteries) {
+            if (!battery.alive || battery.reload > 0) continue;
+            const target = chooseIncomingMissile(side, battery);
+            if (!target) {
+              battery.reload = rand(0.12, 0.28);
+              continue;
+            }
+            launchInterceptor(side, battery, target);
+          }
+        }
+      }
+
+      function chooseIncomingMissile(side, battery) {
+        let best = null;
+        let bestScore = -Infinity;
+        for (const missile of missiles) {
+          if (missile.targetSide !== side.key || missile.dead) continue;
+          if (missile.locks > 1) continue;
+          const timeLeft = Math.max(0.1, missile.duration * (1 - missile.t));
+          const dist = Math.hypot(missile.x - (battery.x + side.offsetX), missile.y - side.groundY);
+          const progress = missile.t;
+          const score = progress * 2.1 + 1 / timeLeft - dist / 900 - missile.locks * 1.1 + Math.random() * 0.14;
+          if (score > bestScore) {
+            bestScore = score;
+            best = missile;
+          }
+        }
+        if (best && best.t > 0.08) return best;
+        return null;
+      }
+
+      function launchInterceptor(side, battery, missile) {
+        const sx = battery.x + side.offsetX;
+        const sy = side.groundY + side.dir * 9;
+        const speedScale = clamp(H / 240, 0.95, 2.15);
+        const interceptorSpeed = rand(86, 106) * speedScale;
+        const roughDist = Math.hypot(missile.x - sx, missile.y - sy);
+        const lead = clamp(roughDist / interceptorSpeed, 0.14, 1.1);
+        const aimT = Math.min(1, missile.t + lead / missile.duration);
+        const aimError = rand(2.5, 8.5) * (Math.random() < 0.5 ? -1 : 1);
+        const tx = missile.sx + (missile.tx - missile.sx) * aimT + aimError;
+        const ty = missile.sy + (missile.ty - missile.sy) * aimT + rand(-4.5, 4.5);
+        const dist = Math.hypot(tx - sx, ty - sy);
+
+        missile.locks++;
+        battery.reload = rand(0.9, 1.52);
+        battery.launchFlash = 0.24;
+        interceptors.push({
+          id: nextId++,
+          side: side.key,
+          sx,
+          sy,
+          tx,
+          ty,
+          x: sx,
+          y: sy,
+          t: 0,
+          duration: Math.max(0.14, dist / interceptorSpeed),
+          color: side.color,
+          radius: rand(10.5, 15),
+          dead: false,
+        });
+        spawnLaunchDust(sx, sy, side.dir, side.color);
+      }
+
+      function updateInterceptors(dt) {
+        for (const interceptor of interceptors) {
+          if (interceptor.dead) continue;
+          interceptor.t += dt / interceptor.duration;
+          const p = Math.min(1, interceptor.t);
+          interceptor.x = interceptor.sx + (interceptor.tx - interceptor.sx) * p;
+          interceptor.y = interceptor.sy + (interceptor.ty - interceptor.sy) * p;
+          if (p >= 1) {
+            interceptor.dead = true;
+            spawnBlast(interceptor.tx, interceptor.ty, interceptor.color, interceptor.radius, interceptor.side, 0.42);
+          }
+        }
+        interceptors = interceptors.filter((i) => !i.dead);
+      }
+
+      function spawnBlast(x, y, color, radius, ownerSide, life) {
+        blasts.push({
+          x,
+          y,
+          color,
+          radius,
+          ownerSide,
+          age: 0,
+          life,
+          hit: false,
+        });
+      }
+
+      function updateBlasts(dt) {
+        let hitSomething = false;
+        for (const blast of blasts) {
+          blast.age += dt;
+          if (!blast.ownerSide) continue;
+          const r = currentBlastRadius(blast);
+          for (const missile of missiles) {
+            if (missile.dead || missile.side === blast.ownerSide) continue;
+            const d = Math.hypot(missile.x - blast.x, missile.y - blast.y);
+            if (d <= r + 2) {
+              missile.dead = true;
+              blast.hit = true;
+              hitSomething = true;
+              spawnBlast(missile.x, missile.y, missile.color, rand(8, 13), null, 0.34);
+              spawnDebris(missile.x, missile.y, 9, missile.color, 28);
+            }
+          }
+        }
+        if (hitSomething) {
+          screenShake = Math.max(screenShake, 0.85);
+          whiteFlash = Math.min(0.32, whiteFlash + 0.045);
+        }
+        missiles = missiles.filter((m) => !m.dead);
+        blasts = blasts.filter((b) => b.age < b.life);
+      }
+
+      function currentBlastRadius(blast) {
+        const p = clamp(blast.age / blast.life, 0, 1);
+        return blast.radius * Math.sin(p * Math.PI);
+      }
+
+      function damageArea(side, x, y, radius) {
+        if (side.replacing || side.invuln > 0) return;
+
+        let hit = 0;
+        for (const structure of side.structures) {
+          if (!structure.alive) continue;
+          const sx = structure.x + side.offsetX;
+          const sy = side.groundY + side.dir * (structure.type === 'battery' ? 8 : 11);
+          const reach = radius + structure.w * 0.45;
+          const d = Math.hypot(sx - x, sy - y);
+          if (d > reach) continue;
+
+          const injury = d < radius * 0.58 ? 2 : 1;
+          const loss = structure.type === 'battery' ? 58 : 46;
+          structure.hp -= injury;
+          structure.flash = 0.55;
+          side.score = Math.max(0, side.score - loss * injury);
+          hit++;
+          if (structure.hp <= 0) {
+            structure.alive = false;
+            side.score = Math.max(0, side.score - (structure.type === 'battery' ? 72 : 88));
+            spawnStructureBurst(side, structure);
+          }
+        }
+
+        if (!hit) {
+          side.score = Math.max(0, side.score - rand(22, 38));
+        }
+
+        if (side.score <= 0 || !side.structures.some((s) => s.alive)) {
+          side.score = 0;
+          for (const structure of side.structures) structure.alive = false;
+          beginReplacement(side);
+        }
+      }
+
+      function beginReplacement(side) {
+        if (side.replacing) return;
+        side.replacing = true;
+        side.replaceTimer = 0;
+        side.slideBuilt = false;
+        side.entryDir = spawnSide;
+        spawnSide *= -1;
+        side.invuln = 2.2;
+        side.offsetX = 0;
+        queuedLaunches = queuedLaunches.filter((item) => item.side !== side.key);
+        missiles = missiles.filter((m) => m.targetSide !== side.key);
+        interceptors = interceptors.filter((i) => i.side !== side.key);
+        spawnDebris(W / 2, side.groundY + side.dir * 12, 34, side.color, 55);
+        screenShake = Math.max(screenShake, 3.4);
+        whiteFlash = Math.min(0.72, whiteFlash + 0.22);
+      }
+
+      function pulseRow(side) {
+        const y = side.groundY + side.dir * 8;
+        for (let i = 0; i < 38; i++) {
+          debris.push({
+            x: side.offsetX + rand(0, W),
+            y: y + rand(-4, 4),
+            vx: -side.entryDir * rand(18, 70),
+            vy: side.dir * rand(3, 26),
+            age: 0,
+            life: rand(0.34, 0.9),
+            color: Math.random() < 0.5 ? side.cityColor : side.color,
+            size: Math.random() < 0.8 ? 1 : 2,
+          });
+        }
+      }
+
+      function spawnStructureBurst(side, structure) {
+        const x = structure.x + side.offsetX;
+        const y = side.groundY + side.dir * 10;
+        spawnDebris(x, y, structure.type === 'battery' ? 18 : 22, side.cityColor, 42);
+      }
+
+      function spawnLaunchDust(x, y, dir, color) {
+        for (let i = 0; i < 5; i++) {
+          debris.push({
+            x: x + rand(-3, 3),
+            y: y - dir * rand(0, 3),
+            vx: rand(-8, 8),
+            vy: -dir * rand(14, 34),
+            age: 0,
+            life: rand(0.18, 0.42),
+            color,
+            size: 1,
+          });
+        }
+      }
+
+      function spawnDebris(x, y, count, color, speed) {
+        for (let i = 0; i < count; i++) {
+          const a = rand(0, TAU);
+          const v = rand(speed * 0.24, speed);
+          debris.push({
+            x,
+            y,
+            vx: Math.cos(a) * v,
+            vy: Math.sin(a) * v,
+            age: 0,
+            life: rand(0.28, 0.95),
+            color,
+            size: Math.random() < 0.82 ? 1 : 2,
+          });
+        }
+      }
+
+      function updateDebris(dt) {
+        for (const dot of debris) {
+          dot.age += dt;
+          dot.x += dot.vx * dt;
+          dot.y += dot.vy * dt;
+          dot.vx *= 1 - dt * 1.2;
+          dot.vy *= 1 - dt * 1.2;
+        }
+        debris = debris.filter((d) => d.age < d.life);
+      }
+
+      function draw() {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        drawBackground();
+
+        const shakeX = screenShake ? rand(-screenShake, screenShake) : 0;
+        const shakeY = screenShake ? rand(-screenShake, screenShake) : 0;
+        ctx.save();
+        ctx.translate(Math.round(shakeX), Math.round(shakeY));
+        drawRows();
+        drawAttackMissiles();
+        drawInterceptors();
+        drawBlasts();
+        drawDebris();
+        ctx.restore();
+
+        drawHud();
+        drawScanlines();
+        if (whiteFlash > 0) {
+          ctx.fillStyle = `rgba(255,255,255,${whiteFlash * 0.28})`;
+          ctx.fillRect(0, 0, W, H);
+        }
+
+        screen.setTransform(dpr, 0, 0, dpr, 0, 0);
+        screen.imageSmoothingEnabled = false;
+        screen.fillStyle = COLORS.bg;
+        screen.fillRect(0, 0, cssW, cssH);
+        screen.drawImage(buffer, 0, 0, W, H, 0, 0, cssW, cssH);
+      }
+
+      function drawBackground() {
+        const gradient = ctx.createLinearGradient(0, 0, 0, H);
+        gradient.addColorStop(0, COLORS.bg);
+        gradient.addColorStop(0.48, COLORS.bg2);
+        gradient.addColorStop(1, COLORS.bg);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, W, H);
+
+        for (const star of stars) {
+          const twinkle = star.a * (0.55 + 0.45 * Math.sin(now * 1.7 + star.p));
+          ctx.fillStyle = `rgba(116,146,255,${twinkle})`;
+          ctx.fillRect(Math.round(star.x), Math.round(star.y), 1, 1);
+        }
+
+        ctx.fillStyle = 'rgba(130, 180, 255, .11)';
+        const mid = Math.round(H / 2);
+        for (let x = 0; x < W; x += 8) ctx.fillRect(x, mid, 3, 1);
+
+        ctx.fillStyle = 'rgba(70, 90, 180, .07)';
+        for (let x = 0; x < W; x += 16) ctx.fillRect(x, 0, 1, H);
+      }
+
+      function drawRows() {
+        drawSide(sides.top);
+        drawSide(sides.bottom);
+      }
+
+      function drawSide(side) {
+        const y = Math.round(side.groundY);
+        ctx.fillStyle = side.softColor;
+        ctx.fillRect(Math.round(side.offsetX), y - (side.dir < 0 ? 1 : 0), W, 2);
+        ctx.fillStyle = side.color;
+        for (let x = Math.round(side.offsetX); x < W + 10; x += 12) {
+          ctx.fillRect(x, y - (side.dir < 0 ? 2 : 0), 7, 1);
+        }
+
+        for (const structure of side.structures) {
+          if (structure.type === 'battery') drawBattery(side, structure);
+          else drawCity(side, structure);
+        }
+      }
+
+      function drawCity(side, city) {
+        const baseY = Math.round(side.groundY);
+        const cityX = city.x + side.offsetX;
+        if (!city.alive) {
+          drawRubble(side, cityX, city.w, city.rubbleSeed);
+          return;
+        }
+
+        const health = clamp(city.hp / city.maxHp, 0, 1);
+        ctx.fillStyle = city.flash > 0 ? COLORS.impact : city.cityColor;
+        for (const block of city.blocks) {
+          const h = Math.max(2, Math.round(block.h * (0.42 + health * 0.58)));
+          const x = Math.round(cityX + block.x);
+          const y = side.dir > 0 ? baseY : baseY - h;
+          ctx.fillRect(x, y, Math.round(block.w), h);
+
+          if (health > 0.45) {
+            ctx.fillStyle = side.key === 'top' ? '#401018' : '#061b22';
+            const wy0 = side.dir > 0 ? y + 3 : y + 2;
+            for (let wy = wy0; wy < y + h - 2; wy += 5) {
+              for (let wx = x + 2; wx < x + block.w - 1; wx += 5) {
+                if (((wx + wy + city.id) & 3) !== 0) ctx.fillRect(wx, wy, 1, 1);
+              }
+            }
+            ctx.fillStyle = city.flash > 0 ? COLORS.impact : city.cityColor;
+          }
+        }
+      }
+
+      function drawBattery(side, battery) {
+        const x = Math.round(battery.x + side.offsetX);
+        const y = Math.round(side.groundY);
+        if (!battery.alive) {
+          drawRubble(side, x, battery.w, battery.id * 17);
+          return;
+        }
+
+        const color = battery.flash > 0 || battery.launchFlash > 0 ? COLORS.impact : side.color;
+        const d = side.dir;
+        ctx.fillStyle = color;
+        rectFromBase(x - 9, y, 18, 4, d);
+        rectFromBase(x - 6, y + d * 4, 12, 4, d);
+        rectFromBase(x - 3, y + d * 8, 6, 5, d);
+        rectFromBase(x - 1, y + d * 13, 2, 4, d);
+
+        if (battery.launchFlash > 0) {
+          ctx.fillStyle = COLORS.impact;
+          rectFromBase(x - 2, y + d * 17, 4, 3, d);
+        }
+      }
+
+      function rectFromBase(x, baseY, w, h, dir) {
+        const y = dir > 0 ? baseY : baseY - h;
+        ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+      }
+
+      function drawRubble(side, x, w, seed) {
+        const y = Math.round(side.groundY);
+        ctx.fillStyle = side.softColor;
+        const count = Math.max(4, Math.round(w / 4));
+        for (let i = 0; i < count; i++) {
+          const rx = Math.round(x - w / 2 + i * (w / count) + ((seed + i * 11) % 3));
+          const rh = 1 + ((seed + i * 7) % 5);
+          rectFromBase(rx, y, 3, rh, side.dir);
+        }
+      }
+
+      function drawAttackMissiles() {
+        for (const missile of missiles) {
+          const sx = Math.round(missile.sx);
+          const sy = Math.round(missile.sy);
+          const x = Math.round(missile.x);
+          const y = Math.round(missile.y);
+          ctx.strokeStyle = missile.side === 'top' ? 'rgba(255, 108, 75, .78)' : 'rgba(93, 255, 235, .72)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+          ctx.fillStyle = missile.color;
+          ctx.fillRect(x - 1, y - 1, 3, 3);
+        }
+      }
+
+      function drawInterceptors() {
+        for (const shot of interceptors) {
+          const sx = Math.round(shot.sx);
+          const sy = Math.round(shot.sy);
+          const x = Math.round(shot.x);
+          const y = Math.round(shot.y);
+          ctx.strokeStyle = shot.side === 'top' ? 'rgba(255, 74, 118, .78)' : 'rgba(65, 246, 192, .76)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+          ctx.fillStyle = COLORS.impact;
+          ctx.fillRect(x, y, 2, 2);
+        }
+      }
+
+      function drawBlasts() {
+        for (const blast of blasts) {
+          const p = clamp(blast.age / blast.life, 0, 1);
+          const r = currentBlastRadius(blast);
+          const alpha = 1 - p;
+          ctx.fillStyle = blast.color;
+          pixelCircle(blast.x, blast.y, Math.max(2, r * 0.22), alpha * 0.78);
+          ctx.fillStyle = blast.ownerSide ? (blast.hit ? COLORS.impact : blast.color) : COLORS.impact;
+          pixelRing(blast.x, blast.y, r, alpha * 0.72);
+          if (r > 7) pixelRing(blast.x, blast.y, r * 0.62, alpha * 0.34);
+        }
+      }
+
+      function pixelCircle(x, y, r, alpha) {
+        const rr = Math.round(r);
+        ctx.globalAlpha = alpha;
+        for (let yy = -rr; yy <= rr; yy++) {
+          for (let xx = -rr; xx <= rr; xx++) {
+            if (xx * xx + yy * yy <= rr * rr && ((xx + yy) & 1) === 0) {
+              ctx.fillRect(Math.round(x + xx), Math.round(y + yy), 1, 1);
+            }
+          }
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      function pixelRing(x, y, r, alpha) {
+        const rr = Math.max(2, Math.round(r));
+        const inner = Math.max(0, rr - 2);
+        ctx.globalAlpha = alpha;
+        for (let yy = -rr; yy <= rr; yy++) {
+          for (let xx = -rr; xx <= rr; xx++) {
+            const d = xx * xx + yy * yy;
+            if (d <= rr * rr && d >= inner * inner && ((xx - yy) & 1) === 0) {
+              ctx.fillRect(Math.round(x + xx), Math.round(y + yy), 1, 1);
+            }
+          }
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      function drawDebris() {
+        for (const dot of debris) {
+          const alpha = 1 - dot.age / dot.life;
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = dot.color;
+          ctx.fillRect(Math.round(dot.x), Math.round(dot.y), dot.size, dot.size);
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      function drawHud() {
+        const scale = W < 300 ? 1 : 2;
+        const topScore = String(Math.max(0, Math.round(sides.top.displayScore))).padStart(4, '0');
+        const bottomScore = String(Math.max(0, Math.round(sides.bottom.displayScore))).padStart(4, '0');
+        drawPixelText('NORTH ' + topScore, 7, 5, scale, sides.top.color);
+        drawPixelText('SOUTH ' + bottomScore, 7, H - 7 * scale - 5, scale, sides.bottom.color);
+
+        drawScoreBar(7, 7 + 9 * scale, sides.top, scale);
+        drawScoreBar(7, H - 10 * scale - 8, sides.bottom, scale);
+      }
+
+      function drawScoreBar(x, y, side, scale) {
+        const w = W < 300 ? 58 : 92;
+        const h = scale;
+        ctx.fillStyle = 'rgba(255,255,255,.16)';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = side.color;
+        ctx.fillRect(x, y, Math.round(w * clamp(side.displayScore / 1000, 0, 1)), h);
+      }
+
+      function drawPixelText(text, x, y, scale, color) {
+        ctx.fillStyle = color;
+        let cursor = x;
+        for (const ch of text) {
+          const glyph = GLYPHS[ch] || GLYPHS[' '];
+          const width = glyph[0].length;
+          for (let row = 0; row < glyph.length; row++) {
+            for (let col = 0; col < width; col++) {
+              if (glyph[row][col] === '1') {
+                ctx.fillRect(cursor + col * scale, y + row * scale, scale, scale);
+              }
+            }
+          }
+          cursor += (width + 1) * scale;
+        }
+      }
+
+      function drawScanlines() {
+        ctx.fillStyle = 'rgba(0,0,0,.22)';
+        for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1);
+        ctx.fillStyle = 'rgba(255,255,255,.025)';
+        for (let y = 1; y < H; y += 6) ctx.fillRect(0, y, W, 1);
+      }
+
+      window.addEventListener('resize', resize);
+      window.addEventListener('pointerdown', reset);
+      resize();
+    </script>
+  </body>
+</html>

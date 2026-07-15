@@ -7,23 +7,25 @@
   </defs>
   <rect width="200" height="200" fill="#0a0600"/>
   <g filter="url(#glow)">
-    <g fill="#b8730c">
-      <rect x="24" y="92" width="14" height="14"/><rect x="40" y="92" width="14" height="14"/>
-      <rect x="56" y="92" width="14" height="14"/><rect x="56" y="76" width="14" height="14"/>
-      <rect x="56" y="60" width="14" height="14"/><rect x="72" y="60" width="14" height="14"/>
-      <rect x="120" y="120" width="14" height="14"/><rect x="120" y="136" width="14" height="14"/>
-      <rect x="136" y="136" width="14" height="14"/><rect x="152" y="136" width="14" height="14"/>
-      <rect x="152" y="120" width="14" height="14"/>
+    <rect x="18" y="18" width="164" height="164" fill="none" stroke="#d98a16" stroke-width="2"/>
+    <g shape-rendering="geometricPrecision">
+      <path d="M34 136h18 18 18v-16h18" fill="none" stroke="#168f86" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" opacity="0.2"/>
+      <path d="M34 136h18 18 18v-16h18" fill="none" stroke="#240402" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity="0.28"/>
+      <path d="M34 136h18 18 18v-16h18" fill="none" stroke="#f5e2b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 4" opacity="0.58"/>
+      <g stroke="#f5e2b8" stroke-width="1.8" stroke-linecap="round" opacity="0.48">
+        <path d="M44 130v12M58 130v12M72 130v12M86 130v12M96 114v12"/>
+      </g>
+      <ellipse cx="54" cy="139" rx="8" ry="5" fill="#6fffe9" opacity="0.13"/>
+      <ellipse cx="86" cy="133" rx="10" ry="6" fill="#6fffe9" opacity="0.12"/>
+      <ellipse cx="99" cy="120" rx="5" ry="8" fill="#240402" opacity="0.24"/>
     </g>
-    <g fill="#ffc23a">
-      <rect x="88" y="60" width="14" height="14"/>
-      <rect x="152" y="104" width="14" height="14"/>
-    </g>
-    <g fill="#ffe08a">
-      <rect x="124" y="64" width="8" height="8"/>
-      <rect x="40" y="148" width="8" height="8"/>
-      <rect x="168" y="40" width="8" height="8"/>
-    </g>
+    <polyline points="71 91 87 91 103 91 119 91 119 107 119 123 119 139" fill="none" stroke="#ffc23a" stroke-width="18" stroke-linecap="square" stroke-linejoin="round"/>
+    <polyline points="71 91 87 91 103 91 119 91 119 107 119 123 119 139" fill="none" stroke="#b8730c" stroke-width="12" stroke-linecap="square" stroke-linejoin="round"/>
+    <rect x="112" y="132" width="14" height="14" fill="#ffc23a"/>
+    <polyline points="136 68 120 68 104 68 104 52 88 52" fill="none" stroke="#6fffe9" stroke-width="18" stroke-linecap="square" stroke-linejoin="round"/>
+    <polyline points="136 68 120 68 104 68 104 52 88 52" fill="none" stroke="#168f86" stroke-width="12" stroke-linecap="square" stroke-linejoin="round"/>
+    <rect x="81" y="45" width="14" height="14" fill="#6fffe9"/>
+    <rect x="148" y="52" width="8" height="8" fill="#ffe08a"/>
   </g>
   <g fill="#000" opacity="0.28">
     <rect x="0" y="2" width="200" height="1.4"/><rect x="0" y="8" width="200" height="1.4"/>

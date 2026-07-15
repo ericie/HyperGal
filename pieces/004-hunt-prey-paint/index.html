@@ -5,26 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>hunt prey paint · HyperGal</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #c2a877; overflow: hidden; }
+      html, body { margin: 0; height: 100%; background: #ddd6c4; overflow: hidden; }
       #stage { position: fixed; inset: 0; display: block; }
       .caption {
         position: fixed;
         bottom: 1rem;
         left: 1rem;
-        color: #2a1f10;
+        color: #171512;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: .8rem;
         letter-spacing: .05em;
         pointer-events: none;
         z-index: 10;
-        text-shadow: 0 1px 0 rgba(255, 246, 224, .45);
+        text-shadow: 0 1px 0 rgba(246, 238, 210, .62);
       }
       #debug {
         position: fixed;
         top: 1rem;
         left: 1rem;
-        color: #2a1f10;
-        background: rgba(255, 246, 224, .72);
+        color: #171512;
+        background: rgba(238, 232, 208, .78);
         padding: .55rem .7rem;
         border-radius: .35rem;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -48,11 +48,10 @@
       // Three layers share one toroidal field (it wraps at every edge, so there
       // are no corners to win or die in):
       //
-      //   PLANTS  — the food. A top-down glyph field, Dwarf-Fortress flavoured:
-      //             each tile holds a character whose density tracks its biomass
-      //             (a bare tile -> . -> , -> : -> " -> a bloom). Grows logist-
-      //             ically, spreads to neighbours, regrows after grazing.
-      //   PREY    — soft vector grazers. They eat plants, grow larger with age,
+      //   PLANTS  — the food. A top-down pixel field: each tile's density tracks
+      //             biomass, blooms into little 8-bit signal sparks, and regrows
+      //             after grazing.
+      //   PREY    — blocky pixel grazers. They eat plants, grow larger with age,
       //             and flee predators. Every prey is born with its own ALERTNESS
       //             (how far off it spots a hunter) and SPRINT SPEED. Sprinting
       //             outruns a predator but burns energy fast — so a hounded prey
@@ -92,9 +91,9 @@
 
       // plants
       let PLANT_GROWTH = 0.32;   // logistic regrow rate (the "growth" dial)
-      let PLANT_PROP   = 0.32;   // lush tiles seeding neighbours (the "prop" dial)
-      const SPONT = 0.025;       // bare tiles spontaneously sprouting, per second
-      const SENESCE = 0.03;      // chance/s a fully-bloomed tile flowers out and dies back (gentle)
+      let PLANT_PROP   = 0.46;   // lush tiles seeding neighbours — patches fill into dense clusters
+      const SPONT = 0.0016;      // RARE pioneers — each seeds a CLUSTER that grows & blooms in a burst, not a uniform lawn
+      const SENESCE = 0.075;     // a bloomed tile flowers out and dies back fast — patches stay distinct, bursts move on
       const EAT = 1.80;          // food a grazing prey removes per second (grazing visibly clears it)
       const NUTR = 0.85;         // energy gained per unit of food eaten (well-fed grazers)
 
@@ -102,7 +101,7 @@
       const PREY0 = 40, MIN_PREY = 16, CAP_PREY = 340;
       const PREY_AGE = [46, 82];     // lifespan range (seconds)
       const PREY_MATURE = 16;        // can reproduce after this age
-      const SIZE_AGE = 95;           // grows VERY slowly — only the rare, long-lived survivor turns giant
+      const SIZE_AGE = 100;          // grows VERY slowly — only the rare, long-lived survivor turns giant
       const MINR = 3.5, MAXR = 22;   // body radius, young -> old (giants)
       const METAB_PREY = 0.055;      // idle energy burn per second
       const FLEE_COST = 4.2;         // sprinting multiplies the burn this much
@@ -120,7 +119,7 @@
       // burn energy by MOVING: a starving hunter sprints faster but spends faster.
       const PRED0 = 8, MIN_PRED = 4, CAP_PRED = 22;
       const PRED_AGE = [60, 96];     // hunters die of old age too
-      const PRED_SPEED = [168, 205]; // fast — closes a chase quickly; fastest prey still escape
+      const PRED_SPEED = [205, 250]; // fast enough to run down any prey; a chase actually ends in a kill
       const PRED_ACCEL = [3.0, 6.5]; // per-hunter: how hard it builds speed (snappier baseline)
       const PRED_TURN = [3.0, 6.0];  // per-hunter: rad/s it can swing its heading (snappier baseline)
       const CRUISE = 0.78;           // fraction of top speed when no prey is in sight (stays fast)
@@ -128,33 +127,32 @@
       const AGGRO_K = 1.0;           // prey-swarm aggression: up to this much extra turn/accel
       const AGGRO_REF = 12;          // a 'lot of prey' = this many in sight
       const BMR = 0.008;             // basal burn per second (standing still)
-      const MOVE_K = 0.00020;        // cheap movement — a fast hunter thrives, but the lifespan trade-off limits it
+      const MOVE_K = 0.00013;        // cheaper still, to offset the higher top speed — a fast hunter must net positive
       const STARVE_SLOW = 0.12;      // a near-empty hunter slows to this fraction of speed, then stalls
-      const HREF = 1.0;              // energy reference for the hunger ramp
-      const KILL_GAIN = 0.78;        // total food a corpse holds, ×(prey size / 7) — torn off peck by peck
+      const HREF = 0.4;              // stays at FULL speed until energy drops below ~0.35, then ramps down
+      const CHASE_MAX = 3.5;         // seconds of fruitless pursuit before it breaks off and cruises
+      const KILL_GAIN = 0.90;        // total food a corpse holds, ×(prey size / 7) — torn off peck by peck
       const SIZE_W = 0.8;            // mild preference for prey near its own size (not so picky it starves)
       const SPLIT_E = 1.9;           // energy at which a fat hunter divides in two
       const PBASE = 3.0, PGROWK = 2.8, PMAX = 8;  // size = PBASE + energy*PGROWK; small darts
       const SEP_K = 1.15;            // same-type bodies push apart at this × their radii
       const DYING_DUR = 1.4;         // seconds a starving animal spends spinning down to nothing
       const PECK_BITE = 0.15;        // energy a hunter tears off a corpse per peck (small bites = longer meal)
-      const GIANT_SIZE = 16;         // a prey this big is a 'giant' — spiny, immune, and pops when it dies
+      const GIANT_SIZE = 17;         // a prey this big is a 'giant' — spiny, immune, and pops when it dies
       const CORPSE_LIFE = 16, HUSK_LIFE = 6; // a body lingers, then a spent husk fades over seconds
 
       // palettes
-      const SOILS = ['#c2a877', '#bca06c', '#c9b282', '#b89a6a', '#c6ad7e'];
-      // vibrant prey colours — each prey wears one, and bleeds in it
+      const SOILS = ['#ddd6c4', '#d1d6c9', '#e4ddc8', '#d5ccb9', '#d9d9c7'];   // cartridge-plastic paper tones
+      // NES-bright prey colours — each prey wears one, and bleeds in it
       const PREY_COLORS = [
-        [64, 176, 200], [91, 123, 224], [168, 111, 214], [224, 100, 140],
-        [232, 161, 58], [95, 184, 120], [210, 96, 63], [111, 194, 176],
+        [232, 48, 56], [0, 168, 232], [248, 184, 0], [64, 184, 80],
+        [112, 80, 216], [248, 112, 40], [40, 80, 200], [224, 224, 192],
       ];
-      // high-contrast green ramp for the groundcover: deep forest -> bright lime
-      const GREENS = ['#2f6b1e', '#3f8a24', '#57a52b', '#74be2f', '#92d836', '#4a7d28'];
-      const FLOWER_SETS = [
-        ['#ff7a3a', '#ffc23a', '#ff5d8a'],
-        ['#e879d6', '#b15cff', '#ffc23a'],
-        ['#ff6a2f', '#ffa23a', '#ffe04c'],
-        ['#ff5d8a', '#ff9ec4', '#c79cff'],
+      const FLOWER_SETS = [   // little 8-bit signal sparks, not botanical decoration
+        ['#e83038', '#f8b800', '#00a8e8'],
+        ['#7050d8', '#40b850', '#f87028'],
+        ['#2850c8', '#f8b800', '#e83038'],
+        ['#00a8e8', '#e0e0c0', '#7050d8'],
       ];
       const ASH = [[58, 48, 40], [44, 36, 30]];
 
@@ -166,8 +164,8 @@
       // coarse 'where is the blood, and what colour' grid — cheap to sample, so a
       // hunter only trails when it stands IN blood, in that blood's own colour
       const BCELL = 16; let bgW = 0, bgH = 0, bA = new Float32Array(0), bR = new Uint8Array(0), bG = new Uint8Array(0), bB = new Uint8Array(0);
-      let soilL, plantL, marksL;          // offscreen layers
-      let prey = [], preds = [], pulses = [], corpses = [], oldBursts = [];
+      let soilL, plantL, cartoL, marksL;  // offscreen layers
+      let prey = [], preds = [], pulses = [], corpses = [], oldBursts = [], erasers = [];
       let soilTint = SOILS[0], flowers = FLOWER_SETS[0], flowerRGBs = FLOWER_SETS[0].map(hexRgb);
       let setIndex = 0;
       let last = 0, fps = 0, plantTimer = 0, WARM = 0;
@@ -191,6 +189,7 @@
       const sat = (c, s) => { const m = (c[0] + c[1] + c[2]) / 3; return [clamp(m + (c[0] - m) * s, 0, 255) | 0, clamp(m + (c[1] - m) * s, 0, 255) | 0, clamp(m + (c[2] - m) * s, 0, 255) | 0]; };
       const deepen = (c) => { const s = sat(c, 1.5); return [s[0] * 0.92 | 0, s[1] * 0.84 | 0, s[2] * 0.84 | 0]; };  // vivid, slightly deep stain
       const pale = (c) => mix(sat(c, 1.1), [228, 218, 198], 0.55);                    // washed, bone-ward
+      const rgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
 
       // ---- layers / sizing ------------------------------------------------
       function makeLayer() {
@@ -207,26 +206,75 @@
         canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-        CELL = Math.max(14, Math.round(Math.min(W, H) / 42));
+        CELL = Math.max(10, Math.round(Math.min(W, H) / 64));   // denser tiles -> finer, city-like clusters
         gcols = Math.ceil(W / CELL); grows = Math.ceil(H / CELL);
         food = new Float32Array(gcols * grows);
         decay = new Float32Array(gcols * grows);
         bgW = Math.ceil(W / BCELL); bgH = Math.ceil(H / BCELL);
         bA = new Float32Array(bgW * bgH); bR = new Uint8Array(bgW * bgH); bG = new Uint8Array(bgW * bgH); bB = new Uint8Array(bgW * bgH);
 
-        soilL = makeLayer(); plantL = makeLayer(); marksL = makeLayer();
+        soilL = makeLayer(); plantL = makeLayer(); cartoL = makeLayer(); marksL = makeLayer();
         configurePlantPixels();
       }
 
       function paintSoil() {
         const c = soilL.ctx;
         c.fillStyle = soilTint; c.fillRect(0, 0, W, H);
-        // sparse two-tone speckle so the ground reads as ground, not a flat fill
+        // sparse two-tone speckle so the ground reads as material, not a flat fill
         for (let i = 0; i < (W * H) / 900; i++) {
-          c.fillStyle = chance(0.5) ? 'rgba(90,70,40,0.10)' : 'rgba(255,240,205,0.12)';
+          c.fillStyle = chance(0.5) ? 'rgba(30,28,24,0.08)' : 'rgba(255,248,220,0.18)';
           const s = rand(1, 2.4);
           c.fillRect(rand(0, W), rand(0, H), s, s);
         }
+      }
+
+      function paintCartography() {
+        const c = cartoL.ctx, u = Math.max(18, Math.round(Math.min(W, H) / 42));
+        c.clearRect(0, 0, W, H);
+        c.save();
+        c.lineCap = 'square';
+        c.lineJoin = 'miter';
+
+        // ghost grid: broken survey marks beneath the ecosystem.
+        c.strokeStyle = 'rgba(18,16,14,0.075)';
+        c.lineWidth = 1;
+        for (let x = (setIndex % 5) * 3; x < W; x += u) {
+          if (chance(0.72)) { c.beginPath(); c.moveTo(x, rand(0, H * 0.25)); c.lineTo(x + rand(-2, 2), rand(H * 0.72, H)); c.stroke(); }
+        }
+        for (let y = (setIndex % 7) * 2; y < H; y += u) {
+          if (chance(0.62)) { c.beginPath(); c.moveTo(rand(0, W * 0.2), y); c.lineTo(rand(W * 0.75, W), y + rand(-2, 2)); c.stroke(); }
+        }
+
+        const accents = [[232, 48, 56], [0, 168, 232], [248, 184, 0], [64, 184, 80], [112, 80, 216]];
+        for (let i = 0; i < 46; i++) {
+          const col = pick(accents), hot = chance(0.38);
+          c.strokeStyle = hot ? `rgba(${col[0]},${col[1]},${col[2]},0.24)` : 'rgba(18,16,14,0.19)';
+          c.lineWidth = hot ? 1.2 : 0.85;
+          c.setLineDash(chance(0.35) ? [u * 0.24, u * 0.16] : []);
+          let x = Math.round(rand(-2, W + 2) / u) * u + rand(-3, 3);
+          let y = Math.round(rand(-2, H + 2) / u) * u + rand(-3, 3);
+          c.beginPath(); c.moveTo(x, y);
+          const turns = 3 + (Math.random() * 4 | 0);
+          for (let k = 0; k < turns; k++) {
+            if (chance(0.5)) x += rand(-4, 5) * u * 0.55;
+            else y += rand(-4, 5) * u * 0.55;
+            c.lineTo(x + rand(-4, 4), y + rand(-4, 4));
+          }
+          c.stroke();
+        }
+        c.setLineDash([]);
+
+        for (let i = 0; i < 28; i++) {
+          const x = rand(0, W), y = rand(0, H), r = rand(u * 1.2, u * 5.5), a = rand(0, TAU);
+          c.strokeStyle = chance(0.45) ? 'rgba(18,16,14,0.15)' : 'rgba(0,168,232,0.18)';
+          c.lineWidth = rand(0.7, 1.4);
+          c.beginPath(); c.arc(x, y, r, a, a + rand(0.4, 1.5)); c.stroke();
+          if (chance(0.35)) {
+            c.fillStyle = 'rgba(18,16,14,0.16)';
+            c.fillRect(Math.round(x / 2) * 2 - 1, Math.round(y / 2) * 2 - 1, 3, 3);
+          }
+        }
+        c.restore();
       }
 
       function compose(layer) {
@@ -236,12 +284,21 @@
       }
 
       // ---- plants ---------------------------------------------------------
+      // a pioneer doesn't sprout one tile — it lays down a small dense CLUSTER, so
+      // growth reads as patches springing up around the world, like blocks from above
+      function seedCluster(cx, cy) {
+        const rad = 1 + (Math.random() * 2 | 0), reach = rad * 2 + 1, n = reach * reach;
+        for (let k = 0; k < n; k++) {
+          const nx = cx + (Math.random() * reach | 0) - rad, ny = cy + (Math.random() * reach | 0) - rad;
+          if (nx >= 0 && ny >= 0 && nx < gcols && ny < grows) { const j = ny * gcols + nx; if (food[j] < 0.1) food[j] = rand(0.1, 0.2); }
+        }
+      }
       function stepPlants(dt) {
         for (let i = 0; i < food.length; i++) {
           let f = food[i];
           if (f > 0.001) f += PLANT_GROWTH * f * (1 - f) * dt;        // logistic growth
           if (decay[i] > 0) decay[i] -= dt;                          // wilt mark fading
-          if (f < 0.05) { if (chance(SPONT * dt)) f = 0.08; }         // bare tile sprouts
+          if (f < 0.05) { if (chance(SPONT * dt)) seedCluster(i % gcols, (i / gcols) | 0); }   // a pioneer drops a cluster
           else if (f > 0.9 && chance(SENESCE * dt)) { f = 0.4; decay[i] = 0.9; } // flowers out, dies back partway
           else if (f > 0.5 && chance(PLANT_PROP * dt)) {             // lush tile spreads
             const cx = i % gcols, cy = (i / gcols) | 0;
@@ -254,20 +311,17 @@
         }
       }
 
-      // Plants are a quiet, distributed pixel terrain — a top-down landscape in
-      // the spirit of the original Dune: a low-contrast dither over the sand whose
-      // DENSITY (not loud colour) tracks biomass, so growth reads as a subtle
-      // thickening of the ground, not a busy field of symbols. Biomass is sampled
-      // bilinearly across tiles (no blocky tile edges) and dithered onto a fine
-      // pixel grid; wilting tiles tint faintly browner. Colours sit very close to
-      // the sand so the whole layer stays calm.
-      const PXS = 3;                                         // one terrain pixel (finer = less chunky)
+      // Plants are a quiet, distributed pixel terrain — a low-contrast dither over
+      // the cartridge-paper field whose DENSITY (not loud colour) tracks biomass.
+      // Biomass is sampled bilinearly across tiles (no blocky tile edges) and
+      // dithered onto a fine pixel grid; wilting tiles tint faintly browner.
+      const PXS = 2;                                         // one terrain pixel (finer = less chunky)
       const PLANT_PIXEL_BUDGET = 1400;                       // incremental pixels per paint pass
-      const T_SAND = [190, 172, 124];                        // the ground the green grows from
-      const T_WILT = [164, 138, 92];
+      const T_SAND = [218, 213, 196];                        // cartridge-paper the green grows from
+      const T_WILT = [186, 176, 148];
       // greens vary smoothly between these two over a low-frequency noise field, so
       // dark and light greens flow into one another instead of tiling into blocks
-      const G_DARK = [54, 80, 36], G_LIGHT = [150, 158, 96];
+      const G_DARK = [62, 110, 86], G_LIGHT = [146, 168, 90];      // NES moss, still low in the hierarchy
       const wrapTile = (cx, cy) => (((cy % grows) + grows) % grows) * gcols + (((cx % gcols) + gcols) % gcols);
       function gcd(a, b) { while (b) { const t = b; b = a % b; a = t; } return Math.abs(a); }
       function configurePlantPixels() {
@@ -302,15 +356,15 @@
         const wl = fieldAt(decay, cxp, cyp);
         if (wl > 0.05) base = mix(base, T_WILT, clamp(wl, 0, 0.8));
         const v = 0.9 + hash((px * 19349663) ^ (py * 83492791) >>> 0) * 0.2;
-        c.fillStyle = `rgba(${base[0] * v | 0},${base[1] * v | 0},${base[2] * v | 0},${0.3 + 0.28 * f})`;
+        c.fillStyle = `rgba(${base[0] * v | 0},${base[1] * v | 0},${base[2] * v | 0},${0.18 + 0.22 * f})`;
         c.fillRect(px, py, PXS, PXS);
 
         const bloom = clamp((f - 0.80) / 0.20, 0, 1);                   // only the very lushest tiles flower
         const seed = (((px / PXS) | 0) * 1597334677 ^ (((py / PXS) | 0) * 3812015801) ^ ((setIndex + 1) * 1013904223)) >>> 0;
-        if (bloom > 0 && hash(seed) < bloom * 0.05) {                   // and only a few of those — sparse
+        if (bloom > 0 && hash(seed) < bloom * 0.035) {                  // and only a few of those — sparse
           const petal = flowerRGBs[(hash(seed ^ 0x9e3779b9) * flowerRGBs.length) | 0];
-          const heart = mix(petal, [255, 238, 162], 0.48);
-          const a = 0.42 + bloom * 0.34;
+          const heart = mix(petal, [236, 224, 188], 0.4);
+          const a = 0.26 + bloom * 0.2;
           c.fillStyle = `rgba(${petal[0]},${petal[1]},${petal[2]},${a})`;
           c.fillRect(px + 1, py, 1, PXS);
           c.fillRect(px, py + 1, PXS, 1);
@@ -386,9 +440,72 @@
         for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) { const dx = cx * BCELL + BCELL / 2 - x, dy = cy * BCELL + BCELL / 2 - y; if (dx * dx + dy * dy < r2) bA[cy * bgW + cx] = 0; }
       }
       function decayBlood(dt) { const m = Math.max(0, 1 - 0.3 * dt); for (let i = 0; i < bA.length; i++) bA[i] *= m; }
+
+      function plotEventScaffold(x, y, r, rgb) {
+        const c = marksL.ctx;
+        c.save();
+        c.lineCap = 'square';
+        c.lineJoin = 'miter';
+        for (let i = 0; i < 8; i++) {
+          const a = rand(0, TAU), inner = rand(r * 0.12, r * 0.38), outer = rand(r * 0.65, r * 1.45);
+          const sx = x + Math.cos(a) * inner, sy = y + Math.sin(a) * inner;
+          const mx = x + Math.cos(a) * outer, my = y + Math.sin(a) * outer;
+          const jog = rand(r * 0.14, r * 0.42) * (chance(0.5) ? 1 : -1);
+          c.strokeStyle = chance(0.45) ? rgba(rgb, 0.24) : 'rgba(16,14,12,0.22)';
+          c.lineWidth = chance(0.25) ? 1.6 : 0.9;
+          c.beginPath();
+          c.moveTo(sx, sy);
+          if (chance(0.5)) { c.lineTo(mx, sy + jog); c.lineTo(mx, my); }
+          else { c.lineTo(sx + jog, my); c.lineTo(mx, my); }
+          c.stroke();
+        }
+        for (let i = 0; i < 5; i++) {
+          const px = x + rand(-r, r), py = y + rand(-r, r), s = rand(2, 5);
+          c.fillStyle = chance(0.5) ? rgba(rgb, 0.24) : 'rgba(16,14,12,0.22)';
+          c.fillRect(Math.round(px / 2) * 2, Math.round(py / 2) * 2, s, s);
+        }
+        c.restore();
+      }
+
+      function traceMotionTiles(ax, ay, bx, by, rgb, size) {
+        const dx = bx - ax, dy = by - ay, d2 = dx * dx + dy * dy;
+        if (d2 <= 4 || d2 > 6400) return;
+        const c = marksL.ctx, n = clamp(Math.ceil(Math.sqrt(d2) / 10), 1, 6), s = clamp(size * 0.22, 1.4, 4.2);
+        c.save();
+        c.fillStyle = rgba(rgb, 0.22);
+        c.strokeStyle = 'rgba(16,14,12,0.08)';
+        c.lineWidth = 1;
+        for (let i = 0; i < n; i++) {
+          const t = (i + Math.random()) / n;
+          const px = Math.round((ax + dx * t + rand(-3, 3)) / 2) * 2;
+          const py = Math.round((ay + dy * t + rand(-3, 3)) / 2) * 2;
+          c.fillRect(px - s * 0.5, py - s * 0.5, s, s);
+          if (chance(0.28)) c.strokeRect(px - s, py - s, s * 2, s * 2);
+        }
+        c.restore();
+      }
+
+      function traceHunterVector(ax, ay, bx, by, hot) {
+        const dx = bx - ax, dy = by - ay, d2 = dx * dx + dy * dy;
+        if (!hot || d2 <= 16 || d2 > 6400 || !chance(0.42)) return;
+        const c = marksL.ctx;
+        c.save();
+        c.strokeStyle = 'rgba(16,14,12,0.18)';
+        c.lineWidth = 1;
+        c.lineCap = 'square';
+        c.setLineDash(chance(0.5) ? [5, 4] : []);
+        c.beginPath();
+        c.moveTo(ax, ay);
+        c.lineTo(bx, by);
+        c.stroke();
+        c.restore();
+      }
+
       function paintStain(x, y, rgb, scale, o) {
         seeps.push(genWatercolor(x, y, rgb, scale, o));
-        stampBlood(x, y, o.baseR * scale * 1.15, rgb, clamp(o.wash * o.layers, 0.12, 1));
+        const rr = o.baseR * scale;
+        plotEventScaffold(x, y, rr * 1.2, rgb);
+        stampBlood(x, y, rr * 1.15, rgb, clamp(o.wash * o.layers, 0.12, 1));
       }
       function growSeeps(dt) {
         const c = marksL.ctx;
@@ -432,6 +549,67 @@
           col = mixRgb(col, target, dprog);
         }
         return col;
+      }
+
+      function preyGlyphBlocks(glyph, giant) {
+        if (giant) {
+          const b = [[-2, -2, 4, 4], [-3, -1, 1, 2], [2, -1, 1, 2], [-1, -3, 2, 1], [-1, 2, 2, 1], [-4, 0, 1, 1], [3, 0, 1, 1], [0, -4, 1, 1], [0, 3, 1, 1]];
+          if (glyph[0]) b.push([-3, -3, 1, 1]); if (glyph[1]) b.push([2, -3, 1, 1]);
+          if (glyph[2]) b.push([-3, 2, 1, 1]); if (glyph[3]) b.push([2, 2, 1, 1]);
+          return b;
+        }
+        const b = [[-1, -1, 2, 2], [-2, -1, 1, 2], [1, -1, 1, 2], [-1, -2, 2, 1], [-1, 1, 2, 1]];
+        if (glyph[0]) b.push([-2, -2, 1, 1]); if (glyph[1]) b.push([1, -2, 1, 1]);
+        if (glyph[2]) b.push([-2, 1, 1, 1]); if (glyph[3]) b.push([1, 1, 1, 1]);
+        if (glyph[4]) b.push([-3, 0, 1, 1]); if (glyph[5]) b.push([2, 0, 1, 1]);
+        return b;
+      }
+
+      function drawPreyGlyph(c, r, glyph, rgb, alpha, giant) {
+        const u = Math.max(1.6, r * (giant ? 0.26 : 0.38));
+        const blocks = preyGlyphBlocks(glyph || [], giant);
+        c.save();
+        c.fillStyle = rgba(rgb, alpha);
+        c.strokeStyle = `rgba(${rgb[0] * 0.26 | 0},${rgb[1] * 0.26 | 0},${rgb[2] * 0.26 | 0},${Math.min(0.94, alpha + 0.05)})`;
+        c.lineWidth = Math.max(0.9, Math.min(1.7, u * 0.28));
+        for (const b of blocks) c.fillRect(b[0] * u, b[1] * u, b[2] * u, b[3] * u);
+        for (const b of blocks) c.strokeRect(b[0] * u, b[1] * u, b[2] * u, b[3] * u);
+        c.fillStyle = `rgba(255,248,210,${giant ? 0.32 : 0.24})`;
+        c.fillRect(-u * 0.45, -u * 0.45, u * 0.9, u * 0.9);
+        if (giant) {
+          c.strokeStyle = 'rgba(255,252,240,0.42)';
+          c.lineWidth = Math.max(1, u * 0.24);
+          c.beginPath();
+          c.moveTo(-u * 3.2, 0); c.lineTo(u * 3.2, 0);
+          c.moveTo(0, -u * 3.2); c.lineTo(0, u * 3.2);
+          c.stroke();
+        }
+        c.restore();
+      }
+
+      function drawPanicPixels(c, r, rgb) {
+        const u = Math.max(2, r * 0.28);
+        c.fillStyle = rgba(rgb, 0.48);
+        c.fillRect(-r * 1.15, -r * 1.05, u, u);
+        c.fillRect(r * 0.86, -r * 1.20, u, u);
+        c.fillRect(-r * 0.95, r * 0.82, u, u);
+        c.fillRect(r * 0.70, r * 1.02, u, u);
+      }
+
+      function drawHunterGlyph(c, r, splitHot) {
+        const u = Math.max(1.8, r * 0.5);
+        const blocks = [[1, -1, 2, 2], [0, -2, 1, 1], [0, 1, 1, 1], [-1, -1, 1, 2], [-2, 0, 1, 1]];
+        c.fillStyle = 'rgba(12,11,10,0.97)';
+        c.strokeStyle = 'rgba(246,238,205,0.28)';
+        c.lineWidth = Math.max(0.8, u * 0.18);
+        for (const b of blocks) c.fillRect(b[0] * u, b[1] * u, b[2] * u, b[3] * u);
+        for (const b of blocks) c.strokeRect(b[0] * u, b[1] * u, b[2] * u, b[3] * u);
+        if (splitHot) {
+          c.fillStyle = 'rgba(248,184,0,0.82)';
+          c.fillRect(-u * 0.25, -u * 0.25, u * 0.5, u * 0.5);
+          c.strokeStyle = 'rgba(248,184,0,0.75)';
+          c.beginPath(); c.moveTo(-u * 2.3, -u * 1.7); c.lineTo(u * 2.9, u * 1.7); c.stroke();
+        }
       }
 
       // A hunter dies as CROSSHATCHING — two crossing sets of short, slightly
@@ -508,17 +686,24 @@
       // A spiny elder pops as a pure BLOOD ERASER: it wipes the stains around it
       // and leaves NOTHING of its own — no white mark, no blob, no bare patch.
       function giantReset(p) {
-        const r = 56 + p.size * 2.6, c = marksL.ctx;
         flushSeeps();                                          // settle any mid-seep stains first
-        c.save(); c.globalCompositeOperation = 'destination-out';
-        for (let k = 0; k < 7; k++) {
-          const ox = p.x + rand(-r * 0.4, r * 0.4), oy = p.y + rand(-r * 0.4, r * 0.4), rr = r * rand(0.7, 1.2);
-          const g = c.createRadialGradient(ox, oy, 0, ox, oy, rr);
-          g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.7, 'rgba(0,0,0,0.7)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-          c.fillStyle = g; c.beginPath(); c.arc(ox, oy, rr, 0, TAU); c.fill();
+        oldAgeBurst(p.x, p.y, 26 + p.size * 2.0, p.size);
+        erasers.push({ x: p.x, y: p.y, max: 60 + p.size * 2.8, age: 0, life: 0.7 });   // the erasure RADIATES outward
+      }
+      // an expanding, blurry blood-eraser — clears the marks in a ring growing outward
+      function updateErasers(dt) {
+        const c = marksL.ctx;
+        for (let i = erasers.length - 1; i >= 0; i--) {
+          const e = erasers[i]; e.age += dt;
+          const t = clamp(e.age / e.life, 0, 1), r = e.max * (1 - (1 - t) * (1 - t));   // easeOut radius
+          c.save(); c.globalCompositeOperation = 'destination-out'; c.filter = 'blur(7px)';
+          const g = c.createRadialGradient(e.x, e.y, r * 0.4, e.x, e.y, r);
+          g.addColorStop(0, 'rgba(0,0,0,0.85)'); g.addColorStop(0.75, 'rgba(0,0,0,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+          c.fillStyle = g; c.beginPath(); c.arc(e.x, e.y, r, 0, TAU); c.fill();
+          c.restore();
+          clearBlood(e.x, e.y, r);
+          if (t >= 1) erasers.splice(i, 1);
         }
-        c.restore();
-        clearBlood(p.x, p.y, r);
       }
 
       function oldAgeBurst(x, y, r, size) {
@@ -567,6 +752,7 @@
           x, y, vx: 0, vy: 0, spd: 0, heading: rand(0, TAU), wander: rand(0, TAU),
           energy: t.energy ?? rand(0.45, 0.7), age: 0, maxAge: rand(PREY_AGE[0], PREY_AGE[1]),
           size: MINR, cool: rand(2, 6), fleeing: false,
+          glyph: Array.from({ length: 6 }, () => chance(0.5)),        // stable block sprite, not a soft cell
           col: t.col || pick(PREY_COLORS),               // worn for life, bled in death
           alert: t.alert ?? rand(ALERT[0], ALERT[1]),
           fleeSpeed: t.fleeSpeed ?? rand(FLEE[0], FLEE[1]),
@@ -588,6 +774,7 @@
           accel: t.accel ?? rand(PRED_ACCEL[0], PRED_ACCEL[1]),  // its own build-up
           turn: t.turn ?? rand(PRED_TURN[0], PRED_TURN[1]),      // its own agility
           peckCd: 0, peckT: 0,                                   // corpse-pecking rhythm + jab
+          chaseT: 0, rest: 0,                                   // give-up-and-cruise timers
         };
       }
 
@@ -627,14 +814,16 @@
           const rate = p.fleeing ? p.accel : PREY_DECEL;
           p.spd += (sp - p.spd) * Math.min(1, rate * dt);
           p.vx = Math.cos(p.heading) * p.spd; p.vy = Math.sin(p.heading) * p.spd;
+          const ox = p.x, oy = p.y;
           p.x = wrapp(p.x + p.vx * dt, W); p.y = wrapp(p.y + p.vy * dt, H);
+          if (p.fleeing && p.spd > 42) traceMotionTiles(ox, oy, p.x, p.y, p.col, p.size);
 
           // a spiny giant is a roaming eraser: it rubs out any blood or trail it walks over
           if (p.size > GIANT_SIZE) {
-            const c = marksL.ctx, er = p.size * 1.1;
-            c.save(); c.globalCompositeOperation = 'destination-out';
+            const c = marksL.ctx, er = p.size * 1.3;
+            c.save(); c.globalCompositeOperation = 'destination-out'; c.filter = 'blur(5px)';   // a soft, blurry rub
             const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, er);
-            g.addColorStop(0, 'rgba(0,0,0,0.7)'); g.addColorStop(0.65, 'rgba(0,0,0,0.32)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+            g.addColorStop(0, 'rgba(0,0,0,0.5)'); g.addColorStop(0.6, 'rgba(0,0,0,0.22)'); g.addColorStop(1, 'rgba(0,0,0,0)');
             c.fillStyle = g; c.beginPath(); c.arc(p.x, p.y, er, 0, TAU); c.fill();
             c.restore();
             clearBlood(p.x, p.y, er);
@@ -704,28 +893,32 @@
                 if (cp.food <= 0.02 || cp.size < 1.6) { cp.spent = true; cp.fade = 0; }   // picked clean — husk lingers
               }
             }
+          } else if (h.rest > 0) {                            // just broke off a hopeless chase — cruise and cool off
+            h.rest -= dt; h.chaseT = 0; h.hunting = false;
+            h.wander += rand(-1, 1) * 2.4 * dt;
+            dvx = Math.cos(h.wander); dvy = Math.sin(h.wander); baseSp = h.speed * CRUISE;
           } else {
-            // pick a live target in sight, preferring prey near its OWN size
+            // pick the NEAREST live, non-spiny prey in sight — size is no object, only spiny is immune
             let best = Infinity, tgt = -1, ndx = 0, ndy = 0, dist = 0, nearby = 0;
             for (let j = 0; j < prey.length; j++) {
               const p = prey[j];
-              if (p.dying || p.size > h.size * IMMUNE_RATIO) continue;   // dying, or too big for this hunter
+              if (p.dying || p.size > GIANT_SIZE) continue;   // dying, or a spiny giant (immune) — leave it
               const dx = wrapd(p.x - h.x, W), dy = wrapd(p.y - h.y, H), d2 = dx * dx + dy * dy;
               if (d2 > D2) continue;
               nearby++;
-              const d = Math.sqrt(d2);
-              const score = d * (1 + SIZE_W * Math.abs(p.size - h.size) / (h.size + 2));
-              if (score < best) { best = score; tgt = j; ndx = dx; ndy = dy; dist = d; }
+              if (d2 < best) { best = d2; tgt = j; ndx = dx; ndy = dy; dist = Math.sqrt(d2); }
             }
             aggro = 1 + AGGRO_K * Math.min(1, nearby / AGGRO_REF);   // a swarm makes it quicker to turn/pursue
             if (tgt >= 0) {
               const inv = 1 / (dist || 1); dvx = ndx * inv; dvy = ndy * inv; baseSp = h.speed; h.hunting = true;
+              h.chaseT += dt;
               const tp = prey[tgt];
-              if (dist < tp.size + h.size * 0.5 + 11 && tp.size <= h.size * IMMUNE_RATIO) {  // caught — too-big prey are immune
-                corpses.push({ x: tp.x, y: tp.y, size: tp.size, col: tp.col, food: KILL_GAIN * (tp.size / 7), age: 0, spent: false, fade: 0 });
-                paintKill(tp); prey.splice(tgt, 1); stats.kill++;
-              }
+              if (dist < tp.size + h.size * 0.5 + 11) {       // caught
+                corpses.push({ x: tp.x, y: tp.y, size: tp.size, col: tp.col, glyph: tp.glyph, heading: tp.heading, food: KILL_GAIN * (tp.size / 7), age: 0, spent: false, fade: 0 });
+                paintKill(tp); prey.splice(tgt, 1); stats.kill++; h.chaseT = 0;
+              } else if (h.chaseT > CHASE_MAX) { h.rest = 2.0; h.chaseT = 0; }   // give up — stop burning out on one runner
             } else {
+              h.chaseT = 0;
               h.wander += rand(-1, 1) * 2.4 * dt;
               dvx = Math.cos(h.wander); dvy = Math.sin(h.wander); baseSp = h.speed * CRUISE; h.hunting = false;
             }
@@ -739,6 +932,7 @@
           h.vx = Math.cos(h.heading) * h.spd; h.vy = Math.sin(h.heading) * h.spd;
           const ox = h.x, oy = h.y;
           h.x = wrapp(h.x + h.vx * dt, W); h.y = wrapp(h.y + h.vy * dt, H);
+          traceHunterVector(ox, oy, h.x, h.y, h.hunting);
           // only when it is standing IN blood does a hunter pick up a trail — and
           // that trail is the blood's OWN colour, tracked out as it leaves the pool
           const bi = clamp(h.y / BCELL | 0, 0, bgH - 1) * bgW + clamp(h.x / BCELL | 0, 0, bgW - 1);
@@ -747,9 +941,9 @@
             h.bloody -= dt;
             const tdx = h.x - h.px, tdy = h.y - h.py;
             if (h.px !== undefined && tdx * tdx + tdy * tdy < 3600) {
-              const mc = marksL.ctx;                            // the blood's own colour, but a faint smear
-              mc.strokeStyle = `rgba(${h.bcol[0]},${h.bcol[1]},${h.bcol[2]},${clamp(h.bloody * 0.28, 0.03, 0.15)})`;
-              mc.lineWidth = Math.max(1.4, h.size * 0.8); mc.lineCap = 'round';
+              const mc = marksL.ctx, d = 0.78;                  // a smooth 1px line, a touch darker than the pool, fading to nothing
+              mc.strokeStyle = `rgba(${h.bcol[0] * d | 0},${h.bcol[1] * d | 0},${h.bcol[2] * d | 0},${clamp(h.bloody * 0.5, 0.06, 0.28)})`;
+              mc.lineWidth = 1; mc.lineCap = 'round'; mc.lineJoin = 'round';
               mc.beginPath(); mc.moveTo(h.px, h.py); mc.lineTo(h.x, h.y); mc.stroke();
             }
           }
@@ -853,11 +1047,11 @@
         // corpses — the body lingers as a dark husk, shrinking peck by peck
         for (const cp of corpses) {
           const a = cp.spent ? clamp(1 - cp.fade / HUSK_LIFE, 0, 1) : 1, r = cp.size, [cr, cg, cb] = deepen(cp.col);
-          ctx.fillStyle = `rgba(${cr},${cg},${cb},${0.8 * a})`;
-          ctx.beginPath(); ctx.ellipse(cp.x, cp.y, r * 1.15, r * 0.92, 0, 0, TAU); ctx.fill();
-          ctx.strokeStyle = `rgba(${cr * 0.5 | 0},${cg * 0.5 | 0},${cb * 0.5 | 0},${0.7 * a})`; ctx.lineWidth = 1; ctx.stroke();
+          ctx.save(); ctx.translate(cp.x, cp.y); ctx.rotate(cp.heading || 0);
+          drawPreyGlyph(ctx, r * 0.95, cp.glyph, [cr, cg, cb], 0.72 * a, false);
+          ctx.restore();
         }
-        // prey — vibrant cells in their own colour; a fleeing one trails a streak.
+        // prey — blocky NES glyphs in their own colour; a fleeing one sheds square panic pixels.
         // A starving one is spinning down: it shrinks toward nothing.
         for (const p of prey) {
           const giant = p.size > GIANT_SIZE, dprog = p.dying ? p.dying / (p.dyingDur || DYING_DUR) : 0;
@@ -866,46 +1060,18 @@
           let [cr, cg, cb] = preyDisplayColor(p, dprog);
           ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.heading);
           const spd = Math.hypot(p.vx, p.vy);
-          if (p.fleeing && spd > 40) {                         // a darting streak behind it
-            const len = clamp(spd / 5, 9, 34);
-            const g = ctx.createLinearGradient(0, 0, -len, 0);
-            g.addColorStop(0, `rgba(${cr},${cg},${cb},0.5)`);
-            g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
-            ctx.fillStyle = g;
-            ctx.beginPath(); ctx.moveTo(0, -r * 0.7); ctx.lineTo(-len, 0); ctx.lineTo(0, r * 0.7); ctx.closePath(); ctx.fill();
-          }
-          ctx.fillStyle = `rgba(${cr},${cg},${cb},0.92)`;
-          ctx.strokeStyle = `rgba(${cr * 0.38 | 0},${cg * 0.38 | 0},${cb * 0.38 | 0},0.88)`; ctx.lineWidth = 1.3;
-          if (giant) {                                         // a giant is SPINY
-            const sp2 = 13;
-            ctx.beginPath();
-            for (let k = 0; k < sp2 * 2; k++) { const a = k / (sp2 * 2) * TAU, rad = (k & 1) ? r * 0.82 : r * 1.42, qx = Math.cos(a) * rad, qy = Math.sin(a) * rad; if (k === 0) ctx.moveTo(qx, qy); else ctx.lineTo(qx, qy); }
-            ctx.closePath(); ctx.fill(); ctx.stroke();
-          } else {
-            ctx.beginPath(); ctx.ellipse(0, 0, r * 1.3, r, 0, 0, TAU); ctx.fill(); ctx.stroke();
-          }
+          if (p.fleeing && spd > 40) drawPanicPixels(ctx, r, [cr, cg, cb]);
+          drawPreyGlyph(ctx, r, p.glyph, [cr, cg, cb], 0.94, giant);
           ctx.restore();
         }
-        // hunters — drawn like a mouse cursor: a filled triangle with a stem,
+        // hunters — compact black arcade glyphs, no stem or taper.
         // always opaque; a weak one is simply SMALLER. Glints gold before it splits.
         for (const h of preds) {
           const dscale = h.dying ? Math.max(0, 1 - h.dying / DYING_DUR) : 1;
-          const r = h.size * dscale, L = r * 3.0;
+          const r = h.size * dscale;
           const jab = h.peckT > 0 ? Math.sin((1 - h.peckT / 0.2) * Math.PI) * r * 0.5 : 0;  // a small nod while feeding
           ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(h.heading); ctx.translate(jab, 0);
-          ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-          // stem
-          ctx.strokeStyle = 'rgba(16,14,12,0.96)'; ctx.lineWidth = clamp(r * 0.5, 1.5, 4);
-          ctx.beginPath(); ctx.moveTo(-L * 0.55, 0); ctx.lineTo(L * 0.08, 0); ctx.stroke();
-          // filled triangle head (the pointer)
-          ctx.fillStyle = 'rgba(16,14,12,0.96)';
-          ctx.beginPath();
-          ctx.moveTo(L * 0.5, 0); ctx.lineTo(-L * 0.12, -r * 1.05); ctx.lineTo(-L * 0.12, r * 1.05); ctx.closePath();
-          ctx.fill();
-          if (h.energy > SPLIT_E * 0.8) {                                                       // about to divide
-            ctx.strokeStyle = 'rgba(248,240,214,0.85)'; ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(-L * 0.55, 0); ctx.lineTo(L * 0.08, 0); ctx.stroke();
-          }
+          drawHunterGlyph(ctx, r, h.energy > SPLIT_E * 0.8);
           ctx.restore();
         }
       }
@@ -924,6 +1090,7 @@
         immigrate(dt);
 
         growSeeps(dt);                 // stains bloom outward over time
+        updateErasers(dt);             // giant-pop erasures radiate outward
         // ...and very slowly soak into the page, so the painting breathes instead
         // of piling up forever (old-age renewal still wipes patches outright)
         { const fc = marksL.ctx; fc.save(); fc.globalCompositeOperation = 'destination-out'; fc.fillStyle = `rgba(0,0,0,${0.22 * dt})`; fc.fillRect(0, 0, W, H); fc.restore(); }
@@ -934,6 +1101,7 @@
 
         compose(soilL);
         compose(plantL);
+        compose(cartoL);
         compose(marksL);
         drawAgents();
 
@@ -960,12 +1128,14 @@
         for (let i = 0; i < food.length; i++) food[i] = chance(0.28) ? rand(0.15, 0.7) : 0;
         decay.fill(0); bA.fill(0);
         plantL.ctx.clearRect(0, 0, W, H);
+        cartoL.ctx.clearRect(0, 0, W, H);
         plantCursor = 0;
-        prey = []; preds = []; pulses = []; seeps = []; corpses = []; oldBursts = [];
+        prey = []; preds = []; pulses = []; seeps = []; corpses = []; oldBursts = []; erasers = [];
         for (let i = 0; i < PREY0; i++) prey.push(makePrey(rand(0, W), rand(0, H)));
         for (let i = 0; i < PRED0; i++) preds.push(makePred(rand(0, W), rand(0, H)));
         stats.starve = stats.kill = stats.old = stats.predDie = stats.splits = 0;
         paintSoil();
+        paintCartography();
         marksL.ctx.clearRect(0, 0, W, H);
         plantTimer = 0;
       }
@@ -987,7 +1157,7 @@
         const wdt = 1 / 30;
         const fc = marksL.ctx;
         for (let s = 0, n = (seconds / wdt) | 0; s < n; s++) {
-          stepPlants(wdt); updatePrey(wdt); updatePreds(wdt); separate(prey, false); separate(preds, true); updateCorpses(wdt); immigrate(wdt); growSeeps(wdt);
+          stepPlants(wdt); updatePrey(wdt); updatePreds(wdt); separate(prey, false); separate(preds, true); updateCorpses(wdt); immigrate(wdt); growSeeps(wdt); updateErasers(wdt);
           fc.save(); fc.globalCompositeOperation = 'destination-out'; fc.fillStyle = `rgba(0,0,0,${0.22 * wdt})`; fc.fillRect(0, 0, W, H); fc.restore(); decayBlood(wdt);   // same soak-away as live
         }
         pulses.length = 0; oldBursts.length = 0; flushSeeps(); drawPlants(plantPixCols * plantPixRows); plantTimer = 0.1;  // full paint, opens settled

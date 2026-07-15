@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Obstacles and How to Avoid Them · HyperGal</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #f3efe4;
+        overflow: hidden;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #f3efe4;
+        cursor: crosshair;
+        touch-action: manipulation;
+      }
+
+      canvas:focus-visible {
+        outline: 2px solid #1d1b17;
+        outline-offset: -8px;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        canvas {
+          cursor: default;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="stage"
+      tabindex="0"
+      role="img"
+      aria-label="Obstacles and How to Avoid Them: muted geometric obstacles sway up and down while horizontal wall-drawing lines redraw around them."
+    ></canvas>
+
+    <script>
+      const canvas = document.getElementById('stage');
+      const ctx = canvas.getContext('2d', { alpha: false });
+      const TAU = Math.PI * 2;
+
+      const COLORS = {
+        wall: '#f3efe4',
+        ink: '#1d1b17',
+        graphite: '#5c5a54',
+        clay: '#b45a45',
+        slate: '#58748a',
+        moss: '#7d8760',
+        ochre: '#c0a04a',
+        fog: '#d8d1c2',
+      };
+
+      const SHAPE_COLORS = [COLORS.clay, COLORS.graphite, COLORS.moss, COLORS.ochre, COLORS.ink, COLORS.wall];
+      const LINE_COLORS = [
+        'rgba(29, 27, 23, 0.78)',
+        'rgba(92, 90, 84, 0.56)',
+        'rgba(180, 90, 69, 0.48)',
+        'rgba(29, 27, 23, 0.64)',
+        'rgba(88, 116, 138, 0.5)',
+        'rgba(92, 90, 84, 0.42)',
+        'rgba(29, 27, 23, 0.7)',
+        'rgba(125, 135, 96, 0.5)',
+        'rgba(192, 160, 74, 0.5)',
+        'rgba(29, 27, 23, 0.58)',
+      ];
+      const TARGET_LINE_FPS = 12;
+      const LINE_EASE_RATE = 16;
+
+      let width = 1;
+      let height = 1;
+      let dpr = 1;
+      let seed = seedFromLocation();
+      let random = mulberry32(seed);
+      let obstacles = [];
+      let lines = [];
+      let targetLines = [];
+      let lineTemplates = [];
+      let resizeTimer = 0;
+      let raf = 0;
+      let startedAt = 0;
+      let lastFrameAt = 0;
+      let lastTargetAt = 0;
+      const reducedMotionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+      let prefersReducedMotion = reducedMotionQuery.matches;
+
+      function seedFromLocation() {
+        const params = new URLSearchParams(location.search);
+        const fromQuery = Number.parseInt(params.get('seed') || '', 36);
+        if (Number.isFinite(fromQuery)) return fromQuery >>> 0;
+        return ((Date.now() * 2654435761) ^ (Math.random() * 0xffffffff)) >>> 0;
+      }
+
+      function mulberry32(a) {
+        return function rand() {
+          a |= 0;
+          a = (a + 0x6d2b79f5) | 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function rand(min, max) {
+        return min + random() * (max - min);
+      }
+
+      function randInt(min, max) {
+        return Math.floor(rand(min, max + 1));
+      }
+
+      function pick(items) {
+        return items[Math.floor(random() * items.length)];
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function smootherStep(value) {
+        const t = clamp(value, 0, 1);
+        return t * t * t * (t * (t * 6 - 15) + 10);
+      }
+
+      function scaled(min, max, bias = 1.32) {
+        return min + (max - min) * Math.pow(random(), bias);
+      }
+
+      function resize() {
+        width = Math.max(1, innerWidth);
+        height = Math.max(1, innerHeight);
+        dpr = Math.min(2, devicePixelRatio || 1);
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        compose();
+      }
+
+      function compose() {
+        cancelAnimationFrame(raf);
+        random = mulberry32((seed ^ Math.round(width * 17) ^ Math.round(height * 31)) >>> 0);
+        obstacles = makeObstacles();
+        lineTemplates = makeLineTemplates();
+        startedAt = performance.now();
+        lastFrameAt = startedAt;
+        lastTargetAt = startedAt;
+        updateObstacleWaves(0);
+        targetLines = makeLines();
+        lines = cloneLines(targetLines);
+        render();
+        if (!prefersReducedMotion) raf = requestAnimationFrame(tick);
+      }
+
+      function makeObstacles() {
+        const minSide = Math.min(width, height);
+        const grid = makeGridSpec();
+        const desired = grid.count;
+        const cellSpan = Math.min(width / (grid.cols + 1), height / (grid.rows + 1));
+        const base = clamp(cellSpan * 0.62, 30, 104);
+        const lineGap = clamp(height / 44, 14, 22);
+        const clearance = clamp(lineGap * 0.7 + minSide * 0.004, 10, 18);
+        const boundary = clamp(minSide * (width < 520 ? 0.075 : 0.055), 28, 76);
+        const corridor = clamp(lineGap * 0.85, 12, 20);
+        const placed = [];
+        const anchors = makeAnchors(grid);
+
+        for (let i = 0; i < anchors.length && placed.length < desired; i++) {
+          const anchor = anchors[i];
+          const type = 'square';
+          const fill = anchor.fill || SHAPE_COLORS[(i + randInt(0, SHAPE_COLORS.length - 1)) % SHAPE_COLORS.length];
+          const obstacle = makeObstacle(type, base, fill, placed.length, anchor.tier);
+          const safeRadius = obstacle.bodyRadius + clearance;
+          let candidate = null;
+
+          for (let attempt = 0; attempt < 80; attempt++) {
+            const jitter = attempt < 48 ? anchor.jitter : anchor.jitter * 1.7;
+            const trial = {
+              ...obstacle,
+              x: anchor.x * width + rand(-jitter, jitter),
+              y: anchor.y * height + rand(-jitter, jitter),
+              rotation: 0,
+              wavePhase: rand(0, TAU),
+              waveSpeed: rand(0.42, 0.72),
+              waveDrift: rand(0.15, 0.27),
+              fieldRadius: safeRadius,
+              placeRadius: safeRadius + corridor * 0.5,
+            };
+
+            const minX = boundary + trial.placeRadius;
+            const maxX = width - boundary - trial.placeRadius;
+            const minY = boundary + trial.placeRadius;
+            const maxY = height - boundary - trial.placeRadius;
+            if (maxX <= minX || maxY <= minY) continue;
+            trial.x = clamp(trial.x, minX, maxX);
+            trial.y = clamp(trial.y, minY, maxY);
+            trial.baseX = trial.x;
+            trial.baseY = trial.y;
+            trial.waveAmp = clamp(lineGap * rand(0.55, 1.15) + trial.bodyRadius * 0.045, 7, 18);
+            trial.minY = minY;
+            trial.maxY = maxY;
+            if (!overlapsPlaced(trial, placed, corridor)) {
+              candidate = trial;
+              break;
+            }
+          }
+
+          if (candidate) placed.push(candidate);
+        }
+
+        tuneWaveAmplitudes(placed);
+        return placed;
+      }
+
+      function tuneWaveAmplitudes(placed) {
+        const edgeGap = clamp(Math.min(width, height) * 0.025, 8, 20);
+        for (const obstacle of placed) {
+          const topRoom = obstacle.baseY - obstacle.bodyRadius - edgeGap;
+          const bottomRoom = height - obstacle.baseY - obstacle.bodyRadius - edgeGap;
+          obstacle.waveAmp = Math.min(obstacle.waveAmp, Math.max(0, topRoom), Math.max(0, bottomRoom));
+        }
+
+        for (let i = 0; i < placed.length; i++) {
+          for (let j = i + 1; j < placed.length; j++) {
+            const a = placed[i];
+            const b = placed[j];
+            const baseDistance = Math.hypot(a.baseX - b.baseX, a.baseY - b.baseY);
+            const safeTravel = Math.max(0, baseDistance - a.bodyRadius - b.bodyRadius - edgeGap);
+            const maxPairAmp = safeTravel * 0.42;
+            if (a.waveAmp + b.waveAmp > maxPairAmp) {
+              const scale = maxPairAmp / Math.max(1, a.waveAmp + b.waveAmp);
+              a.waveAmp *= scale;
+              b.waveAmp *= scale;
+            }
+          }
+        }
+      }
+
+      function overlapsPlaced(candidate, placed, corridor) {
+        for (const existing of placed) {
+          const dx = candidate.x - existing.x;
+          const dy = candidate.y - existing.y;
+          const minDistance = candidate.placeRadius + existing.placeRadius + corridor * 0.32;
+          if (dx * dx + dy * dy < minDistance * minDistance) return true;
+        }
+        return false;
+      }
+
+      function makeGridSpec() {
+        const cols =
+          width < 520
+            ? 3
+            : Math.round(clamp(Math.round(width / 210), 5, width > 1600 ? 8 : 7));
+        const rows =
+          width < 520
+            ? Math.round(clamp(Math.round(height / 165), 5, 6))
+            : Math.round(clamp(Math.round(height / 215), 4, 5));
+        return { cols, rows, count: cols * rows };
+      }
+
+      function makeAnchors(grid) {
+        const { cols, rows } = grid;
+        const marginX = width < 520 ? 0.2 : 0.1;
+        const marginY = width < 520 ? 0.11 : 0.14;
+        const spanX = cols > 1 ? (1 - marginX * 2) / (cols - 1) : 0;
+        const spanY = rows > 1 ? (1 - marginY * 2) / (rows - 1) : 0;
+        const cellSpan = Math.min(width / (cols + 1), height / (rows + 1));
+        const jitter = clamp(cellSpan * 0.032, 4, 10);
+        const tiers = width < 520
+          ? ['small', 'medium', 'tiny', 'large', 'small', 'tiny', 'medium', 'small', 'tiny']
+          : ['tiny', 'small', 'medium', 'small', 'tiny', 'large', 'small', 'medium', 'tiny', 'small', 'medium', 'small'];
+        const fills = [
+          COLORS.clay,
+          COLORS.wall,
+          COLORS.graphite,
+          COLORS.moss,
+          COLORS.ochre,
+          COLORS.moss,
+          COLORS.wall,
+          COLORS.clay,
+          COLORS.ink,
+          COLORS.wall,
+          COLORS.graphite,
+          COLORS.ochre,
+        ];
+        const anchors = [];
+
+        for (let row = 0; row < rows; row++) {
+          const rowLean = (row - (rows - 1) / 2) * 0.0035;
+          for (let col = 0; col < cols; col++) {
+            const i = anchors.length;
+            const colBreathe = (col - (cols - 1) / 2) * 0.0025;
+            const staggerX =
+              (row + col) % 5 === 0 ? spanX * 0.16 : (row * 2 + col) % 7 === 0 ? -spanX * 0.14 : 0;
+            const staggerY =
+              (row * 3 + col) % 6 === 0 ? spanY * 0.1 : (row + col * 2) % 8 === 0 ? -spanY * 0.09 : 0;
+            const x = marginX + col * spanX + staggerX + rand(-0.006, 0.006);
+            const y = marginY + row * spanY + staggerY + rowLean + colBreathe + rand(-0.006, 0.006);
+            anchors.push({
+              x: clamp(x, marginX * 0.86, 1 - marginX * 0.86),
+              y: clamp(y, marginY * 0.86, 1 - marginY * 0.86),
+              tier: tiers[i % tiers.length],
+              fill: fills[i % fills.length],
+              jitter,
+            });
+          }
+        }
+
+        return anchors;
+      }
+
+      function makeObstacle(type, base, fill, id, tier = 'small') {
+        const ranges = {
+          tiny: {
+            circle: [0.12, 0.24],
+            square: [0.18, 0.28],
+            triangleW: [0.2, 0.4],
+            triangleH: [0.2, 0.42],
+            rectW: [0.26, 0.58],
+            rectH: [0.13, 0.3],
+          },
+          small: {
+            circle: [0.24, 0.46],
+            square: [0.34, 0.5],
+            triangleW: [0.4, 0.72],
+            triangleH: [0.38, 0.72],
+            rectW: [0.5, 0.9],
+            rectH: [0.18, 0.42],
+          },
+          medium: {
+            circle: [0.46, 0.74],
+            square: [0.5, 0.66],
+            triangleW: [0.74, 1.2],
+            triangleH: [0.68, 1.1],
+            rectW: [0.92, 1.48],
+            rectH: [0.32, 0.68],
+          },
+          large: {
+            circle: [0.76, 1.02],
+            square: [0.66, 0.84],
+            triangleW: [1.08, 1.56],
+            triangleH: [0.96, 1.42],
+            rectW: [1.28, 1.9],
+            rectH: [0.48, 0.82],
+          },
+        }[tier];
+
+        if (type === 'circle') {
+          const radius = scaled(base * ranges.circle[0], base * ranges.circle[1], 1.08);
+          return { id, type, fill, radius, bodyRadius: radius };
+        }
+        if (type === 'square') {
+          const size = scaled(base * ranges.square[0], base * ranges.square[1], 1.08);
+          return { id, type, fill, width: size, height: size, bodyRadius: Math.SQRT2 * size * 0.5 + 2 };
+        }
+        if (type === 'triangle') {
+          const w = scaled(base * ranges.triangleW[0], base * ranges.triangleW[1], 1.08);
+          const h = scaled(base * ranges.triangleH[0], base * ranges.triangleH[1], 1.08);
+          const bodyRadius = Math.max(Math.hypot(w * 0.55, h * 0.56), Math.hypot(w * 0.55, h * 0.46));
+          return { id, type, fill, width: w, height: h, bodyRadius: bodyRadius + 2 };
+        }
+        const w = scaled(base * ranges.rectW[0], base * ranges.rectW[1], 1.08);
+        const h = scaled(base * ranges.rectH[0], base * ranges.rectH[1], 1.08);
+        return { id, type, fill, width: w, height: h, bodyRadius: Math.hypot(w, h) * 0.5 + 2 };
+      }
+
+      function makeLines() {
+        const lineGap = clamp(height / 44, 14, 22);
+        const xStep = clamp(width / 190, 5.4, 8.2);
+        const stroke = clamp(Math.min(width, height) / 520, 1.05, 2.25);
+        const clearance = clamp(lineGap * 0.42, 5, 8);
+        const approach = clamp(lineGap * 1.2, 14, 24);
+        prepareObstacleCaches(clearance, approach);
+        const made = [];
+
+        for (let i = 0; i < lineTemplates.length; i++) {
+          const template = lineTemplates[i];
+          const baseY = template.baseY;
+          const points = [];
+          const activeObstacles = obstacles.filter(
+            (obstacle) => Math.abs(baseY - obstacle.y) < obstacle.bodyRadius + approach + lineGap * 3.2
+          );
+
+          for (let x = -8; x <= width + 8; x += xStep) {
+            let y =
+              baseY +
+              Math.sin(x * template.waveA + template.phaseA) * template.wobble +
+              Math.sin(x * template.waveB + template.phaseB) * template.wobble * 0.38;
+
+            for (let o = 0; o < activeObstacles.length; o++) {
+              const obstacle = activeObstacles[o];
+              const exact = shapeIntervalAtX(obstacle, x, clearance);
+              const soft = shapeIntervalAtX(obstacle, x, clearance + approach);
+              if (!soft) continue;
+
+              const side = sideForLine(baseY, i, obstacle);
+              const lane = lineLaneOffset(baseY, lineGap);
+              const softLane = lane * 0.45;
+              const softTarget = side < 0 ? soft.top - softLane : soft.bottom + softLane;
+              const insideSoft = y > soft.top && y < soft.bottom;
+
+              if (insideSoft) {
+                const depth = side < 0 ? (y - soft.top) / soft.height : (soft.bottom - y) / soft.height;
+                const strength = smootherStep(depth) * 0.52;
+                y += (softTarget - y) * strength;
+              }
+
+              if (exact) {
+                const exactTarget = side < 0 ? exact.top - lane : exact.bottom + lane;
+                if ((side < 0 && y > exactTarget) || (side > 0 && y < exactTarget)) y = exactTarget;
+              }
+            }
+
+            points.push({ x, y });
+          }
+
+          relaxAndConstrain(points, baseY, i, lineGap, activeObstacles);
+          made.push({
+            baseY,
+            index: i,
+            points,
+            stroke,
+            color: template.color,
+          });
+        }
+
+        return made;
+      }
+
+      function makeLineTemplates() {
+        const lineGap = clamp(height / 44, 14, 22);
+        const count = Math.ceil(height / lineGap) + 4;
+        const templates = [];
+        for (let i = 0; i < count; i++) {
+          templates.push({
+            baseY: -lineGap * 1.5 + i * lineGap,
+            phaseA: rand(0, TAU),
+            phaseB: rand(0, TAU),
+            waveA: rand(0.0035, 0.008),
+            waveB: rand(0.009, 0.018),
+            wobble: lineGap * rand(0.08, 0.22),
+            color: LINE_COLORS[i % LINE_COLORS.length],
+          });
+        }
+        return templates;
+      }
+
+      function tick(time) {
+        raf = requestAnimationFrame(tick);
+        const deltaSeconds = clamp((time - lastFrameAt) / 1000, 0, 0.08);
+        lastFrameAt = time;
+        const seconds = (time - startedAt) / 1000;
+
+        updateObstacleWaves(seconds);
+        if (time - lastTargetAt >= 1000 / TARGET_LINE_FPS) {
+          lastTargetAt = time;
+          targetLines = makeLines();
+        }
+        advanceLines(deltaSeconds);
+        render();
+      }
+
+      function cloneLines(source) {
+        return source.map((line) => ({
+          baseY: line.baseY,
+          index: line.index,
+          stroke: line.stroke,
+          color: line.color,
+          points: line.points.map((point) => ({ x: point.x, y: point.y })),
+        }));
+      }
+
+      function advanceLines(deltaSeconds) {
+        if (!targetLines.length) return;
+        if (lines.length !== targetLines.length) {
+          lines = cloneLines(targetLines);
+          return;
+        }
+
+        const ease = 1 - Math.exp(-LINE_EASE_RATE * deltaSeconds);
+        for (let i = 0; i < targetLines.length; i++) {
+          const line = lines[i];
+          const target = targetLines[i];
+
+          if (line.points.length !== target.points.length) {
+            lines[i] = cloneLines([target])[0];
+            continue;
+          }
+
+          line.baseY = target.baseY;
+          line.index = target.index;
+          line.stroke += (target.stroke - line.stroke) * ease;
+          line.color = target.color;
+
+          for (let p = 0; p < target.points.length; p++) {
+            line.points[p].x = target.points[p].x;
+            line.points[p].y += (target.points[p].y - line.points[p].y) * ease;
+          }
+        }
+      }
+
+      function updateObstacleWaves(seconds) {
+        const slowCurrent = seconds * 0.18;
+        for (const obstacle of obstacles) {
+          if (obstacle.waveAmp <= 0) {
+            obstacle.x = obstacle.baseX;
+            obstacle.y = obstacle.baseY;
+            continue;
+          }
+          const mainWave = Math.sin(seconds * obstacle.waveSpeed + obstacle.wavePhase);
+          const secondary = Math.sin(seconds * obstacle.waveDrift + obstacle.wavePhase * 0.7 + obstacle.baseX * 0.004);
+          const y = obstacle.baseY + mainWave * obstacle.waveAmp + secondary * obstacle.waveAmp * 0.32;
+          obstacle.y = clamp(y, obstacle.minY, obstacle.maxY);
+          obstacle.x = obstacle.baseX + Math.sin(slowCurrent + obstacle.wavePhase) * 1.4;
+        }
+      }
+
+      function sideForLine(baseY, lineIndex, obstacle) {
+        const dy = baseY - (obstacle.baseY || obstacle.y);
+        if (Math.abs(dy) > 3) return dy < 0 ? -1 : 1;
+        const h = Math.sin((seed + 1) * 12.9898 + lineIndex * 78.233 + obstacle.id * 37.719);
+        return h < 0 ? -1 : 1;
+      }
+
+      function lineLaneOffset(baseY, lineGap) {
+        return clamp(lineGap * 0.42, 4.5, 8);
+      }
+
+      function relaxAndConstrain(points, baseY, lineIndex, lineGap, activeObstacles) {
+        const scratch = points.map((p) => p.y);
+        const clearance = clamp(lineGap * 0.42, 5, 8);
+        for (let pass = 0; pass < 3; pass++) {
+          for (let i = 2; i < points.length - 2; i++) {
+            scratch[i] =
+              points[i].y * 0.5 +
+              (points[i - 1].y + points[i + 1].y) * 0.19 +
+              (points[i - 2].y + points[i + 2].y) * 0.06;
+          }
+          for (let i = 2; i < points.length - 2; i++) points[i].y = scratch[i];
+          constrain(points, baseY, lineIndex, lineGap, activeObstacles);
+        }
+        constrain(points, baseY, lineIndex, lineGap, activeObstacles);
+        constrainSegments(points, baseY, lineIndex, lineGap, clearance, activeObstacles);
+        constrain(points, baseY, lineIndex, lineGap, activeObstacles);
+      }
+
+      function constrain(points, baseY, lineIndex, lineGap, activeObstacles) {
+        const minY = -lineGap * 2.2;
+        const maxY = height + lineGap * 2.2;
+        const clearance = clamp(lineGap * 0.42, 5, 8);
+        for (const p of points) {
+          for (const obstacle of activeObstacles) {
+            const interval = shapeIntervalAtX(obstacle, p.x, clearance);
+            if (interval) {
+              const side = sideForLine(baseY, lineIndex, obstacle);
+              const lane = lineLaneOffset(baseY, lineGap);
+              const target = side < 0 ? interval.top - lane : interval.bottom + lane;
+              if ((side < 0 && p.y > target) || (side > 0 && p.y < target)) p.y = target;
+            }
+          }
+          p.y = clamp(p.y, minY, maxY);
+        }
+      }
+
+      function constrainSegments(points, baseY, lineIndex, lineGap, clearance, activeObstacles) {
+        for (let pass = 0; pass < 1; pass++) {
+          let changed = false;
+          for (let i = 1; i < points.length; i++) {
+            const a = points[i - 1];
+            const b = points[i];
+            for (let s = 1; s < 8; s++) {
+              const t = s / 8;
+              const x = a.x + (b.x - a.x) * t;
+              const y = a.y + (b.y - a.y) * t;
+              for (const obstacle of activeObstacles) {
+                const interval = shapeIntervalAtX(obstacle, x, clearance);
+                if (!interval || y <= interval.top || y >= interval.bottom) continue;
+
+                const side = sideForLine(baseY, lineIndex, obstacle);
+                const lane = lineLaneOffset(baseY, lineGap);
+                const target = side < 0 ? interval.top - lane : interval.bottom + lane;
+                if (side < 0) {
+                  if (a.y > target) a.y = target;
+                  if (b.y > target) b.y = target;
+                } else {
+                  if (a.y < target) a.y = target;
+                  if (b.y < target) b.y = target;
+                }
+                changed = true;
+              }
+            }
+          }
+          if (!changed) return;
+        }
+      }
+
+      function shapeIntervalAtX(obstacle, x, margin) {
+        if (obstacle.type === 'circle') {
+          const radius = obstacle.radius + margin;
+          const dx = x - obstacle.x;
+          if (Math.abs(dx) > radius) return null;
+          const span = Math.sqrt(radius * radius - dx * dx);
+          return makeInterval(obstacle.y - span, obstacle.y + span);
+        }
+
+        const cached = cachedGeometry(obstacle, margin);
+        if (cached && (x < cached.minX || x > cached.maxX)) return null;
+        const vertices = cached ? cached.vertices : obstacleVertices(obstacle, margin);
+        let minY = Infinity;
+        let maxY = -Infinity;
+        let hits = 0;
+
+        for (let i = 0; i < vertices.length; i++) {
+          const a = vertices[i];
+          const b = vertices[(i + 1) % vertices.length];
+          const minX = Math.min(a.x, b.x);
+          const maxX = Math.max(a.x, b.x);
+          if (x < minX || x > maxX) continue;
+
+          const dx = b.x - a.x;
+          if (Math.abs(dx) < 0.0001) {
+            if (Math.abs(x - a.x) < 0.5) {
+              minY = Math.min(minY, a.y, b.y);
+              maxY = Math.max(maxY, a.y, b.y);
+              hits += 2;
+            }
+            continue;
+          }
+
+          const t = (x - a.x) / dx;
+          if (t >= 0 && t <= 1) {
+            const y = a.y + (b.y - a.y) * t;
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+            hits++;
+          }
+        }
+
+        if (hits < 2) return null;
+        return makeInterval(minY, maxY);
+      }
+
+      function makeInterval(top, bottom) {
+        return {
+          top,
+          bottom,
+          center: (top + bottom) * 0.5,
+          height: Math.max(1, bottom - top),
+        };
+      }
+
+      function obstacleVertices(obstacle, margin) {
+        let local;
+        if (obstacle.type === 'triangle') {
+          local = [
+            { x: 0, y: -obstacle.height * 0.56 - margin },
+            { x: obstacle.width * 0.55 + margin, y: obstacle.height * 0.46 + margin },
+            { x: -obstacle.width * 0.55 - margin, y: obstacle.height * 0.46 + margin },
+          ];
+        } else {
+          const halfW = obstacle.width * 0.5 + margin;
+          const halfH = obstacle.height * 0.5 + margin;
+          local = [
+            { x: -halfW, y: -halfH },
+            { x: halfW, y: -halfH },
+            { x: halfW, y: halfH },
+            { x: -halfW, y: halfH },
+          ];
+        }
+
+        const cos = Math.cos(obstacle.rotation);
+        const sin = Math.sin(obstacle.rotation);
+        return local.map((point) => ({
+          x: obstacle.x + point.x * cos - point.y * sin,
+          y: obstacle.y + point.x * sin + point.y * cos,
+        }));
+      }
+
+      function prepareObstacleCaches(clearance, approach) {
+        const softMargin = clearance + approach;
+        for (const obstacle of obstacles) {
+          obstacle._exactMargin = clearance;
+          obstacle._softMargin = softMargin;
+          obstacle._exactGeometry =
+            obstacle.type === 'circle' ? null : makeGeometryCache(obstacleVertices(obstacle, clearance));
+          obstacle._softGeometry =
+            obstacle.type === 'circle' ? null : makeGeometryCache(obstacleVertices(obstacle, softMargin));
+        }
+      }
+
+      function cachedGeometry(obstacle, margin) {
+        if (Math.abs(margin - obstacle._exactMargin) < 0.0001) return obstacle._exactGeometry;
+        if (Math.abs(margin - obstacle._softMargin) < 0.0001) return obstacle._softGeometry;
+        return null;
+      }
+
+      function makeGeometryCache(vertices) {
+        let minX = Infinity;
+        let maxX = -Infinity;
+        for (const vertex of vertices) {
+          minX = Math.min(minX, vertex.x);
+          maxX = Math.max(maxX, vertex.x);
+        }
+        return { vertices, minX, maxX };
+      }
+
+      function render() {
+        ctx.fillStyle = COLORS.wall;
+        ctx.fillRect(0, 0, width, height);
+        drawRegistrationMarks();
+        drawLines();
+        drawObstacles();
+      }
+
+      function drawRegistrationMarks() {
+        const step = clamp(Math.min(width, height) * 0.075, 34, 86);
+        ctx.save();
+        ctx.globalAlpha = 0.14;
+        ctx.strokeStyle = COLORS.ink;
+        ctx.lineWidth = 1;
+        for (let x = step; x < width; x += step) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, 5);
+          ctx.moveTo(x, height - 5);
+          ctx.lineTo(x, height);
+          ctx.stroke();
+        }
+        for (let y = step; y < height; y += step) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(5, y);
+          ctx.moveTo(width - 5, y);
+          ctx.lineTo(width, y);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawLines() {
+        ctx.save();
+        for (const line of lines) {
+          ctx.beginPath();
+          ctx.lineWidth = line.stroke;
+          ctx.strokeStyle = line.color;
+          drawSmoothLine(line.points);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawSmoothLine(points) {
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length - 2; i++) {
+          const midX = (points[i].x + points[i + 1].x) * 0.5;
+          const midY = (points[i].y + points[i + 1].y) * 0.5;
+          ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+        }
+        const last = points[points.length - 1];
+        const prev = points[points.length - 2];
+        ctx.quadraticCurveTo(prev.x, prev.y, last.x, last.y);
+      }
+
+      function drawObstacles() {
+        const outline = clamp(Math.min(width, height) / 360, 1.5, 3);
+        for (const obstacle of obstacles) {
+          ctx.save();
+          ctx.translate(obstacle.x, obstacle.y);
+          ctx.rotate(obstacle.rotation);
+          ctx.fillStyle = obstacle.fill;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = outline;
+
+          if (obstacle.type === 'circle') drawCircleObstacle(obstacle);
+          else if (obstacle.type === 'triangle') drawTriangleObstacle(obstacle);
+          else drawRectObstacle(obstacle);
+
+          ctx.restore();
+        }
+      }
+
+      function drawCircleObstacle(obstacle) {
+        ctx.beginPath();
+        ctx.arc(0, 0, obstacle.radius, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      function drawRectObstacle(obstacle) {
+        const x = -obstacle.width * 0.5;
+        const y = -obstacle.height * 0.5;
+        ctx.beginPath();
+        ctx.rect(x, y, obstacle.width, obstacle.height);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      function drawTriangleObstacle(obstacle) {
+        ctx.beginPath();
+        ctx.moveTo(0, -obstacle.height * 0.56);
+        ctx.lineTo(obstacle.width * 0.55, obstacle.height * 0.46);
+        ctx.lineTo(-obstacle.width * 0.55, obstacle.height * 0.46);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      function reseed() {
+        seed = ((Date.now() * 1664525) ^ (Math.random() * 0xffffffff)) >>> 0;
+        compose();
+      }
+
+      addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(resize, 120);
+      });
+
+      if (typeof reducedMotionQuery.addEventListener === 'function') {
+        reducedMotionQuery.addEventListener('change', (event) => {
+          prefersReducedMotion = event.matches;
+          compose();
+        });
+      } else if (typeof reducedMotionQuery.addListener === 'function') {
+        reducedMotionQuery.addListener((event) => {
+          prefersReducedMotion = event.matches;
+          compose();
+        });
+      }
+
+      canvas.addEventListener('click', reseed);
+      canvas.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          reseed();
+        }
+      });
+
+      resize();
+    </script>
+  </body>
+</html>

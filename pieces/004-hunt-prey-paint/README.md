@@ -6,25 +6,24 @@ there are no corners to win or die in.
 
 ## The three layers
 
-- **Plants** — the food, drawn as a quiet **distributed-pixel terrain** in the
-  spirit of the original *Dune*'s top-down landscape: a low-contrast dither over
-  the sand whose density (not colour) tracks biomass, so growth reads as a subtle
-  thickening of the ground rather than a busy field of symbols. Lush patches
-  sprout tiny flowers from the active bloom palette. Plants grow more slowly and
-  the visible terrain is painted incrementally, one small pixel at a time, so new
-  groundcover fills in instead of popping on all at once.
-- **Prey** — vector grazers, each wearing one of many **colours**. They eat
-  plants, grow into larger bodies, and flee hunters. Giant prey become spiny and
-  age continuously toward white. They must reach a visibly grown body before
-  they can breed. Every prey is born with its own **alertness** (how far off it
-  spots a hunter) and **sprint speed**; a fleeing one trails a streak in its own
-  colour. A sprint outruns a hunter but burns energy fast, so a hounded prey can
-  run itself to starvation.
-- **Hunters** — black **arrows** that run the nearest prey down and **grow** as
-  they feed (a weakening hunter is simply *smaller*, never faded out). Their
-  energy is spent by **moving**: a starving hunter sprints faster but burns out
-  faster for it. The only way a hunter breeds is to eat enough to swell and
-  **split in half**, dividing into two.
+- **Plants** — the food, drawn as quiet **distributed-pixel terrain** over a
+  pale cartographic field: low-contrast dither tracks biomass while broken
+  grids, arcs, and route lines sit underneath the ecosystem. Lush patches sprout
+  tiny 8-bit signal sparks from the active bloom palette. Plants grow more
+  slowly and the visible terrain is painted incrementally, one small pixel at a
+  time, so new groundcover fills in instead of popping on all at once.
+- **Prey** — blocky pixel grazers, each wearing one of many **colours**. They
+  eat plants, grow into larger bodies, and flee hunters. Giant prey become
+  spiny square emblems and age continuously toward white. They must reach a
+  visibly grown body before they can breed. Every prey is born with its own
+  **alertness** (how far off it spots a hunter) and **sprint speed**; a fleeing
+  one sheds square motion ticks in its own colour. A sprint outruns a hunter but
+  burns energy fast, so a hounded prey can run itself to starvation.
+- **Hunters** — compact black arcade glyphs that run the nearest prey down and
+  **grow** as they feed (a weakening hunter is simply *smaller*, never faded
+  out). Their energy is spent by **moving**: a starving hunter sprints faster
+  but burns out faster for it. The only way a hunter breeds is to eat enough to
+  swell and **split in half**, dividing into two.
 
 Prey and hunters have solid bodies — their own kind cannot overlap, only bump
 and crowd; a hunter and a prey, of course, do meet.
@@ -33,7 +32,7 @@ and crowd; a hunter and a prey, of course, do meet.
 
 The marks layer is painterly watercolour and persistent — it *is* the painting:
 
-- a prey that is **killed** blooms a watercolour stain **in its own colour**;
+- a prey that is **killed** blooms a watercolour stain and line-scaffold **in its own colour**;
 - a prey that **starves** leaves a pale, washed-out stain of that colour;
 - a hunter that dies leaves a dark ash mark;
 - a spiny prey that reaches **old age** is the one redemption: it bursts white,
