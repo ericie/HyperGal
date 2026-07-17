@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Paddle · HyperGal</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        color: #fff;
+        overflow: hidden;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      canvas:focus-visible {
+        outline: 4px solid #fff;
+        outline-offset: -10px;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        canvas {
+          cursor: default;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="stage"
+      tabindex="0"
+      role="img"
+      aria-label="Paddle: a one-player Pong on a looping field. A single paddle stands where the net would be and catches eight of every ten balls. The ball leaves one edge and returns from the other, scoring a point for the edge it crossed. Each miss burns a mark into the centre line."
+    ></canvas>
+
+    <script>
+      (() => {
+        const WHITE = '#fff';
+
+        // The paddle is allowed exactly two misses in every ten passes.
+        const BAG_SIZE = 10;
+        const BAG_MISSES = 2;
+
+        const MAX_BOUNCE_ANGLE = 0.95; // radians off horizontal at the paddle's rim
+        const ENGLISH_MIN = 0.25; // never strike dead-centre, or the rally goes flat
+        const ENGLISH_MAX = 0.72; // stay inside the paddle face so the catch still lands
+        const COMMIT_START = 0.12; // fraction of the loop spent watching the ball
+        const COMMIT_END = 0.58; // by here the paddle is on its final mark
+        const BALL_TRAIL_LIFE = 0.2; // phosphor persistence, seconds
+        const PADDLE_TRAIL_LIFE = 0.1;
+        const TRAIL_MAX = 240;
+        const FLASH_DUR = 0.18;
+        const SCARS = 160; // histogram buckets down the net
+        const SCAR_FULL = 24; // misses in one bucket that reach full bar length
+        const MAX_DT = 1 / 30;
+        const REDUCED_TIME_SCALE = 0.32;
+
+        const DIGITS = {
+          0: ['11111', '10001', '10001', '10001', '10001', '10001', '11111'],
+          1: ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+          2: ['11111', '00001', '00001', '11111', '10000', '10000', '11111'],
+          3: ['11111', '00001', '00001', '11111', '00001', '00001', '11111'],
+          4: ['10001', '10001', '10001', '11111', '00001', '00001', '00001'],
+          5: ['11111', '10000', '10000', '11111', '00001', '00001', '11111'],
+          6: ['11111', '10000', '10000', '11111', '10001', '10001', '11111'],
+          7: ['11111', '00001', '00001', '00010', '00100', '00100', '00100'],
+          8: ['11111', '10001', '10001', '11111', '10001', '10001', '11111'],
+          9: ['11111', '10001', '10001', '11111', '00001', '00001', '11111'],
+        };
+
+        const canvas = document.getElementById('stage');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const reduceQuery =
+          typeof matchMedia === 'function'
+            ? matchMedia('(prefers-reduced-motion: reduce)')
+            : { matches: false };
+        const params = new URLSearchParams(location.search);
+        const showDebug = params.has('debug');
+
+        let viewportW = 1;
+        let viewportH = 1;
+        let dpr = 1;
+        let netX = 0;
+        let courtTop = 0;
+        let courtBottom = 0;
+        let courtW = 1;
+        let courtH = 1;
+        let wallT = 4;
+        let inset = 10;
+        let paddleW = 12;
+        let paddleH = 80;
+        let ballR = 6;
+        let ballSpeed = 430;
+        let paddleSpeed = 820;
+
+        let rng = mulberry32(seedFromLocation());
+        let prefersReducedMotion = reduceQuery.matches;
+        let ball = { x: 0, y: 0, vx: 1, vy: 0 };
+        let paddle = { y: 0, vy: 0 };
+        let score = { left: 0, right: 0 };
+        let scarLeft = new Int32Array(SCARS);
+        let scarRight = new Int32Array(SCARS);
+        let bag = [];
+        let bagIndex = 0;
+        let pass = null;
+        let flash = null;
+        let ballTrail = [];
+        let paddleTrail = [];
+        let stats = { passes: 0, catches: 0, misses: 0, disagree: 0 };
+        let lastTime = 0;
+        let raf = 0;
+
+        resize();
+        reset();
+        warmFromLocation();
+        addEventListener('resize', resize, { passive: true });
+        canvas.addEventListener('pointerdown', reseed, { passive: true });
+        canvas.addEventListener('keydown', (event) => {
+          if (event.key === 'r' || event.key === 'R') reseed();
+        });
+        if (typeof reduceQuery.addEventListener === 'function') {
+          reduceQuery.addEventListener('change', (event) => {
+            prefersReducedMotion = event.matches;
+          });
+        } else if (typeof reduceQuery.addListener === 'function') {
+          reduceQuery.addListener((event) => {
+            prefersReducedMotion = event.matches;
+          });
+        }
+        raf = requestAnimationFrame(tick);
+
+        function seedFromLocation() {
+          const fromQuery = Number.parseInt(params.get('seed') || '', 36);
+          if (Number.isFinite(fromQuery)) return fromQuery >>> 0;
+          return ((Date.now() * 2654435761) ^ (Math.random() * 0xffffffff)) >>> 0;
+        }
+
+        function warmFromLocation() {
+          const seconds = Number.parseFloat(params.get('warm') || '');
+          if (!Number.isFinite(seconds) || seconds <= 0) return;
+          const steps = Math.min(Math.round(seconds * 60), 240000);
+          for (let i = 0; i < steps; i += 1) step(1 / 60);
+        }
+
+        function resize() {
+          viewportW = Math.max(1, innerWidth);
+          viewportH = Math.max(1, innerHeight);
+          dpr = Math.min(2, devicePixelRatio || 1);
+          canvas.width = Math.round(viewportW * dpr);
+          canvas.height = Math.round(viewportH * dpr);
+          canvas.style.width = `${viewportW}px`;
+          canvas.style.height = `${viewportH}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          inset = clamp(viewportH * 0.05, 10, 40);
+          wallT = Math.round(clamp(viewportH * 0.009, 3, 8));
+          courtTop = Math.round(inset + wallT);
+          courtBottom = Math.round(viewportH - inset - wallT);
+          courtH = Math.max(40, courtBottom - courtTop);
+          courtW = viewportW;
+          netX = Math.round(viewportW / 2);
+          paddleW = Math.round(clamp(viewportW * 0.009, 8, 16));
+          paddleH = Math.round(clamp(courtH * 0.15, 46, 140));
+          ballR = Math.round(clamp(Math.min(viewportW, viewportH) * 0.008, 5, 9));
+          ballSpeed = clamp(viewportW * 0.34, 260, 560);
+          paddleSpeed = ballSpeed * 1.9;
+
+          // Keep the current rally valid inside the new geometry.
+          ball.x = wrapX(ball.x);
+          ball.y = clamp(ball.y, courtTop + ballR, courtBottom - ballR);
+          const speed = Math.hypot(ball.vx, ball.vy) || ballSpeed;
+          ball.vx = (ball.vx / speed) * ballSpeed;
+          ball.vy = (ball.vy / speed) * ballSpeed;
+          paddle.y = clamp(paddle.y, paddleMin(), paddleMax());
+          if (pass) planPass(pass.isMiss);
+        }
+
+        function reset() {
+          scarLeft = new Int32Array(SCARS);
+          scarRight = new Int32Array(SCARS);
+          score = { left: 0, right: 0 };
+          stats = { passes: 0, catches: 0, misses: 0, disagree: 0 };
+          flash = null;
+          bag = [];
+          bagIndex = BAG_SIZE;
+
+          const dir = rng() < 0.5 ? 1 : -1;
+          const angle = (rng() * 2 - 1) * 0.5;
+          ball = {
+            x: netX - dir * courtW * 0.3,
+            y: courtTop + ballR + rng() * (courtH - ballR * 2),
+            vx: dir * ballSpeed * Math.cos(angle),
+            vy: ballSpeed * Math.sin(angle),
+          };
+          ball.x = wrapX(ball.x);
+          paddle = { y: (courtTop + courtBottom) / 2, vy: 0 };
+          ballTrail = [];
+          paddleTrail = [];
+          beginPass();
+        }
+
+        function reseed() {
+          rng = mulberry32(((Date.now() * 2654435761) ^ (Math.random() * 0xffffffff)) >>> 0);
+          reset();
+        }
+
+        function paddleMin() {
+          return courtTop + paddleH / 2;
+        }
+
+        function paddleMax() {
+          return courtBottom - paddleH / 2;
+        }
+
+        function wrapX(x) {
+          let v = x % courtW;
+          if (v < 0) v += courtW;
+          return v;
+        }
+
+        // Horizontal distance the ball still has to cover before it reaches the
+        // net plane. The field is a cylinder, so a ball on the far side of the
+        // net has to go the long way round rather than turn back.
+        function distanceToNet(x, vx) {
+          let d = vx > 0 ? netX - x : x - netX;
+          if (d <= 0) d += courtW;
+          return d;
+        }
+
+        // The trajectory is fully determined between crossings: vx is constant
+        // and the walls are perfect mirrors, so the crossing height folds out
+        // analytically. The paddle is never guessing.
+        function predictCrossY() {
+          const lo = courtTop + ballR;
+          const hi = courtBottom - ballR;
+          const t = distanceToNet(ball.x, ball.vx) / Math.abs(ball.vx);
+          return fold(ball.y + ball.vy * t, lo, hi);
+        }
+
+        function refillBag() {
+          bag = [];
+          for (let i = 0; i < BAG_SIZE; i += 1) bag.push(i < BAG_MISSES);
+          for (let i = bag.length - 1; i > 0; i -= 1) {
+            const j = Math.floor(rng() * (i + 1));
+            const tmp = bag[i];
+            bag[i] = bag[j];
+            bag[j] = tmp;
+          }
+          bagIndex = 0;
+        }
+
+        function drawFromBag() {
+          if (bagIndex >= bag.length) refillBag();
+          const value = bag[bagIndex];
+          bagIndex += 1;
+          return value;
+        }
+
+        function beginPass() {
+          planPass(drawFromBag());
+        }
+
+        // Decide where the paddle intends to stand for this pass. Intent is
+        // authoritative — the bag already ruled on catch or miss — and the mark
+        // is chosen so the geometry agrees with the ruling.
+        function planPass(isMiss) {
+          const predY = predictCrossY();
+          const reach = paddleH / 2 + ballR;
+          const lo = paddleMin();
+          const hi = paddleMax();
+          let targetY;
+
+          if (isMiss) {
+            // Stand just far enough off that the ball clips past the rim.
+            const gap = ballR * 0.5 + rng() * ballR * 1.4;
+            const options = [];
+            for (const side of [-1, 1]) {
+              const mark = predY + side * (reach + gap);
+              if (mark >= lo && mark <= hi) options.push(mark);
+            }
+            targetY = options.length
+              ? options[Math.floor(rng() * options.length)]
+              : clamp(predY + (predY < (courtTop + courtBottom) / 2 ? 1 : -1) * (reach + gap), lo, hi);
+          } else {
+            // Strike off-centre on purpose: a dead-centre hit returns the ball
+            // flat, and a flat rally never comes back anywhere interesting.
+            const english =
+              (rng() < 0.5 ? -1 : 1) * (ENGLISH_MIN + rng() * (ENGLISH_MAX - ENGLISH_MIN));
+            targetY = clamp(predY + english * (paddleH / 2), lo, hi);
+          }
+
+          pass = { isMiss, predY, targetY, startDist: distanceToNet(ball.x, ball.vx) };
+        }
+
+        function step(dt) {
+          const prevX = ball.x;
+          ball.x += ball.vx * dt;
+          ball.y += ball.vy * dt;
+
+          const lo = courtTop + ballR;
+          const hi = courtBottom - ballR;
+          if (ball.y < lo) {
+            ball.y = lo + (lo - ball.y);
+            ball.vy = Math.abs(ball.vy);
+          } else if (ball.y > hi) {
+            ball.y = hi - (ball.y - hi);
+            ball.vy = -Math.abs(ball.vy);
+          }
+
+          // The score is a tally of edge crossings: off the left edge is a
+          // point for LEFT, off the right edge a point for RIGHT. Exactly one
+          // crossing happens per lap, so every lap scores. A catch sends the
+          // ball back out the edge behind it and a miss lets it through to the
+          // far one — the paddle decides which side a point lands on, never
+          // whether one lands at all.
+          let wrapped = false;
+          if (ball.x < 0) {
+            ball.x += courtW;
+            wrapped = true;
+            score.left = (score.left + 1) % 10000;
+          } else if (ball.x >= courtW) {
+            ball.x -= courtW;
+            wrapped = true;
+            score.right = (score.right + 1) % 10000;
+          }
+
+          updatePaddle(dt);
+
+          if (!wrapped) {
+            const crossedRight = prevX < netX && ball.x >= netX;
+            const crossedLeft = prevX > netX && ball.x <= netX;
+            if (crossedRight || crossedLeft) resolveCrossing(crossedRight ? 1 : -1);
+          }
+
+          if (flash) {
+            flash.t += dt;
+            if (flash.t >= FLASH_DUR) flash = null;
+          }
+
+          ballTrail.push({ x: ball.x, y: ball.y, age: 0 });
+          paddleTrail.push({ y: paddle.y, age: 0 });
+          ageTrail(ballTrail, BALL_TRAIL_LIFE, dt);
+          ageTrail(paddleTrail, PADDLE_TRAIL_LIFE, dt);
+        }
+
+        // Phosphor is drawn from an aged history rather than by fading an
+        // accumulation layer. A destination-out fade bottoms out at an alpha of
+        // 1/255 and then rounds back to itself, so it never reaches zero and
+        // leaves a permanent haze of every path the ball has taken. The scars
+        // are meant to be the only thing here that lasts.
+        function ageTrail(list, life, dt) {
+          for (const point of list) point.age += dt;
+          while (list.length && list[0].age >= life) list.shift();
+          while (list.length > TRAIL_MAX) list.shift();
+        }
+
+        function updatePaddle(dt) {
+          const dist = distanceToNet(ball.x, ball.vx);
+          const travelled = pass.startDist > 0 ? 1 - dist / pass.startDist : 1;
+          const commit = smootherStep(
+            clamp((travelled - COMMIT_START) / (COMMIT_END - COMMIT_START), 0, 1)
+          );
+          // Early in the loop the paddle simply watches the ball's height; as
+          // the ball closes it slides onto the mark it committed to.
+          const target = clamp(
+            ball.y + (pass.targetY - ball.y) * commit,
+            paddleMin(),
+            paddleMax()
+          );
+
+          const desired = clamp((target - paddle.y) * 9, -paddleSpeed, paddleSpeed);
+          paddle.vy += (desired - paddle.vy) * Math.min(1, dt * 14);
+          paddle.y = clamp(paddle.y + paddle.vy * dt, paddleMin(), paddleMax());
+        }
+
+        function resolveCrossing(dir) {
+          const crossY = pass.predY;
+          const reach = paddleH / 2 + ballR;
+          const geometryHit = Math.abs(crossY - paddle.y) <= reach;
+
+          stats.passes += 1;
+          if (geometryHit === pass.isMiss) stats.disagree += 1;
+
+          if (pass.isMiss) {
+            stats.misses += 1;
+            addScar(dir > 0 ? 'right' : 'left', crossY);
+            flash = { y: crossY, t: 0, miss: true };
+            // The ball is not turned back; it carries on around the loop.
+            ball.x = wrapX(netX + dir * (paddleW / 2 + ballR + 0.5));
+          } else {
+            stats.catches += 1;
+            const rel = clamp((crossY - paddle.y) / (paddleH / 2), -1, 1);
+            const angle = rel * MAX_BOUNCE_ANGLE;
+            ball.vx = -dir * ballSpeed * Math.cos(angle);
+            ball.vy = ballSpeed * Math.sin(angle);
+            ball.y = crossY;
+            ball.x = wrapX(netX - dir * (paddleW / 2 + ballR + 0.5));
+            flash = { y: crossY, t: 0, miss: false };
+          }
+
+          beginPass();
+        }
+
+        function addScar(side, y) {
+          const norm = clamp((y - courtTop) / courtH, 0, 0.999999);
+          const bucket = Math.floor(norm * SCARS);
+          const target = side === 'right' ? scarRight : scarLeft;
+          target[bucket] += 1;
+        }
+
+        function tick(now) {
+          raf = requestAnimationFrame(tick);
+          if (!lastTime) lastTime = now;
+          let dt = (now - lastTime) / 1000;
+          lastTime = now;
+          dt = Math.min(dt, MAX_DT) * (prefersReducedMotion ? REDUCED_TIME_SCALE : 1);
+          if (dt > 0) step(dt);
+          render();
+        }
+
+        function render() {
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, viewportW, viewportH);
+
+          // Only the moving parts smear; the net, the scars and the score stay
+          // crisp underneath.
+          drawWalls();
+          drawScore();
+          drawScars();
+          drawNet();
+          drawBallTrail();
+          drawPaddleTrail();
+          drawPaddle();
+          drawBall();
+          drawFlash();
+          drawScanlines();
+          drawCaption();
+          if (showDebug) drawDebug();
+        }
+
+        function drawWalls() {
+          ctx.fillStyle = 'rgba(255,255,255,0.82)';
+          ctx.fillRect(0, courtTop - wallT, viewportW, wallT);
+          ctx.fillRect(0, courtBottom, viewportW, wallT);
+        }
+
+        function drawNet() {
+          const dash = Math.round(clamp(courtH * 0.022, 8, 18));
+          const gap = Math.round(dash * 0.75);
+          const w = Math.max(2, Math.round(paddleW * 0.34));
+          ctx.fillStyle = 'rgba(255,255,255,0.38)';
+          for (let y = courtTop + 2; y < courtBottom - 2; y += dash + gap) {
+            const h = Math.min(dash, courtBottom - 2 - y);
+            ctx.fillRect(netX - Math.floor(w / 2), y, w, h);
+          }
+        }
+
+        // Every miss burns a bar into the net at the height the ball slipped
+        // past, growing to the side it was heading. Left bars are left's score
+        // and right bars are right's, so the centre line slowly becomes a
+        // picture of where this paddle fails.
+        function drawScars() {
+          const maxLen = clamp(viewportW * 0.055, 26, 96);
+          const barH = Math.max(1, Math.ceil(courtH / SCARS));
+          const edge = Math.ceil(paddleW / 2);
+
+          for (let i = 0; i < SCARS; i += 1) {
+            const y = Math.round(courtTop + (i / SCARS) * courtH);
+            for (const side of [-1, 1]) {
+              const count = side > 0 ? scarRight[i] : scarLeft[i];
+              if (!count) continue;
+              const load = clamp(Math.log1p(count) / Math.log1p(SCAR_FULL), 0, 1);
+              const len = Math.max(2, Math.round(maxLen * load));
+              ctx.fillStyle = `rgba(255,255,255,${0.2 + load * 0.5})`;
+              ctx.fillRect(side > 0 ? netX + edge : netX - edge - len, y, len, barH);
+            }
+          }
+        }
+
+        function drawPaddle() {
+          bloomRect(netX - paddleW / 2, paddle.y - paddleH / 2, paddleW, paddleH);
+        }
+
+        function drawBall() {
+          const size = ballR * 2;
+          eachBallX(ball.x, (x) => bloomRect(x, ball.y - ballR, size, size));
+        }
+
+        function drawBallTrail() {
+          const size = ballR * 2;
+          for (const point of ballTrail) {
+            const life = 1 - point.age / BALL_TRAIL_LIFE;
+            if (life <= 0) continue;
+            ctx.fillStyle = `rgba(255,255,255,${life * life * 0.5})`;
+            eachBallX(point.x, (x) => ctx.fillRect(x, point.y - ballR, size, size));
+          }
+        }
+
+        function drawPaddleTrail() {
+          const x = netX - paddleW / 2;
+          for (const point of paddleTrail) {
+            const life = 1 - point.age / PADDLE_TRAIL_LIFE;
+            if (life <= 0) continue;
+            ctx.fillStyle = `rgba(255,255,255,${life * life * 0.4})`;
+            ctx.fillRect(x, point.y - paddleH / 2, paddleW, paddleH);
+          }
+        }
+
+        // The ball is drawn on both sides of the seam so the wrap reads as
+        // continuous rather than as a cut.
+        function eachBallX(cx, draw) {
+          const size = ballR * 2;
+          for (const offset of [-courtW, 0, courtW]) {
+            const x = cx + offset - ballR;
+            if (x > viewportW + size || x + size < -size) continue;
+            draw(x);
+          }
+        }
+
+        // Cheap phosphor bloom: concentric dim rectangles, no filters or
+        // shadows, so it renders the same in any browser that has a canvas.
+        function bloomRect(x, y, w, h) {
+          ctx.fillStyle = 'rgba(255,255,255,0.10)';
+          ctx.fillRect(x - 6, y - 6, w + 12, h + 12);
+          ctx.fillStyle = 'rgba(255,255,255,0.22)';
+          ctx.fillRect(x - 3, y - 3, w + 6, h + 6);
+          ctx.fillStyle = WHITE;
+          ctx.fillRect(x, y, w, h);
+        }
+
+        function drawFlash() {
+          if (!flash) return;
+          const life = 1 - flash.t / FLASH_DUR;
+          const alpha = life * life * (flash.miss ? 0.5 : 0.32);
+          const spread = (flash.miss ? 26 : 16) * (1 - life) + 6;
+          ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+          ctx.fillRect(netX - spread, flash.y - 1.5, spread * 2, 3);
+        }
+
+        function drawScore() {
+          const cell = Math.max(3, Math.round(clamp(viewportW * 0.0061, 3, 12)));
+          const y = Math.round(courtTop + courtH * 0.07);
+          const offset = Math.round(viewportW * 0.16);
+          drawNumber(score.left, netX - offset, y, cell);
+          drawNumber(score.right, netX + offset, y, cell);
+        }
+
+        function drawNumber(value, centerX, top, cell) {
+          const text = String(value % 10000).padStart(4, '0');
+          const width = (text.length * 5 + (text.length - 1)) * cell;
+          let x = Math.round(centerX - width / 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.9)';
+          for (const char of text) {
+            const glyph = DIGITS[char];
+            for (let row = 0; row < 7; row += 1) {
+              for (let col = 0; col < 5; col += 1) {
+                if (glyph[row][col] === '1') ctx.fillRect(x + col * cell, top + row * cell, cell, cell);
+              }
+            }
+            x += cell * 6;
+          }
+        }
+
+        function drawScanlines() {
+          ctx.fillStyle = 'rgba(0,0,0,0.16)';
+          for (let y = 0; y < viewportH; y += 3) ctx.fillRect(0, y, viewportW, 1);
+        }
+
+        function drawCaption() {
+          ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'alphabetic';
+          ctx.fillStyle = 'rgba(255,255,255,0.34)';
+          ctx.fillText('Paddle · 2026 · eight of ten · click to reseed', netX, viewportH - 8);
+          ctx.textAlign = 'left';
+        }
+
+        function drawDebug() {
+          const rate = stats.passes ? ((stats.catches / stats.passes) * 100).toFixed(1) : '—';
+          const lines = [
+            `passes ${stats.passes}`,
+            `catches ${stats.catches}  misses ${stats.misses}`,
+            `catch rate ${rate}%`,
+            `geometry disagreements ${stats.disagree}`,
+            `next ${pass.isMiss ? 'MISS' : 'catch'}`,
+          ];
+          ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
+          ctx.fillStyle = 'rgba(255,255,255,0.75)';
+          ctx.textAlign = 'left';
+          lines.forEach((line, i) => ctx.fillText(line, 12, courtTop + 16 + i * 14));
+        }
+
+        function fold(value, lo, hi) {
+          const span = hi - lo;
+          if (span <= 0) return lo;
+          let t = (value - lo) % (span * 2);
+          if (t < 0) t += span * 2;
+          if (t > span) t = span * 2 - t;
+          return lo + t;
+        }
+
+        function smootherStep(value) {
+          const t = clamp(value, 0, 1);
+          return t * t * t * (t * (t * 6 - 15) + 10);
+        }
+
+        function clamp(value, min, max) {
+          return Math.max(min, Math.min(max, value));
+        }
+
+        function mulberry32(seed) {
+          let a = seed >>> 0;
+          return function random() {
+            a = (a + 0x6d2b79f5) >>> 0;
+            let t = a;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+      })();
+    </script>
+  </body>
+</html>

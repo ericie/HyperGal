@@ -3,5 +3,5 @@
   "year": 2026,
   "type": "interactive",
   "thumbnail": "thumbnail.svg",
-  "description": "A yellow arcade car hunts for the fastest lane in dense traffic. Other cars carry aggression and compassion values, signal unevenly, avoid obstacles, and sometimes let the hero merge. Each car the hero passes is +1; each car that passes the hero is -1."
+  "description": "One yellow arcade car hunts for the fastest lane through gray traffic, speeding up or backing off to make openings, but never exits. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray cars can take ramps and leave the highway. Every car claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car alone scores: each gray car it passes is +1."
 }

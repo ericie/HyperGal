@@ -34,10 +34,6 @@
       const SHIP_TURN = 5.25;
       const AUTO_TURN_GAIN = 1.8;
       const AUTO_TURN_DEADZONE = .085;
-      const SHIP_DRAG = 0.24;
-      const AUTO_THRUST_DRAG = .36;
-      const AUTO_COAST_DRAG = .76;
-      const AUTO_BRAKE_DRAG = .93;
       const SHIP_R = 13;
       const MAX_ROCKS = 64;
       const MIN_ROCK_R = 5.5;
@@ -46,12 +42,12 @@
       const CAPTURE_PULL = 2.7;
       const ROCK_INERTIA = 1.7;
       const MAX_ROCK_SPEED = 132;
+      const MAX_ROCK_SPIN = .48;
       const COLLISION_BOUNCE = .16;
       const CONTACT_SKIN = 1.2;
       const GLUE_SETTLE_TIME = .46;
       const MERGE_TOUCH_PAD = 2.4;
       const SEAM_DECAY = .3;
-      const ROCK_DRAG = 0.052;
       const LINE = 'rgba(244,255,250,';
 
       let W = 0, H = 0, dpr = 1;
@@ -123,6 +119,7 @@
           autoAvoidRockId: null,
           autoAvoidSide: 1,
           autoAvoidSideUntil: 0,
+          autoBrakeUntil: 0,
           autoPauseUntil: rand(1.1, 2.8),
           autoCruiseUntil: 0,
           cruiseAngle: rand(-Math.PI, Math.PI),
@@ -198,6 +195,10 @@
           crackPhase: opts.crackPhase ?? rand(0, TAU),
           mergeFlash: opts.mergeFlash ?? 0,
           seams: opts.seams ? opts.seams.slice() : [],
+          mergeAge: opts.mergeAge ?? 1,
+          mergeDuration: opts.mergeDuration ?? 0,
+          mergeGhosts: opts.mergeGhosts ? opts.mergeGhosts.map(copyMergeGhost) : [],
+          mergeAbsorb: opts.mergeAbsorb ? copyMergeAbsorb(opts.mergeAbsorb) : null,
         };
       }
 
@@ -212,6 +213,34 @@
           rot: lobe.rot || 0,
           hull: copyHull(lobe.hull),
           mass: lobe.mass ?? Math.max(MIN_ROCK_R * MIN_ROCK_R, hullRadius(lobe.hull) ** 2),
+        };
+      }
+
+      function copyMergeGhost(ghost) {
+        return {
+          startX: ghost.startX,
+          startY: ghost.startY,
+          startRot: ghost.startRot || 0,
+          endX: ghost.endX,
+          endY: ghost.endY,
+          endRot: ghost.endRot || 0,
+          hull: copyHull(ghost.hull),
+        };
+      }
+
+      function copyMergeAbsorb(anim) {
+        return {
+          bigX: anim.bigX,
+          bigY: anim.bigY,
+          bigRot: anim.bigRot || 0,
+          bigHull: copyHull(anim.bigHull),
+          bigRadius: anim.bigRadius,
+          smallX: anim.smallX,
+          smallY: anim.smallY,
+          smallRot: anim.smallRot || 0,
+          smallHull: copyHull(anim.smallHull),
+          smallRadius: anim.smallRadius,
+          targetScale: anim.targetScale,
         };
       }
 
@@ -448,24 +477,6 @@
           if (Math.random() < .42) thrustSpark();
         }
 
-        const dragRate = playerControl ? SHIP_DRAG : controls.thrust ? AUTO_THRUST_DRAG : controls.hardBrake ? AUTO_BRAKE_DRAG : AUTO_COAST_DRAG;
-        const drag = Math.pow(1 - dragRate, dt);
-        ship.vx *= drag;
-        ship.vy *= drag;
-        const maxShipSpeed = playerControl ? 360 : controls.thrust ? 150 : 72;
-        let speed = shipSpeed();
-        if (speed > maxShipSpeed) {
-          ship.vx = (ship.vx / speed) * maxShipSpeed;
-          ship.vy = (ship.vy / speed) * maxShipSpeed;
-          speed = maxShipSpeed;
-        }
-        if (!playerControl && !controls.thrust) {
-          const stopSpeed = controls.hardBrake ? 42 : 18;
-          if (speed < stopSpeed) {
-            ship.vx = 0;
-            ship.vy = 0;
-          }
-        }
         ship.x = wrap(ship.x + ship.vx * dt, W);
         ship.y = wrap(ship.y + ship.vy * dt, H);
         ship.fireCd = Math.max(0, ship.fireCd - dt);
@@ -494,27 +505,39 @@
         let thrust = false;
         let evading = false;
         let escapeBurn = false;
+        let braking = false;
         let urgentSteer = false;
         let steerMode = 'cruise';
         const speed = shipSpeed();
         const threat = danger ? Math.min(danger.clearance, danger.predictedClearance) : Infinity;
+        const openingClear = danger && danger.closing < -12 && danger.clearance > 52 && danger.predictedClearance > 72;
         const pausing = now < ship.autoPauseUntil && threat > 170;
+        if (speed > 18 && threat > 105) ship.autoBrakeUntil = Math.max(ship.autoBrakeUntil || 0, now + .9);
+        if (speed < 6 || threat <= 130) ship.autoBrakeUntil = Math.min(ship.autoBrakeUntil || 0, now);
+        const wantsStationary = speed > 7 && threat > 95 && now < (ship.autoBrakeUntil || 0);
 
-        if (pausing) {
-          desired = aimAngle != null && threat > 90 ? aimAngle : ship.cruiseAngle;
-          steerMode = aimAngle != null && threat > 90 ? 'aim' : 'cruise';
-        } else if (danger && threat < 94 + speed * .1) {
+        if (danger && !openingClear && threat < 130 + speed * .16) {
           desired = evasionAngle(danger, true);
           evading = true;
-          escapeBurn = threat < 46 || danger.predictedClearance < 36 || (danger.closing > 42 && threat < 120);
+          escapeBurn = threat < 34 || danger.predictedClearance < 24 ||
+            (danger.closing > 12 && (threat < 90 || danger.predictedClearance < 84)) ||
+            (danger.closing > 34 && threat < 150);
           urgentSteer = true;
           steerMode = 'avoid';
-        } else if (danger && threat < 285 + speed * .12) {
+        } else if (danger && !openingClear && threat < 340 + speed * .18) {
           desired = evasionAngle(danger, false);
+          evading = true;
           steerMode = 'avoid';
           const aim = Math.abs(normAngle(desired - ship.a));
-          escapeBurn = danger.closing > 22 && danger.predictedClearance < 125 && threat < 210;
-          thrust = escapeBurn && aim < .82 && speed < 105 && danger.dist > 90;
+          escapeBurn = danger.closing > 8 || danger.predictedClearance < 160 || threat < 180;
+          thrust = escapeBurn && aim < 1.05 && speed < 190 && danger.dist > 65;
+        } else if (wantsStationary) {
+          desired = Math.atan2(-ship.vy, -ship.vx);
+          steerMode = 'brake';
+          braking = true;
+        } else if (pausing) {
+          desired = aimAngle != null && threat > 90 ? aimAngle : ship.cruiseAngle;
+          steerMode = aimAngle != null && threat > 90 ? 'aim' : 'cruise';
         } else if (aimAngle != null) {
           desired = aimAngle;
           steerMode = 'aim';
@@ -528,13 +551,15 @@
 
         desired = holdAutoSteer(desired, steerMode, urgentSteer);
         const delta = normAngle(desired - ship.a);
-        if (evading) thrust = escapeBurn && Math.abs(delta) < 1.35 && speed < 125;
+        if (evading) thrust = escapeBurn && Math.abs(delta) < 1.25 && speed < 230 && danger.dist > 46;
+        if (braking) thrust = Math.abs(delta) < .62 && speed > 5.5;
         const patient = now - ship.lastShot > 2.2 && bullets.length < MAX_BULLETS;
         const shotReady = now >= ship.nextAutoShot && ship.fireCd <= 0 && bullets.length < MAX_BULLETS;
         let shoot = false;
         let fireAngle = null;
         if (ship.autoBurstLeft > 0 && now - ship.autoBurstAt > .9) ship.autoBurstLeft = 0;
-        if (ship.autoBurstLeft > 0 && now >= ship.autoBurstAt && threat > 80 && ship.fireCd <= 0 && bullets.length < MAX_BULLETS) {
+        if (evading && threat < 170) ship.autoBurstLeft = 0;
+        if (!evading && ship.autoBurstLeft > 0 && now >= ship.autoBurstAt && threat > 80 && ship.fireCd <= 0 && bullets.length < MAX_BULLETS) {
           const burstShot = autoShot();
           if (burstShot && burstShot.aim < burstShot.cone * 1.24) {
             shoot = true;
@@ -544,7 +569,7 @@
           } else {
             ship.autoBurstLeft = 0;
           }
-        } else if (threat > 90 && shotReady && !!shot && (shot.aim < shot.cone || (patient && shot.aim < shot.cone * 1.22))) {
+        } else if (!braking && !evading && threat > 90 && shotReady && !!shot && (shot.aim < shot.cone || (patient && shot.aim < shot.cone * 1.22))) {
           shoot = true;
           fireAngle = shot.angle;
           const burst = autoBurstCountForShot(shot);
@@ -552,15 +577,14 @@
           ship.autoBurstAt = now + rand(.1, .18);
           ship.nextAutoShot = now + rand(burst > 1 ? .52 : .34, burst > 1 ? 1.05 : .72);
         }
-        const turnGain = evading ? 1.45 : 1.12;
-        const maxTurn = evading ? .88 : .68;
+        const turnGain = evading ? (urgentSteer ? 2.05 : 1.75) : 1.12;
+        const maxTurn = evading ? (urgentSteer ? 1 : .92) : .68;
         let turn = clamp(delta * turnGain, -maxTurn, maxTurn);
         if (Math.abs(delta) < (evading ? AUTO_TURN_DEADZONE : .12)) turn = 0;
         else if (!evading && Math.abs(delta) < .36) turn *= .16;
         return {
           turn,
           thrust,
-          hardBrake: !thrust && (steerMode !== 'avoid' || threat > 120 || !danger || danger.closing <= 0),
           fire: shoot,
           fireAngle,
         };
@@ -568,7 +592,7 @@
 
       function updateAutoMood(danger) {
         const threat = danger ? Math.min(danger.clearance, danger.predictedClearance) : Infinity;
-        if (danger && threat < 170) {
+        if (danger && threat < 220) {
           ship.autoPauseUntil = Math.min(ship.autoPauseUntil || 0, now);
           if (now >= ship.autoCruiseUntil) ship.autoCruiseUntil = now + rand(.35, .85);
           return;
@@ -650,14 +674,14 @@
         const rvy = rock.vy - ship.vy;
         const rv2 = rvx * rvx + rvy * rvy;
         const closing = rv2 > .001 ? -(dx * rvx + dy * rvy) / Math.max(1, dist) : 0;
-        const time = rv2 > .001 ? clamp(-(dx * rvx + dy * rvy) / rv2, 0, 2.6) : 0;
+        const time = rv2 > .001 ? clamp(-(dx * rvx + dy * rvy) / rv2, 0, 3.2) : 0;
         const pdx = dx + rvx * time;
         const pdy = dy + rvy * time;
         const predictedDist = Math.hypot(pdx, pdy);
         const predictedClearance = predictedDist - rockExtent(rock) - SHIP_R;
         const risk = Math.min(clearance, predictedClearance) -
-          Math.max(0, closing) * .22 -
-          Math.max(0, 2.6 - time) * 7;
+          Math.max(0, closing) * .36 -
+          Math.max(0, 3.2 - time) * 10;
         return { rock, dx, dy, dist, clearance, rvx, rvy, time, pdx, pdy, predictedClearance, closing, risk };
       }
 
@@ -675,7 +699,7 @@
           ship.autoAvoidSide = naturalSide;
           ship.autoAvoidSideUntil = now + (urgent ? .42 : .68);
         }
-        const lateral = urgent ? .72 : .46;
+        const lateral = urgent ? .94 : .62;
         const awayX = -px + (-rvy * side) * lateral;
         const awayY = -py + (rvx * side) * lateral;
         return Math.atan2(awayY, awayX);
@@ -783,6 +807,7 @@
         ship.autoAvoidRockId = null;
         ship.autoAvoidSide = 1;
         ship.autoAvoidSideUntil = now;
+        ship.autoBrakeUntil = now;
         ship.autoPauseUntil = now + rand(1.1, 2.6);
         ship.autoCruiseUntil = now + rand(.8, 1.8);
         ship.cruiseAngle = rand(-Math.PI, Math.PI);
@@ -816,14 +841,6 @@
         });
         ship.lastShot = now;
         ship.fireCd = playerControl ? .12 : .12;
-        if (!playerControl) {
-          ship.vx *= .42;
-          ship.vy *= .42;
-          if (shipSpeed() < 24) {
-            ship.vx = 0;
-            ship.vy = 0;
-          }
-        }
         return 1;
       }
 
@@ -852,16 +869,19 @@
           }
           r.x = wrap(r.x + r.vx * dt, W);
           r.y = wrap(r.y + r.vy * dt, H);
+          r.vr = clamp(r.vr, -MAX_ROCK_SPIN, MAX_ROCK_SPIN);
           r.rot += r.vr * dt;
           r.crack = Math.max(0, r.crack - dt * .055);
           r.mergeFlash = Math.max(0, r.mergeFlash - dt * 1.25);
+          if (r.mergeDuration > 0 && r.mergeAge < r.mergeDuration) {
+            r.mergeAge = Math.min(r.mergeDuration, r.mergeAge + dt);
+            if (r.mergeAge >= r.mergeDuration) {
+              r.mergeGhosts = [];
+              r.mergeAbsorb = null;
+            }
+          }
           for (const seam of r.seams) seam.life = Math.max(0, seam.life - dt * SEAM_DECAY);
           r.seams = r.seams.filter((seam) => seam.life > .015);
-
-          const drag = Math.pow(1 - ROCK_DRAG, dt);
-          r.vx *= drag;
-          r.vy *= drag;
-          r.vr *= Math.pow(.6, dt);
         }
 
         resolveRockCollisions(dt);
@@ -925,7 +945,8 @@
         small.vy += py * dt;
         big.vx -= px * dt * (small.mass / big.mass) * .045;
         big.vy -= py * dt * (small.mass / big.mass) * .045;
-        small.vr += clamp((dir.x * small.vy - dir.y * small.vx) * .0014, -.045, .045) * falloff;
+        const spinNudge = clamp((dir.x * small.vy - dir.y * small.vx) * .00036, -.012, .012);
+        small.vr = clamp(small.vr + spinNudge * falloff * Math.min(1, dt * 60), -MAX_ROCK_SPIN, MAX_ROCK_SPIN);
       }
 
       function resolveRockCollisions(dt) {
@@ -970,8 +991,9 @@
               b.vx -= tangentImpulse * invB * tx;
               b.vy -= tangentImpulse * invB * ty;
 
-              a.vr += clamp((contact.nx * rvy - contact.ny * rvx) * invA * 3.4, -.045, .045);
-              b.vr -= clamp((contact.nx * rvy - contact.ny * rvx) * invB * 3.4, -.045, .045);
+              const spinKick = clamp((contact.nx * rvy - contact.ny * rvx) * .00045, -.01, .01) * Math.min(1, dt * 60);
+              a.vr = clamp(a.vr + spinKick, -MAX_ROCK_SPIN, MAX_ROCK_SPIN);
+              b.vr = clamp(b.vr - spinKick, -MAX_ROCK_SPIN, MAX_ROCK_SPIN);
             }
           }
         }
@@ -1053,13 +1075,35 @@
         const y = wrap(a.y + dy * (b.mass / total), H);
         const aLocal = { x: wrapDelta(a.x - x, W), y: wrapDelta(a.y - y, H) };
         const bLocal = { x: wrapDelta(b.x - x, W), y: wrapDelta(b.y - y, H) };
-        const lobes = compactMergedLobes([
+        const carried = [
           ...carryLobes(a, x, y, 0),
           ...carryLobes(b, x, y, 0),
-        ], Math.sqrt(total));
+        ];
+        const lobes = compactMergedLobes(carried, Math.sqrt(total));
+        const bigSource = a.radius >= b.radius ? a : b;
+        const smallSource = bigSource === a ? b : a;
+        const bigLocal = bigSource === a ? aLocal : bLocal;
+        const smallLocal = bigSource === a ? bLocal : aLocal;
+        const bigRadius = rockExtent(bigSource);
+        const smallRadius = rockExtent(smallSource);
+        const centerGap = Math.hypot(smallLocal.x - bigLocal.x, smallLocal.y - bigLocal.y);
+        const targetScale = clamp((centerGap + smallRadius * 1.08) / Math.max(1, bigRadius), 1.08, 2.65);
+        const mergeAbsorb = {
+          bigX: bigLocal.x,
+          bigY: bigLocal.y,
+          bigRot: bigSource.rot,
+          bigHull: copyHull(bigSource.hull),
+          bigRadius,
+          smallX: smallLocal.x,
+          smallY: smallLocal.y,
+          smallRot: smallSource.rot,
+          smallHull: copyHull(smallSource.hull),
+          smallRadius,
+          targetScale,
+        };
         const radius = clamp(Math.sqrt(total), MIN_ROCK_R, maxRockRadius());
         const hull = makeCompoundHull(lobes);
-        const bounds = Math.max(radius, hullRadius(hull));
+        const bounds = Math.max(radius, hullRadius(hull), compoundBounds(carried));
         const seams = [
           ...carrySeams(a, x, y, 0),
           ...carrySeams(b, x, y, 0),
@@ -1068,15 +1112,18 @@
         const merged = makeRock(x, y, radius, {
           vx: (a.vx * a.mass + b.vx * b.mass) / total,
           vy: (a.vy * a.mass + b.vy * b.mass) / total,
-          vr: (a.vr * a.mass + b.vr * b.mass) / total + rand(-.08, .08),
+          vr: clamp((a.vr * a.mass + b.vr * b.mass) / total, -MAX_ROCK_SPIN * .45, MAX_ROCK_SPIN * .45),
           rot: 0,
           lobes,
           hull,
           mass: total,
           bounds,
           crack: Math.max(a.crack, b.crack, .35),
-          mergeFlash: .58,
+          mergeFlash: 0,
           seams,
+          mergeAge: 0,
+          mergeDuration: .78,
+          mergeAbsorb,
         });
         clearContactsFor(a, b);
         burst(x, y, 11, 70);
@@ -1440,7 +1487,7 @@
               mass: childMass,
               vx: rock.vx * .34 + Math.cos(a) * kick + Math.cos(tangent) * rand(-26, 26),
               vy: rock.vy * .34 + Math.sin(a) * kick + Math.sin(tangent) * rand(-26, 26),
-              vr: rock.vr * .45 + rand(-1.25, 1.25),
+              vr: clamp(rock.vr * .35 + rand(-.32, .32), -MAX_ROCK_SPIN, MAX_ROCK_SPIN),
               crack: 1,
               mergeFlash: .22,
             }
@@ -1467,7 +1514,7 @@
         const kick = clamp(215 - rock.radius * 2.3, 82, 178);
         rock.vx += Math.cos(away) * kick + Math.cos(side) * rand(-24, 24);
         rock.vy += Math.sin(away) * kick + Math.sin(side) * rand(-24, 24);
-        rock.vr += rand(-1.45, 1.45);
+        rock.vr = clamp(rock.vr + rand(-.28, .28), -MAX_ROCK_SPIN, MAX_ROCK_SPIN);
         rock.crack = 1;
         rock.mergeFlash = .46;
         burstDirected(x, y, 12, 115, away, .7);
@@ -1548,14 +1595,50 @@
       function drawRocks() {
         drawAttractionBridges();
         for (const rock of rocks) {
-          drawWrappedObject(rock.x, rock.y, rockExtent(rock) + 12, (cx, cy) => drawRockAt(rock, cx, cy));
+          drawWrappedObject(rock.x, rock.y, rockDrawExtent(rock), (cx, cy) => drawRockAt(rock, cx, cy));
         }
       }
 
+      function rockDrawExtent(rock) {
+        let extent = rockExtent(rock) + 12;
+        const anim = rock.mergeAbsorb;
+        if (rock.mergeDuration > 0 && rock.mergeAge < rock.mergeDuration && anim) {
+          const bigReach = Math.hypot(anim.bigX, anim.bigY) + anim.bigRadius * anim.targetScale;
+          const smallReach = Math.hypot(anim.smallX, anim.smallY) + anim.smallRadius;
+          extent = Math.max(extent, bigReach, smallReach) + 16;
+        }
+        return extent;
+      }
+
       function drawRockAt(rock, cx, cy) {
+        const absorbing = rock.mergeDuration > 0 && rock.mergeAge < rock.mergeDuration && rock.mergeAbsorb;
+        if (absorbing) {
+          const t = clamp(rock.mergeAge / rock.mergeDuration, 0, 1);
+          drawAbsorbAt(rock, cx, cy, t);
+          return;
+        }
         drawHullAt(rock, cx, cy, .7 + rock.mergeFlash * .22);
         if (rock.seams.length) drawSeamsAt(rock, cx, cy);
         if (rock.crack > .02) drawCracksAt(rock, cx, cy);
+      }
+
+      function easeOutCubic(t) {
+        return 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+      }
+
+      function drawAbsorbAt(rock, cx, cy, t) {
+        const anim = rock.mergeAbsorb;
+        const reach = easeOutCubic(clamp(t / .9, 0, 1));
+        const push = .22 * reach;
+        const bigX = anim.bigX + (anim.smallX - anim.bigX) * push;
+        const bigY = anim.bigY + (anim.smallY - anim.bigY) * push;
+        const bigRot = normAngle(anim.bigRot + normAngle(anim.smallRot - anim.bigRot) * .06 * reach);
+        const scale = 1 + (anim.targetScale - 1) * reach;
+        const gap = Math.hypot(anim.smallX - bigX, anim.smallY - bigY);
+        const coversSmall = scale * anim.bigRadius >= gap + anim.smallRadius * .86;
+
+        if (!coversSmall) drawLocalHullAt(rock, cx, cy, anim.smallX, anim.smallY, anim.smallRot, anim.smallHull, .62, 1);
+        drawLocalHullAt(rock, cx, cy, bigX, bigY, bigRot, anim.bigHull, .82, scale);
       }
 
       function drawAttractionBridges() {
@@ -1609,6 +1692,22 @@
         strokePath(pts, true, 1.25, alpha);
       }
 
+      function drawLocalHullAt(rock, cx, cy, lx, ly, lrot, hull, alpha, scale = 1) {
+        const rca = Math.cos(rock.rot), rsa = Math.sin(rock.rot);
+        const lca = Math.cos(lrot), lsa = Math.sin(lrot);
+        const pts = hull.map(([x, y]) => {
+          const sx = x * scale;
+          const sy = y * scale;
+          const px = lx + sx * lca - sy * lsa;
+          const py = ly + sx * lsa + sy * lca;
+          return {
+            x: cx + px * rca - py * rsa,
+            y: cy + px * rsa + py * rca,
+          };
+        });
+        strokePath(pts, true, 1, alpha);
+      }
+
       function drawSeamsAt(rock, cx, cy) {
         const ca = Math.cos(rock.rot), sa = Math.sin(rock.rot);
         for (const seam of rock.seams) {
@@ -1625,7 +1724,7 @@
       }
 
       function drawDissolvingLine(p1, p2, life) {
-        const alpha = Math.pow(life, 1.35) * .4;
+        const alpha = .36;
         if (life > .58) {
           strokePath([p1, p2], false, .85, alpha);
           return;

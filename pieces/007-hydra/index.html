@@ -24,15 +24,14 @@
   </head>
   <body>
     <canvas id="stage"></canvas>
-    <div class="caption">hydra · 2026 · five snakes, one mouse · click to reseed</div>
+    <div class="caption">hydra · 2026 · five contenders, one mouse · click to reseed</div>
     <script>
       // hydra — autonomous traditional Snake, rendered as a luminous fossil field.
       //
-      // Five snakes hunt one mouse. Snakes enter with varied length and
-      // aggression, which tilt each one between chasing the mouse and preserving
-      // room around bodies. Edge, self, and other-snake contact kill one snake;
-      // its body becomes a layered stain and bone trace, then the mouse becomes
-      // the replacement snake.
+      // Five contenders hunt one mouse. Snakes enter from beyond the arena with
+      // varied length and aggression, which tilt each one between chasing the
+      // mouse and preserving room around bodies. Edge, self, and other-snake
+      // contact kill one snake; its body becomes a layered stain and bone trace.
       //
       // The look is saturated snakes over a black arena: connected glowing
       // bodies, organic colored residue, pale ribs, and a little screen grain.
@@ -44,7 +43,7 @@
       const STEP = 0.16;         // starting seconds per snake move
       const MIN_STEP = 0.12;     // longest snakes still need to be readable
       const SPEEDUP_PER_SEG = 0.003;
-      const GROW = 1;            // traditional Snake: one segment gained per mouse
+      const GROW = 1;            // base growth; consecutive mouse catches multiply it
       const START_SNAKES = 5;
       const START_LEN_MIN = 4;
       const START_LEN_MAX = 9;
@@ -81,7 +80,7 @@
 
       // ---- state ----------------------------------------------------------
       let W = 0, H = 0, dpr = 1, CELL = 18, GW = 0, GH = 0, OX = 0, OY = 0;
-      let snakes = [], mouse = null, pools = [];
+      let snakes = [], mouse = null, pools = [], lastEater = null;
       let last = 0, frame = 0, colorCursor = 0;
 
       const DIRS = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
@@ -100,6 +99,9 @@
       const nextColorIndex = () => colorCursor++ % SNAKE_PALETTE.length;
       const newStartLength = () => START_LEN_MIN + ((Math.random() * (START_LEN_MAX - START_LEN_MIN + 1)) | 0);
       const newAggression = () => rand(AGGRESSION_MIN, AGGRESSION_MAX);
+      const nextEatStreak = (s) => lastEater === s ? (s.eatStreak || 0) + 1 : 1;
+      const growthForStreak = (streak) => GROW * Math.max(1, streak);
+      const growthForNextMouse = (s) => growthForStreak(nextEatStreak(s));
       const effectiveAggression = (s) => Math.min(AGGRESSION_CAP, s.aggression + Math.max(0, s.body.length - START_LEN_MIN) * AGGRESSION_PER_SEG);
       const moveInterval = (s) => Math.max(MIN_STEP, STEP - Math.max(0, s.body.length - START_LEN_MIN) * SPEEDUP_PER_SEG);
       const occupiedBySnakes = (x, y, list = snakes) => list.some(s => s.body.some(p => p.x === x && p.y === y));
@@ -144,28 +146,53 @@
           if (!fits.length) continue;
           const dir = pick(fits);
           const body = buildBody(seed.x, seed.y, len, dir);
-          return { body, dir, grow: 0, prev: copyBody(body), colorIndex, aggression, moveAcc: 0 };
+          return { body, dir, grow: 0, prev: copyBody(body), colorIndex, aggression, moveAcc: 0, eatStreak: 0 };
         }
         const dir = pick(DIRS);
         const body = buildBody(x, y, Math.min(len, START_LEN_MIN), dir).filter(p => inB(p.x, p.y));
-        return { body, dir, grow: 0, prev: copyBody(body), colorIndex, aggression, moveAcc: 0 };
+        return { body, dir, grow: 0, prev: copyBody(body), colorIndex, aggression, moveAcc: 0, eatStreak: 0 };
+      }
+
+      function entrySpec(side, lane) {
+        if (side === 0) return { x: -1, y: lane, dir: { x: 1, y: 0 } };
+        if (side === 1) return { x: GW, y: lane, dir: { x: -1, y: 0 } };
+        if (side === 2) return { x: lane, y: -1, dir: { x: 0, y: 1 } };
+        return { x: lane, y: GH, dir: { x: 0, y: -1 } };
+      }
+
+      function makeEntrySnake(avoid = snakes, reserved = new Set()) {
+        const len = newStartLength();
+        const colorIndex = nextColorIndex();
+        const aggression = newAggression();
+        for (let t = 0; t < 300; t++) {
+          const side = t < 4 ? t : (Math.random() * 4) | 0;
+          const span = side < 2 ? GH : GW;
+          const lane = t < 4 ? Math.max(0, Math.min(span - 1, Math.floor(span * (t + 0.5) / 4))) : (Math.random() * span) | 0;
+          const spec = entrySpec(side, lane);
+          const entry = { x: spec.x + spec.dir.x, y: spec.y + spec.dir.y };
+          const ek = key(entry);
+          if (!inB(entry.x, entry.y) || occupiedBySnakes(entry.x, entry.y, avoid) || reserved.has(ek)) continue;
+          const body = buildBody(spec.x, spec.y, len, spec.dir);
+          reserved.add(ek);
+          return { body, dir: spec.dir, grow: 0, prev: copyBody(body), colorIndex, aggression, moveAcc: 0, eatStreak: 0 };
+        }
+        const spec = entrySpec((Math.random() * 4) | 0, 0);
+        const body = buildBody(spec.x, spec.y, len, spec.dir);
+        return { body, dir: spec.dir, grow: 0, prev: copyBody(body), colorIndex, aggression, moveAcc: 0, eatStreak: 0 };
+      }
+
+      function bringContenders(list = snakes) {
+        const reserved = new Set();
+        while (list.length < START_SNAKES) list.push(makeEntrySnake(list, reserved));
       }
 
       function spawnMouse(list = snakes) {
         mouse = randomFreeCell(list);
       }
 
-      function makeReplacement(avoid = snakes) {
-        const seed = mouse && !occupiedBySnakes(mouse.x, mouse.y, avoid) ? mouse : randomFreeCell(avoid);
-        return makeSnake(seed.x, seed.y, newStartLength(), nextColorIndex(), newAggression(), avoid);
-      }
-
       function reset() {
-        snakes = []; mouse = null; pools = []; colorCursor = 0;
-        for (let i = 0; i < START_SNAKES; i++) {
-          const start = randomFreeCell(snakes);
-          snakes.push(makeSnake(start.x, start.y, newStartLength(), nextColorIndex(), newAggression(), snakes));
-        }
+        snakes = []; mouse = null; pools = []; lastEater = null; colorCursor = 0;
+        bringContenders(snakes);
         spawnMouse();
       }
 
@@ -307,11 +334,12 @@
         const future = futureBodyAfter(s, nx, ate);
         const area = floodArea(s, nx, future);
         const path = pathDistanceToMouse(s, nx, future);
-        const bodyNeed = s.body.length + s.grow + (ate ? GROW : 0);
+        const eatGrowth = ate ? growthForNextMouse(s) : 0;
+        const bodyNeed = s.body.length + s.grow + eatGrowth;
         const crampedPenalty = Math.max(0, bodyNeed - area) * 45;
         const pathScore = Number.isFinite(path) ? 140 - path * 7 : -mouseDist * 8 - 90;
         const dangerScore = area * 3 + Math.min(8, nearestOtherDistance(s, nx)) * 16 - crampedPenalty;
-        const huntScore = pathScore + (ate ? 180 : 0);
+        const huntScore = pathScore + (ate ? 160 + eatGrowth * 35 : 0);
         const trapScore = boxingScore(s, nx, future);
         const edgePressure = Math.max(0, 2 - borderDistance(h));
         const edgeRelief = Math.max(0, borderDistance(nx) - borderDistance(h));
@@ -376,25 +404,36 @@
 
         const next = [];
         let mouseEaten = false;
+        let eater = null;
         for (const s of current) {
           if (dead.has(s)) continue;
           if (!movingSet.has(s)) { next.push(s); continue; }
           const { nx } = plans.get(s);
           const ate = !dead.size && sameCell(nx, mouse);
           s.body.unshift(nx);
-          if (ate) { s.grow += GROW; mouseEaten = true; }
+          if (ate) {
+            s.eatStreak = nextEatStreak(s);
+            s.grow += growthForStreak(s.eatStreak);
+            mouseEaten = true;
+            eater = s;
+          }
           if (s.grow > 0) s.grow--; else s.body.pop();
           next.push(s);
+        }
+
+        if (eater) {
+          lastEater = eater;
+          for (const s of next) if (s !== eater) s.eatStreak = 0;
+        } else if (dead.has(lastEater)) {
+          lastEater = null;
         }
 
         for (const s of current) {
           if (!dead.has(s)) continue;
           recordDeath(s);
-          const replacement = makeReplacement(next);
-          next.push(replacement);
-          spawnMouse(next);
         }
 
+        if (next.length <= 1) bringContenders(next);
         snakes = next.slice(0, START_SNAKES);
         if (mouseEaten && !dead.size) spawnMouse(snakes);
       }

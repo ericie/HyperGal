@@ -51,7 +51,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Happiness Hunter: a yellow arcade car searches for faster lanes, signals into traffic, avoids obstacles, and scores by passing cars."
+      aria-label="Happiness Hunter: one yellow car and many gray cars slide between lanes, avoid obstacles, and score only when the yellow car passes traffic."
     ></canvas>
 
     <script>
@@ -65,36 +65,27 @@
 
         const TAU = Math.PI * 2;
         const LANES = 5;
+        const ROAD_PATTERN = [5, 4, 2, 5, 3, 2, 4, 5];
+        const ROAD_TRANSITION_METERS = 88;
         const HERO_YELLOW = '#ffd21f';
-        const CAR_COLORS = [
-          '#ef3e36',
-          '#2f7cff',
-          '#26b36a',
-          '#b24dff',
-          '#ff5b8d',
-          '#28c7cc',
-          '#f1732e',
-          '#f1f4ff',
-          '#8b5aef',
-          '#00a86b',
-        ];
+        const TRAFFIC_GRAYS = ['#545b65', '#656d78', '#777f8a', '#8a929d', '#9da4ae'];
         const COLORS = {
           sky: '#070910',
           asphalt: '#1a1f28',
-          asphalt2: '#222936',
           shoulder: '#34404d',
           lane: '#dce7f2',
           laneDim: 'rgba(220, 231, 242, 0.18)',
           ink: '#030407',
           hud: '#f8f4df',
-          hudDim: 'rgba(248, 244, 223, 0.56)',
+          hudHot: '#fff6a8',
           amber: '#ffb000',
           amberOff: '#5a4208',
-          red: '#ff3b2f',
           blue: '#33d6ff',
           green: '#17c964',
+          red: '#ff3b2f',
           cone: '#ff7a1a',
           barricade: '#f5f2df',
+          grayCar: '#737b86',
         };
 
         let width = 1;
@@ -111,10 +102,13 @@
         let cars = [];
         let obstacles = [];
         let exits = [];
+        let roadSections = [];
         let score = 0;
         let nextCarId = 1;
-        let nextObstacleS = 160;
-        let nextExitS = 520;
+        let nextObstacleS = 180;
+        let nextExitS = 620;
+        let nextRoadSectionS = 260;
+        let roadPatternIndex = 0;
         let lastFrameAt = 0;
         let raf = 0;
         let prefersReducedMotion = reduceQuery.matches;
@@ -160,20 +154,26 @@
             isHero: true,
             s: 0,
             lane: Math.floor(LANES / 2),
-            lanePos: Math.floor(LANES / 2),
-            targetLane: Math.floor(LANES / 2),
+            drawLane: Math.floor(LANES / 2),
             speed: 27,
-            desiredSpeed: 34,
+            desiredSpeed: 38,
             length: 5.2,
             width: 1.9,
             signal: 0,
-            exitSlow: 0,
+            signalUntil: 0,
+            huntingOpening: false,
+            gapTargetSpeed: null,
+            pathTargetLane: Math.floor(LANES / 2),
+            stoppedForObstacle: false,
           };
           cars = [];
           obstacles = [];
           exits = [];
-          nextObstacleS = rand(150, 240);
-          nextExitS = rand(480, 700);
+          roadSections = [];
+          roadPatternIndex = 0;
+          nextObstacleS = rand(150, 230);
+          nextExitS = rand(520, 740);
+          seedRoadSections();
           seedTraffic();
           scheduleRoadEvents();
         }
@@ -209,12 +209,16 @@
           for (const car of cars) car.prevDelta = car.s - hero.s;
           scheduleRoadEvents();
           maintainTraffic();
-          planHero(dt);
-          for (const car of cars) planTrafficCar(car, dt);
+          planHero(t);
+          for (const car of cars) planTrafficCar(car, t);
           updateSpeed(hero, dt);
           for (const car of cars) updateSpeed(car, dt);
           moveVehicle(hero, dt);
           for (const car of cars) moveVehicle(car, dt);
+          animateLane(hero, dt);
+          for (const car of cars) animateLane(car, dt);
+          enforceObstacleStops();
+          enforceRoadLaneStops();
           preventOverlaps();
           resolveExits(t);
           updateScore();
@@ -223,558 +227,892 @@
 
         function seedTraffic() {
           for (let lane = 0; lane < LANES; lane += 1) {
-            let s = -110 + rand(0, 24);
-            while (s < 330) {
-              s += rand(17, 42);
-              if (lane === hero.lane && Math.abs(s - hero.s) < 24) s += 26;
-              cars.push(makeCar(lane, s));
+            let s = hero.s - 130 + rand(0, 28);
+            while (s < hero.s + 360) {
+              s += rand(48, 96);
+              if (lane === hero.lane && Math.abs(s - hero.s) < 32) s += 38;
+              if (spotIsFree(lane, s, 16, null)) cars.push(makeCar(lane, s));
             }
           }
         }
 
         function maintainTraffic() {
           cars = cars.filter((car) => {
+            if (car.exiting) return car.exitProgress < 1.18;
             const delta = car.s - hero.s;
-            return delta > -135 && delta < 380;
+            return delta > -155 && delta < 470;
           });
 
           for (let lane = 0; lane < LANES; lane += 1) {
             let maxS = -Infinity;
             let minS = Infinity;
             for (const car of cars) {
-              if (Math.round(car.lanePos) !== lane) continue;
+              if (car.exiting) continue;
+              if (car.lane !== lane) continue;
               maxS = Math.max(maxS, car.s);
               minS = Math.min(minS, car.s);
             }
-            if (!Number.isFinite(maxS)) maxS = hero.s + rand(35, 80);
-            while (maxS < hero.s + 335) {
-              maxS += rand(20, 48);
-              cars.push(makeCar(lane, maxS));
+
+            if (!Number.isFinite(maxS)) maxS = hero.s + rand(44, 90);
+            while (maxS < hero.s + 430) {
+              maxS += rand(54, 112);
+              if (spotIsFree(lane, maxS, 18, null)) cars.push(makeCar(lane, maxS));
             }
-            if (!Number.isFinite(minS) || minS > hero.s - 80) {
-              const behind = hero.s - rand(78, 126);
-              cars.push(makeCar(lane, behind, true));
+
+            if (!Number.isFinite(minS) || minS > hero.s - 92) {
+              const behind = hero.s - rand(98, 148);
+              if (spotIsFree(lane, behind, 18, null)) cars.push(makeCar(lane, behind, true));
             }
           }
         }
 
         function makeCar(lane, s, fromBehind = false) {
-          const aggression = Math.pow(random(), 0.82);
-          const compassion = Math.pow(random(), 1.05);
-          const desiredSpeed = rand(22, 34) + aggression * 5.2 - compassion * 1.4;
           const car = {
             id: nextCarId,
             s,
             prevDelta: s - hero.s,
             lane,
-            lanePos: lane,
-            targetLane: lane,
-            speed: fromBehind ? rand(29, 38) : rand(18, 34),
-            desiredSpeed,
-            aggression,
-            compassion,
-            length: rand(4.1, 5.8),
+            drawLane: lane,
+            speed: fromBehind ? rand(29, 37) : rand(18, 32),
+            desiredSpeed: rand(21, 34),
+            length: rand(4.2, 5.7),
             width: rand(1.7, 2.1),
-            color: pick(CAR_COLORS),
+            color: pick(TRAFFIC_GRAYS),
             signal: 0,
-            wantsSignal: 0,
-            mergeCooldown: rand(0.2, 2.4),
-            courtesySeed: random(),
-            yielding: false,
+            signalUntil: 0,
+            mergeCooldown: rand(0.5, 2.8),
+            exitSeed: random(),
+            exitTarget: null,
+            exiting: false,
+            exitProgress: 0,
+            stoppedForObstacle: false,
             scoreFlash: 0,
           };
           nextCarId += 1;
           return car;
         }
 
-        function scheduleRoadEvents() {
-          while (nextObstacleS < hero.s + 660) {
-            obstacles.push(makeObstacle(nextObstacleS));
-            nextObstacleS += rand(190, 360);
+        function seedRoadSections() {
+          const first = { s0: hero.s - 720, s1: hero.s + 260, start: 0, count: LANES };
+          roadSections.push(first);
+          nextRoadSectionS = first.s1;
+          roadPatternIndex = 1;
+          ensureRoadSections();
+        }
+
+        function ensureRoadSections() {
+          if (!roadSections.length) seedRoadSections();
+          while (nextRoadSectionS < hero.s + 1500) {
+            const count = ROAD_PATTERN[roadPatternIndex % ROAD_PATTERN.length];
+            const prev = roadSections[roadSections.length - 1];
+            const start = chooseRoadStart(prev, count);
+            const length = rand(count <= 2 ? 430 : 520, count <= 2 ? 620 : 780);
+            roadSections.push({
+              s0: nextRoadSectionS,
+              s1: nextRoadSectionS + length,
+              start,
+              count,
+            });
+            nextRoadSectionS += length;
+            roadPatternIndex += 1;
           }
-          while (nextExitS < hero.s + 980) {
+        }
+
+        function chooseRoadStart(prev, count) {
+          if (count >= LANES) return 0;
+          const maxStart = LANES - count;
+          const candidates = [];
+          for (let start = 0; start <= maxStart; start += 1) {
+            const end = start + count;
+            const overlap = Math.min(end, prev.start + prev.count) - Math.max(start, prev.start);
+            if (overlap > 0) candidates.push(start);
+          }
+          return pick(candidates.length ? candidates : range(0, maxStart + 1));
+        }
+
+        function scheduleRoadEvents() {
+          ensureRoadSections();
+          while (nextObstacleS < hero.s + 700) {
+            obstacles.push(makeObstacle(nextObstacleS));
+            nextObstacleS += rand(190, 340);
+          }
+          while (nextExitS < hero.s + 1020) {
             exits.push({ id: nextExitS, s: nextExitS, resolved: false, flash: 0 });
-            nextExitS += rand(560, 860);
+            nextExitS += rand(620, 900);
           }
         }
 
         function makeObstacle(s) {
           const type = pick(['construction', 'police', 'deer', 'cow', 'accident']);
+          const laneRange = roadLaneRangeAt(s);
+          const activeCount = laneRange.end - laneRange.start;
           let lanes = [];
           let length = 8;
           if (type === 'construction') {
-            const count = randInt(2, 3);
-            const start = randInt(0, LANES - count);
+            const count = Math.min(randInt(2, 3), Math.max(1, activeCount - 1));
+            const start = randInt(laneRange.start, laneRange.end - count);
             lanes = range(start, start + count);
             length = rand(18, 32);
           } else if (type === 'accident') {
-            const count = random() < 0.45 ? 2 : 1;
-            const start = randInt(0, LANES - count);
+            const count = Math.min(random() < 0.38 ? 2 : 1, Math.max(1, activeCount - 1));
+            const start = randInt(laneRange.start, laneRange.end - count);
             lanes = range(start, start + count);
             length = rand(11, 18);
           } else {
-            lanes = [randInt(0, LANES - 1)];
+            lanes = [randInt(laneRange.start, laneRange.end - 1)];
             length = rand(6, 11);
           }
-          return {
-            id: s,
-            s,
-            type,
-            lanes,
-            length,
-            phase: rand(0, TAU),
-          };
+          return { id: s, s, type, lanes, length, phase: rand(0, TAU) };
         }
 
         function trimOldEvents() {
-          obstacles = obstacles.filter((obstacle) => obstacle.s > hero.s - 120);
-          exits = exits.filter((exit) => exit.s > hero.s - 180);
+          obstacles = obstacles.filter((obstacle) => obstacle.s > hero.s - 135);
+          exits = exits.filter((exit) => exit.s > hero.s - 185);
+          roadSections = roadSections.filter((section) => section.s1 > hero.s - 420);
         }
 
-        function planHero(dt) {
-          const lane = nearestLane(hero.lanePos);
-          const exit = nextExit();
-          const exitDistance = exit ? exit.s - hero.s : Infinity;
-          const obstacle = nearestObstacleAhead(lane, hero.s, 150);
-          let desiredLane = bestTrafficLane();
+        function planHero(t) {
+          expireSignal(hero, t);
+          hero.stoppedForObstacle = false;
+          hero.huntingOpening = false;
+          hero.gapTargetSpeed = null;
+          hero.pathTargetLane = hero.lane;
+          const obstacle = nearestObstacleAheadFor(hero, hero.lane, 150);
+          let requestedLane = hero.lane;
+          let forced = false;
+          let shouldSignal = false;
 
-          if (obstacle && obstacle.distance < 118) {
-            desiredLane = bestEscapeLane(lane, obstacle);
-          }
-
-          if (exit && exitDistance < 260) {
-            desiredLane = LANES - 1;
-          }
-
-          const laneDelta = desiredLane - lane;
-          if (laneDelta !== 0) {
-            const stepLane = lane + Math.sign(laneDelta);
-            hero.signal = Math.sign(laneDelta);
-            if (canMerge(hero, stepLane, true)) {
-              hero.targetLane = stepLane;
-            } else {
-              hero.targetLane = lane;
-            }
+          if (obstacle && obstacle.gap < Math.max(92, hero.speed * 3.2)) {
+            requestedLane = bestEscapeLane(hero, obstacle);
+            forced = true;
+            shouldSignal = requestedLane !== hero.lane;
           } else {
-            hero.signal = 0;
-            hero.targetLane = lane;
-          }
-
-          if (exit && exitDistance < 95 && lane !== LANES - 1) {
-            hero.signal = 1;
-            hero.exitSlow = Math.max(hero.exitSlow, (95 - exitDistance) / 95);
-          } else {
-            hero.exitSlow = Math.max(0, hero.exitSlow - dt * 1.6);
-          }
-        }
-
-        function bestTrafficLane() {
-          const lane = nearestLane(hero.lanePos);
-          let bestLane = lane;
-          let bestScore = laneScore(lane) + 3;
-          for (const candidate of [lane - 1, lane + 1]) {
-            if (candidate < 0 || candidate >= LANES) continue;
-            const scoreForLane = laneScore(candidate);
-            if (scoreForLane > bestScore) {
-              bestScore = scoreForLane;
-              bestLane = candidate;
+            requestedLane = bestHeroPathLane();
+            hero.pathTargetLane = requestedLane;
+            const front = nearestVehicleAheadFor(hero, hero.lane, 125);
+            hero.huntingOpening = requestedLane !== hero.lane || Boolean(front && front.gap < 95);
+            if (requestedLane !== hero.lane) {
+              hero.gapTargetSpeed = heroGapTargetSpeed(requestedLane);
+            } else if (front && front.gap < 95) {
+              hero.gapTargetSpeed = Math.min(45.5, Math.max(hero.desiredSpeed, front.vehicle.speed + 8));
             }
           }
-          return bestLane;
+
+          const changed = requestLaneChange(hero, requestedLane, t, shouldSignal);
+          if (changed && !forced) hero.gapTargetSpeed = Math.max(hero.gapTargetSpeed ?? 0, 45);
+          if (forced && !changed && requestedLane !== hero.lane) hero.stoppedForObstacle = true;
+          if (obstacle && obstacle.gap < 36 && requestedLane === hero.lane) hero.stoppedForObstacle = true;
         }
 
-        function laneScore(lane) {
-          const front = nearestVehicleAhead(lane, hero.s, hero.id);
-          const obstacle = nearestObstacleAhead(lane, hero.s, 180);
-          const frontDistance = front ? front.distance : 180;
-          const frontSpeed = front ? front.vehicle.speed : hero.desiredSpeed + 2;
-          const obstacleDistance = obstacle ? obstacle.distance : 220;
-          const opening = mergeWindow(lane, hero.s, hero.id);
-          const backPressure = opening.behind
-            ? Math.max(0, opening.behind.vehicle.speed - hero.speed) * 2
-            : 0;
-          return (
-            Math.min(frontDistance, 150) * 0.28 +
-            frontSpeed * 2.1 +
-            Math.min(obstacleDistance, 180) * 0.18 -
-            backPressure -
-            Math.abs(lane - nearestLane(hero.lanePos)) * 2.2
-          );
-        }
+        function planTrafficCar(car, t) {
+          if (car.exiting) return;
+          expireSignal(car, t);
+          car.stoppedForObstacle = false;
+          car.mergeCooldown = Math.max(0, car.mergeCooldown - 0.025);
+          chooseTrafficExit(car);
+          const obstacle = nearestObstacleAheadFor(car, car.lane, 118);
+          const front = nearestVehicleAheadFor(car, car.lane, 80);
+          const exitDistance = car.exitTarget == null ? Infinity : car.exitTarget - car.s;
+          const exitLane = car.exitTarget == null ? null : rightmostLaneAt(car.exitTarget);
+          let requestedLane = car.lane;
+          let forced = false;
 
-        function bestEscapeLane(lane, obstacle) {
-          let bestLane = lane;
-          let best = -Infinity;
-          for (const candidate of [lane - 1, lane + 1, lane - 2, lane + 2]) {
-            if (candidate < 0 || candidate >= LANES) continue;
-            if (obstacle.lanes.includes(candidate)) continue;
-            const opening = mergeWindow(candidate, hero.s, hero.id);
-            const gap = Math.min(opening.aheadGap, opening.behindGap);
-            const scoreForLane = gap + laneScore(candidate) * 0.25 - Math.abs(candidate - lane) * 8;
-            if (scoreForLane > best) {
-              best = scoreForLane;
-              bestLane = candidate;
+          if (car.exitTarget != null && exitDistance < -8) {
+            if (car.lane === exitLane) {
+              car.exiting = true;
+              car.exitProgress = 0;
+              car.signal = 0;
+              car.stoppedForObstacle = false;
+              return;
             }
+            car.exitTarget = null;
           }
-          return bestLane;
-        }
 
-        function planTrafficCar(car, dt) {
-          car.mergeCooldown = Math.max(0, car.mergeCooldown - dt);
-          car.yielding = shouldYieldToHero(car);
-          const lane = nearestLane(car.lanePos);
-          const obstacle = nearestObstacleAhead(lane, car.s, 110);
-          const front = nearestVehicleAhead(lane, car.s, car.id);
-          let desiredLane = lane;
-          let wantsDirection = 0;
-
-          if (obstacle && obstacle.distance < 74 + car.speed * 0.6) {
-            desiredLane = chooseTrafficEscapeLane(car, obstacle);
+          if (obstacle && obstacle.gap < Math.max(68, car.speed * 2.7)) {
+            requestedLane = bestEscapeLane(car, obstacle);
+            forced = true;
+          } else if (car.exitTarget != null && exitDistance < 280 && car.lane !== exitLane) {
+            requestedLane = car.lane + Math.sign(exitLane - car.lane);
           } else if (
             front &&
             car.mergeCooldown <= 0 &&
-            car.desiredSpeed > front.vehicle.speed + 2 &&
-            front.distance < safeGap(car, front.vehicle) * (1.45 + car.aggression * 0.75)
+            car.desiredSpeed > front.vehicle.speed + 2.5 &&
+            front.gap < safeGap(car, front.vehicle) * 1.55
           ) {
-            desiredLane = choosePassingLane(car);
+            requestedLane = bestCruiseLane(car);
           }
 
-          if (desiredLane !== lane) {
-            wantsDirection = Math.sign(desiredLane - lane);
-            const stepLane = lane + wantsDirection;
-            if (canMerge(car, stepLane, false)) {
-              car.targetLane = stepLane;
-              car.mergeCooldown = rand(1.2, 3.8);
-              car.signal = random() < 0.3 + car.compassion * 0.38 ? wantsDirection : 0;
-            } else {
-              car.signal = random() < 0.16 ? wantsDirection : 0;
-            }
-          } else if (Math.abs(car.targetLane - car.lanePos) < 0.04) {
-            car.signal = 0;
-            car.targetLane = lane;
+          const changed = requestLaneChange(car, requestedLane, t, forced && requestedLane !== car.lane);
+          if (changed) car.mergeCooldown = rand(1.4, 3.8);
+          if (forced && !changed && requestedLane !== car.lane) car.stoppedForObstacle = true;
+          if (obstacle && obstacle.gap < 30 && requestedLane === car.lane) car.stoppedForObstacle = true;
+        }
+
+        function chooseTrafficExit(car) {
+          if (car.exitTarget != null || car.exiting) return;
+          const exit = exits.find((item) => item.s > car.s + 70 && item.s < car.s + 360);
+          if (!exit) return;
+          if (hash01(car.id * 17.13 + exit.id * 0.071 + car.exitSeed * 91) < 0.34) {
+            car.exitTarget = exit.s;
           }
         }
 
-        function chooseTrafficEscapeLane(car, obstacle) {
-          const lane = nearestLane(car.lanePos);
-          let bestLane = lane;
-          let best = -Infinity;
-          for (const candidate of [lane - 1, lane + 1]) {
-            if (candidate < 0 || candidate >= LANES) continue;
-            if (obstacle.lanes.includes(candidate)) continue;
-            const window = mergeWindow(candidate, car.s, car.id);
-            const scoreForLane = Math.min(window.aheadGap, window.behindGap) + laneScoreForCar(car, candidate);
-            if (scoreForLane > best) {
-              best = scoreForLane;
-              bestLane = candidate;
+        function requestLaneChange(vehicle, requestedLane, t, shouldSignal) {
+          if (requestedLane === vehicle.lane) return false;
+          if (Math.abs((vehicle.drawLane ?? vehicle.lane) - vehicle.lane) > 0.035) return false;
+          const direction = Math.sign(requestedLane - vehicle.lane);
+          const lane = vehicle.lane + direction;
+          if (!laneExists(lane)) return false;
+
+          if (canMerge(vehicle, lane)) {
+            vehicle.lane = lane;
+            if (shouldSignal) {
+              vehicle.signal = direction;
+              vehicle.signalUntil = t + (vehicle.isHero ? 0.72 : 0.38);
+            }
+            return true;
+          }
+
+          if (vehicle.isHero && shouldSignal) {
+            vehicle.signal = direction;
+            vehicle.signalUntil = Math.max(vehicle.signalUntil, t + 0.25);
+          }
+          return false;
+        }
+
+        function bestEscapeLane(vehicle, obstacle) {
+          const options = [vehicle.lane - 1, vehicle.lane + 1]
+            .filter(laneExists)
+            .filter((lane) => !obstacle.lanes.includes(lane))
+            .sort((a, b) => laneSafetyScore(vehicle, b) - laneSafetyScore(vehicle, a));
+          return options[0] ?? vehicle.lane;
+        }
+
+        function bestCruiseLane(vehicle) {
+          const current = laneSafetyScore(vehicle, vehicle.lane);
+          let bestLane = vehicle.lane;
+          let bestScore = current;
+          for (const lane of [vehicle.lane - 1, vehicle.lane + 1]) {
+            if (!laneExists(lane)) continue;
+            const score = laneSafetyScore(vehicle, lane) - Math.abs(lane - vehicle.lane) * 4;
+            if (score > bestScore + (vehicle.isHero ? 10 : 16)) {
+              bestScore = score;
+              bestLane = lane;
             }
           }
           return bestLane;
         }
 
-        function choosePassingLane(car) {
-          const lane = nearestLane(car.lanePos);
-          let bestLane = lane;
-          let best = laneScoreForCar(car, lane);
-          for (const candidate of [lane - 1, lane + 1]) {
-            if (candidate < 0 || candidate >= LANES) continue;
-            const scoreForLane = laneScoreForCar(car, candidate) - Math.abs(candidate - lane) * 2;
-            if (scoreForLane > best + 5) {
-              best = scoreForLane;
-              bestLane = candidate;
+        function bestHeroPathLane() {
+          const current = heroLaneOpportunityScore(hero.lane);
+          const front = nearestVehicleAheadFor(hero, hero.lane, 145);
+          const urgency = front ? clamp((110 - front.gap) / 110, 0, 1) : 0;
+          const threshold = 8 - urgency * 6;
+          let bestLane = hero.lane;
+          let bestScore = current;
+
+          for (const lane of [hero.lane - 1, hero.lane + 1]) {
+            if (!laneExists(lane)) continue;
+            const score = heroLaneOpportunityScore(lane);
+            if (score > bestScore + threshold) {
+              bestScore = score;
+              bestLane = lane;
             }
           }
+
           return bestLane;
         }
 
-        function laneScoreForCar(car, lane) {
-          const front = nearestVehicleAhead(lane, car.s, car.id);
-          const obstacle = nearestObstacleAhead(lane, car.s, 150);
+        function heroLaneOpportunityScore(lane) {
+          if (!laneExists(lane)) return -Infinity;
+          if (!laneIsOpenAt(lane, hero.s, hero.length + 7)) return -900;
+
+          const front = nearestVehicleAheadFor(hero, lane, 280);
+          const behind = nearestVehicleBehindFor(hero, lane, 150);
+          const obstacle = nearestObstacleAheadFor(hero, lane, 330);
+          const frontGap = front ? front.gap : 280;
+          const frontSpeed = front ? front.vehicle.speed : 46;
+          const obstacleGap = obstacle ? obstacle.gap : 330;
+          const opening = laneOpeningSlack(hero, lane, front, behind);
+          const blockedPenalty = Math.max(0, -opening) * 1.75;
+          const rearPressure = behind
+            ? Math.max(0, behind.vehicle.speed - hero.speed) * 3.2 + Math.max(0, 32 - behind.gap) * 0.8
+            : 0;
+          const mergeBonus = lane === hero.lane || canMerge(hero, lane) ? 20 : 0;
+
           return (
-            (front ? Math.min(front.distance, 130) : 130) * 0.35 +
-            (front ? front.vehicle.speed : car.desiredSpeed) * 1.6 +
-            (obstacle ? Math.min(obstacle.distance, 150) : 150) * 0.12
+            Math.min(frontGap, 240) * 0.58 +
+            clamp(frontSpeed, 16, 46) * 2.7 +
+            Math.min(obstacleGap, 300) * 0.33 +
+            mergeBonus -
+            blockedPenalty -
+            rearPressure -
+            Math.abs(lane - hero.lane) * 3.5
           );
         }
 
-        function shouldYieldToHero(car) {
-          if (!hero.signal) return false;
-          const heroLane = nearestLane(hero.lanePos);
-          const targetLane = heroLane + hero.signal;
-          if (targetLane < 0 || targetLane >= LANES) return false;
-          if (nearestLane(car.lanePos) !== targetLane) return false;
-          const delta = car.s - hero.s;
-          if (delta > 12 || delta < -34) return false;
-          const willingness = car.compassion * 0.78 + (1 - car.aggression) * 0.22;
-          return car.courtesySeed < willingness;
+        function laneOpeningSlack(vehicle, lane, ahead, behind) {
+          const front = ahead ?? nearestVehicleAheadFor(vehicle, lane, 160);
+          const rear = behind ?? nearestVehicleBehindFor(vehicle, lane, 160);
+          const aheadSlack = front ? front.gap - safeGap(vehicle, front.vehicle) * 0.82 : 140;
+          const behindNeed = rear
+            ? 9 + rear.vehicle.speed * 0.42 + Math.max(0, rear.vehicle.speed - vehicle.speed) * 0.9
+            : 0;
+          const behindSlack = rear ? rear.gap - behindNeed : 110;
+          return Math.min(aheadSlack, behindSlack);
+        }
+
+        function heroGapTargetSpeed(lane) {
+          if (!laneExists(lane)) return hero.desiredSpeed;
+          if (canMerge(hero, lane)) return 45.5;
+
+          const ahead = nearestVehicleAheadFor(hero, lane, 165);
+          const behind = nearestVehicleBehindFor(hero, lane, 165);
+          const aheadNeed = ahead ? safeGap(hero, ahead.vehicle) * 0.88 : 0;
+          const behindNeed = behind
+            ? 11 + behind.vehicle.speed * 0.44 + Math.max(0, behind.vehicle.speed - hero.speed) * 0.95
+            : 0;
+          const aheadShort = Boolean(ahead && ahead.gap < aheadNeed);
+          const behindShort = Boolean(behind && behind.gap < behindNeed);
+
+          let target = 45.5;
+
+          if (aheadShort && behindShort) {
+            const aheadDeficit = aheadNeed - ahead.gap;
+            const behindDeficit = behindNeed - behind.gap;
+            const frontWillOpen = ahead.vehicle.speed > hero.speed - 1;
+            const rearWillOpen = behind.vehicle.speed < hero.speed + 1;
+
+            if (behindDeficit > aheadDeficit * 1.2 && frontWillOpen) {
+              target = Math.max(hero.speed + 8, behind.vehicle.speed + 7);
+            } else if (aheadDeficit > behindDeficit * 1.1 && rearWillOpen) {
+              target = Math.min(hero.speed - 8, ahead.vehicle.speed - 5);
+            } else if (ahead.vehicle.speed >= behind.vehicle.speed) {
+              target = Math.min(hero.speed - 7, ahead.vehicle.speed - 4);
+            } else {
+              target = Math.max(hero.speed + 7, behind.vehicle.speed + 6);
+            }
+          } else if (aheadShort) {
+            target = Math.min(hero.speed - 6, ahead.vehicle.speed - 4);
+          } else if (behindShort) {
+            target = Math.max(hero.speed + 7, behind.vehicle.speed + 6);
+          }
+
+          return clamp(target, 5, 46);
+        }
+
+        function laneSafetyScore(vehicle, lane) {
+          if (!laneExists(lane)) return -Infinity;
+          if (!laneIsOpenAt(lane, vehicle.s, vehicle.length + 7)) return -900;
+          if (!hasVehicleRoom(vehicle, lane, 8)) return -850;
+          const front = nearestVehicleAheadFor(vehicle, lane, 190);
+          const behind = nearestVehicleBehindFor(vehicle, lane, 95);
+          const obstacle = nearestObstacleAheadFor(vehicle, lane, 220);
+          const frontGap = front ? front.gap : 190;
+          const frontSpeed = front ? front.vehicle.speed : vehicle.desiredSpeed + 3;
+          const behindPressure = behind
+            ? Math.max(0, behind.vehicle.speed - vehicle.speed) * 3 + Math.max(0, 35 - behind.gap)
+            : 0;
+          const obstacleGap = obstacle ? obstacle.gap : 220;
+          return (
+            Math.min(frontGap, 160) * 0.48 +
+            frontSpeed * 1.8 +
+            Math.min(obstacleGap, 190) * 0.34 -
+            behindPressure
+          );
+        }
+
+        function canMerge(vehicle, lane) {
+          if (!laneExists(lane)) return false;
+          if (!laneIsOpenAt(lane, vehicle.s, vehicle.length + 8)) return false;
+          if (!hasVehicleRoom(vehicle, lane, 11)) return false;
+
+          const obstacle = nearestObstacleAheadFor(vehicle, lane, 18);
+          if (obstacle && obstacle.gap < 14) return false;
+
+          const ahead = nearestVehicleAheadFor(vehicle, lane, 75);
+          const behind = nearestVehicleBehindFor(vehicle, lane, 75);
+          if (ahead && ahead.gap < safeGap(vehicle, ahead.vehicle) * 0.8) return false;
+          if (behind) {
+            const behindNeed = 9 + behind.vehicle.speed * 0.42 + Math.max(0, behind.vehicle.speed - vehicle.speed) * 0.9;
+            if (behind.gap < behindNeed) return false;
+          }
+          return true;
         }
 
         function updateSpeed(vehicle, dt) {
-          const lane = nearestLane(vehicle.lanePos);
-          const front = nearestVehicleAhead(lane, vehicle.s, vehicle.id);
-          const obstacle = nearestObstacleAhead(lane, vehicle.s, 140);
+          if (vehicle.exiting) {
+            vehicle.speed = clamp(vehicle.speed + 2.8 * dt, 18, 32);
+            return;
+          }
+
+          const front = nearestVehicleAheadFor(vehicle, vehicle.lane, 190);
+          const obstacle = nearestObstacleAheadFor(vehicle, vehicle.lane, 170);
           let targetSpeed = vehicle.desiredSpeed;
 
           if (vehicle.isHero) {
-            targetSpeed = hero.desiredSpeed;
-            const exit = nextExit();
-            if (exit) {
-              const exitDistance = exit.s - hero.s;
-              if (exitDistance < 160 && nearestLane(hero.lanePos) !== LANES - 1) {
-                targetSpeed = Math.min(targetSpeed, clamp(exitDistance * 0.11, 5, 18));
-              }
-              if (exitDistance < 34 && nearestLane(hero.lanePos) !== LANES - 1) {
-                targetSpeed = Math.min(targetSpeed, 5.5);
-              }
-            }
-            if (hero.exitSlow > 0) {
-              targetSpeed = Math.min(targetSpeed, 18 - hero.exitSlow * 12);
-            }
-          } else if (vehicle.yielding) {
-            targetSpeed = Math.min(targetSpeed, Math.max(10, hero.speed * 0.68));
+            targetSpeed = hero.gapTargetSpeed ?? (hero.huntingOpening ? 45.5 : hero.desiredSpeed);
           }
 
           if (front) {
             const desiredGap = safeGap(vehicle, front.vehicle);
-            if (front.distance < desiredGap) {
+            if (front.gap < desiredGap) {
               targetSpeed = Math.min(
                 targetSpeed,
-                Math.max(0, front.vehicle.speed - (desiredGap - front.distance) * 0.55)
+                Math.max(0, front.vehicle.speed - (desiredGap - front.gap) * 0.68)
               );
-            } else if (front.distance < desiredGap * 1.8) {
-              const closeRate = vehicle.isHero ? 0.72 : 0.52 + vehicle.aggression * 1.6;
-              targetSpeed = Math.min(
-                targetSpeed,
-                front.vehicle.speed + (front.distance - desiredGap) * closeRate
-              );
+            } else if (front.gap < desiredGap * 1.7) {
+              targetSpeed = Math.min(targetSpeed, front.vehicle.speed + (front.gap - desiredGap) * 0.42);
             }
           }
 
           if (obstacle) {
-            const brakingDistance = vehicle.isHero ? 98 : 68 + vehicle.speed * 0.75;
-            if (obstacle.distance < brakingDistance) {
-              const obstacleSpeed = clamp((obstacle.distance - 10) * 0.35, 0, targetSpeed);
+            const stopLine = Math.max(0, obstacle.gap - 2.2);
+            const obstacleSpeed = clamp(stopLine * 0.42, 0, targetSpeed);
+            if (obstacle.gap < Math.max(82, vehicle.speed * 2.4) || vehicle.stoppedForObstacle) {
               targetSpeed = Math.min(targetSpeed, obstacleSpeed);
             }
           }
 
-          const closing = vehicle.isHero ? 1.1 : 0.72 + vehicle.aggression * 2.1;
-          const accel = vehicle.isHero ? 4.2 : 2.3 + vehicle.aggression * 2.5;
-          const brake = vehicle.isHero ? 8.8 : 5.5 + vehicle.aggression * 3.5;
-          const delta = targetSpeed - vehicle.speed;
-          vehicle.speed += clamp(delta * closing * dt, -brake * dt, accel * dt);
-          vehicle.speed = clamp(vehicle.speed, 0, 42);
-          if (!vehicle.isHero) vehicle.scoreFlash = Math.max(0, vehicle.scoreFlash - dt * 2);
-        }
+          if (vehicle.stoppedForObstacle) targetSpeed = Math.min(targetSpeed, 1.5);
 
-        function safeGap(vehicle, frontVehicle) {
-          const aggression = vehicle.isHero ? 0.48 : vehicle.aggression;
-          const base = lerp(14, 6.5, aggression);
-          const speedTerm = vehicle.speed * lerp(0.54, 0.24, aggression);
-          const closingTerm = Math.max(0, vehicle.speed - frontVehicle.speed) * lerp(1.1, 0.42, aggression);
-          return base + speedTerm + closingTerm;
+          const accel = vehicle.isHero ? (hero.huntingOpening ? 12.2 : 6.1) : 3.4;
+          const brake = vehicle.isHero ? (hero.gapTargetSpeed != null && hero.gapTargetSpeed < hero.speed ? 13.4 : 10.5) : 9.4;
+          const delta = targetSpeed - vehicle.speed;
+          vehicle.speed += clamp(delta * 1.45 * dt, -brake * dt, accel * dt);
+          vehicle.speed = clamp(vehicle.speed, 0, vehicle.isHero ? 46 : 41);
+          if (!vehicle.isHero) vehicle.scoreFlash = Math.max(0, vehicle.scoreFlash - dt * 2.4);
         }
 
         function moveVehicle(vehicle, dt) {
-          const laneRate = vehicle.isHero ? 1.75 : 0.86 + vehicle.aggression * 0.92;
-          const laneDelta = vehicle.targetLane - vehicle.lanePos;
-          vehicle.lanePos += clamp(laneDelta, -laneRate * dt, laneRate * dt);
-          if (Math.abs(vehicle.targetLane - vehicle.lanePos) < 0.015) {
-            vehicle.lanePos = vehicle.targetLane;
-            vehicle.lane = nearestLane(vehicle.lanePos);
-          }
           vehicle.s += vehicle.speed * dt;
+          if (vehicle.exiting) {
+            vehicle.exitProgress = clamp(vehicle.exitProgress + dt * 0.78, 0, 1.25);
+          }
+        }
+
+        function animateLane(vehicle, dt) {
+          if (vehicle.drawLane == null) vehicle.drawLane = vehicle.lane;
+          if (vehicle.exiting) {
+            vehicle.drawLane = vehicle.lane + vehicle.exitProgress * 1.42;
+            return;
+          }
+          if (prefersReducedMotion) {
+            vehicle.drawLane = vehicle.lane;
+            return;
+          }
+          const delta = vehicle.lane - vehicle.drawLane;
+          const rate = vehicle.isHero ? 5.4 : 4.2;
+          vehicle.drawLane += clamp(delta, -rate * dt, rate * dt);
+          if (Math.abs(vehicle.lane - vehicle.drawLane) < 0.015) {
+            vehicle.drawLane = vehicle.lane;
+          }
+        }
+
+        function enforceObstacleStops() {
+          for (const vehicle of [hero, ...cars]) {
+            if (vehicle.exiting) continue;
+            for (const obstacle of obstacles) {
+              if (!obstacle.lanes.includes(vehicle.lane)) continue;
+              const obstacleBack = obstacle.s - obstacle.length * 0.5;
+              const obstacleFront = obstacle.s + obstacle.length * 0.5;
+              const vehicleFront = vehicle.s + vehicle.length * 0.5;
+              const vehicleRear = vehicle.s - vehicle.length * 0.5;
+              const overlaps = vehicleFront > obstacleBack - 0.9 && vehicleRear < obstacleFront + 0.9;
+              if (!overlaps) continue;
+              vehicle.s = obstacleBack - vehicle.length * 0.5 - 0.9;
+              vehicle.speed = 0;
+              vehicle.stoppedForObstacle = true;
+            }
+          }
+        }
+
+        function enforceRoadLaneStops() {
+          for (const vehicle of [hero, ...cars]) {
+            if (vehicle.exiting) continue;
+            if (laneActiveForVehicle(vehicle, vehicle.lane)) continue;
+            const boundary = latestLaneDropBefore(vehicle.lane, vehicle.s + vehicle.length * 0.5 + 0.2);
+            if (boundary == null) continue;
+            vehicle.s = boundary - vehicle.length * 0.5 - 1.1;
+            vehicle.speed = 0;
+            vehicle.stoppedForObstacle = true;
+          }
         }
 
         function preventOverlaps() {
-          const vehicles = [hero, ...cars];
+          const vehicles = [hero, ...cars.filter((car) => !car.exiting)];
+          const visualVehicles = [hero, ...cars];
           for (let lane = 0; lane < LANES; lane += 1) {
             const inLane = vehicles
-              .filter((vehicle) => nearestLane(vehicle.lanePos) === lane)
+              .filter((vehicle) => vehicle.lane === lane)
               .sort((a, b) => b.s - a.s);
             for (let i = 1; i < inLane.length; i += 1) {
               const ahead = inLane[i - 1];
               const behind = inLane[i];
-              const minGap = (ahead.length + behind.length) * 0.55 + 1.2;
+              const minGap = visualHalfLength(ahead) + visualHalfLength(behind) + 1.6;
               const gap = ahead.s - behind.s;
               if (gap < minGap) {
                 behind.s = ahead.s - minGap;
-                behind.speed = Math.min(behind.speed, Math.max(0, ahead.speed - 0.8));
+                behind.speed = Math.min(behind.speed, Math.max(0, ahead.speed - 1.2));
+              }
+            }
+          }
+
+          preventVisualOverlaps(visualVehicles);
+        }
+
+        function preventVisualOverlaps(vehicles) {
+          for (let pass = 0; pass < 2; pass += 1) {
+            for (let i = 0; i < vehicles.length; i += 1) {
+              for (let j = i + 1; j < vehicles.length; j += 1) {
+                const a = vehicles[i];
+                const b = vehicles[j];
+                const aBox = vehicleBox(a);
+                const bBox = vehicleBox(b);
+                const lateral = Math.abs(aBox.x - bBox.x);
+                const vertical = Math.abs(a.s - b.s) * metersToPixels;
+                const minX = (aBox.w + bBox.w) * 0.5 + 5;
+                const minY = (aBox.h + bBox.h) * 0.5 + 7;
+                if (lateral >= minX || vertical >= minY) continue;
+
+                const ahead = a.s >= b.s ? a : b;
+                const behind = ahead === a ? b : a;
+                const requiredWorld = minY / metersToPixels + 0.5;
+                behind.s = ahead.s - requiredWorld;
+                behind.speed = Math.min(behind.speed, Math.max(0, ahead.speed - 1.4));
               }
             }
           }
         }
 
         function resolveExits(t) {
-          const exit = nextExit();
-          if (!exit) return;
-          const lane = nearestLane(hero.lanePos);
-          const distance = exit.s - hero.s;
-          if (distance < 18 && distance > -8) {
-            exit.flash = Math.max(exit.flash, 1);
+          for (const exit of exits) {
+            const active = cars.some(
+              (car) => car.exitTarget === exit.s && Math.abs(car.s - exit.s) < 34
+            );
+            exit.flash = active ? 1 : Math.max(0, exit.flash - 0.025);
           }
-          if (distance < -6 && !exit.resolved) {
-            exit.resolved = true;
-            if (lane === LANES - 1) {
-              statusPulse = { text: 'EXIT', until: t + 1.2 };
-              hero.speed = Math.min(hero.speed, 16);
-            } else {
-              statusPulse = { text: 'SLOW EXIT', until: t + 1.5 };
-              hero.speed = Math.min(hero.speed, 5.2);
-              hero.targetLane = LANES - 1;
-              hero.signal = 1;
-            }
-          }
-          for (const item of exits) item.flash = Math.max(0, item.flash - 0.025);
         }
 
         function updateScore() {
           for (const car of cars) {
+            if (car.exiting) continue;
             const delta = car.s - hero.s;
             if (car.prevDelta > 0 && delta <= 0) {
               score += 1;
-              car.scoreFlash = 1;
-            } else if (car.prevDelta < 0 && delta >= 0) {
-              score -= 1;
               car.scoreFlash = 1;
             }
             car.prevDelta = delta;
           }
         }
 
-        function canMerge(vehicle, lane, isHero) {
-          if (lane < 0 || lane >= LANES) return false;
-          const obstacle = nearestObstacleAhead(lane, vehicle.s - 4, 22);
-          if (obstacle && obstacle.distance < 20) return false;
-          const window = mergeWindow(lane, vehicle.s, vehicle.id);
-          const aheadNeed = isHero ? 14 : 10 + vehicle.speed * 0.14;
-          let behindNeed = isHero ? 11 : 9 + vehicle.speed * 0.1;
-          if (window.behind) {
-            const behind = window.behind.vehicle;
-            behindNeed += Math.max(0, behind.speed - vehicle.speed) * 0.9;
-            if (isHero && shouldYieldToHero(behind)) behindNeed *= 0.68;
-          }
-          return window.aheadGap > aheadNeed && window.behindGap > behindNeed;
+        function laneExists(lane) {
+          return Number.isInteger(lane) && lane >= 0 && lane < LANES;
         }
 
-        function mergeWindow(lane, s, ignoreId) {
-          let ahead = null;
-          let behind = null;
-          for (const vehicle of [hero, ...cars]) {
-            if (vehicle.id === ignoreId) continue;
-            if (nearestLane(vehicle.lanePos) !== lane) continue;
-            const delta = vehicle.s - s;
-            if (delta >= 0 && (!ahead || delta < ahead.distance)) {
-              ahead = { vehicle, distance: delta };
-            } else if (delta < 0 && (!behind || -delta < behind.distance)) {
-              behind = { vehicle, distance: -delta };
-            }
+        function roadSectionAt(s) {
+          if (!roadSections.length) return { s0: -Infinity, s1: Infinity, start: 0, count: LANES };
+          for (const section of roadSections) {
+            if (s >= section.s0 && s < section.s1) return section;
           }
-          return {
-            ahead,
-            behind,
-            aheadGap: ahead ? ahead.distance - ahead.vehicle.length * 0.55 : 999,
-            behindGap: behind ? behind.distance - behind.vehicle.length * 0.55 : 999,
-          };
+          if (s < roadSections[0].s0) return roadSections[0];
+          return roadSections[roadSections.length - 1];
         }
 
-        function nearestVehicleAhead(lane, s, ignoreId) {
+        function roadSectionIndexAt(s) {
+          if (!roadSections.length) return -1;
+          for (let i = 0; i < roadSections.length; i += 1) {
+            const section = roadSections[i];
+            if (s >= section.s0 && s < section.s1) return i;
+          }
+          return s < roadSections[0].s0 ? 0 : roadSections.length - 1;
+        }
+
+        function roadLaneRangeAt(s) {
+          const section = roadSectionAt(s);
+          return { start: section.start, end: section.start + section.count };
+        }
+
+        function rightmostLaneAt(s) {
+          const laneRange = roadLaneRangeAt(s);
+          return laneRange.end - 1;
+        }
+
+        function laneActiveInSection(section, lane) {
+          return laneExists(lane) && lane >= section.start && lane < section.start + section.count;
+        }
+
+        function laneActiveAt(lane, s) {
+          return laneActiveInSection(roadSectionAt(s), lane);
+        }
+
+        function laneActiveForVehicle(vehicle, lane) {
+          return (
+            laneActiveAt(lane, vehicle.s - vehicle.length * 0.5) &&
+            laneActiveAt(lane, vehicle.s) &&
+            laneActiveAt(lane, vehicle.s + vehicle.length * 0.5)
+          );
+        }
+
+        function nearestLaneDropAheadFor(vehicle, lane, maxGap) {
+          if (!laneExists(lane)) return null;
+          const front = vehicle.s + vehicle.length * 0.5;
+          if (!laneActiveAt(lane, front + 0.4)) {
+            return {
+              id: `road-edge-${lane}-${front | 0}`,
+              s: front,
+              type: 'lane-drop',
+              lanes: [lane],
+              length: 10,
+              phase: 0,
+              gap: 0,
+            };
+          }
+
           let best = null;
-          for (const vehicle of [hero, ...cars]) {
-            if (vehicle.id === ignoreId) continue;
-            if (nearestLane(vehicle.lanePos) !== lane) continue;
-            const raw = vehicle.s - s;
-            const distance = raw - vehicle.length * 0.5;
-            if (distance > -0.5 && (!best || distance < best.distance)) {
-              best = { vehicle, distance };
-            }
+          for (let i = 1; i < roadSections.length; i += 1) {
+            const prev = roadSections[i - 1];
+            const next = roadSections[i];
+            if (laneActiveInSection(prev, lane) && laneActiveInSection(next, lane)) continue;
+            if (!laneActiveInSection(prev, lane) || laneActiveInSection(next, lane)) continue;
+            const gap = next.s0 - front;
+            if (gap < -0.9 || gap >= maxGap) continue;
+            const laneDrop = {
+              id: `road-edge-${lane}-${Math.round(next.s0)}`,
+              s: next.s0,
+              type: 'lane-drop',
+              lanes: [lane],
+              length: 10,
+              phase: 0,
+              gap,
+            };
+            if (!best || laneDrop.gap < best.gap) best = laneDrop;
           }
           return best;
         }
 
-        function nearestObstacleAhead(lane, s, maxDistance) {
-          let best = null;
+        function latestLaneDropBefore(lane, s) {
+          let boundary = null;
+          for (let i = 1; i < roadSections.length; i += 1) {
+            const prev = roadSections[i - 1];
+            const next = roadSections[i];
+            if (next.s0 > s) break;
+            if (laneActiveInSection(prev, lane) && !laneActiveInSection(next, lane)) {
+              boundary = next.s0;
+            }
+          }
+          return boundary;
+        }
+
+        function roadBoundsAt(s) {
+          const index = roadSectionIndexAt(s);
+          const section = index >= 0 ? roadSections[index] : roadSectionAt(s);
+          let bounds = roadSectionBounds(section);
+
+          if (index > 0) {
+            const transitionIn = clamp((s - section.s0) / ROAD_TRANSITION_METERS, 0, 1);
+            if (transitionIn < 1) {
+              bounds = mixRoadBounds(roadSectionBounds(roadSections[index - 1]), bounds, smoothstep(transitionIn));
+            }
+          }
+
+          if (index >= 0 && index < roadSections.length - 1) {
+            const transitionOut = clamp((section.s1 - s) / ROAD_TRANSITION_METERS, 0, 1);
+            if (transitionOut < 1) {
+              bounds = mixRoadBounds(bounds, roadSectionBounds(roadSections[index + 1]), smoothstep(1 - transitionOut));
+            }
+          }
+
+          return bounds;
+        }
+
+        function roadSectionBounds(section) {
+          const left = roadLeft + section.start * laneWidth;
+          const right = roadLeft + (section.start + section.count) * laneWidth;
+          return { left, right, width: right - left };
+        }
+
+        function mixRoadBounds(a, b, amount) {
+          const left = a.left + (b.left - a.left) * amount;
+          const right = a.right + (b.right - a.right) * amount;
+          return { left, right, width: right - left };
+        }
+
+        function smoothstep(value) {
+          const t = clamp(value, 0, 1);
+          return t * t * (3 - 2 * t);
+        }
+
+        function safeGap(vehicle, frontVehicle) {
+          const base = vehicle.isHero ? 12.5 : 10.5;
+          const speedTerm = vehicle.speed * (vehicle.isHero ? 0.38 : 0.32);
+          const closingTerm = Math.max(0, vehicle.speed - frontVehicle.speed) * 0.85;
+          return base + visualHalfLength(vehicle) + visualHalfLength(frontVehicle) + speedTerm + closingTerm;
+        }
+
+        function spotIsFree(lane, s, gap, ignoreId) {
+          if (!laneIsOpenAt(lane, s, gap)) return false;
+          for (const vehicle of [hero, ...cars]) {
+            if (!vehicle || vehicle.id === ignoreId) continue;
+            if (!vehicleClaimsLane(vehicle, lane)) continue;
+            const required = gap + visualHalfLength(vehicle);
+            if (Math.abs(vehicle.s - s) < required) return false;
+          }
+          return true;
+        }
+
+        function hasVehicleRoom(vehicle, lane, padding) {
+          const vehicleHalf = visualHalfLength(vehicle);
+          for (const other of [hero, ...cars]) {
+            if (!other || other.id === vehicle.id) continue;
+            if (!vehicleClaimsLane(other, lane)) continue;
+            const required = vehicleHalf + visualHalfLength(other) + padding;
+            if (Math.abs(other.s - vehicle.s) < required) return false;
+          }
+          return true;
+        }
+
+        function vehicleClaimsLane(vehicle, lane) {
+          if (vehicle.exiting) return false;
+          if (vehicle.lane === lane) return true;
+          const drawLane = vehicle.drawLane ?? vehicle.lane;
+          return Math.abs(drawLane - lane) < 0.62;
+        }
+
+        function laneIsOpenAt(lane, s, length) {
+          if (!laneExists(lane)) return false;
+          const back = s - length * 0.5;
+          const front = s + length * 0.5;
+          if (!laneActiveAt(lane, back) || !laneActiveAt(lane, s) || !laneActiveAt(lane, front)) {
+            return false;
+          }
           for (const obstacle of obstacles) {
             if (!obstacle.lanes.includes(lane)) continue;
-            const distance = obstacle.s - s - obstacle.length * 0.5;
-            if (distance >= -4 && distance < maxDistance && (!best || distance < best.distance)) {
-              best = { ...obstacle, distance };
+            const obstacleBack = obstacle.s - obstacle.length * 0.5 - 1.8;
+            const obstacleFront = obstacle.s + obstacle.length * 0.5 + 1.8;
+            if (front > obstacleBack && back < obstacleFront) return false;
+          }
+          return true;
+        }
+
+        function nearestVehicleAheadFor(vehicle, lane, maxGap) {
+          let best = null;
+          const front = vehicle.s + visualHalfLength(vehicle);
+          for (const other of [hero, ...cars]) {
+            if (!other || other.id === vehicle.id || !vehicleClaimsLane(other, lane)) continue;
+            const gap = other.s - visualHalfLength(other) - front;
+            if (gap >= -0.2 && gap < maxGap && (!best || gap < best.gap)) {
+              best = { vehicle: other, gap };
             }
           }
           return best;
         }
 
-        function nextExit() {
-          return exits.find((exit) => !exit.resolved && exit.s > hero.s - 42) || null;
+        function nearestVehicleBehindFor(vehicle, lane, maxGap) {
+          let best = null;
+          const rear = vehicle.s - visualHalfLength(vehicle);
+          for (const other of [hero, ...cars]) {
+            if (!other || other.id === vehicle.id || !vehicleClaimsLane(other, lane)) continue;
+            const gap = rear - (other.s + visualHalfLength(other));
+            if (gap >= -0.2 && gap < maxGap && (!best || gap < best.gap)) {
+              best = { vehicle: other, gap };
+            }
+          }
+          return best;
+        }
+
+        function nearestObstacleAheadFor(vehicle, lane, maxGap) {
+          let best = null;
+          const front = vehicle.s + vehicle.length * 0.5;
+          const laneDrop = nearestLaneDropAheadFor(vehicle, lane, maxGap);
+          if (laneDrop) best = laneDrop;
+          for (const obstacle of obstacles) {
+            if (!obstacle.lanes.includes(lane)) continue;
+            const gap = obstacle.s - obstacle.length * 0.5 - front;
+            if (gap >= -0.9 && gap < maxGap && (!best || gap < best.gap)) {
+              best = { ...obstacle, gap };
+            }
+          }
+          return best;
+        }
+
+        function expireSignal(vehicle, t) {
+          if (vehicle.signal && t > vehicle.signalUntil) vehicle.signal = 0;
         }
 
         function render(t) {
           ctx.fillStyle = COLORS.sky;
           ctx.fillRect(0, 0, width, height);
-          drawRoad(t);
-          drawExits(t);
+          drawRoad();
+          drawExits();
           drawObstacles(t);
           drawVehicles(t);
           drawHud(t);
           drawScanlines();
         }
 
-        function drawRoad(t) {
+        function drawRoad() {
           const shoulder = Math.max(16, laneWidth * 0.22);
-          ctx.fillStyle = COLORS.shoulder;
-          ctx.fillRect(roadLeft - shoulder, 0, roadWidth + shoulder * 2, height);
-          ctx.fillStyle = COLORS.asphalt;
-          ctx.fillRect(roadLeft, 0, roadWidth, height);
-
+          const stripH = 6;
           const bandH = 20;
-          const bandOffset = mod(hero.s * metersToPixels, bandH);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.025)';
-          for (let y = -bandOffset; y < height; y += bandH * 2) {
-            ctx.fillRect(roadLeft, Math.round(y), roadWidth, bandH);
-          }
-
-          ctx.fillStyle = COLORS.laneDim;
-          for (let i = 1; i < LANES; i += 1) {
-            const x = Math.round(roadLeft + i * laneWidth);
-            ctx.fillRect(x - 1, 0, 2, height);
-          }
-
           const dashH = clamp(laneWidth * 0.52, 24, 46);
           const gap = clamp(laneWidth * 0.42, 18, 38);
-          const offset = mod(hero.s * metersToPixels, dashH + gap);
-          ctx.fillStyle = COLORS.lane;
-          for (let i = 1; i < LANES; i += 1) {
-            const x = Math.round(roadLeft + i * laneWidth);
-            for (let y = -offset - dashH; y < height + dashH; y += dashH + gap) {
-              ctx.fillRect(x - 3, Math.round(y), 6, Math.round(dashH));
+          const dashCycle = dashH + gap;
+
+          for (let y = -stripH; y < height + stripH; y += stripH) {
+            const s = screenToWorldY(y + stripH * 0.5);
+            const bounds = roadBoundsAt(s);
+            const laneRange = roadLaneRangeAt(s);
+            rect(bounds.left - shoulder, y, bounds.width + shoulder * 2, stripH + 1, COLORS.shoulder);
+            rect(bounds.left, y, bounds.width, stripH + 1, COLORS.asphalt);
+
+            if (mod(s * metersToPixels, bandH * 2) < bandH) {
+              rect(bounds.left, y, bounds.width, stripH + 1, 'rgba(255, 255, 255, 0.025)');
             }
-          }
 
-          ctx.fillStyle = '#f9f2a4';
-          ctx.fillRect(Math.round(roadLeft - shoulder * 0.6), 0, 4, height);
-          ctx.fillRect(Math.round(roadLeft + roadWidth + shoulder * 0.6), 0, 4, height);
+            for (let i = laneRange.start + 1; i < laneRange.end; i += 1) {
+              const x = Math.round(roadLeft + i * laneWidth);
+              rect(x - 1, y, 2, stripH + 1, COLORS.laneDim);
+              if (mod(s * metersToPixels, dashCycle) < dashH) {
+                rect(x - 3, y, 6, stripH + 1, COLORS.lane);
+              }
+            }
 
-          const speckOffset = Math.floor(hero.s * 5) % 37;
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-          for (let i = 0; i < 80; i += 1) {
-            const x = roadLeft + mod(i * 73 + speckOffset * 11, roadWidth);
-            const y = mod(i * 41 + speckOffset * 7, height);
-            ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+            rect(bounds.left - shoulder * 0.6, y, 4, stripH + 1, '#f9f2a4');
+            rect(bounds.right + shoulder * 0.6, y, 4, stripH + 1, '#f9f2a4');
           }
         }
 
-        function drawExits(t) {
+        function drawExits() {
           for (const exit of exits) {
             const y = worldToY(exit.s);
             if (y < -130 || y > height + 160) continue;
-            const rampX = roadLeft + roadWidth;
+            const roadBounds = roadBoundsAt(exit.s);
+            const rampX = roadBounds.right;
             const rampW = Math.max(laneWidth * 1.4, 96);
-            const rampY = y - laneWidth * 1.6;
+            const rampTop = y - laneWidth * 0.55;
+            const rampJoin = y + laneWidth * 0.56;
+            const rampEnd = y + laneWidth * 2.22;
             ctx.fillStyle = '#263544';
             ctx.beginPath();
-            ctx.moveTo(rampX, rampY);
-            ctx.bezierCurveTo(rampX + rampW * 0.52, rampY + laneWidth * 0.18, rampX + rampW, y, rampX + rampW, y + laneWidth * 1.8);
-            ctx.lineTo(rampX, y + laneWidth * 0.86);
+            ctx.moveTo(rampX, rampTop);
+            ctx.bezierCurveTo(
+              rampX + rampW * 0.22,
+              rampTop + laneWidth * 0.36,
+              rampX + rampW * 0.72,
+              y + laneWidth * 1.18,
+              rampX + rampW,
+              rampEnd
+            );
+            ctx.lineTo(rampX + rampW, rampEnd + laneWidth * 0.72);
+            ctx.bezierCurveTo(
+              rampX + rampW * 0.58,
+              rampJoin + laneWidth * 0.6,
+              rampX + laneWidth * 0.18,
+              rampJoin,
+              rampX,
+              rampJoin
+            );
             ctx.closePath();
             ctx.fill();
 
@@ -782,18 +1120,24 @@
             ctx.lineWidth = 4;
             ctx.setLineDash([12, 10]);
             ctx.beginPath();
-            ctx.moveTo(rampX + 10, y - laneWidth * 0.6);
-            ctx.bezierCurveTo(rampX + 58, y - 8, rampX + 92, y + 32, rampX + rampW - 8, y + laneWidth * 1.2);
+            ctx.moveTo(rampX + 8, rampTop + laneWidth * 0.2);
+            ctx.bezierCurveTo(
+              rampX + rampW * 0.26,
+              y + laneWidth * 0.26,
+              rampX + rampW * 0.68,
+              y + laneWidth * 1.28,
+              rampX + rampW - 8,
+              rampEnd + laneWidth * 0.34
+            );
             ctx.stroke();
             ctx.setLineDash([]);
 
             const signW = Math.min(78, laneWidth * 0.92);
-            const signH = 28;
             const signX = Math.min(width - signW - 8, rampX + 18);
-            const signY = y - laneWidth * 1.32;
+            const signY = y - laneWidth * 1.25;
             if (signY > -40 && signY < height + 10) {
-              rect(signX, signY, signW, signH, '#0f7c45');
-              strokeRect(signX, signY, signW, signH, '#d8ffd8', 2);
+              rect(signX, signY, signW, 28, '#0f7c45');
+              strokeRect(signX, signY, signW, 28, '#d8ffd8', 2);
               drawPixelText('EXIT', signX + signW / 2, signY + 19, 15, '#f5ffe8', 'center');
             }
           }
@@ -806,7 +1150,7 @@
             .sort((a, b) => a.y - b.y);
 
           for (const { obstacle, y } of visible) {
-            if (obstacle.type === 'construction') drawConstruction(obstacle, y, t);
+            if (obstacle.type === 'construction') drawConstruction(obstacle, y);
             if (obstacle.type === 'police') drawPolice(obstacle, y, t);
             if (obstacle.type === 'deer') drawDeer(obstacle, y);
             if (obstacle.type === 'cow') drawCow(obstacle, y, t);
@@ -814,7 +1158,7 @@
           }
         }
 
-        function drawConstruction(obstacle, y, t) {
+        function drawConstruction(obstacle, y) {
           const top = y - obstacle.length * metersToPixels * 0.5;
           const bottom = y + obstacle.length * metersToPixels * 0.5;
           for (const lane of obstacle.lanes) {
@@ -839,7 +1183,7 @@
           const x = laneCenter(obstacle.lanes[0]);
           const w = Math.min(laneWidth * 0.58, 42);
           const h = Math.min(laneWidth * 0.92, 68);
-          drawCarShape(x, y, w, h, '#f4f6ff', 0, false, 0, 0);
+          drawCarShape(x, y, w, h, '#dfe3e8', 0, false, false);
           rect(x - w * 0.42, y - h * 0.1, w * 0.34, h * 0.18, '#11151d');
           rect(x + w * 0.08, y - h * 0.1, w * 0.34, h * 0.18, '#11151d');
           const blink = prefersReducedMotion || Math.floor(t * 8) % 2 === 0;
@@ -882,12 +1226,11 @@
             ctx.save();
             ctx.translate(x, y + (i - 0.5) * 18);
             ctx.rotate((i % 2 === 0 ? -0.22 : 0.2) + Math.sin(t + obstacle.phase) * 0.02);
-            drawCarShape(0, 0, w, h, i % 2 === 0 ? '#ef3e36' : '#28c7cc', 0, false, 0, 0);
+            drawCarShape(0, 0, w, h, '#7d858f', 0, false, false);
             rect(-w * 0.36, -h * 0.08, w * 0.72, h * 0.14, '#151922');
             ctx.restore();
           }
-          const spark = Math.sin(t * 12 + obstacle.phase) > 0.3;
-          if (spark) {
+          if (Math.sin(t * 12 + obstacle.phase) > 0.3) {
             rect(laneCenter(obstacle.lanes[0]) - 3, y - 4, 6, 6, '#fff7a8');
           }
         }
@@ -902,27 +1245,30 @@
         }
 
         function drawVehicle(vehicle, y, t) {
-          const x = laneCenter(vehicle.lanePos);
-          const w = vehicle.isHero ? clamp(laneWidth * 0.5, 24, 42) : clamp(laneWidth * 0.46, 21, 38);
-          const h = vehicle.isHero ? clamp(laneWidth * 0.9, 42, 70) : clamp(laneWidth * 0.82, 36, 64);
-          const signal = vehicle.signal;
-          const blinkOn = prefersReducedMotion ? signal !== 0 : signal !== 0 && Math.floor(t * 4.8) % 2 === 0;
-          const flash = vehicle.scoreFlash || 0;
-          drawCarShape(x, y, w, h, vehicle.isHero ? HERO_YELLOW : vehicle.color, signal, blinkOn, vehicle.aggression || 0, vehicle.compassion || 0, flash);
+          const box = vehicleBox(vehicle);
+          const x = box.x;
+          const w = box.w;
+          const h = box.h;
+          const blinkOn =
+            vehicle.signal &&
+            (prefersReducedMotion || Math.floor(t * (vehicle.isHero ? 5.2 : 4.4)) % 2 === 0);
+          const fill = vehicle.isHero ? HERO_YELLOW : vehicle.color;
+          drawCarShape(x, y, w, h, fill, vehicle.signal, blinkOn, vehicle.isHero, vehicle.scoreFlash);
 
-          if (vehicle.yielding) {
-            rect(x - w * 0.58, y + h * 0.54, w * 1.16, 4, COLORS.blue);
+          if (vehicle.stoppedForObstacle && !vehicle.isHero) {
+            rect(x - w * 0.48, y + h * 0.54, w * 0.96, 4, '#cdd3db');
           }
         }
 
-        function drawCarShape(x, y, w, h, fill, signal, blinkOn, aggression, compassion, flash = 0) {
+        function drawCarShape(x, y, w, h, fill, signal, blinkOn, isHero, flash = 0) {
+          const bodyFill = flash > 0 ? '#fff7c7' : fill;
           rect(x - w / 2 + 4, y - h / 2 + 7, w, h, 'rgba(0, 0, 0, 0.34)');
           rect(x - w / 2, y - h / 2, w, h, COLORS.ink);
-          rect(x - w / 2 + 4, y - h / 2 + 4, w - 8, h - 8, flash > 0 ? '#fff7c7' : fill);
-          rect(x - w * 0.3, y - h * 0.32, w * 0.6, h * 0.2, '#dff8ff');
+          rect(x - w / 2 + 4, y - h / 2 + 4, w - 8, h - 8, bodyFill);
+          rect(x - w * 0.3, y - h * 0.32, w * 0.6, h * 0.2, isHero ? '#fff6af' : '#dfe6ef');
           rect(x - w * 0.3, y + h * 0.06, w * 0.6, h * 0.24, '#171b24');
-          rect(x - w * 0.42, y - h * 0.1, w * 0.12, h * 0.42, shade(fill, -0.28));
-          rect(x + w * 0.3, y - h * 0.1, w * 0.12, h * 0.42, shade(fill, -0.28));
+          rect(x - w * 0.42, y - h * 0.1, w * 0.12, h * 0.42, shade(fill, -0.24));
+          rect(x + w * 0.3, y - h * 0.1, w * 0.12, h * 0.42, shade(fill, -0.24));
 
           const off = COLORS.amberOff;
           const on = blinkOn ? COLORS.amber : off;
@@ -932,33 +1278,31 @@
           rect(x - w * 0.62, y + h * 0.3, 6, 9, left);
           rect(x + w * 0.5, y - h * 0.34, 6, 9, right);
           rect(x + w * 0.5, y + h * 0.3, 6, 9, right);
-
-          if (fill !== HERO_YELLOW) {
-            const barW = Math.max(2, w - 12);
-            rect(x - barW / 2, y - h * 0.49, barW * aggression, 4, COLORS.red);
-            rect(x - barW / 2, y + h * 0.43, barW * compassion, 4, COLORS.blue);
-          }
         }
 
         function drawHud(t) {
           const pad = clamp(width * 0.025, 14, 28);
-          const scoreText = `SCORE ${score < 0 ? score : String(score).padStart(2, '0')}`;
           drawPixelText('HAPPINESS HUNTER', pad, pad + 18, clamp(width * 0.024, 15, 22), COLORS.hud, 'left');
-          drawPixelText(scoreText, pad, pad + 44, clamp(width * 0.023, 15, 21), score < 0 ? '#ff8c8c' : COLORS.hud, 'left');
+          drawPixelText(
+            `SCORE ${String(score).padStart(3, '0')}`,
+            pad,
+            pad + 44,
+            clamp(width * 0.023, 15, 21),
+            COLORS.hudHot,
+            'left'
+          );
 
-          const exit = nextExit();
-          if (exit) {
-            const dist = Math.max(0, Math.round(exit.s - hero.s));
-            drawPixelText(`EXIT ${dist}m`, width - pad, pad + 18, clamp(width * 0.022, 14, 20), COLORS.hud, 'right');
-          }
           if (hero.signal) {
             drawPixelText(hero.signal < 0 ? '<' : '>', width - pad, pad + 45, clamp(width * 0.034, 20, 34), COLORS.amber, 'right');
+          }
+          if (hero.stoppedForObstacle) {
+            drawPixelText('WAIT', width / 2, height * 0.16, clamp(width * 0.045, 24, 48), COLORS.hudHot, 'center');
           }
           if (statusPulse.text && t < statusPulse.until) {
             const alpha = clamp((statusPulse.until - t) / 0.5, 0, 1);
             ctx.save();
             ctx.globalAlpha = alpha;
-            drawPixelText(statusPulse.text, width / 2, height * 0.16, clamp(width * 0.05, 26, 54), COLORS.hud, 'center');
+            drawPixelText(statusPulse.text, width / 2, height * 0.22, clamp(width * 0.05, 26, 54), COLORS.hud, 'center');
             ctx.restore();
           }
 
@@ -970,8 +1314,8 @@
           rect(x, y, w, 5, 'rgba(255, 255, 255, 0.18)');
           rect(x, y, w * clamp(hero.speed / 38, 0, 1), 5, HERO_YELLOW);
           rect(x, y + 10, w, 5, 'rgba(255, 255, 255, 0.18)');
-          const traffic = clamp(cars.filter((car) => Math.abs(car.s - hero.s) < 90).length / 24, 0, 1);
-          rect(x, y + 10, w * traffic, 5, COLORS.blue);
+          const traffic = clamp(cars.filter((car) => Math.abs(car.s - hero.s) < 90).length / 18, 0, 1);
+          rect(x, y + 10, w * traffic, 5, '#aeb6c1');
         }
 
         function drawScanlines() {
@@ -1000,16 +1344,36 @@
           ctx.fillText(text, Math.round(x), Math.round(y));
         }
 
-        function laneCenter(lanePos) {
-          return roadLeft + (lanePos + 0.5) * laneWidth;
+        function laneCenter(lane) {
+          return roadLeft + (lane + 0.5) * laneWidth;
+        }
+
+        function vehicleBox(vehicle) {
+          const size = vehicleDrawSize(vehicle);
+          return {
+            x: laneCenter(vehicle.drawLane ?? vehicle.lane),
+            w: size.w,
+            h: size.h,
+          };
+        }
+
+        function vehicleDrawSize(vehicle) {
+          return {
+            w: vehicle.isHero ? clamp(laneWidth * 0.5, 24, 42) : clamp(laneWidth * 0.46, 21, 38),
+            h: vehicle.isHero ? clamp(laneWidth * 0.9, 42, 70) : clamp(laneWidth * 0.82, 36, 64),
+          };
+        }
+
+        function visualHalfLength(vehicle) {
+          return (vehicleDrawSize(vehicle).h / Math.max(1, metersToPixels)) * 0.5;
         }
 
         function worldToY(s) {
           return heroScreenY - (s - hero.s) * metersToPixels;
         }
 
-        function nearestLane(lanePos) {
-          return clamp(Math.round(lanePos), 0, LANES - 1);
+        function screenToWorldY(y) {
+          return hero.s + (heroScreenY - y) / metersToPixels;
         }
 
         function rect(x, y, w, h, fill) {
@@ -1063,12 +1427,13 @@
           return Math.max(min, Math.min(max, value));
         }
 
-        function lerp(a, b, t) {
-          return a + (b - a) * t;
-        }
-
         function mod(value, size) {
           return ((value % size) + size) % size;
+        }
+
+        function hash01(value) {
+          const x = Math.sin(value) * 43758.5453123;
+          return x - Math.floor(x);
         }
 
         addEventListener('pagehide', () => cancelAnimationFrame(raf), { once: true });

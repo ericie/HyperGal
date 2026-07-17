@@ -55,7 +55,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "Autonomous traditional Snake on a luminous black field. Five snakes with random starting lengths and aggression values hunt one mouse. Eating grows a snake; larger snakes move faster and become more aggressive, and any snake may box when another snake's available space is small relative to its own length. Touching the border, itself, or another snake kills one snake. A dead snake leaves layered color stain, darker clots, and pale bone memory, then the mouse becomes the replacement snake and the hunt begins again. Outlined bodies, clear arena border, glow. Click to reseed."
+      "description": "Autonomous traditional Snake on a luminous black field. Five contenders with random starting lengths and aggression values enter from offscreen to hunt one mouse. Eating grows a snake; consecutive catches by the same snake raise its growth multiplier, larger snakes move faster and become more aggressive, and any snake may box when another snake's available space is small relative to its own length. Touching the border, itself, or another snake kills one snake. Dead snakes leave layered color stain, darker clots, and pale bone memory; once only one survivor remains, new contenders enter from beyond the border. Outlined bodies, clear arena border, glow. Click to reseed."
     },
     {
       "slug": "008-vectrex-asteroids",
@@ -63,7 +63,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "A black-and-white Vectrex-style Asteroids variant. The ship mostly parks, bleeds off momentum, predicts asteroid paths, and fires tight two- or three-shot bursts one bullet at a time until a player takes over, thrusting mainly to dodge and keeping only three shots alive at once. Bullets split asteroids into deeper generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Heavier fragments accelerate slowly, drift together under stronger gravity, bump instead of passing through, settle before they glom, and weld into rough integrated asteroid outlines that retain shoulders, valleys, and bulges from their joined pieces. Any asteroid can kill the ship on contact."
+      "description": "A black-and-white Vectrex-style Asteroids variant. The ship tries to park with visible retrograde burns, predicts asteroid paths, and fires tight two- or three-shot bursts one bullet at a time until a player takes over, thrusting mainly to dodge and keeping only three shots alive at once. Bullets split asteroids into deeper generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Heavier fragments accelerate slowly, drift together under stronger gravity, bump instead of passing through, settle before they glom, and weld into rough integrated asteroid outlines that animate from their joined pieces. Any asteroid can kill the ship on contact."
     },
     {
       "slug": "009-mutual-command",
@@ -95,7 +95,15 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "A yellow arcade car hunts for the fastest lane in dense traffic. Other cars carry aggression and compassion values, signal unevenly, avoid obstacles, and sometimes let the hero merge. Each car the hero passes is +1; each car that passes the hero is -1."
+      "description": "One yellow arcade car hunts for the fastest lane through gray traffic, speeding up or backing off to make openings, but never exits. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray cars can take ramps and leave the highway. Every car claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car alone scores: each gray car it passes is +1."
+    },
+    {
+      "slug": "013-paddle",
+      "title": "Paddle",
+      "year": 2026,
+      "type": "interactive",
+      "thumbnail": "thumbnail.svg",
+      "description": "One-player Pong folded into a cylinder. A single paddle stands where the net used to be; the ball leaves one edge and returns from the other, so every save comes back around and the only way to be rid of the ball is to miss. The two counters tally edge crossings, left and right, and exactly one crossing happens per lap — a catch sends the ball back out the edge behind it, a miss lets it through to the far one, so the paddle decides which side a point lands on but never whether one lands. It catches eight of every ten, striking off-centre on purpose to keep the rally alive, and each miss burns a permanent bar into the centre line, which slowly becomes a histogram of where this paddle fails."
     }
   ]
 };

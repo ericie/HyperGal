@@ -3,8 +3,8 @@
 A black-and-white vector Asteroids variant for a Vectrex monitor that never
 really clears the field.
 
-The ship pilots itself until a player takes the controls, mostly parking to aim
-and fire while bleeding off momentum, then thrusting mainly to dodge predicted
+The ship pilots itself until a player takes the controls, mostly trying to park
+itself with visible retrograde burns, then thrusting mainly to dodge predicted
 asteroid paths. It fires tight two- or three-shot bursts one bullet at a time
 when the aim is clean. It keeps up to three bullets alive at once, with
 extra-narrow aim for small fragments. A bullet does not

@@ -3,5 +3,5 @@
   "year": 2026,
   "type": "interactive",
   "thumbnail": "thumbnail.svg",
-  "description": "Autonomous traditional Snake on a luminous black field. Five snakes with random starting lengths and aggression values hunt one mouse. Eating grows a snake; larger snakes move faster and become more aggressive, and any snake may box when another snake's available space is small relative to its own length. Touching the border, itself, or another snake kills one snake. A dead snake leaves layered color stain, darker clots, and pale bone memory, then the mouse becomes the replacement snake and the hunt begins again. Outlined bodies, clear arena border, glow. Click to reseed."
+  "description": "Autonomous traditional Snake on a luminous black field. Five contenders with random starting lengths and aggression values enter from offscreen to hunt one mouse. Eating grows a snake; consecutive catches by the same snake raise its growth multiplier, larger snakes move faster and become more aggressive, and any snake may box when another snake's available space is small relative to its own length. Touching the border, itself, or another snake kills one snake. Dead snakes leave layered color stain, darker clots, and pale bone memory; once only one survivor remains, new contenders enter from beyond the border. Outlined bodies, clear arena border, glow. Click to reseed."
 }
