@@ -428,13 +428,13 @@
           } else {
             requestedLane = bestHeroPathLane();
             hero.pathTargetLane = requestedLane;
-            const front = nearestVehicleAheadFor(hero, hero.lane, 170);
-            hero.huntingOpening = requestedLane !== hero.lane || Boolean(front && front.gap < 135);
+            const front = nearestVehicleAheadFor(hero, hero.lane, 125);
+            hero.huntingOpening = requestedLane !== hero.lane || Boolean(front && front.gap < 95);
             shouldSignal = requestedLane !== hero.lane;
             if (requestedLane !== hero.lane) {
               hero.gapTargetSpeed = heroGapTargetSpeed(requestedLane);
-            } else if (front && front.gap < 135) {
-              hero.gapTargetSpeed = Math.min(46, Math.max(hero.desiredSpeed + 2, front.vehicle.speed + 10));
+            } else if (front && front.gap < 95) {
+              hero.gapTargetSpeed = Math.min(45.5, Math.max(hero.desiredSpeed, front.vehicle.speed + 8));
             }
           }
 
@@ -522,7 +522,7 @@
 
           if (vehicle.isHero && shouldSignal) {
             vehicle.signal = direction;
-            vehicle.signalUntil = Math.max(vehicle.signalUntil, t + 0.38);
+            vehicle.signalUntil = Math.max(vehicle.signalUntil, t + 0.25);
           }
           return false;
         }
@@ -555,10 +555,10 @@
 
         function bestHeroPathLane() {
           const current = heroLaneOpportunityScore(hero.lane);
-          const front = nearestVehicleAheadFor(hero, hero.lane, 230);
-          const urgency = front ? clamp((215 - front.gap) / 215, 0, 1) : 0;
+          const front = nearestVehicleAheadFor(hero, hero.lane, 190);
+          const urgency = front ? clamp((170 - front.gap) / 170, 0, 1) : 0;
           const trafficBound = front && front.vehicle.speed < hero.desiredSpeed + 5;
-          const threshold = Math.max(0.25, 4.2 - urgency * 3.8 - (trafficBound ? 2.6 : 0));
+          const threshold = Math.max(0.75, 5.5 - urgency * 4.8 - (trafficBound ? 2.2 : 0));
           let bestLane = hero.lane;
           let bestScore = current;
 
@@ -576,39 +576,37 @@
 
         function heroLaneOpportunityScore(lane) {
           if (!laneExists(lane)) return -Infinity;
-          if (!laneIsOpenAt(lane, hero.s, hero.length + 6)) return -900;
+          if (!laneIsOpenAt(lane, hero.s, hero.length + 7)) return -900;
 
-          const front = nearestVehicleAheadFor(hero, lane, 320);
-          const behind = nearestVehicleBehindFor(hero, lane, 180);
+          const front = nearestVehicleAheadFor(hero, lane, 280);
+          const behind = nearestVehicleBehindFor(hero, lane, 150);
           const obstacle = nearestObstacleAheadFor(hero, lane, 330);
-          const frontGap = front ? front.gap : 320;
+          const frontGap = front ? front.gap : 280;
           const frontSpeed = front ? front.vehicle.speed : 46;
           const obstacleGap = obstacle ? obstacle.gap : 330;
           const opening = laneOpeningSlack(hero, lane, front, behind);
-          const blockedPenalty = Math.max(0, -opening) * 1.1;
+          const blockedPenalty = Math.max(0, -opening) * 1.75;
           const rearPressure = behind
-            ? Math.max(0, behind.vehicle.speed - hero.speed) * 2.1 + Math.max(0, 24 - behind.gap) * 0.45
+            ? Math.max(0, behind.vehicle.speed - hero.speed) * 3.2 + Math.max(0, 32 - behind.gap) * 0.8
             : 0;
-          const mergeBonus = lane === hero.lane ? 0 : canMerge(hero, lane) ? 34 : 7;
+          const mergeBonus = lane === hero.lane || canMerge(hero, lane) ? 20 : 0;
 
           return (
-            Math.min(frontGap, 285) * 0.68 +
-            clamp(frontSpeed, 16, 46) * 3.05 +
+            Math.min(frontGap, 240) * 0.58 +
+            clamp(frontSpeed, 16, 46) * 2.7 +
             Math.min(obstacleGap, 300) * 0.33 +
             mergeBonus -
             blockedPenalty -
             rearPressure -
-            Math.abs(lane - hero.lane) * 2.4
+            Math.abs(lane - hero.lane) * 3.5
           );
         }
 
         function laneOpeningSlack(vehicle, lane, ahead, behind) {
           const front = ahead ?? nearestVehicleAheadFor(vehicle, lane, 160);
           const rear = behind ?? nearestVehicleBehindFor(vehicle, lane, 160);
-          const aheadScale = vehicle.isHero ? 0.64 : 0.82;
-          const behindScale = vehicle.isHero ? 0.72 : 1;
-          const aheadSlack = front ? front.gap - safeGap(vehicle, front.vehicle) * aheadScale : 140;
-          const behindNeed = rear ? mergeBehindNeed(vehicle, rear.vehicle) * behindScale : 0;
+          const aheadSlack = front ? front.gap - safeGap(vehicle, front.vehicle) * 0.82 : 140;
+          const behindNeed = rear ? mergeBehindNeed(vehicle, rear.vehicle) : 0;
           const behindSlack = rear ? rear.gap - behindNeed : 110;
           return Math.min(aheadSlack, behindSlack);
         }
@@ -729,10 +727,10 @@
 
           if (vehicle.stoppedForObstacle) targetSpeed = Math.min(targetSpeed, 1.5);
 
-          const accel = vehicle.isHero ? (hero.huntingOpening ? 11.2 : 4.8) : vehicle.accel ?? 3.4;
+          const accel = vehicle.isHero ? (hero.huntingOpening ? 9.4 : 4.8) : vehicle.accel ?? 3.4;
           const brake = vehicle.isHero
             ? hero.gapTargetSpeed != null && hero.gapTargetSpeed < hero.speed
-              ? 11.6
+              ? 10.8
               : 8.6
             : vehicle.brake ?? 9.4;
           const delta = targetSpeed - vehicle.speed;
@@ -1103,7 +1101,6 @@
         function vehicleClaimsLane(vehicle, lane) {
           if (vehicle.exiting) return false;
           if (vehicle.lane === lane) return true;
-          if (vehicle.isHero && vehicle.signal && lane === vehicle.lane + vehicle.signal) return true;
           const drawLane = vehicle.drawLane ?? vehicle.lane;
           return Math.abs(drawLane - lane) < 0.62;
         }

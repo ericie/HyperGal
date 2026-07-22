@@ -10,9 +10,10 @@ The growth model is biased by visible and invisible forces:
 - Temperature, yearly rainfall, droughts, and wet years change annual ring width.
 - Each new ring randomly selects an opaque palette swatch and flat tone variant.
 - Ground slope adds reaction wood toward the downhill side.
-- Pest and fire are one-year incidents, pre-marked with abstract chart lines.
-  When the growth front reaches one, that year boundary is cut or compressed and
-  the bark briefly records bore marks or char before later rings grow over it.
+- Pest and fire are severity-scaled incidents, pre-marked with abstract chart
+  lines. Each one affects 1-5 years of growth: minor incidents leave narrow
+  kinks, severe incidents compress multiple rings and deform the bark while
+  later rings grow over the record.
 
 Those forces are drawn as abstract field-map symbols around the trunk. Click or
 press Enter/Space to reseed the specimen.

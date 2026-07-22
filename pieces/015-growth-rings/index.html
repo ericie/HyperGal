@@ -47,7 +47,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Growth Rings: a palette-toned animated trunk cross-section adds annual rings while abstract map symbols show latitude, sun angle, wind exposure, temperature, ground slope, rainfall, and one-year pest and fire incident lines."
+      aria-label="Growth Rings: a palette-toned animated trunk cross-section adds annual rings while abstract map symbols show latitude, sun angle, wind exposure, temperature, ground slope, rainfall, and severity-scaled pest and fire incident lines."
     ></canvas>
 
     <script>
@@ -393,9 +393,9 @@
           }
 
           boundary = smoothLoop(boundary, 2);
-          const incidentsThisYear = damageEvents.filter((event) => event.year === year);
-          if (incidentsThisYear.length) {
-            boundary = applyDamageIncidents(boundary, previous, angles, incidentsThisYear, widthTotal / SAMPLE_COUNT);
+          const activeIncidents = damageEvents.filter((event) => year >= event.year && year < event.year + event.duration);
+          if (activeIncidents.length) {
+            boundary = applyDamageIncidents(boundary, previous, angles, activeIncidents, widthTotal / SAMPLE_COUNT, year);
           }
           boundaries.push(boundary);
           const stressIndex =
@@ -518,18 +518,25 @@
 
       function makeDamageEvent(kind, random, index) {
         const fire = kind === 'fire';
+        const severityRoll = fire ? Math.pow(random(), 0.72) : Math.pow(random(), 0.82);
+        const minSeverity = fire ? 0.32 : 0.08;
+        const maxSeverity = fire ? 0.96 : 0.86;
+        const severity = lerp(minSeverity, maxSeverity, severityRoll);
+        const severityT = clamp((severity - minSeverity) / (maxSeverity - minSeverity), 0, 1);
+        const duration = clamp(Math.round(lerp(1, 5, Math.pow(severityT, 0.72)) + (random() - 0.5) * 1.25), 1, 5);
         return {
           kind,
           year: Math.floor(lerp(13, TARGET_AGE - 13, random())),
           angle: random() * TAU,
-          width: fire ? lerp(0.18, 0.43, random()) : lerp(0.1, 0.3, random()),
-          severity: fire ? lerp(0.34, 0.66, random()) : lerp(0.18, 0.4, random()),
+          width: fire ? lerp(0.24, 0.55, random()) : lerp(0.08, 0.34, random()),
+          duration,
+          severity,
           seed: random() * 1000 + index * 17,
           lane: 0,
         };
       }
 
-      function applyDamageIncidents(boundary, previous, angles, events, meanWidth) {
+      function applyDamageIncidents(boundary, previous, angles, events, meanWidth, year) {
         const out = boundary.slice();
         for (let i = 0; i < out.length; i++) {
           const a = angles[i];
@@ -537,24 +544,31 @@
           let callus = 0;
 
           for (const event of events) {
+            const eventAge = year - event.year;
+            const durationT = event.duration <= 1 ? 0 : eventAge / (event.duration - 1);
+            const timeFalloff = event.kind === 'fire' ? 1 - durationT * 0.5 : 0.72 + 0.28 * Math.sin((durationT + 0.15) * Math.PI);
             const angular = angleDelta(a, event.angle);
             const angularFalloff = Math.exp(-(angular * angular) / (event.width * event.width));
-            const irregular = 0.78 + 0.22 * Math.sin(event.seed + i * 2.17);
+            const irregular = 0.72 + 0.28 * Math.sin(event.seed + i * 2.17 + eventAge * 1.9);
 
             if (event.kind === 'fire') {
-              bite += meanWidth * event.severity * 4.35 * angularFalloff * irregular;
+              const heatPulse = eventAge === 0 ? 1.55 : 0.8;
+              bite += meanWidth * event.severity * 7.2 * heatPulse * timeFalloff * angularFalloff * irregular;
               const edgeDistance = Math.abs(Math.abs(angular) - event.width * 1.05);
               const edgeWidth = Math.max(0.034, event.width * 0.26);
               const edgeFalloff = Math.exp(-(edgeDistance * edgeDistance) / (edgeWidth * edgeWidth));
-              callus += meanWidth * event.severity * 0.78 * edgeFalloff;
+              callus += meanWidth * event.severity * 1.15 * smootherStep((eventAge + 1) / Math.max(2, event.duration)) * edgeFalloff;
             } else {
-              const mottled = angularFalloff * (0.58 + 0.42 * Math.sin(a * 19 + event.seed));
-              bite += meanWidth * event.severity * 2.45 * Math.max(0, mottled) * irregular;
-              callus += meanWidth * event.severity * 0.2 * angularFalloff * Math.max(0, Math.sin(a * 11 - event.seed));
+              const migration = Math.sin(event.seed + eventAge * 1.4) * event.width * 0.22;
+              const movingFalloff = Math.exp(-Math.pow(angleDelta(a, event.angle + migration), 2) / (event.width * event.width));
+              const mottled = movingFalloff * (0.52 + 0.48 * Math.sin(a * 19 + event.seed + eventAge * 2.4));
+              const outbreak = 0.7 + 0.3 * Math.sin((durationT + 0.08) * Math.PI);
+              bite += meanWidth * event.severity * 4.1 * outbreak * Math.max(0, mottled) * irregular;
+              callus += meanWidth * event.severity * 0.34 * movingFalloff * Math.max(0, Math.sin(a * 11 - event.seed + eventAge));
             }
           }
 
-          out[i] = Math.max(previous[i] * 0.985, out[i] - bite + callus);
+          out[i] = Math.max(previous[i] * 0.965, out[i] - bite + callus);
         }
         return smoothLoop(out, 1);
       }
@@ -818,9 +832,10 @@
             y: clamp(rawMark.y, margin, height - margin),
           };
           const rgb = event.kind === 'fire' ? COLORS.fireRgb : COLORS.pestRgb;
+          const severityT = eventSeverityT(event);
 
-          ctx.strokeStyle = rgbaCss(rgb, 0.58);
-          ctx.lineWidth = event.kind === 'fire' ? 1.2 : 1;
+          ctx.strokeStyle = rgbaCss(rgb, lerp(0.42, 0.72, severityT));
+          ctx.lineWidth = event.kind === 'fire' ? lerp(1.05, 1.8, severityT) : lerp(0.75, 1.35, severityT);
           ctx.setLineDash(event.kind === 'fire' ? [12, 8] : [2, 5]);
           ctx.beginPath();
           ctx.moveTo(target.x, target.y);
@@ -828,38 +843,45 @@
           ctx.stroke();
           ctx.setLineDash([]);
 
-          drawIncidentLineCluster(event.kind, mark.x, mark.y, event.angle, markSize, rgb);
+          drawIncidentLineCluster(event, mark.x, mark.y, event.angle, markSize, rgb);
 
           const label = {
             x: clamp(mark.x + side.x * (markSize + 10), margin, width - margin),
             y: clamp(mark.y + side.y * (markSize + 10), margin, height - margin),
           };
           ctx.fillStyle = rgbaCss(rgb, 0.78);
-          ctx.fillText(`${event.kind === 'fire' ? 'F' : 'P'}${String(event.year).padStart(3, '0')}`, label.x, label.y);
+          ctx.fillText(`${event.kind === 'fire' ? 'F' : 'P'}${String(event.year).padStart(3, '0')}+${event.duration}`, label.x, label.y);
         }
         ctx.restore();
       }
 
-      function drawIncidentLineCluster(kind, x, y, angle, size, rgb) {
+      function drawIncidentLineCluster(event, x, y, angle, size, rgb) {
+        const severityT = eventSeverityT(event);
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(angle + Math.PI / 2);
-        ctx.lineWidth = kind === 'fire' ? 1.45 : 1.1;
+        ctx.lineWidth = event.kind === 'fire' ? lerp(1.2, 2.2, severityT) : lerp(0.9, 1.45, severityT);
         ctx.strokeStyle = rgbCss(rgb);
-        if (kind === 'fire') {
-          for (let i = -1; i <= 1; i++) {
-            const offset = i * size * 0.22;
+        if (event.kind === 'fire') {
+          const lines = 2 + event.duration;
+          const center = (lines - 1) / 2;
+          for (let i = 0; i < lines; i++) {
+            const offset = (i - center) * size * 0.17;
+            const reach = lerp(0.58, 0.92, severityT);
             ctx.beginPath();
-            ctx.moveTo(-size * 0.72 + offset * 0.26, size * 0.34 + offset);
-            ctx.lineTo(size * 0.72 + offset * 0.18, -size * 0.34 + offset);
+            ctx.moveTo(-size * reach + offset * 0.26, size * 0.34 + offset);
+            ctx.lineTo(size * reach + offset * 0.18, -size * 0.34 + offset);
             ctx.stroke();
           }
         } else {
-          for (let i = -3; i <= 3; i++) {
-            const x = i * size * 0.18;
+          const lines = 3 + event.duration + Math.round(severityT * 2);
+          const center = (lines - 1) / 2;
+          for (let i = 0; i < lines; i++) {
+            const x = (i - center) * size * 0.15;
+            const half = size * lerp(0.28, 0.52, severityT) * (0.88 + 0.12 * Math.sin(event.seed + i));
             ctx.beginPath();
-            ctx.moveTo(x, -size * 0.42);
-            ctx.lineTo(x, size * 0.42);
+            ctx.moveTo(x, -half);
+            ctx.lineTo(x, half);
             ctx.stroke();
           }
           ctx.setLineDash([1, 4]);
@@ -870,6 +892,12 @@
           ctx.setLineDash([]);
         }
         ctx.restore();
+      }
+
+      function eventSeverityT(event) {
+        const min = event.kind === 'fire' ? 0.32 : 0.08;
+        const max = event.kind === 'fire' ? 0.96 : 0.86;
+        return clamp((event.severity - min) / (max - min), 0, 1);
       }
 
       function drawCompassTicks(cx, cy, radius) {
@@ -997,7 +1025,7 @@
         ctx.save();
         for (const event of model.damageEvents) {
           const eventAge = age - event.year;
-          if (eventAge < 0 || eventAge > 5.5) continue;
+          if (eventAge < 0 || eventAge > event.duration + 1.25) continue;
           if (event.kind === 'fire') drawFireBarkDamage(radius, boundary, event, age);
           else drawPestBarkDamage(radius, boundary, event, age);
         }
@@ -1006,8 +1034,8 @@
 
       function drawFireBarkDamage(radius, boundary, event, age) {
         const eventAge = age - event.year;
-        const maturity = smootherStep(eventAge / 1.6);
-        const alpha = smootherStep(eventAge / 0.55) * (1 - smootherStep((eventAge - 2.25) / 3.25));
+        const maturity = smootherStep(eventAge / Math.max(1.2, event.duration * 0.58));
+        const alpha = smootherStep(eventAge / 0.45) * (1 - smootherStep((eventAge - event.duration) / 1.25));
         const arc = event.width * lerp(0.95, 1.45, maturity);
         const points = 8;
         ctx.save();
@@ -1028,7 +1056,7 @@
           const t = i / (points - 1);
           const a = event.angle + (t - 0.5) * arc;
           const jag = 0.72 + 0.28 * Math.sin(event.seed + i * 2.31 + age * 0.05);
-          const bite = clamp(radius * event.severity * 0.055 * jag, 6, 22);
+          const bite = clamp(radius * event.severity * 0.085 * jag, 8, 32);
           const r = boundaryRadiusAt(boundary, a) * radius - bite;
           const p = { x: Math.cos(a) * r, y: Math.sin(a) * r };
           ctx.lineTo(p.x, p.y);
@@ -1041,9 +1069,9 @@
 
       function drawPestBarkDamage(radius, boundary, event, age) {
         const eventAge = age - event.year;
-        const maturity = smootherStep(eventAge / 1.5);
-        const alpha = smootherStep(eventAge / 0.55) * (1 - smootherStep((eventAge - 2) / 3.5));
-        const holes = 6 + Math.floor(event.severity * 10);
+        const maturity = smootherStep(eventAge / Math.max(1.2, event.duration * 0.56));
+        const alpha = smootherStep(eventAge / 0.45) * (1 - smootherStep((eventAge - event.duration) / 1.25));
+        const holes = 4 + event.duration + Math.floor(event.severity * 11);
         ctx.save();
         ctx.globalAlpha *= clamp(alpha, 0, 1);
         ctx.strokeStyle = rgbaCss(COLORS.inkRgb, 0.76);
@@ -1158,7 +1186,7 @@
           `WIND ${f.windExposure.toFixed(2)}  ${directionName(f.windFrom)}`,
           `TEMP ${formatSigned(f.temperatureMean, 1)}C  VAR ${f.temperatureVolatility.toFixed(2)}`,
           `RAIN ${formatSigned(formingRing.rainfall, 2)}  WET ${model.weatherSummary.wetYears} DRY ${model.weatherSummary.dryYears}`,
-          `LINES F ${fireCount}  P ${pestCount}`,
+          `INC F ${fireCount}  P ${pestCount}`,
           `GROUND ${Math.round(f.slopeMagnitude)}deg  ${directionName(f.slopeDown)}`,
         ];
         drawTextPlate(width - margin - readoutWidth(forceLines), margin, forceLines, { accent: COLORS.wind, align: 'left' });
