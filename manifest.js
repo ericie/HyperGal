@@ -31,7 +31,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "An abstract ecosystem that paints itself in watercolour and cartographic linework, then wipes the painting clean forever. Over a pale NES-bright pixel terrain, blocky prey graze, grow into spiny square emblems that age toward white, and flee hunters with their own alertness and sprint speed. Compact black arcade hunters run prey down, fatten, and breed only by splitting in half. Death paints stains, route ticks, and line scaffolds; old spiny prey burst white and erase nearby bloodstains. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats."
+      "description": "An abstract ecosystem that paints itself in watercolour and cartographic linework, then wipes the painting clean forever. Over a pale NES-bright pixel terrain, blocky prey graze, grow into spiny square emblems that age toward white, and flee hunters with their own alertness and sprint speed. Spiny prey trundle toward richer plant patches and, when they die, burst into clean eraser blasts that wipe stains, foliage, food, and husks instead of fertilizing the ground. Compact black arcade hunters run prey down, fatten, and breed only by splitting in half. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats."
     },
     {
       "slug": "005-only-invaders",
@@ -95,7 +95,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "One yellow arcade car hunts for the fastest lane through gray traffic, speeding up or backing off to make openings, but never exits. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray cars can take ramps and leave the highway. Every car claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car alone scores: each gray car it passes is +1."
+      "description": "One yellow arcade car hunts for the fastest lane through compact gray traffic, buses, and semi trucks, signaling, speeding up, surging, or backing off to make openings, but never exits. Other gray vehicles have wider speed personalities, from aggressive squeezers to conservative gap-waiters, and try to pass too. Slow traffic packs tighter while fast traffic leaves more room. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray vehicles can take diagonal ramps offscreen and leave the highway. Every vehicle claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car scores +1 for every pass, loses 1 when most vehicles pass it, and loses 5 when a semi passes it."
     },
     {
       "slug": "013-paddle",
@@ -104,6 +104,22 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "One-player Pong folded into a cylinder. A single paddle stands where the net used to be; the ball leaves one edge and returns from the other, so every save comes back around and the only way to be rid of the ball is to miss. The two counters tally edge crossings, left and right, and exactly one crossing happens per lap — a catch sends the ball back out the edge behind it, a miss lets it through to the far one, so the paddle decides which side a point lands on but never whether one lands. It catches eight of every ten, striking off-centre on purpose to keep the rally alive, and each miss burns a permanent bar into the centre line, which slowly becomes a histogram of where this paddle fails."
+    },
+    {
+      "slug": "014-only-ghosts",
+      "title": "Only Ghosts",
+      "year": 2026,
+      "type": "interactive",
+      "thumbnail": "thumbnail.svg",
+      "description": "A stripped-down Pac-Man riff with one oversized Pac and one oversized ghost on a fixed 17-by-11 course: one outer hallway around one solid inner box, with power pellets on the outside corners. Pac searches for power, flees if it sees a ghost ahead, checks behind after escaping, then becomes a ghost until it has enough privacy or distance to turn yellow again. Ghosts explore their own internal map, hunt visible Pacs, and steer away from other ghosts instead of chasing them."
+    },
+    {
+      "slug": "015-growth-rings",
+      "title": "Growth Rings",
+      "year": 2026,
+      "type": "interactive",
+      "thumbnail": "thumbnail.png",
+      "description": "A trunk cross-section that grows toward 200 years one ring at a time. Latitude, solar angle, wind exposure, temperature, rainfall, and ground slope push the cambium out of symmetry; one-year fire and pest incidents are marked as abstract chart lines and cut that year's growth record."
     }
   ]
 };

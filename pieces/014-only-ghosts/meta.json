@@ -1,0 +1,7 @@
+{
+  "title": "Only Ghosts",
+  "year": 2026,
+  "type": "interactive",
+  "thumbnail": "thumbnail.svg",
+  "description": "A stripped-down Pac-Man riff with one oversized Pac and one oversized ghost on a fixed 17-by-11 course: one outer hallway around one solid inner box, with power pellets on the outside corners. Pac searches for power, flees if it sees a ghost ahead, checks behind after escaping, then becomes a ghost until it has enough privacy or distance to turn yellow again. Ghosts explore their own internal map, hunt visible Pacs, and steer away from other ghosts instead of chasing them."
+}

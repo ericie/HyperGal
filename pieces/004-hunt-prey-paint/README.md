@@ -14,8 +14,9 @@ there are no corners to win or die in.
   time, so new groundcover fills in instead of popping on all at once.
 - **Prey** — blocky pixel grazers, each wearing one of many **colours**. They
   eat plants, grow into larger bodies, and flee hunters. Giant prey become
-  spiny square emblems and age continuously toward white. They must reach a
-  visibly grown body before they can breed. Every prey is born with its own
+  spiny square emblems, age continuously toward white, and sample the surrounding
+  terrain for richer plant patches instead of camping in place. They must reach
+  a visibly grown body before they can breed. Every prey is born with its own
   **alertness** (how far off it spots a hunter) and **sprint speed**; a fleeing
   one sheds square motion ticks in its own colour. A sprint outruns a hunter but
   burns energy fast, so a hounded prey can run itself to starvation.
@@ -33,11 +34,10 @@ and crowd; a hunter and a prey, of course, do meet.
 The marks layer is painterly watercolour and persistent — it *is* the painting:
 
 - a prey that is **killed** blooms a watercolour stain and line-scaffold **in its own colour**;
-- a prey that **starves** leaves a pale, washed-out stain of that colour;
+- a small prey that **starves** leaves a pale, washed-out stain of that colour;
 - a hunter that dies leaves a dark ash mark;
-- a spiny prey that reaches **old age** is the one redemption: it bursts white,
-  erases the bloodstains around it, and flushes the ground. Living long enough
-  is the only thing that heals the field.
+- a spiny prey that dies bursts white and wipes the bloodstains, food, foliage,
+  and nearby husks around it. It leaves no fertile patch behind.
 
 Both prey and hunters die of starvation and of old age. The painting fills with
 the watercolour marks of the hunt and is endlessly cleansed by the old —

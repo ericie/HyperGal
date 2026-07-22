@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200" shape-rendering="crispEdges">
+  <title>Only Ghosts thumbnail</title>
+  <rect width="200" height="200" fill="#05040a"/>
+
+  <g fill="#101a55">
+    <path d="M16 16h168v168H16zM44 44v112h112V44z" fill-rule="evenodd"/>
+    <rect x="58" y="58" width="84" height="84"/>
+  </g>
+  <g fill="none" stroke="#3762ff" stroke-width="4" stroke-opacity=".72">
+    <rect x="16" y="16" width="168" height="168"/>
+    <rect x="44" y="44" width="112" height="112"/>
+    <rect x="58" y="58" width="84" height="84"/>
+  </g>
+
+  <g fill="#f7fbff">
+    <circle cx="31" cy="31" r="7"/>
+    <circle cx="169" cy="31" r="7"/>
+    <circle cx="31" cy="169" r="7"/>
+    <circle cx="169" cy="169" r="7"/>
+  </g>
+  <g fill="#ffdf82">
+    <rect x="56" y="28" width="5" height="5"/>
+    <rect x="78" y="28" width="5" height="5"/>
+    <rect x="100" y="28" width="5" height="5"/>
+    <rect x="122" y="28" width="5" height="5"/>
+    <rect x="144" y="28" width="5" height="5"/>
+    <rect x="28" y="72" width="5" height="5"/>
+    <rect x="28" y="96" width="5" height="5"/>
+    <rect x="28" y="120" width="5" height="5"/>
+    <rect x="167" y="72" width="5" height="5"/>
+    <rect x="167" y="96" width="5" height="5"/>
+    <rect x="167" y="120" width="5" height="5"/>
+    <rect x="56" y="167" width="5" height="5"/>
+    <rect x="78" y="167" width="5" height="5"/>
+    <rect x="100" y="167" width="5" height="5"/>
+    <rect x="122" y="167" width="5" height="5"/>
+    <rect x="144" y="167" width="5" height="5"/>
+  </g>
+
+  <g transform="translate(74 166)">
+    <circle r="37" fill="#ffe94a"/>
+    <path d="M0 0 38 -21V21z" fill="#05040a"/>
+    <circle cx="-8" cy="-16" r="5" fill="#ffad35"/>
+  </g>
+
+  <g transform="translate(126 34)" fill="#ff3155">
+    <path d="M-31 2a31 31 0 0 1 62 0v39l-10-9-10 9-10-9-10 9-10-9-12 9z"/>
+    <g fill="#f9fbff">
+      <ellipse cx="-12" cy="2" rx="8" ry="10"/>
+      <ellipse cx="12" cy="2" rx="8" ry="10"/>
+    </g>
+    <g fill="#263bff">
+      <rect x="-7" y="1" width="6" height="6"/>
+      <rect x="17" y="1" width="6" height="6"/>
+    </g>
+  </g>
+</svg>

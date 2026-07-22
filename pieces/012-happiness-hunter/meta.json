@@ -3,5 +3,5 @@
   "year": 2026,
   "type": "interactive",
   "thumbnail": "thumbnail.svg",
-  "description": "One yellow arcade car hunts for the fastest lane through gray traffic, speeding up or backing off to make openings, but never exits. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray cars can take ramps and leave the highway. Every car claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car alone scores: each gray car it passes is +1."
+  "description": "One yellow arcade car hunts for the fastest lane through compact gray traffic, buses, and semi trucks, signaling, speeding up, surging, or backing off to make openings, but never exits. Other gray vehicles have wider speed personalities, from aggressive squeezers to conservative gap-waiters, and try to pass too. Slow traffic packs tighter while fast traffic leaves more room. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray vehicles can take diagonal ramps offscreen and leave the highway. Every vehicle claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car scores +1 for every pass, loses 1 when most vehicles pass it, and loses 5 when a semi passes it."
 }

@@ -1,0 +1,1706 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Only Ghosts - HyperGal</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #05040a; overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; }
+      .caption {
+        position: fixed;
+        left: 50%;
+        bottom: 1rem;
+        transform: translateX(-50%);
+        color: rgba(245, 247, 255, .62);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: .8rem;
+        letter-spacing: .04em;
+        text-align: center;
+        pointer-events: none;
+        text-shadow: 0 1px 0 #000;
+        white-space: nowrap;
+      }
+      .debug {
+        position: fixed;
+        left: .8rem;
+        top: .7rem;
+        margin: 0;
+        color: rgba(245, 247, 255, .74);
+        font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        pointer-events: none;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div class="caption">Only Ghosts - 2026 - click to reseed</div>
+    <pre id="debug" class="debug" hidden></pre>
+    <script>
+      const canvas = document.getElementById('stage');
+      const ctx = canvas.getContext('2d');
+      const debugEl = document.getElementById('debug');
+      const TAU = Math.PI * 2;
+
+      const BASE_MAZE = [
+        '#################',
+        '#o.............o#',
+        '#.#############.#',
+        '#.#############.#',
+        '#.#############.#',
+        '#.#############.#',
+        '#.#############.#',
+        '#.#############.#',
+        '#.#############.#',
+        '#o.............o#',
+        '#################',
+      ];
+
+      const ROWS = BASE_MAZE.length;
+      const COLS = BASE_MAZE[0].length;
+      for (const row of BASE_MAZE) {
+        if (row.length !== COLS) throw new Error('Maze rows must be equal width.');
+      }
+
+      const COLORS = {
+        bg: '#05040a',
+        void: '#090813',
+        wall: '#101a55',
+        wallEdge: '#244dff',
+        wallEdgeSoft: 'rgba(69, 103, 255, .28)',
+        gate: 'rgba(255, 153, 218, .82)',
+        pellet: '#ffdf82',
+        power: '#f7fbff',
+        fruit: '#ff3b7d',
+        fruitStem: '#4dff9f',
+        pac: '#ffe94a',
+        pacHot: '#fff9c9',
+        eye: '#f9fbff',
+        pupil: '#263bff',
+        text: 'rgba(245, 247, 255, .78)',
+        sight: 'rgba(255, 255, 255, .7)',
+      };
+
+      const AGENT_SPECS = [
+        { name: 'Pac', color: '#ffad35', start: [8, 9], dir: [-1, 0], pac: true },
+        { name: 'Ghost', color: '#ff3155', start: [8, 1], dir: [1, 0] },
+      ];
+
+      const DIRS = [
+        { name: 'right', x: 1, y: 0, angle: 0 },
+        { name: 'down', x: 0, y: 1, angle: Math.PI / 2 },
+        { name: 'left', x: -1, y: 0, angle: Math.PI },
+        { name: 'up', x: 0, y: -1, angle: -Math.PI / 2 },
+      ];
+
+      const HOME = { x: 8.5, y: 1.5, c: 8, r: 1 };
+      const POWER_PELLET_SECONDS = 3.1;
+      const POWER_EAT_BONUS_SECONDS = .25;
+      const POWER_MAX_SECONDS = 3.4;
+      const params = new URLSearchParams(location.search);
+      const DEBUG = params.has('debug');
+      const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      let W = 0, H = 0, dpr = 1, cell = 20, cellX = 20, cellY = 20, ox = 0, oy = 0;
+      let now = 0, lastT = 0, raf = 0;
+      let rng = Math.random;
+      let seed = params.get('seed') || randomSeed();
+      let warmSeconds = Math.max(0, Number(params.get('warm') || 0) || 0);
+      let maze = BASE_MAZE;
+      let openCells = [];
+      let foodCells = [];
+      let agents = [];
+      let pellets = new Map();
+      let pelletCount = 0;
+      let fruit = null;
+      let nextFruitAt = 0;
+      let particles = [];
+      let stains = [];
+      let sightLines = [];
+      let pairCooldowns = new Map();
+      let boardClears = 0;
+      let eatenPellets = 0;
+      let ghostCollisions = 0;
+      let deaths = 0;
+      let powerEats = 0;
+
+      function randomSeed() {
+        return Math.floor(Math.random() * 0xffffffff).toString(36);
+      }
+
+      function xmur3(str) {
+        let h = 1779033703 ^ str.length;
+        for (let i = 0; i < str.length; i++) {
+          h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+          h = (h << 13) | (h >>> 19);
+        }
+        return function nextHash() {
+          h = Math.imul(h ^ (h >>> 16), 2246822507);
+          h = Math.imul(h ^ (h >>> 13), 3266489909);
+          return (h ^= h >>> 16) >>> 0;
+        };
+      }
+
+      function mulberry32(a) {
+        return function nextRandom() {
+          let t = (a += 0x6d2b79f5);
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      const rand = (a, b) => a + rng() * (b - a);
+      const randi = (a, b) => Math.floor(rand(a, b + 1));
+      const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const keyOf = (c, r) => r + ',' + c;
+      const cellOf = (x, y) => ({ c: clamp(Math.floor(x), 0, COLS - 1), r: clamp(Math.floor(y), 0, ROWS - 1) });
+      const cellCenterX = (c) => c + .5;
+      const cellCenterY = (r) => r + .5;
+      const px = (x) => ox + x * cellX;
+      const py = (y) => oy + y * cellY;
+      const wrapRow = (r) => r >= 0 && r < ROWS && isOpenCell(0, r) && isOpenCell(COLS - 1, r);
+
+      function reset(nextSeed = seed) {
+        cancelAnimationFrame(raf);
+        seed = String(nextSeed || randomSeed());
+        rng = mulberry32(xmur3(seed)());
+        maze = generateMaze();
+        rebuildCellCaches();
+        now = 0;
+        eatenPellets = 0;
+        ghostCollisions = 0;
+        deaths = 0;
+        powerEats = 0;
+        boardClears = 0;
+        particles = [];
+        stains = [];
+        sightLines = [];
+        pairCooldowns = new Map();
+        fruit = null;
+        nextFruitAt = rand(7, 14);
+        resizeCanvas();
+        seedPellets();
+        agents = AGENT_SPECS.map(makeAgent);
+        lastT = performance.now();
+
+        if (warmSeconds > 0) {
+          const steps = Math.min(1800, Math.floor(warmSeconds * 30));
+          for (let i = 0; i < steps; i++) update(1 / 30, true);
+        }
+
+        raf = requestAnimationFrame(tick);
+      }
+
+      function resizeCanvas() {
+        dpr = Math.min(2, devicePixelRatio || 1);
+        W = innerWidth;
+        H = innerHeight;
+        canvas.width = Math.round(W * dpr);
+        canvas.height = Math.round(H * dpr);
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        cellX = W / COLS;
+        cellY = H / ROWS;
+        cell = Math.max(8, Math.min(cellX, cellY));
+        ox = 0;
+        oy = 0;
+      }
+
+      function generateMaze() {
+        return BASE_MAZE.slice();
+      }
+
+      function carveMirrored(grid, c, r) {
+        const mirror = COLS - 1 - c;
+        let carved = carveCell(grid, c, r);
+        if (mirror !== c) carved = carveCell(grid, mirror, r) || carved;
+        return carved;
+      }
+
+      function carveCell(grid, c, r) {
+        if (!canCarveCell(grid, c, r)) return false;
+        grid[r][c] = rng() < .78 ? '.' : ' ';
+        return true;
+      }
+
+      function canCarveCell(grid, c, r) {
+        if (r <= 0 || r >= ROWS - 1 || c <= 0 || c >= COLS - 1) return false;
+        if (Math.abs(r - HOME.r) <= 3 && Math.abs(c - HOME.c) <= 4) return false;
+        if (grid[r][c] !== '#') return false;
+        let openNeighbors = 0;
+        let wallNeighbors = 0;
+        for (const d of DIRS) {
+          if (gridOpen(grid, c + d.x, r + d.y)) openNeighbors++;
+          else wallNeighbors++;
+        }
+        if (openNeighbors === 0 || wallNeighbors === 0) return false;
+        if (openNeighbors > 2 && rng() < .45) return false;
+        return true;
+      }
+
+      function gridOpen(grid, c, r) {
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return false;
+        const ch = grid[r][c];
+        if (ch === '#') return false;
+        if (ch === ' ' && r !== HOME.r && (c < 5 || c > COLS - 6)) return false;
+        return true;
+      }
+
+      function rebuildCellCaches() {
+        openCells = [];
+        foodCells = [];
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            if (isOpenCell(c, r)) openCells.push({ c, r });
+            if (maze[r][c] === '.' || maze[r][c] === 'o') foodCells.push({ c, r });
+          }
+        }
+      }
+
+      function seedPellets() {
+        pellets = new Map();
+        pelletCount = 0;
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            const ch = maze[r][c];
+            if (ch !== '.' && ch !== 'o') continue;
+            const p = {
+              c,
+              r,
+              type: ch === 'o' ? 'power' : 'dot',
+              pulse: rand(0, TAU),
+              alive: true,
+            };
+            pellets.set(keyOf(c, r), p);
+            pelletCount++;
+          }
+        }
+      }
+
+      function makeAgent(spec, id) {
+        const [c, r] = spec.start;
+        return {
+          id,
+          name: spec.name,
+          color: spec.color,
+          x: cellCenterX(c),
+          y: cellCenterY(r),
+          dir: dirFromVector(spec.dir[0], spec.dir[1]),
+          nextDir: null,
+          target: null,
+          state: spec.pac ? 'pac' : 'ghost',
+          confidence: spec.pac ? .86 : rand(.22, .58),
+          power: 0,
+          speedBias: rand(-.18, .18),
+          huntUntil: 0,
+          huntTargetId: null,
+          panicUntil: 0,
+          panicTargetId: null,
+          escapeCheckAt: 0,
+          checkingBehindUntil: 0,
+          checkDir: null,
+          returningHome: false,
+          rebirthPending: false,
+          rebirthStartedAt: 0,
+          exploredCells: new Set(),
+          exploreTarget: null,
+          turnAt: 0,
+          mouth: rand(0, TAU),
+          wobble: rand(0, TAU),
+          seenBy: null,
+          seenFlash: 0,
+          spawnFlash: rand(.3, 1.1),
+          bumpFlash: 0,
+          pelletEats: 0,
+          kills: 0,
+          targetAge: 0,
+          lastTransform: -9,
+          lastCollision: -9,
+          eyeSpin: rand(0, TAU),
+        };
+      }
+
+      function tick(t) {
+        const rawDt = (t - lastT) / 1000 || 0;
+        const dt = Math.min(1 / 24, Math.max(0, rawDt));
+        lastT = t;
+        update(dt, false);
+        draw();
+        raf = requestAnimationFrame(tick);
+      }
+
+      function update(dt, silent) {
+        now += dt;
+        if (REDUCED) dt *= .72;
+
+        if (pelletCount < 18) refillBoard();
+        updateFruit(dt);
+        updateConfidence(dt);
+        applyVisibilityRules();
+        for (const a of agents) updateAgent(a, dt);
+        for (const a of agents) eatAtCurrentCell(a);
+        resolveCollisions();
+        applyVisibilityRules();
+        updateFX(dt);
+        if (DEBUG && !silent) updateDebug();
+      }
+
+      function refillBoard() {
+        boardClears++;
+        spawnBurst(HOME.x, HOME.y, '#fff6aa', 42, .95);
+        seedPellets();
+        for (const a of agents) a.confidence = clamp(a.confidence + .08, 0, 1);
+      }
+
+      function updateFruit(dt) {
+        fruit = null;
+      }
+
+      function pickFruitCell() {
+        for (let tries = 0; tries < 60; tries++) {
+          const p = foodCells[randi(0, foodCells.length - 1)];
+          if (isOpenCell(p.c, p.r)) return p;
+        }
+        return { c: HOME.c, r: HOME.r };
+      }
+
+      function updateConfidence(dt) {
+        for (const a of agents) {
+          if (a.state === 'eyes') continue;
+          a.power = Math.max(0, a.power - dt);
+          if (a.power > 0) {
+            a.panicTargetId = null;
+            a.panicUntil = 0;
+            a.escapeCheckAt = 0;
+            a.checkingBehindUntil = 0;
+          }
+          a.seenFlash = Math.max(0, a.seenFlash - dt * 4);
+          a.spawnFlash = Math.max(0, a.spawnFlash - dt * 1.6);
+          a.bumpFlash = Math.max(0, a.bumpFlash - dt * 3);
+        }
+      }
+
+      function nearbyFoodScore(a) {
+        let score = 0;
+        const ac = Math.floor(a.x);
+        const ar = Math.floor(a.y);
+        for (let dr = -5; dr <= 5; dr++) {
+          for (let dc = -5; dc <= 5; dc++) {
+            const dist = Math.abs(dc) + Math.abs(dr);
+            if (dist > 5) continue;
+            const p = pellets.get(keyOf(ac + dc, ar + dr));
+            if (p && p.alive) score += (p.type === 'power' ? 2.8 : .55) / (1 + dist * .55);
+          }
+        }
+        if (fruit) {
+          const d = Math.abs(fruit.c - ac) + Math.abs(fruit.r - ar);
+          if (d <= 7) score += 3.4 / (1 + d * .45);
+        }
+        return clamp(score / 4.8, 0, 1.2);
+      }
+
+      function updateAgent(a, dt) {
+        a.mouth += dt * (a.power > 0 ? 18 : 11);
+        a.wobble += dt * (a.state === 'ghost' ? 1.35 : 3.4);
+        if (a.state === 'eyes') {
+          updateEyes(a, dt);
+          return;
+        }
+        if (a.state === 'ghost') {
+          if (a.returningHome && gridDistance(a.x, a.y, HOME.x, HOME.y) <= .55) {
+            a.x = HOME.x;
+            a.y = HOME.y;
+            a.returningHome = false;
+            resetExploration(a);
+          }
+          if (a.rebirthPending && rebirthIsSafe(a)) {
+            becomePacAfterPrivacy(a);
+            return;
+          }
+        }
+        if (a.state === 'ghost') markExplored(a);
+
+        if (atCellCenter(a) || !canContinue(a)) {
+          snapToCenter(a);
+          if (now >= a.turnAt || !canContinue(a)) {
+            a.target = pickTarget(a);
+            a.nextDir = a.target ? firstDirToward(a, a.target) : null;
+            a.turnAt = now + decisionDelay(a);
+          }
+          const legal = legalDirsForAgent(a);
+          if (a.nextDir && legal.some((d) => d.name === a.nextDir.name)) {
+            a.dir = a.nextDir;
+          } else if (!canContinue(a) || rng() < randomTurnChance(a)) {
+            a.dir = pickBestLegalDir(a, legal);
+          }
+        }
+
+        const speed = agentSpeed(a);
+        let nx = a.x + a.dir.x * speed * dt;
+        let ny = a.y + a.dir.y * speed * dt;
+        if (nx < -0.05 && wrapRow(Math.floor(a.y))) nx = COLS - .05;
+        if (nx > COLS + .05 && wrapRow(Math.floor(a.y))) nx = .05;
+        if (isOpenAt(nx, ny)) {
+          a.x = nx;
+          a.y = ny;
+        } else {
+          snapToCenter(a);
+          a.turnAt = 0;
+        }
+      }
+
+      function updateEyes(a, dt) {
+        const dx = HOME.x - a.x;
+        const dy = HOME.y - a.y;
+        const dist = Math.hypot(dx, dy);
+        const speed = 5.8 + a.speedBias;
+        if (dist < .16) {
+          a.x = HOME.x;
+          a.y = HOME.y;
+          a.state = 'ghost';
+          a.confidence = .10;
+          a.power = 0;
+          a.panicTargetId = null;
+          a.panicUntil = 0;
+          a.escapeCheckAt = 0;
+          a.checkingBehindUntil = 0;
+          a.returningHome = false;
+          resetExploration(a);
+          clearHuntTarget(a);
+          a.dir = DIRS[randi(0, DIRS.length - 1)];
+          a.turnAt = 0;
+          a.spawnFlash = 1;
+          a.lastTransform = now;
+          spawnBurst(a.x, a.y, a.color, 24, .7);
+          return;
+        }
+        a.x += (dx / Math.max(.001, dist)) * speed * dt;
+        a.y += (dy / Math.max(.001, dist)) * speed * dt;
+        a.eyeSpin += dt * 11;
+      }
+
+      function agentSpeed(a) {
+        if (a.state === 'pac' && now < a.checkingBehindUntil) return 0;
+        if (a.state === 'pac') {
+          const panicBoost = a.panicTargetId !== null ? .55 : 0;
+          return (a.power > 0 ? 4.25 : 3.1 + panicBoost) + a.speedBias * .6;
+        }
+        const huntBoost = isHunting(a) ? .45 : 0;
+        const homeBoost = a.returningHome || a.rebirthPending ? .25 : 0;
+        return 2.15 + huntBoost + homeBoost + a.speedBias * .35;
+      }
+
+      function decisionDelay(a) {
+        if (a.state === 'pac') return a.panicTargetId !== null || a.power > 0 ? rand(.42, .76) : rand(.92, 1.42);
+        if (isHunting(a)) return rand(.46, .78);
+        return rand(1.6, 3.05);
+      }
+
+      function randomTurnChance(a) {
+        if (!canContinue(a)) return 1;
+        if (a.state === 'pac') return a.panicTargetId !== null ? .025 : 0;
+        return isHunting(a) ? .01 : .003;
+      }
+
+      function isHunting(a) {
+        return a.state === 'ghost' && huntTargetFor(a) !== null;
+      }
+
+      function setHuntTarget(ghost, pac) {
+        if (ghost.huntTargetId !== pac.id) resetExploration(ghost);
+        ghost.huntTargetId = pac.id;
+        ghost.huntUntil = now + 9999;
+      }
+
+      function clearHuntTarget(ghost) {
+        ghost.huntTargetId = null;
+        ghost.huntUntil = 0;
+      }
+
+      function clearHuntsFor(target) {
+        for (const a of agents) {
+          if (a.huntTargetId === target.id) clearHuntTarget(a);
+        }
+      }
+
+      function huntTargetFor(ghost) {
+        if (ghost.huntTargetId === null) return null;
+        const target = agents.find((a) => a.id === ghost.huntTargetId);
+        if (!target || target.state !== 'pac' || target.power > 0) {
+          clearHuntTarget(ghost);
+          return null;
+        }
+        return target;
+      }
+
+      function markExplored(a) {
+        const cell = cellOf(a.x, a.y);
+        if (isOpenCell(cell.c, cell.r)) a.exploredCells.add(keyOf(cell.c, cell.r));
+      }
+
+      function visibleGhostFor(a) {
+        return nearestAgent(a, (b) => b.state === 'ghost' && canSee(a, b));
+      }
+
+      function ghostPrivacyThreat(a) {
+        return visibleGhostFor(a) || nearestAgent(a, (b) => b.state === 'ghost' && canSee(b, a));
+      }
+
+      function rebirthIsSafe(a) {
+        const waited = now - a.rebirthStartedAt;
+        if (waited < .85) return false;
+        const threat = ghostPrivacyThreat(a);
+        if (!threat) return true;
+        return waited > 1.35 && gridDistance(a.x, a.y, threat.x, threat.y) > 5.4;
+      }
+
+      function resetExploration(a) {
+        a.exploredCells = new Set();
+        a.exploreTarget = null;
+        if (a.state === 'ghost') markExplored(a);
+      }
+
+      function exploreTargetFor(a) {
+        markExplored(a);
+        if (a.returningHome) {
+          if (gridDistance(a.x, a.y, HOME.x, HOME.y) > .55) return { c: HOME.c, r: HOME.r };
+          a.returningHome = false;
+          resetExploration(a);
+        }
+        if (a.exploreTarget && !a.exploredCells.has(keyOf(a.exploreTarget.c, a.exploreTarget.r))) return a.exploreTarget;
+        const start = cellOf(a.x, a.y);
+        const target = bfsNearest(start, (c, r) => isOpenCell(c, r) && !a.exploredCells.has(keyOf(c, r)));
+        if (target) {
+          a.exploreTarget = target;
+          return target;
+        }
+        resetExploration(a);
+        return bfsNearest(start, (c, r) => isOpenCell(c, r) && !a.exploredCells.has(keyOf(c, r))) || openCells[randi(0, openCells.length - 1)];
+      }
+
+      function pickTarget(a) {
+        if (a.state === 'pac') {
+          if (a.power > 0) {
+            const ghost = nearestAgent(a, (b) => b.state === 'ghost');
+            if (ghost) return cellOf(ghost.x, ghost.y);
+          }
+          const panicTarget = panicTargetFor(a);
+          if (panicTarget) return fleeTargetFrom(panicTarget, a);
+          return nearestPowerTarget(a) || nearestFoodTarget(a, false);
+        }
+
+        const visiblePac = nearestAgent(a, (b) => b.state === 'pac' && canSee(a, b));
+        if (visiblePac) {
+          setHuntTarget(a, visiblePac);
+          return cellOf(visiblePac.x, visiblePac.y);
+        }
+
+        const visibleGhost = visibleGhostFor(a);
+        if (visibleGhost) {
+          clearHuntTarget(a);
+          reactToSeenGhost(a, visibleGhost);
+          return fleeTargetFrom(visibleGhost, a);
+        }
+
+        const huntedPac = huntTargetFor(a);
+        if (huntedPac) return cellOf(huntedPac.x, huntedPac.y);
+
+        return exploreTargetFor(a);
+      }
+
+      function facingDir(a) {
+        return a.state === 'pac' && a.checkingBehindUntil > 0 && a.checkDir ? a.checkDir : a.dir;
+      }
+
+      function beginBehindCheck(pac) {
+        pac.checkDir = oppositeDir(pac.dir);
+        pac.dir = pac.checkDir;
+        pac.checkingBehindUntil = now + .48;
+        pac.target = null;
+        pac.nextDir = null;
+        pac.turnAt = now + .48;
+        pac.seenFlash = 1;
+      }
+
+      function resumeFleeAfterBackCheck(pac, ghost) {
+        pac.checkingBehindUntil = 0;
+        pac.checkDir = null;
+        pac.escapeCheckAt = now + 1;
+        steerFleeFrom(pac, ghost, .12);
+      }
+
+      function steerFleeFrom(pac, ghost, turnSoon) {
+        const awayDir = dirAwayFrom(pac, ghost);
+        pac.target = fleeTargetFrom(ghost, pac);
+        const routeDir = firstDirToward(pac, pac.target);
+        pac.nextDir = canMoveDir(pac, awayDir) ? awayDir : routeDir || awayDir;
+        if (canMoveDir(pac, pac.nextDir)) pac.dir = pac.nextDir;
+        pac.turnAt = Math.min(pac.turnAt, now + turnSoon);
+      }
+
+      function steerGhostAwayFrom(ghost, other, turnSoon) {
+        const awayDir = dirAwayFrom(ghost, other);
+        ghost.target = fleeTargetFrom(other, ghost);
+        const routeDir = firstDirToward(ghost, ghost.target);
+        ghost.nextDir = canMoveDir(ghost, awayDir) ? awayDir : routeDir || awayDir;
+        ghost.turnAt = Math.min(ghost.turnAt, now + turnSoon);
+      }
+
+      function dirAwayFrom(a, threat) {
+        const ac = Math.floor(a.x), ar = Math.floor(a.y);
+        const tc = Math.floor(threat.x), tr = Math.floor(threat.y);
+        if (ar === tr && ac !== tc) return dirFromVector(ac > tc ? 1 : -1, 0);
+        if (ac === tc && ar !== tr) return dirFromVector(0, ar > tr ? 1 : -1);
+        return oppositeDir(a.dir);
+      }
+
+      function canMoveDir(a, dir) {
+        if (!dir) return false;
+        const c = Math.floor(a.x);
+        const r = Math.floor(a.y);
+        let nc = c + dir.x;
+        const nr = r + dir.y;
+        if (wrapRow(r)) {
+          if (nc < 0) nc = COLS - 1;
+          if (nc >= COLS) nc = 0;
+        }
+        return isOpenCell(nc, nr);
+      }
+
+      function oppositeDir(dir) {
+        if (!dir) return DIRS[0];
+        return DIRS.find((d) => d.x === -dir.x && d.y === -dir.y) || DIRS[0];
+      }
+
+      function panicTargetFor(a) {
+        if (a.panicTargetId === null) return null;
+        const target = agents.find((b) => b.id === a.panicTargetId);
+        if (!target || target.state !== 'ghost' || a.power > 0) {
+          a.panicTargetId = null;
+          a.panicUntil = 0;
+          a.escapeCheckAt = 0;
+          a.checkingBehindUntil = 0;
+          a.checkDir = null;
+          return null;
+        }
+        return target;
+      }
+
+      function nearestPowerTarget(a) {
+        const start = cellOf(a.x, a.y);
+        return bfsNearest(start, (c, r) => {
+          const p = pellets.get(keyOf(c, r));
+          return !!(p && p.alive && p.type === 'power');
+        });
+      }
+
+      function nearestFoodTarget(a, preferPower) {
+        const start = cellOf(a.x, a.y);
+        const result = bfsNearest(start, (c, r) => {
+          const p = pellets.get(keyOf(c, r));
+          if (!p || !p.alive) return false;
+          return preferPower ? p.type === 'power' : true;
+        });
+        if (result) return result;
+        return foodCells[randi(0, foodCells.length - 1)];
+      }
+
+      function fleeTargetFrom(threat, seeker = null) {
+        let best = null;
+        let bestScore = -Infinity;
+        const threatCell = cellOf(threat.x, threat.y);
+        const seekerCell = seeker ? cellOf(seeker.x, seeker.y) : null;
+        const awayDir = seeker ? dirAwayFrom(seeker, threat) : null;
+        for (let i = 0; i < openCells.length; i++) {
+          const p = openCells[i];
+          const threatDistance = pathDistanceCells(threatCell, p);
+          if (!Number.isFinite(threatDistance)) continue;
+          const seekerDistance = seekerCell ? pathDistanceCells(seekerCell, p) : 0;
+          const first = seeker ? firstDirToward(seeker, p) : null;
+          const firstStep = first && awayDir && first.x === awayDir.x && first.y === awayDir.y ? 12 : 0;
+          const wrongWay = first && awayDir && first.x === -awayDir.x && first.y === -awayDir.y ? -18 : 0;
+          const food = pellets.has(keyOf(p.c, p.r)) ? .8 : 0;
+          const centerBias = -Math.abs(p.c - HOME.c) * .04 - Math.abs(p.r - HOME.r) * .02;
+          const score = threatDistance - seekerDistance * .08 + firstStep + wrongWay + food + centerBias + rng() * .55;
+          if (score > bestScore) {
+            bestScore = score;
+            best = p;
+          }
+        }
+        return best || { c: HOME.c, r: HOME.r };
+      }
+
+      function reactToSeenGhost(a, ghost) {
+        a.bumpFlash = Math.max(a.bumpFlash, .55);
+        a.seenFlash = Math.max(a.seenFlash, .6);
+        spawnSightLine(a, ghost, a.color);
+        return true;
+      }
+
+      function nearestAgent(a, predicate) {
+        let best = null;
+        let bestD = Infinity;
+        for (const b of agents) {
+          if (a === b || !predicate(b)) continue;
+          const d = gridDistance(a.x, a.y, b.x, b.y);
+          if (d < bestD) {
+            bestD = d;
+            best = b;
+          }
+        }
+        return best;
+      }
+
+      function gridDistance(ax, ay, bx, by) {
+        let dx = Math.abs(ax - bx);
+        if (Math.floor(ay) === Math.floor(by) && wrapRow(Math.floor(ay))) dx = Math.min(dx, COLS - dx);
+        return Math.hypot(dx, ay - by);
+      }
+
+      function eatAtCurrentCell(a) {
+        if (a.state !== 'pac') return;
+        const c = Math.floor(a.x);
+        const r = Math.floor(a.y);
+        const p = pellets.get(keyOf(c, r));
+        if (p && p.alive) {
+          p.alive = false;
+          pelletCount--;
+          eatenPellets++;
+          a.pelletEats++;
+          a.confidence = clamp(a.confidence + (p.type === 'power' ? .34 : .045), 0, 1);
+          if (p.type === 'power') {
+            a.power = POWER_PELLET_SECONDS;
+            a.confidence = 1;
+            a.seenFlash = 1;
+            spawnBurst(cellCenterX(c), cellCenterY(r), COLORS.power, 42, .95);
+          } else if (rng() < .22) {
+            spawnParticle(cellCenterX(c), cellCenterY(r), COLORS.pellet, .8, rand(.25, .42));
+          }
+        }
+
+        if (fruit && Math.hypot(a.x - fruit.x, a.y - fruit.y) < .58) {
+          a.confidence = 1;
+          spawnBurst(fruit.x, fruit.y, COLORS.fruit, 36, .8);
+          fruit = null;
+          nextFruitAt = now + rand(19, 34);
+        }
+      }
+
+      function resolveCollisions() {
+        for (let i = 0; i < agents.length; i++) {
+          for (let j = i + 1; j < agents.length; j++) {
+            const a = agents[i];
+            const b = agents[j];
+            if (a.state === 'eyes' || b.state === 'eyes') continue;
+            const bothGhosts = a.state === 'ghost' && b.state === 'ghost';
+            const hitRange = bothGhosts ? .82 : 1.26;
+            if (gridDistance(a.x, a.y, b.x, b.y) > hitRange) continue;
+            const k = i + ':' + j;
+            if ((pairCooldowns.get(k) || 0) > now) continue;
+            pairCooldowns.set(k, now + (bothGhosts ? 1.35 : .75));
+
+            if (bothGhosts) {
+              ghostCollisions++;
+              ghostBump(a, b);
+              continue;
+            }
+
+            if (a.state === 'pac' && b.state === 'pac') {
+              pacsStartle(a, b);
+              continue;
+            }
+
+            const pac = a.state === 'pac' ? a : b;
+            const ghost = a.state === 'ghost' ? a : b;
+            if (pac.power > 0) {
+              eatGhost(pac, ghost);
+            } else {
+              killPac(pac, ghost);
+            }
+          }
+        }
+      }
+
+      function ghostBump(a, b) {
+        clearHuntTarget(a);
+        clearHuntTarget(b);
+        steerGhostAwayFrom(a, b, .42);
+        steerGhostAwayFrom(b, a, .42);
+        a.bumpFlash = b.bumpFlash = 1;
+        a.lastCollision = b.lastCollision = now;
+        spawnBurst((a.x + b.x) / 2, (a.y + b.y) / 2, '#9da7ff', 16, .45);
+      }
+
+      function pacsStartle(a, b) {
+        a.state = 'ghost';
+        b.state = 'ghost';
+        a.power = b.power = 0;
+        a.confidence = 0;
+        b.confidence = 0;
+        a.panicTargetId = b.panicTargetId = null;
+        a.panicUntil = b.panicUntil = 0;
+        a.escapeCheckAt = b.escapeCheckAt = 0;
+        a.checkingBehindUntil = b.checkingBehindUntil = 0;
+        a.checkDir = b.checkDir = null;
+        a.returningHome = b.returningHome = true;
+        a.rebirthPending = b.rebirthPending = true;
+        a.rebirthStartedAt = b.rebirthStartedAt = now;
+        clearHuntTarget(a);
+        clearHuntTarget(b);
+        resetExploration(a);
+        resetExploration(b);
+        a.target = b.target = { c: HOME.c, r: HOME.r };
+        a.nextDir = firstDirToward(a, a.target);
+        b.nextDir = firstDirToward(b, b.target);
+        a.seenFlash = b.seenFlash = 1;
+        a.lastTransform = b.lastTransform = now;
+        spawnSightLine(a, b, '#fff7b0');
+        spawnBurst((a.x + b.x) / 2, (a.y + b.y) / 2, '#fff7b0', 24, .62);
+      }
+
+      function killPac(pac, ghost) {
+        deaths++;
+        ghost.kills++;
+        pac.state = 'eyes';
+        pac.power = 0;
+        pac.confidence = 0;
+        pac.panicTargetId = null;
+        pac.panicUntil = 0;
+        pac.escapeCheckAt = 0;
+        pac.checkingBehindUntil = 0;
+        pac.checkDir = null;
+        pac.returningHome = false;
+        pac.rebirthPending = true;
+        pac.rebirthStartedAt = now;
+        clearHuntsFor(pac);
+        clearHuntTarget(ghost);
+        pac.seenFlash = 0;
+        pac.lastTransform = now;
+        ghost.confidence = clamp(ghost.confidence + .12, 0, 1);
+        stains.push({ x: pac.x, y: pac.y, color: ghost.color, life: 18, maxLife: 18, r: rand(.28, .48) });
+        spawnBurst(pac.x, pac.y, ghost.color, 38, .9);
+      }
+
+      function eatGhost(pac, ghost) {
+        powerEats++;
+        pac.kills++;
+        pac.power = Math.min(POWER_MAX_SECONDS, pac.power + POWER_EAT_BONUS_SECONDS);
+        pac.confidence = 1;
+        ghost.state = 'eyes';
+        ghost.power = 0;
+        ghost.confidence = 0;
+        ghost.panicTargetId = null;
+        ghost.panicUntil = 0;
+        ghost.escapeCheckAt = 0;
+        ghost.checkingBehindUntil = 0;
+        ghost.checkDir = null;
+        ghost.returningHome = false;
+        ghost.rebirthPending = false;
+        ghost.rebirthStartedAt = 0;
+        clearHuntTarget(ghost);
+        ghost.lastTransform = now;
+        stains.push({ x: ghost.x, y: ghost.y, color: COLORS.power, life: 12, maxLife: 12, r: rand(.34, .62) });
+        spawnBurst(ghost.x, ghost.y, COLORS.power, 46, 1);
+      }
+
+      function applyVisibilityRules() {
+        for (const pac of agents) {
+          if (pac.state !== 'pac' || pac.power > 0) continue;
+          const panicTarget = panicTargetFor(pac);
+          if (panicTarget) {
+            if (gridDistance(pac.x, pac.y, panicTarget.x, panicTarget.y) < 1.18) {
+              killPac(pac, panicTarget);
+              spawnSightLine(pac, panicTarget, panicTarget.color);
+              continue;
+            }
+            if (now < pac.checkingBehindUntil) {
+              pac.dir = pac.checkDir || oppositeDir(pac.dir);
+              const ghostBehind = firstGhostSeenByPac(pac);
+              if (ghostBehind && ghostBehind.state === 'ghost') {
+                resumeFleeAfterBackCheck(pac, ghostBehind);
+              }
+              continue;
+            }
+            if (pac.checkingBehindUntil > 0) {
+              const ghostBehind = firstGhostSeenByPac(pac);
+              if (!ghostBehind || ghostBehind.state !== 'ghost') {
+                becomeGhostAfterEscape(pac, panicTarget);
+              } else {
+                resumeFleeAfterBackCheck(pac, ghostBehind);
+              }
+              continue;
+            }
+            if (!canSee(pac, panicTarget)) {
+              if (now >= pac.escapeCheckAt) beginBehindCheck(pac);
+              else pac.turnAt = Math.min(pac.turnAt, now + .42);
+              continue;
+            }
+            steerFleeFrom(pac, panicTarget, .22);
+            continue;
+          }
+          const target = firstGhostSeenByPac(pac);
+          if (!target) continue;
+          if (target.state === 'ghost' && gridDistance(pac.x, pac.y, target.x, target.y) < 1.18) {
+            killPac(pac, target);
+            spawnSightLine(pac, target, target.color);
+            continue;
+          }
+          if (target.state === 'ghost') {
+            pac.panicTargetId = target.id;
+            pac.panicUntil = now + 4.2;
+            pac.escapeCheckAt = now + 1.05;
+            pac.checkingBehindUntil = 0;
+            pac.checkDir = null;
+            pac.seenBy = target.id;
+            pac.seenFlash = 1;
+            steerFleeFrom(pac, target, .18);
+            setHuntTarget(target, pac);
+            spawnSightLine(pac, target, COLORS.sight);
+            spawnBurst(pac.x, pac.y, COLORS.sight, 10, .34);
+          } else {
+            continue;
+          }
+        }
+
+        for (const ghost of agents) {
+          if (ghost.state !== 'ghost') continue;
+          const visiblePac = nearestAgent(ghost, (b) => b.state === 'pac' && canSee(ghost, b));
+          if (visiblePac) {
+            setHuntTarget(ghost, visiblePac);
+            ghost.target = cellOf(visiblePac.x, visiblePac.y);
+            ghost.nextDir = firstDirToward(ghost, ghost.target);
+            ghost.turnAt = Math.min(ghost.turnAt, now + .24);
+            continue;
+          }
+          const visibleGhost = visibleGhostFor(ghost);
+          if (visibleGhost) {
+            clearHuntTarget(ghost);
+            reactToSeenGhost(ghost, visibleGhost);
+            steerGhostAwayFrom(ghost, visibleGhost, .34);
+            continue;
+          }
+          const huntedPac = huntTargetFor(ghost);
+          if (huntedPac) {
+            ghost.target = cellOf(huntedPac.x, huntedPac.y);
+            ghost.nextDir = firstDirToward(ghost, ghost.target);
+            ghost.turnAt = Math.min(ghost.turnAt, now + .24);
+            continue;
+          }
+        }
+      }
+
+      function becomeGhostAfterEscape(pac, witness) {
+        pac.state = 'ghost';
+        pac.power = 0;
+        pac.confidence = 0;
+        pac.panicTargetId = null;
+        pac.panicUntil = 0;
+        pac.escapeCheckAt = 0;
+        pac.checkingBehindUntil = 0;
+        pac.checkDir = null;
+        pac.returningHome = true;
+        pac.rebirthPending = true;
+        pac.rebirthStartedAt = now;
+        clearHuntsFor(pac);
+        clearHuntTarget(pac);
+        resetExploration(pac);
+        pac.lastTransform = now;
+        pac.seenBy = witness ? witness.id : null;
+        pac.seenFlash = 1;
+        pac.target = { c: HOME.c, r: HOME.r };
+        pac.nextDir = firstDirToward(pac, pac.target);
+        pac.turnAt = now + rand(.32, .62);
+        if (witness) spawnSightLine(pac, witness, COLORS.sight);
+        spawnBurst(pac.x, pac.y, pac.color, 18, .48);
+      }
+
+      function becomePacAfterPrivacy(ghost) {
+        ghost.state = 'pac';
+        ghost.power = 0;
+        ghost.confidence = Math.max(ghost.confidence, .72);
+        ghost.panicTargetId = null;
+        ghost.panicUntil = 0;
+        ghost.escapeCheckAt = 0;
+        ghost.checkingBehindUntil = 0;
+        ghost.checkDir = null;
+        ghost.returningHome = false;
+        ghost.rebirthPending = false;
+        ghost.rebirthStartedAt = 0;
+        clearHuntTarget(ghost);
+        clearHuntsFor(ghost);
+        ghost.lastTransform = now;
+        ghost.seenBy = null;
+        ghost.seenFlash = 1;
+        ghost.target = nearestPowerTarget(ghost) || nearestFoodTarget(ghost, false);
+        ghost.nextDir = firstDirToward(ghost, ghost.target);
+        ghost.turnAt = now + rand(.36, .7);
+        spawnBurst(ghost.x, ghost.y, COLORS.pac, 24, .56);
+      }
+
+      function firstGhostSeenByPac(pac) {
+        for (const b of agents) {
+          if (pac === b || b.state !== 'ghost') continue;
+          if (canSee(pac, b)) return b;
+        }
+        return null;
+      }
+
+      function canSee(viewer, target) {
+        if (!hasCorridorLine(viewer, target)) return false;
+        if (viewer.state !== 'pac') return true;
+        return targetIsAhead(viewer, target);
+      }
+
+      function hasCorridorLine(a, b) {
+        const ac = Math.floor(a.x), ar = Math.floor(a.y);
+        const bc = Math.floor(b.x), br = Math.floor(b.y);
+        if (ar === br) {
+          if (Math.abs(a.y - cellCenterY(ar)) > .22 || Math.abs(b.y - cellCenterY(br)) > .22) return false;
+          return rowClear(ar, ac, bc);
+        }
+        if (ac === bc) {
+          if (Math.abs(a.x - cellCenterX(ac)) > .22 || Math.abs(b.x - cellCenterX(bc)) > .22) return false;
+          return colClear(ac, ar, br);
+        }
+        return false;
+      }
+
+      function targetIsAhead(viewer, target) {
+        const dir = facingDir(viewer);
+        const vc = Math.floor(viewer.x), vr = Math.floor(viewer.y);
+        const tc = Math.floor(target.x), tr = Math.floor(target.y);
+        if (dir.x !== 0) return vr === tr && (tc - vc) * dir.x > 0;
+        return vc === tc && (tr - vr) * dir.y > 0;
+      }
+
+      function rowClear(r, a, b) {
+        if (a === b) return true;
+        const step = a < b ? 1 : -1;
+        for (let c = a + step; c !== b; c += step) {
+          if (!isOpenCell(c, r)) return false;
+        }
+        return true;
+      }
+
+      function colClear(c, a, b) {
+        if (a === b) return true;
+        const step = a < b ? 1 : -1;
+        for (let r = a + step; r !== b; r += step) {
+          if (!isOpenCell(c, r)) return false;
+        }
+        return true;
+      }
+
+      function updateFX(dt) {
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.life -= dt;
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vx *= Math.pow(.08, dt);
+          p.vy *= Math.pow(.08, dt);
+          if (p.life <= 0) particles.splice(i, 1);
+        }
+        for (let i = stains.length - 1; i >= 0; i--) {
+          stains[i].life -= dt * .18;
+          if (stains[i].life <= 0) stains.splice(i, 1);
+        }
+        for (let i = sightLines.length - 1; i >= 0; i--) {
+          sightLines[i].life -= dt * 1.7;
+          if (sightLines[i].life <= 0) sightLines.splice(i, 1);
+        }
+      }
+
+      function spawnParticle(x, y, color, speed, life) {
+        if (REDUCED && rng() < .65) return;
+        const a = rand(0, TAU);
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(a) * speed * rand(.2, 1.1),
+          vy: Math.sin(a) * speed * rand(.2, 1.1),
+          color,
+          life,
+          maxLife: life,
+          size: rand(.04, .13),
+        });
+      }
+
+      function spawnBurst(x, y, color, count, speed) {
+        const n = REDUCED ? Math.ceil(count * .35) : count;
+        for (let i = 0; i < n; i++) spawnParticle(x, y, color, speed * rand(.45, 1.25), rand(.32, .86));
+      }
+
+      function spawnSightLine(a, b, color) {
+        sightLines.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, color, life: 1, maxLife: 1 });
+      }
+
+      function draw() {
+        ctx.fillStyle = COLORS.bg;
+        ctx.fillRect(0, 0, W, H);
+        drawBackdrop();
+        drawMaze();
+        drawStains();
+        drawPellets();
+        drawFruit();
+        drawSightLines();
+        drawAgents();
+        drawParticles();
+        drawFrameText();
+      }
+
+      function drawBackdrop() {
+        const cx = W / 2;
+        const cy = H / 2;
+        const g = ctx.createRadialGradient(cx, cy, Math.min(W, H) * .08, cx, cy, Math.max(W, H) * .62);
+        g.addColorStop(0, '#101039');
+        g.addColorStop(.62, '#070613');
+        g.addColorStop(1, '#030207');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.save();
+        ctx.globalAlpha = .18;
+        ctx.strokeStyle = '#243169';
+        ctx.lineWidth = 1;
+        const gap = Math.max(28, cell * 2);
+        for (let x = (ox % gap) - gap; x < W + gap; x += gap) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, H);
+          ctx.stroke();
+        }
+        for (let y = (oy % gap) - gap; y < H + gap; y += gap) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(W, y);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawMaze() {
+        ctx.save();
+        ctx.translate(ox, oy);
+        ctx.fillStyle = COLORS.void;
+        ctx.fillRect(0, 0, COLS * cellX, ROWS * cellY);
+
+        ctx.fillStyle = COLORS.wall;
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            if (maze[r][c] !== '#') continue;
+            ctx.fillRect(c * cellX, r * cellY, cellX, cellY);
+          }
+        }
+
+        ctx.strokeStyle = COLORS.wallEdgeSoft;
+        ctx.lineWidth = Math.max(1, cell * .075);
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            if (maze[r][c] !== '#') continue;
+            const x = c * cellX;
+            const y = r * cellY;
+            if (isOpenCell(c, r - 1)) line(x, y, x + cellX, y);
+            if (isOpenCell(c, r + 1)) line(x, y + cellY, x + cellX, y + cellY);
+            if (isOpenCell(c - 1, r)) line(x, y, x, y + cellY);
+            if (isOpenCell(c + 1, r)) line(x + cellX, y, x + cellX, y + cellY);
+          }
+        }
+
+        ctx.strokeStyle = COLORS.wallEdge;
+        ctx.globalAlpha = .38;
+        ctx.lineWidth = Math.max(1, cell * .035);
+        const inset = Math.max(1, cell * .045);
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            if (maze[r][c] !== '#') continue;
+            const x = c * cellX;
+            const y = r * cellY;
+            if (isOpenCell(c, r - 1)) line(x + inset, y + inset, x + cellX - inset, y + inset);
+            if (isOpenCell(c, r + 1)) line(x + inset, y + cellY - inset, x + cellX - inset, y + cellY - inset);
+            if (isOpenCell(c - 1, r)) line(x + inset, y + inset, x + inset, y + cellY - inset);
+            if (isOpenCell(c + 1, r)) line(x + cellX - inset, y + inset, x + cellX - inset, y + cellY - inset);
+          }
+        }
+        ctx.globalAlpha = 1;
+
+        ctx.strokeStyle = COLORS.gate;
+        ctx.lineWidth = Math.max(2, cell * .14);
+        ctx.beginPath();
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            if (maze[r][c] === '-') {
+              ctx.moveTo(c * cellX, (r + .5) * cellY);
+              ctx.lineTo((c + 1) * cellX, (r + .5) * cellY);
+            }
+          }
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(255,255,255,.12)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(.5, .5, COLS * cellX - 1, ROWS * cellY - 1);
+        ctx.restore();
+      }
+
+      function line(x1, y1, x2, y2) {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+
+      function drawStains() {
+        ctx.save();
+        for (const s of stains) {
+          const a = clamp(s.life / s.maxLife, 0, 1);
+          ctx.globalAlpha = .08 + a * .24;
+          ctx.fillStyle = s.color;
+          ctx.beginPath();
+          ctx.arc(px(s.x), py(s.y), cell * (s.r + (1 - a) * .65), 0, TAU);
+          ctx.fill();
+          ctx.globalAlpha = .15 * a;
+          ctx.strokeStyle = s.color;
+          ctx.lineWidth = Math.max(1, cell * .045);
+          ctx.beginPath();
+          ctx.arc(px(s.x), py(s.y), cell * (s.r + (1 - a) * 1.5), 0, TAU);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawPellets() {
+        ctx.save();
+        for (const p of pellets.values()) {
+          if (!p.alive) continue;
+          const x = px(cellCenterX(p.c));
+          const y = py(cellCenterY(p.r));
+          if (p.type === 'power') {
+            const pulse = .5 + .5 * Math.sin(now * 4.5 + p.pulse);
+            ctx.globalAlpha = .55 + pulse * .35;
+            ctx.fillStyle = COLORS.power;
+            ctx.beginPath();
+            ctx.arc(x, y, cell * (.18 + pulse * .035), 0, TAU);
+            ctx.fill();
+            ctx.globalAlpha = .28;
+            ctx.strokeStyle = COLORS.power;
+            ctx.lineWidth = Math.max(1, cell * .045);
+            ctx.beginPath();
+            ctx.arc(x, y, cell * (.31 + pulse * .08), 0, TAU);
+            ctx.stroke();
+          } else {
+            ctx.globalAlpha = .82;
+            ctx.fillStyle = COLORS.pellet;
+            ctx.fillRect(Math.round(x - cell * .055), Math.round(y - cell * .055), Math.max(2, Math.round(cell * .11)), Math.max(2, Math.round(cell * .11)));
+          }
+        }
+        ctx.restore();
+      }
+
+      function drawFruit() {
+        if (!fruit) return;
+        const x = px(fruit.x);
+        const y = py(fruit.y);
+        const pulse = .5 + .5 * Math.sin(fruit.pulse + now * 6);
+        ctx.save();
+        ctx.globalAlpha = .96;
+        ctx.fillStyle = COLORS.fruit;
+        ctx.beginPath();
+        ctx.moveTo(x, y - cell * (.27 + pulse * .04));
+        ctx.lineTo(x + cell * .25, y);
+        ctx.lineTo(x, y + cell * .27);
+        ctx.lineTo(x - cell * .25, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = COLORS.fruitStem;
+        ctx.lineWidth = Math.max(1, cell * .055);
+        ctx.beginPath();
+        ctx.moveTo(x, y - cell * .22);
+        ctx.quadraticCurveTo(x + cell * .18, y - cell * .42, x + cell * .34, y - cell * .3);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawSightLines() {
+        ctx.save();
+        ctx.lineCap = 'round';
+        for (const s of sightLines) {
+          const a = clamp(s.life / s.maxLife, 0, 1);
+          ctx.globalAlpha = a * .72;
+          ctx.strokeStyle = s.color;
+          ctx.lineWidth = Math.max(1, cell * (.08 + (1 - a) * .05));
+          ctx.beginPath();
+          ctx.moveTo(px(s.ax), py(s.ay));
+          ctx.lineTo(px(s.bx), py(s.by));
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawAgents() {
+        const ordered = [...agents].sort((a, b) => (a.state === 'eyes') - (b.state === 'eyes'));
+        for (const a of ordered) {
+          if (a.state === 'eyes') drawEyes(a);
+          else if (a.state === 'pac') drawPac(a);
+          else drawGhost(a);
+        }
+      }
+
+      function drawPac(a) {
+        const x = px(a.x);
+        const y = py(a.y);
+        const r = cell * .72;
+        const angle = facingDir(a).angle;
+        const mouth = .18 + Math.abs(Math.sin(a.mouth)) * (a.power > 0 ? .33 : .23);
+        const hot = a.power > 0;
+
+        ctx.save();
+        drawConfidenceHalo(a, x, y, r * 1.12);
+        if (a.seenFlash > 0 || hot) {
+          ctx.globalAlpha = (hot ? .32 : .18) + a.seenFlash * .22;
+          ctx.fillStyle = hot ? COLORS.power : a.color;
+          ctx.beginPath();
+          ctx.arc(x, y, r * (1.55 + .12 * Math.sin(now * 8)), 0, TAU);
+          ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = hot ? COLORS.pacHot : COLORS.pac;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.arc(x, y, r, angle + mouth, angle - mouth, false);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = a.color;
+        ctx.globalAlpha = .84;
+        ctx.beginPath();
+        ctx.arc(x - Math.sin(angle) * r * .34 + Math.cos(angle) * r * .10, y + Math.cos(angle) * r * .34 + Math.sin(angle) * r * .10, r * .11, 0, TAU);
+        ctx.fill();
+
+        if (hot) {
+          ctx.globalAlpha = .8;
+          ctx.strokeStyle = COLORS.power;
+          ctx.lineWidth = Math.max(1, cell * .08);
+          ctx.beginPath();
+          ctx.arc(x, y, r * (1.15 + .08 * Math.sin(now * 10)), 0, TAU);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawGhost(a) {
+        const x = px(a.x);
+        const y = py(a.y);
+        const r = cell * .68;
+        const bob = Math.sin(now * 2.4 + a.wobble) * cell * .055;
+
+        ctx.save();
+        drawConfidenceHalo(a, x, y + bob, r * 1.13);
+        if (a.bumpFlash > 0 || a.spawnFlash > 0) {
+          ctx.globalAlpha = .15 + Math.max(a.bumpFlash, a.spawnFlash) * .22;
+          ctx.fillStyle = a.bumpFlash > 0 ? '#ffffff' : a.color;
+          ctx.beginPath();
+          ctx.arc(x, y + bob, r * 1.5, 0, TAU);
+          ctx.fill();
+        }
+
+        ctx.fillStyle = a.color;
+        ctx.globalAlpha = .94;
+        ctx.beginPath();
+        ctx.arc(x, y + bob - r * .05, r, Math.PI, 0, false);
+        ctx.lineTo(x + r, y + bob + r * .66);
+        const foot = r / 3;
+        for (let i = 0; i < 3; i++) {
+          const fx = x + r - foot * (i * 2 + 1);
+          ctx.quadraticCurveTo(fx, y + bob + r * .34, fx - foot, y + bob + r * .66);
+        }
+        ctx.lineTo(x - r, y + bob - r * .05);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.globalAlpha = .22;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x - r * .58, y + bob + r * .05, r * 1.16, Math.max(1, cell * .05));
+
+        drawAgentEyes(a, x, y + bob - r * .16, r);
+        ctx.restore();
+      }
+
+      function drawEyes(a) {
+        const x = px(a.x);
+        const y = py(a.y);
+        const r = cell * .54;
+        ctx.save();
+        ctx.globalAlpha = .28;
+        ctx.strokeStyle = a.color;
+        ctx.lineWidth = Math.max(1, cell * .05);
+        ctx.beginPath();
+        ctx.arc(x, y, r * (1.1 + .2 * Math.sin(a.eyeSpin)), 0, TAU);
+        ctx.stroke();
+        drawAgentEyes(a, x, y, r * 1.15);
+        ctx.restore();
+      }
+
+      function drawAgentEyes(a, x, y, r) {
+        const look = a.state === 'eyes'
+          ? Math.atan2(HOME.y - a.y, HOME.x - a.x)
+          : facingDir(a).angle;
+        const lx = Math.cos(look) * r * .12;
+        const ly = Math.sin(look) * r * .12;
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = COLORS.eye;
+        ctx.beginPath();
+        ctx.ellipse(x - r * .33, y, r * .23, r * .30, 0, 0, TAU);
+        ctx.ellipse(x + r * .33, y, r * .23, r * .30, 0, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = COLORS.pupil;
+        ctx.beginPath();
+        ctx.arc(x - r * .33 + lx, y + ly, r * .095, 0, TAU);
+        ctx.arc(x + r * .33 + lx, y + ly, r * .095, 0, TAU);
+        ctx.fill();
+      }
+
+      function drawConfidenceHalo(a, x, y, r) {
+        const start = -Math.PI / 2;
+        const end = start + TAU * a.confidence;
+        ctx.save();
+        ctx.globalAlpha = .18 + a.confidence * .25;
+        ctx.strokeStyle = a.state === 'pac' ? COLORS.pac : a.color;
+        ctx.lineWidth = Math.max(1, cell * .045);
+        ctx.beginPath();
+        ctx.arc(x, y, r, start, end);
+        ctx.stroke();
+        ctx.globalAlpha = .11;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, TAU);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawParticles() {
+        ctx.save();
+        for (const p of particles) {
+          const a = clamp(p.life / p.maxLife, 0, 1);
+          ctx.globalAlpha = a;
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(px(p.x), py(p.y), Math.max(1, cell * p.size * (1 + (1 - a))), 0, TAU);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function drawFrameText() {
+        if (cell < 13) return;
+        ctx.save();
+        ctx.fillStyle = COLORS.text;
+        ctx.font = `${Math.max(10, Math.floor(cell * .45))}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+        ctx.textBaseline = 'top';
+        const pacs = agents.filter((a) => a.state === 'pac').length;
+        const ghosts = agents.filter((a) => a.state === 'ghost').length;
+        const eyes = agents.filter((a) => a.state === 'eyes').length;
+        const label = `PAC ${pacs}  GHOST ${ghosts}  EYES ${eyes}`;
+        ctx.globalAlpha = .42;
+        ctx.fillText(label, ox, Math.max(8, oy - cell * .85));
+        ctx.textAlign = 'right';
+        ctx.fillText(`DOTS ${pelletCount}`, ox + COLS * cellX, Math.max(8, oy - cell * .85));
+        ctx.restore();
+      }
+
+      function updateDebug() {
+        debugEl.hidden = false;
+        const lines = [
+          `seed ${seed}`,
+          `pellets ${pelletCount} eaten ${eatenPellets} clears ${boardClears}`,
+          `deaths ${deaths} power-eats ${powerEats} ghost-bumps ${ghostCollisions}`,
+          ...agents.map((a) => {
+            const mode = a.state === 'pac'
+              ? (a.power > 0 ? 'power' : a.panicTargetId !== null ? 'flee' : 'seek')
+              : a.state === 'ghost'
+                ? (isHunting(a) ? 'hunt' : a.returningHome ? 'home' : a.rebirthPending ? 'hide' : 'explore')
+                : 'eyes';
+            return `${a.name.padEnd(6)} ${a.state.padEnd(5)} ${mode.padEnd(7)} power ${a.power.toFixed(1)} explored ${a.exploredCells.size} @ ${Math.floor(a.x)},${Math.floor(a.y)}`;
+          }),
+        ];
+        debugEl.textContent = lines.join('\n');
+      }
+
+      function isOpenCell(c, r) {
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return false;
+        const ch = maze[r][c];
+        if (ch === '#') return false;
+        if (ch === ' ' && r !== HOME.r && (c < 5 || c > COLS - 6)) return false;
+        return true;
+      }
+
+      function isOpenAt(x, y) {
+        const r = Math.floor(y);
+        let c = Math.floor(x);
+        if (wrapRow(r)) {
+          if (c < 0) c = COLS - 1;
+          if (c >= COLS) c = 0;
+        }
+        return isOpenCell(c, r);
+      }
+
+      function neighbors(c, r) {
+        const out = [];
+        for (const d of DIRS) {
+          let nc = c + d.x;
+          const nr = r + d.y;
+          if (wrapRow(r)) {
+            if (nc < 0) nc = COLS - 1;
+            if (nc >= COLS) nc = 0;
+          }
+          if (isOpenCell(nc, nr)) out.push({ c: nc, r: nr, dir: d });
+        }
+        return out;
+      }
+
+      function bfsNearest(start, predicate) {
+        const q = [start];
+        const seen = new Set([keyOf(start.c, start.r)]);
+        for (let head = 0; head < q.length; head++) {
+          const p = q[head];
+          if (predicate(p.c, p.r)) return p;
+          for (const n of neighbors(p.c, p.r)) {
+            const k = keyOf(n.c, n.r);
+            if (seen.has(k)) continue;
+            seen.add(k);
+            q.push({ c: n.c, r: n.r });
+          }
+        }
+        return null;
+      }
+
+      function pathDistanceCells(start, target) {
+        if (start.c === target.c && start.r === target.r) return 0;
+        const q = [{ c: start.c, r: start.r, d: 0 }];
+        const seen = new Set([keyOf(start.c, start.r)]);
+        for (let head = 0; head < q.length; head++) {
+          const p = q[head];
+          for (const n of neighbors(p.c, p.r)) {
+            const k = keyOf(n.c, n.r);
+            if (seen.has(k)) continue;
+            if (n.c === target.c && n.r === target.r) return p.d + 1;
+            seen.add(k);
+            q.push({ c: n.c, r: n.r, d: p.d + 1 });
+          }
+        }
+        return Infinity;
+      }
+
+      function firstDirToward(a, target) {
+        const start = cellOf(a.x, a.y);
+        if (!target || (start.c === target.c && start.r === target.r)) return null;
+        const q = [];
+        const seen = new Set([keyOf(start.c, start.r)]);
+        for (const n of neighbors(start.c, start.r)) {
+          const reverse = a.dir && n.dir.x === -a.dir.x && n.dir.y === -a.dir.y;
+          const continuing = a.dir && n.dir.x === a.dir.x && n.dir.y === a.dir.y;
+          const penalty = reverse && canContinue(a) ? 3.2 : continuing ? -.35 : .25;
+          q.push({ c: n.c, r: n.r, first: n.dir, penalty });
+          seen.add(keyOf(n.c, n.r));
+        }
+        q.sort((m, n) => m.penalty - n.penalty);
+        for (let head = 0; head < q.length; head++) {
+          const p = q[head];
+          if (p.c === target.c && p.r === target.r) return p.first;
+          for (const n of neighbors(p.c, p.r)) {
+            const k = keyOf(n.c, n.r);
+            if (seen.has(k)) continue;
+            seen.add(k);
+            q.push({ c: n.c, r: n.r, first: p.first, penalty: 0 });
+          }
+        }
+        return null;
+      }
+
+      function legalDirsForAgent(a) {
+        const c = Math.floor(a.x);
+        const r = Math.floor(a.y);
+        return neighbors(c, r).map((n) => n.dir);
+      }
+
+      function pickBestLegalDir(a, legal) {
+        if (!legal.length) return a.dir || DIRS[0];
+        const target = a.target;
+        if (!target) return legal[randi(0, legal.length - 1)];
+        let best = legal[0];
+        let bestScore = Infinity;
+        for (const d of legal) {
+          const reverse = a.dir && d.x === -a.dir.x && d.y === -a.dir.y;
+          let nc = Math.floor(a.x) + d.x;
+          const nr = Math.floor(a.y) + d.y;
+          if (wrapRow(nr)) {
+            if (nc < 0) nc = COLS - 1;
+            if (nc >= COLS) nc = 0;
+          }
+          const continuing = a.dir && d.x === a.dir.x && d.y === a.dir.y;
+          const reversePenalty = reverse ? (a.state === 'ghost' ? 4.4 : 3.5) : 0;
+          const inertia = continuing && canContinue(a) ? -.45 : 0;
+          const score = Math.abs(nc - target.c) + Math.abs(nr - target.r) + reversePenalty + inertia + rng() * .06;
+          if (score < bestScore) {
+            bestScore = score;
+            best = d;
+          }
+        }
+        return best;
+      }
+
+      function atCellCenter(a) {
+        const c = Math.floor(a.x);
+        const r = Math.floor(a.y);
+        return Math.abs(a.x - cellCenterX(c)) < .035 && Math.abs(a.y - cellCenterY(r)) < .035;
+      }
+
+      function snapToCenter(a) {
+        const c = Math.floor(a.x);
+        const r = Math.floor(a.y);
+        a.x = cellCenterX(c);
+        a.y = cellCenterY(r);
+      }
+
+      function canContinue(a) {
+        if (!a.dir) return false;
+        const c = Math.floor(a.x);
+        const r = Math.floor(a.y);
+        let nc = c + a.dir.x;
+        const nr = r + a.dir.y;
+        if (wrapRow(r)) {
+          if (nc < 0) nc = COLS - 1;
+          if (nc >= COLS) nc = 0;
+        }
+        return isOpenCell(nc, nr);
+      }
+
+      function dirFromVector(x, y) {
+        return DIRS.find((d) => d.x === x && d.y === y) || DIRS[0];
+      }
+
+      addEventListener('resize', () => {
+        resizeCanvas();
+      });
+
+      addEventListener('click', () => {
+        warmSeconds = 0;
+        reset(randomSeed());
+      });
+
+      addEventListener('keydown', (e) => {
+        if (e.key === 'r' || e.key === 'R' || e.key === ' ') {
+          e.preventDefault();
+          warmSeconds = 0;
+          reset(randomSeed());
+        }
+      });
+
+      reset(seed);
+    </script>
+  </body>
+</html>

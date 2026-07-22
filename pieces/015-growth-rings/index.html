@@ -1,0 +1,1279 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Growth Rings - HyperGal</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #e8eee8;
+        --ink: #152019;
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        overflow: hidden;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: var(--bg);
+        cursor: crosshair;
+        touch-action: manipulation;
+      }
+
+      canvas:focus-visible {
+        outline: 2px solid var(--ink);
+        outline-offset: -8px;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        canvas {
+          cursor: default;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="stage"
+      tabindex="0"
+      role="img"
+      aria-label="Growth Rings: a palette-toned animated trunk cross-section adds annual rings while abstract map symbols show latitude, sun angle, wind exposure, temperature, ground slope, rainfall, and one-year pest and fire incident lines."
+    ></canvas>
+
+    <script>
+      const canvas = document.getElementById('stage');
+      const ctx = canvas.getContext('2d', { alpha: false });
+      const TAU = Math.PI * 2;
+      const TARGET_AGE = 200;
+      const SAMPLE_COUNT = 320;
+      const DEFAULT_RING_SECONDS = 0.22;
+      const RING_TONES = [-0.24, -0.16, -0.08, 0, 0.1, 0.2, 0.3];
+      const DAMAGE_KINDS = ['fire', 'pest'];
+      const PALETTES = {
+        debug: {
+          name: 'Debug',
+          colors: [
+            { name: 'Debug Wheat', color: [255, 215, 123, 0.5] },
+            { name: 'Debug Pale Yellow', color: [255, 255, 100, 0.5] },
+            { name: 'Debug Blue', color: [0, 75, 255, 0.5] },
+            { name: 'Debug Purple', color: [255, 0, 44, 0.5] },
+            { name: 'Debug Burlywood', color: [222, 184, 135, 0.5] },
+          ],
+        },
+        hokusai: {
+          name: 'Hokusai',
+          colors: [
+            { name: 'Wheat', color: [255, 215, 123] },
+            { name: 'Pale Yellow', color: [255, 255, 179] },
+            { name: 'Prussian Blue', color: [0, 75, 135] },
+            { name: 'Tyrian Purple', color: [168, 0, 44] },
+            { name: 'Burlywood', color: [222, 184, 135] },
+          ],
+        },
+        gucci: {
+          name: 'Gucci',
+          colors: [
+            { name: 'Dark Red', color: [102, 0, 34] },
+            { name: 'Gold', color: [255, 204, 0] },
+            { name: 'Teal', color: [0, 204, 153] },
+            { name: 'Charcoal', color: [51, 51, 51] },
+            { name: 'White', color: [255, 255, 255] },
+          ],
+        },
+        renaissance: {
+          name: 'Renaissance',
+          colors: [
+            { name: 'Chestnut', color: [120, 31, 2] },
+            { name: 'Pale Brown', color: [206, 159, 105] },
+            { name: 'Crimson', color: [204, 36, 29] },
+            { name: 'Peach', color: [255, 218, 121] },
+            { name: 'Eggshell', color: [249, 247, 229] },
+          ],
+        },
+        nature_photo: {
+          name: 'Nature Photo',
+          colors: [
+            { name: 'Pine Green', color: [0, 62, 51] },
+            { name: 'Khaki', color: [235, 196, 94] },
+            { name: 'Beige', color: [210, 190, 147] },
+            { name: 'Lavender Grey', color: [203, 202, 211] },
+            { name: 'Grey Green', color: [167, 190, 182] },
+          ],
+        },
+        vapor_wave: {
+          name: 'Vapor Wave',
+          colors: [
+            { name: 'Light Pink', color: [255, 179, 246] },
+            { name: 'Deep Purple', color: [106, 0, 255] },
+            { name: 'Electric Blue', color: [0, 255, 251] },
+            { name: 'Yellow', color: [255, 252, 0] },
+            { name: 'Neon Orange', color: [255, 110, 0] },
+          ],
+        },
+      };
+      const params = new URLSearchParams(location.search);
+      const reducedMotionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+      const activePalette = resolvePalette(params.get('palette'));
+
+      const COLORS = makeSceneColors(activePalette);
+      document.documentElement.style.setProperty('--bg', COLORS.paper);
+      document.documentElement.style.setProperty('--ink', COLORS.ink);
+
+      let width = 1;
+      let height = 1;
+      let dpr = 1;
+      let seed = params.get('seed') || randomSeed();
+      let ringSeconds = Number.parseFloat(params.get('rate') || '');
+      if (!Number.isFinite(ringSeconds) || ringSeconds <= 0) ringSeconds = DEFAULT_RING_SECONDS;
+      let startAge = Number.parseFloat(params.get('age') || '0');
+      if (!Number.isFinite(startAge)) startAge = 0;
+      let model = null;
+      let startTime = 0;
+      let raf = 0;
+      let prefersReducedMotion = reducedMotionQuery.matches;
+
+      function randomSeed() {
+        return Math.floor(Math.random() * 0xffffffff).toString(36);
+      }
+
+      function xmur3(str) {
+        let h = 1779033703 ^ str.length;
+        for (let i = 0; i < str.length; i++) {
+          h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+          h = (h << 13) | (h >>> 19);
+        }
+        return function nextHash() {
+          h = Math.imul(h ^ (h >>> 16), 2246822507);
+          h = Math.imul(h ^ (h >>> 13), 3266489909);
+          return (h ^= h >>> 16) >>> 0;
+        };
+      }
+
+      function mulberry32(a) {
+        return function nextRandom() {
+          let t = (a += 0x6d2b79f5);
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function clamp(value, min, max) {
+        return value < min ? min : value > max ? max : value;
+      }
+
+      function lerp(a, b, t) {
+        return a + (b - a) * t;
+      }
+
+      function easeOutQuart(t) {
+        const u = clamp(t, 0, 1);
+        return 1 - Math.pow(1 - u, 4);
+      }
+
+      function smootherStep(t) {
+        const u = clamp(t, 0, 1);
+        return u * u * u * (u * (u * 6 - 15) + 10);
+      }
+
+      function angleDelta(a, b) {
+        return Math.atan2(Math.sin(a - b), Math.cos(a - b));
+      }
+
+      function unit(angle) {
+        return { x: Math.cos(angle), y: Math.sin(angle) };
+      }
+
+      function resolvePalette(requested) {
+        const aliases = {
+          nature: 'nature_photo',
+          naturephoto: 'nature_photo',
+          nature_photo: 'nature_photo',
+          vapor: 'vapor_wave',
+          vaporwave: 'vapor_wave',
+          vapor_wave: 'vapor_wave',
+        };
+        const key = normalizePaletteId(requested || 'hokusai');
+        return PALETTES[aliases[key] || key] || PALETTES.hokusai;
+      }
+
+      function normalizePaletteId(value) {
+        return String(value || '')
+          .trim()
+          .toLowerCase()
+          .replace(/[\s-]+/g, '_')
+          .replace(/[^a-z0-9_]/g, '');
+      }
+
+      function makeSceneColors(palette) {
+        const swatches = palette.colors.map((entry) => rgbFromEntry(entry));
+        const byLight = swatches.slice().sort((a, b) => relativeLuma(a) - relativeLuma(b));
+        const dark = byLight[0];
+        const light = byLight[byLight.length - 1];
+        const paperRgb = mixRgb(light, [255, 255, 255], 0.64);
+        const inkRgb = mixRgb(dark, [0, 0, 0], 0.72);
+        const windRgb = swatches[2] || dark;
+        const warmRgb = swatches[3] || swatches[1] || light;
+        const groundRgb = swatches[4] || swatches[0] || dark;
+        const fireRgb = mixRgb(warmRgb, [190, 32, 16], 0.22);
+        const pestRgb = mixRgb(windRgb, inkRgb, 0.28);
+        const rainRgb = mixRgb(windRgb, light, 0.34);
+
+        return {
+          paper: rgbCss(paperRgb),
+          paperRgb,
+          paperClear: rgbaCss(paperRgb, 0.92),
+          ink: rgbCss(inkRgb),
+          inkRgb,
+          inkSoft: rgbaCss(inkRgb, 0.66),
+          grid: rgbaCss(inkRgb, 0.085),
+          gridStrong: rgbaCss(inkRgb, 0.18),
+          contour: rgbaCss(inkRgb, 0.22),
+          contourSoft: rgbaCss(inkRgb, 0.12),
+          sun: rgbCss(warmRgb),
+          wind: rgbCss(windRgb),
+          slope: rgbCss(groundRgb),
+          tempCold: rgbCss(windRgb),
+          tempColdRgb: windRgb,
+          tempHot: rgbCss(warmRgb),
+          tempHotRgb: warmRgb,
+          fire: rgbCss(fireRgb),
+          fireRgb,
+          pest: rgbCss(pestRgb),
+          pestRgb,
+          rain: rgbCss(rainRgb),
+          rainRgb,
+          active: rgbCss(light),
+        };
+      }
+
+      function rgbFromEntry(entry) {
+        const color = entry.color;
+        return [color[0], color[1], color[2], color.length > 3 ? color[3] : 1];
+      }
+
+      function relativeLuma(rgb) {
+        return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+      }
+
+      function mixRgb(a, b, t) {
+        const u = clamp(t, 0, 1);
+        return [
+          Math.round(lerp(a[0], b[0], u)),
+          Math.round(lerp(a[1], b[1], u)),
+          Math.round(lerp(a[2], b[2], u)),
+          a.length > 3 ? a[3] : 1,
+        ];
+      }
+
+      function rgbCss(rgb) {
+        return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+      }
+
+      function rgbaCss(rgb, alpha) {
+        const sourceAlpha = rgb.length > 3 ? rgb[3] : 1;
+        return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${clamp(alpha * sourceAlpha, 0, 1)})`;
+      }
+
+      function reset(nextSeed = randomSeed()) {
+        cancelAnimationFrame(raf);
+        seed = String(nextSeed);
+        const hash = xmur3(seed);
+        const random = mulberry32(hash());
+        model = makeModel(random, hash());
+        startTime = performance.now() - clamp(startAge, 0, TARGET_AGE) * ringSeconds * 1000;
+        draw(performance.now());
+        if (!prefersReducedMotion) raf = requestAnimationFrame(tick);
+      }
+
+      function resize() {
+        width = Math.max(1, innerWidth);
+        height = Math.max(1, innerHeight);
+        dpr = Math.min(2, devicePixelRatio || 1);
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        if (model) draw(performance.now());
+      }
+
+      function tick(t) {
+        draw(t);
+        const age = currentAge(t);
+        if (age < TARGET_AGE) raf = requestAnimationFrame(tick);
+      }
+
+      function currentAge(t) {
+        if (prefersReducedMotion) return TARGET_AGE;
+        return clamp((t - startTime) / 1000 / ringSeconds, 0, TARGET_AGE);
+      }
+
+      function makeModel(random, salt) {
+        const colorRandom = mulberry32((salt ^ 0x9e3779b9) >>> 0);
+        const forces = makeForces(random);
+        const organicField = makeOrganicField(random);
+        const angles = Array.from({ length: SAMPLE_COUNT }, (_, i) => (i / SAMPLE_COUNT) * TAU);
+        const boundaries = [new Array(SAMPLE_COUNT).fill(0.018)];
+        const rings = [{ salt, temp: 0, rainfall: 0, stress: 0, meanWidth: 0, colorIndex: 0, tone: 0 }];
+        const damageEvents = makeDamageEvents(random);
+        const soilPhase = random() * TAU;
+        const grainPhase = random() * TAU;
+        const rainPhase = random() * TAU;
+        let climateMemory = random() * 0.4 - 0.2;
+        let rainfallMemory = random() * 0.7 - 0.35;
+        let lastColorIndex = -1;
+        let lastToneIndex = -1;
+        const weatherSummary = { minRainfall: Infinity, maxRainfall: -Infinity, dryYears: 0, wetYears: 0 };
+
+        for (let year = 1; year <= TARGET_AGE; year++) {
+          climateMemory = climateMemory * 0.68 + (random() * 2 - 1) * 0.42;
+          rainfallMemory = rainfallMemory * 0.5 + (random() * 2 - 1) * 0.72;
+          const slowCycle = Math.sin(year * 0.071 + forces.temperaturePhase) * 0.56;
+          const fastCycle = Math.sin(year * 0.39 + forces.temperaturePhase * 1.7) * 0.18;
+          const rainCycle = Math.sin(year * 0.093 + rainPhase) * 0.52 + Math.sin(year * 0.31 + rainPhase * 0.6) * 0.22;
+          const droughtShock = random() < 0.058 ? -lerp(0.42, 1.24, random()) : 0;
+          const wetShock = random() < 0.052 ? lerp(0.34, 1.05, random()) : 0;
+          const rainfallSignal = clamp(rainCycle + rainfallMemory + droughtShock + wetShock, -1.75, 1.68);
+          const ageTaper = Math.exp(-year / 155);
+          const temperatureSignal = clamp(
+            (forces.temperatureMean - 7) / 17 + (slowCycle + fastCycle + climateMemory) * forces.temperatureVolatility,
+            -1.35,
+            1.35
+          );
+          weatherSummary.minRainfall = Math.min(weatherSummary.minRainfall, rainfallSignal);
+          weatherSummary.maxRainfall = Math.max(weatherSummary.maxRainfall, rainfallSignal);
+          if (rainfallSignal < -0.62) weatherSummary.dryYears += 1;
+          if (rainfallSignal > 0.62) weatherSummary.wetYears += 1;
+
+          const baseGrowth =
+            2.22 +
+            1.62 * ageTaper +
+            Math.sin(year * 0.043 + soilPhase) * 0.28 +
+            Math.sin(year * 0.17 + grainPhase) * 0.18;
+          const annualWeatherWidth = clamp(
+            1 + rainfallSignal * 0.38 + temperatureSignal * 0.13 + (random() - 0.5) * 0.3,
+            0.24,
+            2.24
+          );
+          const previous = boundaries[year - 1];
+          let boundary = new Array(SAMPLE_COUNT);
+          let widthTotal = 0;
+
+          for (let i = 0; i < SAMPLE_COUNT; i++) {
+            const a = angles[i];
+            const sunBias = forces.sunPower * (0.16 * Math.cos(a - forces.sunAngle) + 0.035 * Math.cos(2 * (a - forces.sunAngle)));
+            const windBias =
+              forces.windExposure *
+              (-0.19 * Math.cos(a - forces.windFrom) + 0.055 * Math.cos(2 * (a - forces.windFrom + 0.4)));
+            const slopeBias = forces.groundPower * (0.2 * Math.cos(a - forces.slopeDown) - 0.035 * Math.cos(3 * (a - forces.slopeDown)));
+            const soilBias =
+              0.045 * Math.sin(a * 3 + soilPhase) +
+              0.034 * Math.sin(a * 7 - year * 0.045 + grainPhase) +
+              0.023 * Math.sin(a * 13 + year * 0.075 + soilPhase * 0.6);
+            const climateBias = temperatureSignal * 0.035 * Math.sin(a * 2 + year * 0.08 + forces.temperaturePhase);
+            const rainfallBias = rainfallSignal * 0.044 * Math.sin(a * 5 - year * 0.12 + rainPhase);
+            const organicBias = organicGrowthBias(organicField, year, a);
+            const stress = sunBias + windBias + slopeBias + soilBias + climateBias + rainfallBias + organicBias;
+            const increment = baseGrowth * annualWeatherWidth * clamp(1 + stress, 0.28, 1.92);
+            boundary[i] = previous[i] + increment;
+            widthTotal += increment;
+          }
+
+          boundary = smoothLoop(boundary, 2);
+          const incidentsThisYear = damageEvents.filter((event) => event.year === year);
+          if (incidentsThisYear.length) {
+            boundary = applyDamageIncidents(boundary, previous, angles, incidentsThisYear, widthTotal / SAMPLE_COUNT);
+          }
+          boundaries.push(boundary);
+          const stressIndex =
+            Math.abs(forces.sunPower) +
+            forces.windExposure +
+            forces.groundPower +
+            Math.abs(temperatureSignal) * 0.45 +
+            Math.abs(rainfallSignal) * 0.35;
+          const colorIndex = nextRandomIndex(activePalette.colors.length, lastColorIndex, colorRandom);
+          const toneIndex = nextRandomIndex(RING_TONES.length, lastToneIndex, colorRandom);
+          lastColorIndex = colorIndex;
+          lastToneIndex = toneIndex;
+          rings.push({
+            salt,
+            temp: temperatureSignal,
+            rainfall: rainfallSignal,
+            stress: stressIndex,
+            meanWidth: widthTotal / SAMPLE_COUNT,
+            colorIndex,
+            tone: clamp(RING_TONES[toneIndex] + (colorRandom() - 0.5) * 0.055, -0.3, 0.34),
+          });
+        }
+
+        const maxRadius = Math.max(...boundaries[TARGET_AGE]);
+        for (const boundary of boundaries) {
+          for (let i = 0; i < boundary.length; i++) boundary[i] /= maxRadius;
+        }
+
+        return { angles, boundaries, rings, forces, organicField, damageEvents, weatherSummary, salt };
+      }
+
+      function nextRandomIndex(length, previous, random) {
+        if (length <= 1) return 0;
+        let index = Math.floor(random() * length);
+        if (index === previous) {
+          index = (index + 1 + Math.floor(random() * (length - 1))) % length;
+        }
+        return index;
+      }
+
+      function makeForces(random) {
+        const latitude = random() < 0.52 ? lerp(12, 67, random()) : -lerp(8, 49, random());
+        const solarElevation = clamp(88 - Math.abs(latitude) * 0.83 + (random() * 8 - 4), 18, 86);
+        const hemisphereSun = latitude >= 0 ? Math.PI / 2 : -Math.PI / 2;
+        const sunAngle = hemisphereSun + (random() - 0.5) * (0.34 + (1 - Math.abs(latitude) / 70) * 0.48);
+        const windFrom = random() * TAU;
+        const windExposure = lerp(0.28, 0.92, Math.pow(random(), 0.72));
+        const temperatureMean = lerp(-4.5, 20.5, random());
+        const temperatureVolatility = lerp(0.18, 0.82, random());
+        const temperaturePhase = random() * TAU;
+        const slopeMagnitude = lerp(3.5, 18.5, Math.pow(random(), 0.65));
+        const slopeDown = random() * TAU;
+        return {
+          latitude,
+          solarElevation,
+          sunAngle,
+          sunPower: clamp((90 - solarElevation) / 80 + 0.18, 0.18, 0.82),
+          windFrom,
+          windExposure,
+          temperatureMean,
+          temperatureVolatility,
+          temperaturePhase,
+          slopeMagnitude,
+          slopeDown,
+          groundPower: slopeMagnitude / 22,
+        };
+      }
+
+      function makeOrganicField(random) {
+        const waves = [];
+        const waveCount = 7;
+        for (let i = 0; i < waveCount; i++) {
+          const order = i + 1;
+          waves.push({
+            order,
+            phase: random() * TAU,
+            drift: lerp(-0.018, 0.018, random()),
+            amplitude: lerp(0.018, 0.07, random()) / Math.sqrt(order),
+          });
+        }
+        return {
+          leanAngle: random() * TAU,
+          leanStrength: lerp(0.09, 0.23, random()),
+          ovalAngle: random() * TAU,
+          ovalStrength: lerp(0.04, 0.12, random()),
+          knotAngle: random() * TAU,
+          knotStrength: lerp(0.035, 0.105, random()),
+          waves,
+        };
+      }
+
+      function organicGrowthBias(field, year, angle) {
+        const t = year / TARGET_AGE;
+        let bias = field.leanStrength * Math.cos(angle - field.leanAngle) * (0.45 + t * 0.95);
+        bias += field.ovalStrength * Math.cos(2 * (angle - field.ovalAngle)) * (0.75 + 0.25 * Math.sin(year * 0.026));
+        bias +=
+          field.knotStrength *
+          Math.exp(-Math.pow(angleDelta(angle, field.knotAngle + Math.sin(year * 0.011) * 0.2), 2) / 0.12) *
+          Math.sin(year * 0.037 + field.knotAngle);
+        for (const wave of field.waves) {
+          const envelope = 0.65 + 0.35 * Math.sin(year * 0.019 * wave.order + wave.phase * 0.3);
+          bias += wave.amplitude * envelope * Math.sin(angle * wave.order + wave.phase + year * wave.drift);
+        }
+        return clamp(bias, -0.34, 0.38);
+      }
+
+      function makeDamageEvents(random) {
+        const events = [
+          makeDamageEvent('fire', random, 0),
+          makeDamageEvent('pest', random, 1),
+        ];
+        const extraCount = 2 + Math.floor(random() * 2);
+        for (let i = 0; i < extraCount; i++) {
+          events.push(makeDamageEvent(DAMAGE_KINDS[Math.floor(random() * DAMAGE_KINDS.length)], random, i + 2));
+        }
+        events.sort((a, b) => a.year - b.year);
+        for (let i = 0; i < events.length; i++) events[i].lane = i % 3;
+        return events;
+      }
+
+      function makeDamageEvent(kind, random, index) {
+        const fire = kind === 'fire';
+        return {
+          kind,
+          year: Math.floor(lerp(13, TARGET_AGE - 13, random())),
+          angle: random() * TAU,
+          width: fire ? lerp(0.18, 0.43, random()) : lerp(0.1, 0.3, random()),
+          severity: fire ? lerp(0.34, 0.66, random()) : lerp(0.18, 0.4, random()),
+          seed: random() * 1000 + index * 17,
+          lane: 0,
+        };
+      }
+
+      function applyDamageIncidents(boundary, previous, angles, events, meanWidth) {
+        const out = boundary.slice();
+        for (let i = 0; i < out.length; i++) {
+          const a = angles[i];
+          let bite = 0;
+          let callus = 0;
+
+          for (const event of events) {
+            const angular = angleDelta(a, event.angle);
+            const angularFalloff = Math.exp(-(angular * angular) / (event.width * event.width));
+            const irregular = 0.78 + 0.22 * Math.sin(event.seed + i * 2.17);
+
+            if (event.kind === 'fire') {
+              bite += meanWidth * event.severity * 4.35 * angularFalloff * irregular;
+              const edgeDistance = Math.abs(Math.abs(angular) - event.width * 1.05);
+              const edgeWidth = Math.max(0.034, event.width * 0.26);
+              const edgeFalloff = Math.exp(-(edgeDistance * edgeDistance) / (edgeWidth * edgeWidth));
+              callus += meanWidth * event.severity * 0.78 * edgeFalloff;
+            } else {
+              const mottled = angularFalloff * (0.58 + 0.42 * Math.sin(a * 19 + event.seed));
+              bite += meanWidth * event.severity * 2.45 * Math.max(0, mottled) * irregular;
+              callus += meanWidth * event.severity * 0.2 * angularFalloff * Math.max(0, Math.sin(a * 11 - event.seed));
+            }
+          }
+
+          out[i] = Math.max(previous[i] * 0.985, out[i] - bite + callus);
+        }
+        return smoothLoop(out, 1);
+      }
+
+      function smoothLoop(values, passes) {
+        let out = values.slice();
+        for (let pass = 0; pass < passes; pass++) {
+          const next = new Array(out.length);
+          for (let i = 0; i < out.length; i++) {
+            const a = out[(i - 1 + out.length) % out.length];
+            const b = out[i];
+            const c = out[(i + 1) % out.length];
+            next[i] = a * 0.24 + b * 0.52 + c * 0.24;
+          }
+          out = next;
+        }
+        return out;
+      }
+
+      function draw(t) {
+        const age = currentAge(t);
+        const cx = width / 2;
+        const cy = height / 2;
+        const radius = trunkRadius();
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = COLORS.paper;
+        ctx.fillRect(0, 0, width, height);
+        drawDatumGrid(cx, cy, radius);
+        drawTopographicField(cx, cy, radius);
+        drawInvisibleForces(cx, cy, radius, t / 1000);
+        drawTrunk(cx, cy, radius, age);
+        drawReadouts(age);
+      }
+
+      function trunkRadius() {
+        const edgeSpace = Math.min(width, height);
+        const wideLimit = width < 680 ? 0.445 : 0.435;
+        const tallLimit = height < 560 ? 0.405 : 0.435;
+        return Math.max(92, Math.min(edgeSpace * wideLimit, height * tallLimit, width * 0.46));
+      }
+
+      function drawDatumGrid(cx, cy, radius) {
+        const gap = clamp(Math.min(width, height) / 18, 24, 48);
+        ctx.save();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = COLORS.grid;
+        for (let x = (cx % gap) - gap; x < width + gap; x += gap) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, height);
+          ctx.stroke();
+        }
+        for (let y = (cy % gap) - gap; y < height + gap; y += gap) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(width, y);
+          ctx.stroke();
+        }
+
+        ctx.strokeStyle = COLORS.gridStrong;
+        ctx.setLineDash([7, 8]);
+        ctx.beginPath();
+        ctx.moveTo(cx, Math.max(0, cy - radius * 1.38));
+        ctx.lineTo(cx, Math.min(height, cy + radius * 1.38));
+        ctx.moveTo(Math.max(0, cx - radius * 1.38), cy);
+        ctx.lineTo(Math.min(width, cx + radius * 1.38), cy);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawTopographicField(cx, cy, radius) {
+        const f = model.forces;
+        ctx.save();
+        ctx.lineWidth = 1;
+        ctx.setLineDash([1, 0]);
+        for (let band = 0; band < 12; band++) {
+          const bandRadius = radius * (1.11 + band * 0.072);
+          ctx.beginPath();
+          for (let i = 0; i <= 168; i++) {
+            const a = (i / 168) * TAU;
+            const forceWarp =
+              1 +
+              0.036 * Math.cos(a - f.slopeDown) +
+              0.028 * Math.cos(a - f.windFrom + Math.PI) +
+              0.022 * Math.sin(a * 4 + band * 0.8);
+            const rx = bandRadius * forceWarp * (1 + band * 0.006);
+            const ry = bandRadius * (1 + 0.03 * Math.sin(band * 0.7)) * (2 - forceWarp);
+            const x = cx + Math.cos(a) * rx;
+            const y = cy + Math.sin(a) * ry;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.closePath();
+          ctx.strokeStyle = band % 3 === 0 ? COLORS.contour : COLORS.contourSoft;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawInvisibleForces(cx, cy, radius, seconds) {
+        drawSunGlyph(cx, cy, radius, seconds);
+        drawWindGlyph(cx, cy, radius, seconds);
+        drawSlopeGlyph(cx, cy, radius);
+        drawTemperatureGlyph(cx, cy, radius);
+        drawDamageIncidentLines(cx, cy, radius);
+        drawCompassTicks(cx, cy, radius);
+      }
+
+      function drawSunGlyph(cx, cy, radius, seconds) {
+        const f = model.forces;
+        const u = unit(f.sunAngle);
+        const p = { x: cx + u.x * radius * 1.18, y: cy + u.y * radius * 1.18 };
+        ctx.save();
+        ctx.strokeStyle = COLORS.sun;
+        ctx.fillStyle = COLORS.sun;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([9, 7]);
+        for (let i = -2; i <= 2; i++) {
+          const a = f.sunAngle + i * 0.105;
+          const outer = pointAt(cx, cy, radius * 1.12, a);
+          const inner = pointAt(cx, cy, radius * 0.72, a);
+          ctx.beginPath();
+          ctx.moveTo(outer.x, outer.y);
+          ctx.lineTo(inner.x, inner.y);
+          ctx.stroke();
+        }
+
+        ctx.setLineDash([]);
+        ctx.translate(p.x, p.y);
+        ctx.rotate(f.sunAngle + Math.PI / 2);
+        const glyph = clamp(radius * 0.075, 18, 34);
+        ctx.beginPath();
+        ctx.arc(0, 0, glyph, -1.18, 1.18);
+        ctx.stroke();
+        for (let i = -3; i <= 3; i++) {
+          const a = i * 0.36;
+          const x1 = Math.sin(a) * glyph * 1.18;
+          const y1 = -Math.cos(a) * glyph * 1.18;
+          const x2 = Math.sin(a) * glyph * 1.48;
+          const y2 = -Math.cos(a) * glyph * 1.48;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        const shimmer = 0.55 + Math.sin(seconds * 1.6) * 0.18;
+        ctx.save();
+        ctx.globalAlpha = shimmer;
+        ctx.fillStyle = COLORS.sun;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3.5, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawWindGlyph(cx, cy, radius, seconds) {
+        const f = model.forces;
+        const from = unit(f.windFrom);
+        const side = { x: -from.y, y: from.x };
+        const pulse = Math.sin(seconds * 1.1) * 5;
+        ctx.save();
+        ctx.strokeStyle = COLORS.wind;
+        ctx.fillStyle = COLORS.wind;
+        ctx.lineWidth = 1.35;
+        ctx.globalAlpha = 0.82;
+        for (let i = -3; i <= 3; i++) {
+          const offset = i * radius * 0.135;
+          const start = {
+            x: cx + from.x * (radius * 1.56 + pulse) + side.x * offset,
+            y: cy + from.y * (radius * 1.56 + pulse) + side.y * offset,
+          };
+          const end = {
+            x: cx + from.x * radius * 1.12 + side.x * (offset * 0.78),
+            y: cy + from.y * radius * 1.12 + side.y * (offset * 0.78),
+          };
+          drawArrow(start.x, start.y, end.x, end.y, 9);
+          const barbBase = {
+            x: lerp(start.x, end.x, 0.55),
+            y: lerp(start.y, end.y, 0.55),
+          };
+          ctx.beginPath();
+          ctx.moveTo(barbBase.x, barbBase.y);
+          ctx.lineTo(barbBase.x + side.x * 11 - from.x * 4, barbBase.y + side.y * 11 - from.y * 4);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawSlopeGlyph(cx, cy, radius) {
+        const f = model.forces;
+        const u = unit(f.slopeDown);
+        const side = { x: -u.y, y: u.x };
+        const p = { x: cx + u.x * radius * 1.34, y: cy + u.y * radius * 1.34 };
+        ctx.save();
+        ctx.strokeStyle = COLORS.slope;
+        ctx.lineWidth = 1.45;
+        ctx.globalAlpha = 0.88;
+        for (let i = -3; i <= 3; i++) {
+          const shift = i * 9;
+          const lift = i * 3.3;
+          ctx.beginPath();
+          ctx.moveTo(p.x + side.x * (-34 + shift) - u.x * lift, p.y + side.y * (-34 + shift) - u.y * lift);
+          ctx.lineTo(p.x + side.x * (34 + shift) + u.x * lift, p.y + side.y * (34 + shift) + u.y * lift);
+          ctx.stroke();
+        }
+        drawArrow(p.x - u.x * 34, p.y - u.y * 34, p.x + u.x * 34, p.y + u.y * 34, 8);
+        ctx.restore();
+      }
+
+      function drawTemperatureGlyph(cx, cy, radius) {
+        const x = clamp(cx - radius * 1.45, 18, width - 86);
+        const y = clamp(cy - radius * 0.58, 100, height - 174);
+        const h = clamp(radius * 0.98, 128, 230);
+        const f = model.forces;
+        ctx.save();
+        ctx.lineWidth = 1.25;
+        ctx.strokeStyle = 'rgba(21, 32, 25, 0.38)';
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x, y + h);
+        ctx.stroke();
+        for (let i = 0; i < 44; i++) {
+          const t = i / 43;
+          const signal =
+            0.5 +
+            0.32 * Math.sin(t * TAU * 2.4 + f.temperaturePhase) +
+            0.12 * Math.sin(t * TAU * 7.3 + f.temperaturePhase * 0.5);
+          const hot = clamp(signal + (f.temperatureMean - 8) / 34, 0, 1);
+          ctx.strokeStyle = mixTemp(hot);
+          const yy = y + t * h;
+          const len = 12 + signal * 28 * f.temperatureVolatility;
+          ctx.beginPath();
+          ctx.moveTo(x - len * 0.35, yy);
+          ctx.lineTo(x + len, yy);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawDamageIncidentLines(cx, cy, radius) {
+        const markSize = clamp(radius * 0.055, 14, 24);
+        const fontSize = clamp(radius * 0.027, 8, 10);
+        const margin = markSize * 1.35 + 10;
+        ctx.save();
+        ctx.font = `${Math.round(fontSize)}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        for (const event of model.damageEvents) {
+          const u = unit(event.angle);
+          const side = { x: -u.y, y: u.x };
+          const targetBoundary = model.boundaries[event.year];
+          const targetRadius = boundaryRadiusAt(targetBoundary, event.angle) * radius;
+          const target = pointAt(cx, cy, targetRadius, event.angle);
+          const lineRadius = Math.max(targetRadius + radius * 0.11, radius * (1.035 + event.lane * 0.04));
+          const rawMark = pointAt(cx, cy, lineRadius, event.angle);
+          const mark = {
+            x: clamp(rawMark.x, margin, width - margin),
+            y: clamp(rawMark.y, margin, height - margin),
+          };
+          const rgb = event.kind === 'fire' ? COLORS.fireRgb : COLORS.pestRgb;
+
+          ctx.strokeStyle = rgbaCss(rgb, 0.58);
+          ctx.lineWidth = event.kind === 'fire' ? 1.2 : 1;
+          ctx.setLineDash(event.kind === 'fire' ? [12, 8] : [2, 5]);
+          ctx.beginPath();
+          ctx.moveTo(target.x, target.y);
+          ctx.lineTo(mark.x - u.x * markSize * 0.38, mark.y - u.y * markSize * 0.38);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          drawIncidentLineCluster(event.kind, mark.x, mark.y, event.angle, markSize, rgb);
+
+          const label = {
+            x: clamp(mark.x + side.x * (markSize + 10), margin, width - margin),
+            y: clamp(mark.y + side.y * (markSize + 10), margin, height - margin),
+          };
+          ctx.fillStyle = rgbaCss(rgb, 0.78);
+          ctx.fillText(`${event.kind === 'fire' ? 'F' : 'P'}${String(event.year).padStart(3, '0')}`, label.x, label.y);
+        }
+        ctx.restore();
+      }
+
+      function drawIncidentLineCluster(kind, x, y, angle, size, rgb) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle + Math.PI / 2);
+        ctx.lineWidth = kind === 'fire' ? 1.45 : 1.1;
+        ctx.strokeStyle = rgbCss(rgb);
+        if (kind === 'fire') {
+          for (let i = -1; i <= 1; i++) {
+            const offset = i * size * 0.22;
+            ctx.beginPath();
+            ctx.moveTo(-size * 0.72 + offset * 0.26, size * 0.34 + offset);
+            ctx.lineTo(size * 0.72 + offset * 0.18, -size * 0.34 + offset);
+            ctx.stroke();
+          }
+        } else {
+          for (let i = -3; i <= 3; i++) {
+            const x = i * size * 0.18;
+            ctx.beginPath();
+            ctx.moveTo(x, -size * 0.42);
+            ctx.lineTo(x, size * 0.42);
+            ctx.stroke();
+          }
+          ctx.setLineDash([1, 4]);
+          ctx.beginPath();
+          ctx.moveTo(-size * 0.72, 0);
+          ctx.lineTo(size * 0.72, 0);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.restore();
+      }
+
+      function drawCompassTicks(cx, cy, radius) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(21, 32, 25, 0.42)';
+        ctx.fillStyle = COLORS.inkSoft;
+        ctx.font = `${Math.round(clamp(radius * 0.045, 10, 13))}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (let deg = 0; deg < 360; deg += 15) {
+          const a = (deg / 180) * Math.PI;
+          const len = deg % 45 === 0 ? 10 : 5;
+          const p1 = pointAt(cx, cy, radius * 1.018, a);
+          const p2 = pointAt(cx, cy, radius * 1.018 + len, a);
+          ctx.lineWidth = deg % 45 === 0 ? 1.2 : 0.7;
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+        }
+        const labels = [
+          ['E', 0],
+          ['S', Math.PI / 2],
+          ['W', Math.PI],
+          ['N', -Math.PI / 2],
+        ];
+        for (const [label, angle] of labels) {
+          const p = pointAt(cx, cy, radius * 1.075, angle);
+          ctx.fillText(label, p.x, p.y);
+        }
+        ctx.restore();
+      }
+
+      function drawTrunk(cx, cy, radius, ageFloat) {
+        const completeAge = Math.floor(ageFloat);
+        const partial = ageFloat - completeAge;
+        const activeAge = Math.min(TARGET_AGE, completeAge + 1);
+        const activeBoundary =
+          completeAge < TARGET_AGE ? interpolateBoundary(completeAge, activeAge, easeOutQuart(partial)) : null;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        if (activeBoundary) {
+          drawFilledBoundary(activeBoundary, radius, colorForRing(activeAge));
+        }
+
+        for (let year = Math.min(completeAge, TARGET_AGE); year >= 1; year--) {
+          drawFilledBoundary(model.boundaries[year], radius, colorForRing(year));
+        }
+
+        const currentBoundary = activeBoundary || model.boundaries[Math.min(completeAge, TARGET_AGE)];
+        drawPith(radius);
+        drawWoodRays(radius, currentBoundary, ageFloat);
+        drawRingLines(radius, ageFloat);
+        drawActiveFront(radius, activeBoundary, activeAge, partial);
+        drawBarkDamage(radius, currentBoundary, ageFloat);
+        drawOuterBark(radius, currentBoundary);
+        ctx.restore();
+      }
+
+      function drawFilledBoundary(boundary, radius, fill) {
+        pathBoundary(boundary, radius);
+        ctx.fillStyle = fill;
+        ctx.fill();
+      }
+
+      function drawPith(radius) {
+        const pith = model.boundaries[0];
+        pathBoundary(pith, radius * 1.9);
+        ctx.fillStyle = '#fff7e3';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(21, 32, 25, 0.54)';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+
+      function drawRingLines(radius, ageFloat) {
+        const visible = Math.min(Math.floor(ageFloat), TARGET_AGE);
+        ctx.save();
+        for (let year = 5; year <= visible; year += 5) {
+          ctx.strokeStyle = year % 25 === 0 ? 'rgba(17, 20, 18, 0.62)' : 'rgba(17, 20, 18, 0.2)';
+          ctx.lineWidth = year % 25 === 0 ? 1.15 : 0.55;
+          pathBoundary(model.boundaries[year], radius);
+          ctx.stroke();
+        }
+        for (let year = 25; year <= visible; year += 25) {
+          placeYearMark(model.boundaries[year], radius, year);
+        }
+        ctx.restore();
+      }
+
+      function drawActiveFront(radius, activeBoundary, activeAge, partial) {
+        if (!activeBoundary || activeAge > TARGET_AGE) return;
+        const frontAlpha = 0.38 + smootherStep(partial) * 0.42;
+        ctx.save();
+        ctx.strokeStyle = rgbaCss(COLORS.paperRgb, frontAlpha);
+        ctx.lineWidth = 1.7;
+        pathBoundary(activeBoundary, radius);
+        ctx.stroke();
+        ctx.strokeStyle = rgbaCss(COLORS.inkRgb, 0.42);
+        ctx.lineWidth = 0.65;
+        pathBoundary(activeBoundary, radius);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawOuterBark(radius, boundary) {
+        if (!boundary) return;
+        ctx.save();
+        ctx.strokeStyle = COLORS.ink;
+        ctx.lineWidth = clamp(radius * 0.018, 2.2, 5);
+        pathBoundary(boundary, radius * 1.003);
+        ctx.stroke();
+        ctx.strokeStyle = rgbaCss(COLORS.inkRgb, 0.34);
+        ctx.lineWidth = 0.8;
+        pathBoundary(boundary, radius * 0.989);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawBarkDamage(radius, boundary, ageFloat) {
+        if (!boundary) return;
+        const age = Math.min(ageFloat, TARGET_AGE);
+        ctx.save();
+        for (const event of model.damageEvents) {
+          const eventAge = age - event.year;
+          if (eventAge < 0 || eventAge > 5.5) continue;
+          if (event.kind === 'fire') drawFireBarkDamage(radius, boundary, event, age);
+          else drawPestBarkDamage(radius, boundary, event, age);
+        }
+        ctx.restore();
+      }
+
+      function drawFireBarkDamage(radius, boundary, event, age) {
+        const eventAge = age - event.year;
+        const maturity = smootherStep(eventAge / 1.6);
+        const alpha = smootherStep(eventAge / 0.55) * (1 - smootherStep((eventAge - 2.25) / 3.25));
+        const arc = event.width * lerp(0.95, 1.45, maturity);
+        const points = 8;
+        ctx.save();
+        ctx.globalAlpha *= clamp(alpha, 0, 1);
+        ctx.fillStyle = rgbaCss(COLORS.inkRgb, 0.72);
+        ctx.strokeStyle = COLORS.fire;
+        ctx.lineWidth = clamp(radius * 0.0045, 0.8, 1.6);
+        ctx.beginPath();
+        for (let i = 0; i < points; i++) {
+          const t = i / (points - 1);
+          const a = event.angle + (t - 0.5) * arc;
+          const r = boundaryRadiusAt(boundary, a) * radius + 1.5;
+          const p = { x: Math.cos(a) * r, y: Math.sin(a) * r };
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        for (let i = points - 1; i >= 0; i--) {
+          const t = i / (points - 1);
+          const a = event.angle + (t - 0.5) * arc;
+          const jag = 0.72 + 0.28 * Math.sin(event.seed + i * 2.31 + age * 0.05);
+          const bite = clamp(radius * event.severity * 0.055 * jag, 6, 22);
+          const r = boundaryRadiusAt(boundary, a) * radius - bite;
+          const p = { x: Math.cos(a) * r, y: Math.sin(a) * r };
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawPestBarkDamage(radius, boundary, event, age) {
+        const eventAge = age - event.year;
+        const maturity = smootherStep(eventAge / 1.5);
+        const alpha = smootherStep(eventAge / 0.55) * (1 - smootherStep((eventAge - 2) / 3.5));
+        const holes = 6 + Math.floor(event.severity * 10);
+        ctx.save();
+        ctx.globalAlpha *= clamp(alpha, 0, 1);
+        ctx.strokeStyle = rgbaCss(COLORS.inkRgb, 0.76);
+        ctx.fillStyle = COLORS.paper;
+        ctx.lineWidth = clamp(radius * 0.0035, 0.75, 1.25);
+        for (let i = 0; i < holes; i++) {
+          const offset =
+            (i / Math.max(1, holes - 1) - 0.5) * event.width * 1.6 +
+            Math.sin(event.seed + i * 4.7) * event.width * 0.16;
+          const a = event.angle + offset;
+          const r = boundaryRadiusAt(boundary, a) * radius - lerp(1, 8, maturity) * ((i % 3) / 2);
+          const p = { x: Math.cos(a) * r, y: Math.sin(a) * r };
+          const bore = clamp(radius * 0.006 * (0.7 + event.severity), 1.1, 2.3);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, bore, 0, TAU);
+          ctx.fill();
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p.x - Math.cos(a) * bore * 3.2, p.y - Math.sin(a) * bore * 3.2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawWoodRays(radius, boundary, ageFloat) {
+        if (!boundary || ageFloat < 8) return;
+        const rayCount = 34;
+        ctx.save();
+        pathBoundary(boundary, radius * 0.986);
+        ctx.clip();
+        ctx.strokeStyle = rgbaCss(COLORS.inkRgb, 0.12);
+        ctx.lineWidth = 0.55;
+        for (let i = 0; i < rayCount; i++) {
+          const jitter = Math.sin(i * 12.989 + model.salt) * 0.025;
+          const a = (i / rayCount) * TAU + jitter;
+          const end = boundaryRadiusAt(boundary, a) * radius * 0.965;
+          const start = Math.max(radius * 0.09, end * 0.1);
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * start, Math.sin(a) * start);
+          ctx.lineTo(Math.cos(a) * end, Math.sin(a) * end);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function boundaryRadiusAt(boundary, angle) {
+        const normalized = ((angle % TAU) + TAU) % TAU;
+        const index = (normalized / TAU) * SAMPLE_COUNT;
+        const i0 = Math.floor(index) % SAMPLE_COUNT;
+        const i1 = (i0 + 1) % SAMPLE_COUNT;
+        return lerp(boundary[i0], boundary[i1], index - i0);
+      }
+
+      function interpolateBoundary(fromYear, toYear, t) {
+        const from = model.boundaries[fromYear];
+        const to = model.boundaries[toYear];
+        const out = new Array(SAMPLE_COUNT);
+        for (let i = 0; i < SAMPLE_COUNT; i++) out[i] = lerp(from[i], to[i], t);
+        return out;
+      }
+
+      function pathBoundary(boundary, radius) {
+        ctx.beginPath();
+        for (let i = 0; i < SAMPLE_COUNT; i++) {
+          const a = model.angles[i];
+          const r = boundary[i] * radius;
+          const x = Math.cos(a) * r;
+          const y = Math.sin(a) * r;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+      }
+
+      function placeYearMark(boundary, radius, year) {
+        const index = Math.floor(((year * 37) % SAMPLE_COUNT + SAMPLE_COUNT) % SAMPLE_COUNT);
+        const a = model.angles[index];
+        const r = boundary[index] * radius;
+        const x = Math.cos(a) * r;
+        const y = Math.sin(a) * r;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(a + Math.PI / 2);
+        ctx.fillStyle = 'rgba(21, 32, 25, 0.7)';
+        ctx.font = `${Math.round(clamp(radius * 0.028, 8, 10))}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(year).padStart(3, '0'), 0, -5);
+        ctx.restore();
+      }
+
+      function drawReadouts(ageFloat) {
+        const f = model.forces;
+        const age = Math.min(TARGET_AGE, Math.floor(ageFloat));
+        const forming = Math.min(TARGET_AGE, age + (age < TARGET_AGE ? 1 : 0));
+        const progress = age >= TARGET_AGE ? 100 : Math.round((ageFloat - age) * 100);
+        const formingRing = model.rings[forming] || model.rings[TARGET_AGE];
+        const fireCount = model.damageEvents.filter((event) => event.kind === 'fire').length;
+        const pestCount = model.damageEvents.length - fireCount;
+        const margin = clamp(Math.min(width, height) * 0.027, 14, 28);
+        const titleLines = [
+          'GROWTH RINGS',
+          `PAL ${activePalette.name.toUpperCase()}`,
+          `AGE ${String(age).padStart(3, '0')} / ${TARGET_AGE}`,
+          age >= TARGET_AGE ? 'CAMBIUM CLOSED' : `FORMING ${String(forming).padStart(3, '0')}  ${String(progress).padStart(2, '0')}%`,
+        ];
+        drawTextPlate(margin, margin, titleLines, { accent: COLORS.ink, align: 'left' });
+
+        const forceLines = [
+          `LAT ${formatSigned(f.latitude, 1)}  SUN ${Math.round(f.solarElevation)}deg`,
+          `WIND ${f.windExposure.toFixed(2)}  ${directionName(f.windFrom)}`,
+          `TEMP ${formatSigned(f.temperatureMean, 1)}C  VAR ${f.temperatureVolatility.toFixed(2)}`,
+          `RAIN ${formatSigned(formingRing.rainfall, 2)}  WET ${model.weatherSummary.wetYears} DRY ${model.weatherSummary.dryYears}`,
+          `LINES F ${fireCount}  P ${pestCount}`,
+          `GROUND ${Math.round(f.slopeMagnitude)}deg  ${directionName(f.slopeDown)}`,
+        ];
+        drawTextPlate(width - margin - readoutWidth(forceLines), margin, forceLines, { accent: COLORS.wind, align: 'left' });
+      }
+
+      function drawTextPlate(x, y, lines, options = {}) {
+        const fontSize = clamp(Math.min(width, height) * 0.018, 10, 13);
+        const lineHeight = Math.round(fontSize * 1.52);
+        ctx.save();
+        ctx.font = `${Math.round(fontSize)}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+        const metrics = lines.map((line) => measuredTextWidth(line, fontSize));
+        const w = Math.max(...metrics) + 18;
+        const h = lineHeight * lines.length + 12;
+        const px = clamp(x, 10, width - w - 10);
+        const py = clamp(y, 10, height - h - 10);
+        ctx.fillStyle = COLORS.paperClear;
+        ctx.strokeStyle = 'rgba(21, 32, 25, 0.32)';
+        ctx.lineWidth = 1;
+        ctx.fillRect(px, py, w, h);
+        ctx.strokeRect(px + 0.5, py + 0.5, w - 1, h - 1);
+        ctx.fillStyle = options.accent || COLORS.ink;
+        ctx.fillRect(px, py, 4, h);
+        ctx.fillStyle = COLORS.ink;
+        ctx.textAlign = options.align || 'left';
+        ctx.textBaseline = 'top';
+        for (let i = 0; i < lines.length; i++) {
+          ctx.fillText(lines[i], px + 11, py + 7 + i * lineHeight);
+        }
+        ctx.restore();
+      }
+
+      function readoutWidth(lines) {
+        const fontSize = clamp(Math.min(width, height) * 0.018, 10, 13);
+        ctx.save();
+        ctx.font = `${Math.round(fontSize)}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+        const w = Math.max(...lines.map((line) => measuredTextWidth(line, fontSize))) + 18;
+        ctx.restore();
+        return w;
+      }
+
+      function measuredTextWidth(line, fontSize) {
+        const measured = ctx.measureText(line).width;
+        const estimated = line.length * fontSize * 0.64;
+        return Math.max(measured, estimated);
+      }
+
+      function colorForRing(year) {
+        const ring = model.rings[year];
+        const colorIndex = ring.colorIndex % activePalette.colors.length;
+        const base = rgbFromEntry(activePalette.colors[colorIndex]);
+        return rgbCss(toneRgb(base, ring.tone));
+      }
+
+      function toneRgb(rgb, tone) {
+        if (Math.abs(tone) < 0.01) return rgb;
+        const target = tone < 0 ? COLORS.inkRgb : COLORS.paperRgb;
+        return mixRgb(rgb, target, Math.abs(tone));
+      }
+
+      function mixTemp(t) {
+        return rgbCss(mixRgb(COLORS.tempColdRgb, COLORS.tempHotRgb, t));
+      }
+
+      function pointAt(cx, cy, radius, angle) {
+        return { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
+      }
+
+      function drawArrow(x1, y1, x2, y2, size) {
+        const a = Math.atan2(y2 - y1, x2 - x1);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - Math.cos(a - 0.55) * size, y2 - Math.sin(a - 0.55) * size);
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - Math.cos(a + 0.55) * size, y2 - Math.sin(a + 0.55) * size);
+        ctx.stroke();
+      }
+
+      function formatSigned(value, places) {
+        return `${value >= 0 ? '+' : ''}${value.toFixed(places)}`;
+      }
+
+      function directionName(angle) {
+        const directions = ['E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N', 'NNE', 'NE', 'ENE'];
+        const normalized = ((angle % TAU) + TAU) % TAU;
+        const index = Math.round((normalized / TAU) * directions.length) % directions.length;
+        return directions[index];
+      }
+
+      canvas.addEventListener('click', () => {
+        startAge = 0;
+        history.replaceState(null, '', location.pathname);
+        reset();
+      });
+
+      canvas.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          startAge = 0;
+          history.replaceState(null, '', location.pathname);
+          reset();
+        }
+      });
+
+      addEventListener('resize', resize);
+      reducedMotionQuery.addEventListener('change', () => {
+        prefersReducedMotion = reducedMotionQuery.matches;
+        reset(seed);
+      });
+
+      resize();
+      reset(seed);
+    </script>
+  </body>
+</html>
