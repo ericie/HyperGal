@@ -119,7 +119,15 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.png",
-      "description": "A trunk cross-section that grows toward 200 years one ring at a time. Latitude, solar angle, wind exposure, temperature, rainfall, and ground slope push the cambium out of symmetry; severity-scaled fire and pest incidents are marked as abstract chart lines and deform 1-5 years of growth."
+      "description": "A trunk cross-section that grows toward 200 years one ring at a time. Latitude, solar angle, wind exposure, temperature, rainfall, and ground slope push the cambium out of symmetry; heavy rain years bloom into wider uneven rings while severity-scaled fire and pest incidents suppress 1-5 years of growth without cutting into older wood."
+    },
+    {
+      "slug": "016-up-mario",
+      "title": "Up Mario",
+      "year": 2026,
+      "type": "interactive",
+      "thumbnail": "thumbnail.svg",
+      "description": "A vertical platformer that never ends. A small red-capped hero named Mario keeps climbing an endless arcade shaft of brick ledges, riveted girders, springs, coins, and rolling barrels. The piece plays itself by default, aiming for the next reachable platform and jumping forever upward, while keyboard or touch input can briefly take over before the climb resumes."
     }
   ]
 };

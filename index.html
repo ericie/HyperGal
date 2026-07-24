@@ -69,16 +69,23 @@
       <p class="subtitle">A digital gallery of self-contained pieces.</p>
     </header>
     <main id="gallery" class="grid"></main>
-    <script src="./manifest.js"></script>
     <script>
       (() => {
         const gallery = document.getElementById('gallery');
-        const data = window.HYPERGAL_MANIFEST;
-        if (!data || !Array.isArray(data.pieces) || data.pieces.length === 0) {
-          gallery.replaceWith(emptyState());
-          return;
+        const script = document.createElement('script');
+        script.src = `./manifest.js?v=${Date.now()}`;
+        script.onload = renderGallery;
+        script.onerror = () => gallery.replaceWith(emptyState());
+        document.head.append(script);
+
+        function renderGallery() {
+          const data = window.HYPERGAL_MANIFEST;
+          if (!data || !Array.isArray(data.pieces) || data.pieces.length === 0) {
+            gallery.replaceWith(emptyState());
+            return;
+          }
+          for (const p of data.pieces) gallery.append(pieceCard(p));
         }
-        for (const p of data.pieces) gallery.append(pieceCard(p));
 
         function pieceCard(p) {
           const a = document.createElement('a');

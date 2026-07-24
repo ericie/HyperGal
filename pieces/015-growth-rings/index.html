@@ -332,6 +332,7 @@
         const soilPhase = random() * TAU;
         const grainPhase = random() * TAU;
         const rainPhase = random() * TAU;
+        const cambiumMemory = new Array(SAMPLE_COUNT).fill(0);
         let climateMemory = random() * 0.4 - 0.2;
         let rainfallMemory = random() * 0.7 - 0.35;
         let lastColorIndex = -1;
@@ -357,6 +358,8 @@
           weatherSummary.maxRainfall = Math.max(weatherSummary.maxRainfall, rainfallSignal);
           if (rainfallSignal < -0.62) weatherSummary.dryYears += 1;
           if (rainfallSignal > 0.62) weatherSummary.wetYears += 1;
+          const wetSurge = Math.pow(clamp((rainfallSignal - 0.18) / 1.5, 0, 1), 1.18);
+          const droughtDrag = Math.pow(clamp((-rainfallSignal - 0.22) / 1.55, 0, 1), 1.08);
 
           const baseGrowth =
             2.22 +
@@ -364,13 +367,19 @@
             Math.sin(year * 0.043 + soilPhase) * 0.28 +
             Math.sin(year * 0.17 + grainPhase) * 0.18;
           const annualWeatherWidth = clamp(
-            1 + rainfallSignal * 0.38 + temperatureSignal * 0.13 + (random() - 0.5) * 0.3,
-            0.24,
-            2.24
+            1 +
+              rainfallSignal * 0.42 +
+              wetSurge * 0.92 -
+              droughtDrag * 0.22 +
+              temperatureSignal * 0.12 +
+              (random() - 0.5) * (0.3 + wetSurge * 0.26),
+            0.18,
+            3.05
           );
           const previous = boundaries[year - 1];
           let boundary = new Array(SAMPLE_COUNT);
           let widthTotal = 0;
+          const ageIrregularity = ageIrregularityFor(year);
 
           for (let i = 0; i < SAMPLE_COUNT; i++) {
             const a = angles[i];
@@ -384,18 +393,28 @@
               0.034 * Math.sin(a * 7 - year * 0.045 + grainPhase) +
               0.023 * Math.sin(a * 13 + year * 0.075 + soilPhase * 0.6);
             const climateBias = temperatureSignal * 0.035 * Math.sin(a * 2 + year * 0.08 + forces.temperaturePhase);
-            const rainfallBias = rainfallSignal * 0.044 * Math.sin(a * 5 - year * 0.12 + rainPhase);
+            const rainfallBias =
+              rainfallSignal * (0.044 + wetSurge * 0.065) * Math.sin(a * 5 - year * 0.12 + rainPhase) +
+              wetSurge * 0.052 * Math.sin(a * 9 + year * 0.19 + rainPhase * 1.7);
             const organicBias = organicGrowthBias(organicField, year, a);
-            const stress = sunBias + windBias + slopeBias + soilBias + climateBias + rainfallBias + organicBias;
+            const memoryBias = cambiumMemory[i] * lerp(0.22, 1.05, ageIrregularity);
+            const stress = sunBias + windBias + slopeBias + soilBias + climateBias + rainfallBias + organicBias + memoryBias;
             const increment = baseGrowth * annualWeatherWidth * clamp(1 + stress, 0.28, 1.92);
             boundary[i] = previous[i] + increment;
             widthTotal += increment;
+
+            const cambiumNudge =
+              organicBias * 0.42 +
+              soilBias * 0.26 +
+              rainfallBias * 0.34 +
+              (sunBias + windBias + slopeBias) * 0.08;
+            cambiumMemory[i] = clamp(cambiumMemory[i] * 0.985 + cambiumNudge * lerp(0.006, 0.026, ageIrregularity), -0.62, 0.58);
           }
 
-          boundary = smoothLoop(boundary, 2);
+          boundary = smoothLoop(boundary, 2, lerp(0.86, 0.18, ageIrregularity));
           const activeIncidents = damageEvents.filter((event) => year >= event.year && year < event.year + event.duration);
           if (activeIncidents.length) {
-            boundary = applyDamageIncidents(boundary, previous, angles, activeIncidents, widthTotal / SAMPLE_COUNT, year);
+            boundary = applyDamageIncidents(boundary, previous, angles, activeIncidents, widthTotal / SAMPLE_COUNT, year, cambiumMemory);
           }
           boundaries.push(boundary);
           const stressIndex =
@@ -502,6 +521,10 @@
         return clamp(bias, -0.34, 0.38);
       }
 
+      function ageIrregularityFor(year) {
+        return smootherStep((year - 16) / 150);
+      }
+
       function makeDamageEvents(random) {
         const events = [
           makeDamageEvent('fire', random, 0),
@@ -536,12 +559,13 @@
         };
       }
 
-      function applyDamageIncidents(boundary, previous, angles, events, meanWidth, year) {
+      function applyDamageIncidents(boundary, previous, angles, events, meanWidth, year, cambiumMemory) {
         const out = boundary.slice();
         for (let i = 0; i < out.length; i++) {
           const a = angles[i];
           let bite = 0;
           let callus = 0;
+          let memoryShift = 0;
 
           for (const event of events) {
             const eventAge = year - event.year;
@@ -553,11 +577,12 @@
 
             if (event.kind === 'fire') {
               const heatPulse = eventAge === 0 ? 1.55 : 0.8;
-              bite += meanWidth * event.severity * 7.2 * heatPulse * timeFalloff * angularFalloff * irregular;
+              bite += meanWidth * event.severity * 5.6 * heatPulse * timeFalloff * angularFalloff * irregular;
               const edgeDistance = Math.abs(Math.abs(angular) - event.width * 1.05);
               const edgeWidth = Math.max(0.034, event.width * 0.26);
               const edgeFalloff = Math.exp(-(edgeDistance * edgeDistance) / (edgeWidth * edgeWidth));
               callus += meanWidth * event.severity * 1.15 * smootherStep((eventAge + 1) / Math.max(2, event.duration)) * edgeFalloff;
+              memoryShift += -event.severity * 0.09 * heatPulse * angularFalloff + event.severity * 0.052 * edgeFalloff;
             } else {
               const migration = Math.sin(event.seed + eventAge * 1.4) * event.width * 0.22;
               const movingFalloff = Math.exp(-Math.pow(angleDelta(a, event.angle + migration), 2) / (event.width * event.width));
@@ -565,23 +590,31 @@
               const outbreak = 0.7 + 0.3 * Math.sin((durationT + 0.08) * Math.PI);
               bite += meanWidth * event.severity * 4.1 * outbreak * Math.max(0, mottled) * irregular;
               callus += meanWidth * event.severity * 0.34 * movingFalloff * Math.max(0, Math.sin(a * 11 - event.seed + eventAge));
+              memoryShift +=
+                -event.severity * 0.07 * outbreak * Math.max(0, mottled) +
+                event.severity * 0.022 * movingFalloff * Math.max(0, Math.sin(a * 11 - event.seed + eventAge));
             }
           }
 
-          out[i] = Math.max(previous[i] * 0.965, out[i] - bite + callus);
+          cambiumMemory[i] = clamp(cambiumMemory[i] + memoryShift, -0.72, 0.64);
+          const incidentCenter = bite > callus;
+          const minAdvance = meanWidth * (incidentCenter ? 0.035 : 0.08);
+          out[i] = Math.max(previous[i] + minAdvance, out[i] - bite + callus);
         }
-        return smoothLoop(out, 1);
+        return smoothLoop(out, 1, 0.36);
       }
 
-      function smoothLoop(values, passes) {
+      function smoothLoop(values, passes, strength = 1) {
         let out = values.slice();
+        const amount = clamp(strength, 0, 1);
         for (let pass = 0; pass < passes; pass++) {
           const next = new Array(out.length);
           for (let i = 0; i < out.length; i++) {
             const a = out[(i - 1 + out.length) % out.length];
             const b = out[i];
             const c = out[(i + 1) % out.length];
-            next[i] = a * 0.24 + b * 0.52 + c * 0.24;
+            const smoothed = a * 0.24 + b * 0.52 + c * 0.24;
+            next[i] = lerp(b, smoothed, amount);
           }
           out = next;
         }

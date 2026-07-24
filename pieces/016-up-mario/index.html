@@ -1,0 +1,1279 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Up Mario · HyperGal</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07030d;
+        --ink: #fff5dd;
+        --muted: rgba(255, 245, 221, 0.68);
+        --hot: #ffd447;
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--ink);
+        overflow: hidden;
+      }
+
+      body {
+        font-family: ui-rounded, Avenir Next, system-ui, sans-serif;
+        overscroll-behavior: none;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: var(--bg);
+        cursor: crosshair;
+        image-rendering: pixelated;
+        touch-action: none;
+      }
+
+      canvas:focus-visible {
+        outline: 3px solid var(--hot);
+        outline-offset: -9px;
+      }
+
+      .hud {
+        position: fixed;
+        inset: clamp(0.75rem, 2vw, 1.1rem) clamp(0.8rem, 2.2vw, 1.4rem) auto;
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 1rem;
+        pointer-events: none;
+        color: var(--ink);
+        font-size: clamp(0.78rem, 1.3vw, 0.95rem);
+        line-height: 1.2;
+        text-shadow: 0 2px 0 #000;
+      }
+
+      .hud strong,
+      .hud span {
+        display: block;
+      }
+
+      .hud strong {
+        font-weight: 850;
+        letter-spacing: 0;
+      }
+
+      .hud span {
+        color: var(--muted);
+        margin-top: 0.12rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .hud__right {
+        text-align: right;
+      }
+
+      .debug {
+        position: fixed;
+        left: 0.85rem;
+        bottom: 0.75rem;
+        margin: 0;
+        color: rgba(255, 245, 221, 0.74);
+        font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        pointer-events: none;
+        white-space: pre;
+        text-shadow: 0 1px 0 #000;
+      }
+
+      @media (max-width: 520px) {
+        .hud {
+          font-size: 0.78rem;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        canvas {
+          cursor: default;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="stage"
+      tabindex="0"
+      role="img"
+      aria-label="Up Mario: a small red-capped platform hero keeps jumping upward through an endless arcade scaffold of brick and girder platforms."
+    ></canvas>
+    <div class="hud" aria-hidden="true">
+      <div>
+        <strong>UP MARIO</strong>
+        <span id="heightReadout">0000 m</span>
+      </div>
+      <div class="hud__right">
+        <strong id="coinReadout">00</strong>
+        <span id="seedReadout">seed</span>
+      </div>
+    </div>
+    <pre id="debug" class="debug" hidden></pre>
+
+    <script>
+      (() => {
+        const canvas = document.getElementById('stage');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const heightReadout = document.getElementById('heightReadout');
+        const coinReadout = document.getElementById('coinReadout');
+        const seedReadout = document.getElementById('seedReadout');
+        const debugEl = document.getElementById('debug');
+        const params = new URLSearchParams(location.search);
+        const reduceQuery =
+          typeof matchMedia === 'function'
+            ? matchMedia('(prefers-reduced-motion: reduce)')
+            : { matches: false };
+
+        const DEBUG = params.has('debug');
+        const TAU = Math.PI * 2;
+        const GRAVITY = -1580;
+        const RUN_SPEED = 275;
+        const AIR_SPEED = 238;
+        const JUMP_SPEED = 735;
+        const SPRING_SPEED = 870;
+        const HERO_W = 26;
+        const HERO_H = 42;
+        const LAUNCH_MARGIN = 20;
+        const MIN_TARGET_GAP = 30;
+        const MAX_TARGET_GAP = 156;
+        const STALL_SECONDS = 5.2;
+        const COLORS = {
+          skyTop: '#08020f',
+          skyBottom: '#111205',
+          shaft: '#130818',
+          shaftEdge: '#342029',
+          grid: 'rgba(255, 212, 71, 0.12)',
+          brick: '#b34432',
+          brickDark: '#71271f',
+          brickLight: '#f07b45',
+          girder: '#d23a3a',
+          girderDark: '#731c2a',
+          girderLight: '#ff7956',
+          rail: '#ffd447',
+          railDark: '#8a5a12',
+          coin: '#ffd447',
+          coinHot: '#fff0a8',
+          spring: '#39d98a',
+          springDark: '#14794c',
+          barrel: '#a46531',
+          barrelDark: '#4a2416',
+          barrelBand: '#f2b15e',
+          heroRed: '#e43a2f',
+          heroRedDark: '#8d1d25',
+          skin: '#f1aa6b',
+          skinDark: '#7a3825',
+          denim: '#285fd6',
+          denimDark: '#132d75',
+          boot: '#47271e',
+          ink: '#150b10',
+          white: '#fff8df',
+          shadow: 'rgba(0, 0, 0, 0.34)',
+          smoke: 'rgba(255, 245, 221, 0.52)',
+        };
+
+        let width = 1;
+        let height = 1;
+        let dpr = 1;
+        let worldWidth = 420;
+        let worldLeft = 0;
+        let cameraY = 0;
+        let highestCameraY = 0;
+        let highestPlatformY = 0;
+        let lastPlatform = null;
+        let raf = 0;
+        let lastFrameAt = 0;
+        let simTime = 0;
+        let prefersReducedMotion = reduceQuery.matches;
+        let seed = params.get('seed') || randomSeed();
+        let rng = Math.random;
+        let hero = null;
+        let platforms = [];
+        let barrels = [];
+        let coins = [];
+        let particles = [];
+        let keys = {
+          left: false,
+          right: false,
+          jump: false,
+        };
+        let pointer = {
+          active: false,
+          x: 0,
+          startX: 0,
+          startY: 0,
+          downAt: 0,
+          moved: false,
+        };
+        let manualUntil = 0;
+        let jumpBufferedUntil = 0;
+        let bestHeight = 0;
+        let coinsCollected = 0;
+        let platformCount = 0;
+        let barrelCount = 0;
+        let coinCount = 0;
+        let targetPlatformId = null;
+        let rescueCount = 0;
+        let lastProgressAt = 0;
+        let lastProgressHeight = 0;
+
+        debugEl.hidden = !DEBUG;
+        resize();
+        reset(seed);
+        addEventListener('resize', resize, { passive: true });
+        addEventListener('keydown', onKeyDown);
+        addEventListener('keyup', onKeyUp);
+        canvas.addEventListener('pointerdown', onPointerDown);
+        canvas.addEventListener('pointermove', onPointerMove);
+        canvas.addEventListener('pointerup', onPointerUp);
+        canvas.addEventListener('pointercancel', onPointerUp);
+        if (typeof reduceQuery.addEventListener === 'function') {
+          reduceQuery.addEventListener('change', (event) => {
+            prefersReducedMotion = event.matches;
+          });
+        } else if (typeof reduceQuery.addListener === 'function') {
+          reduceQuery.addListener((event) => {
+            prefersReducedMotion = event.matches;
+          });
+        }
+
+        function randomSeed() {
+          return Math.floor(Math.random() * 0xffffffff).toString(36);
+        }
+
+        function xmur3(str) {
+          let h = 1779033703 ^ str.length;
+          for (let i = 0; i < str.length; i += 1) {
+            h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+            h = (h << 13) | (h >>> 19);
+          }
+          return function nextHash() {
+            h = Math.imul(h ^ (h >>> 16), 2246822507);
+            h = Math.imul(h ^ (h >>> 13), 3266489909);
+            return (h ^= h >>> 16) >>> 0;
+          };
+        }
+
+        function mulberry32(a) {
+          return function nextRandom() {
+            let t = (a += 0x6d2b79f5);
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        function reset(nextSeed = randomSeed()) {
+          cancelAnimationFrame(raf);
+          seed = String(nextSeed || randomSeed());
+          rng = mulberry32(xmur3(seed)());
+          simTime = 0;
+          lastFrameAt = 0;
+          cameraY = 0;
+          highestCameraY = 0;
+          bestHeight = 0;
+          coinsCollected = 0;
+          platformCount = 0;
+          barrelCount = 0;
+          coinCount = 0;
+          rescueCount = 0;
+          targetPlatformId = null;
+          platforms = [];
+          barrels = [];
+          coins = [];
+          particles = [];
+          lastPlatform = makePlatform(worldWidth * 0.5, 88, Math.min(230, worldWidth * 0.74), 'brick', false);
+          platforms.push(lastPlatform);
+          highestPlatformY = lastPlatform.y;
+          while (highestPlatformY < height * 1.75) addPlatform();
+          hero = {
+            x: lastPlatform.x + lastPlatform.w * 0.5,
+            y: lastPlatform.y,
+            previousY: lastPlatform.y,
+            vx: 0,
+            vy: 0,
+            facing: 1,
+            grounded: true,
+            groundId: lastPlatform.id,
+            lastGroundedAt: 0,
+            landedAt: 0,
+            groundedSince: 0,
+            jumpCooldownUntil: 0,
+            stumbleUntil: 0,
+            blinkUntil: 0,
+            rescuedUntil: 0,
+            autoTargetId: null,
+            autoLaunchX: null,
+            autoLandingX: null,
+          };
+          lastProgressAt = 0;
+          lastProgressHeight = 0;
+          seedReadout.textContent = seed;
+          const warmSeconds = Math.max(0, Number(params.get('warm') || 0) || 0);
+          if (warmSeconds > 0) {
+            const steps = Math.min(2400, Math.floor(warmSeconds * 60));
+            for (let i = 0; i < steps; i += 1) update(1 / 60);
+          }
+          raf = requestAnimationFrame(tick);
+        }
+
+        function resize() {
+          width = Math.max(1, innerWidth);
+          height = Math.max(1, innerHeight);
+          dpr = Math.min(2, devicePixelRatio || 1);
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.imageSmoothingEnabled = false;
+          worldWidth = Math.round(clamp(width * (width < 560 ? 0.9 : 0.62), 300, 700));
+          worldLeft = Math.round((width - worldWidth) / 2);
+        }
+
+        function tick(now) {
+          if (!lastFrameAt) lastFrameAt = now;
+          const rawDt = clamp((now - lastFrameAt) / 1000, 0.001, 0.045);
+          lastFrameAt = now;
+          const dt = rawDt * (prefersReducedMotion ? 0.45 : 1);
+          update(dt);
+          render();
+          raf = requestAnimationFrame(tick);
+        }
+
+        function update(dt) {
+          simTime += dt;
+          extendWorld();
+          updateControls(dt);
+          updateHero(dt);
+          updateBarrels(dt);
+          updateCoins();
+          updateParticles(dt);
+          updateCamera(dt);
+          rescueIfNeeded();
+          recoverIfStalled();
+          trimWorld();
+          updateHud();
+        }
+
+        function updateControls(dt) {
+          if (keys.jump && simTime > jumpBufferedUntil) jumpBufferedUntil = simTime + 0.12;
+          if (manualActive()) {
+            targetPlatformId = null;
+            return;
+          }
+          planAutopilot(dt);
+        }
+
+        function updateHero(dt) {
+          hero.previousY = hero.y;
+          let desiredVx = 0;
+          const manual = manualActive();
+
+          if (manual) {
+            desiredVx = manualDesiredVx();
+          } else {
+            desiredVx = hero.autoVx || 0;
+          }
+
+          const maxSpeed = hero.grounded ? RUN_SPEED : AIR_SPEED;
+          desiredVx = clamp(desiredVx, -maxSpeed, maxSpeed);
+          const accel = hero.grounded ? 18 : 8;
+          hero.vx += (desiredVx - hero.vx) * (1 - Math.exp(-accel * dt));
+          hero.vx = clamp(hero.vx, -maxSpeed, maxSpeed);
+          if (Math.abs(hero.vx) > 12) hero.facing = hero.vx > 0 ? 1 : -1;
+
+          const canBufferedJump =
+            jumpBufferedUntil > simTime &&
+            simTime >= hero.jumpCooldownUntil &&
+            (hero.grounded || simTime - hero.lastGroundedAt < 0.09);
+          if (canBufferedJump) {
+            jump(false);
+            jumpBufferedUntil = 0;
+          }
+
+          hero.x += hero.vx * dt;
+          hero.vy += GRAVITY * dt;
+          hero.y += hero.vy * dt;
+          keepHeroInShaft();
+          collidePlatforms();
+        }
+
+        function planAutopilot() {
+          hero.autoVx = 0;
+
+          if (!hero.grounded) {
+            const target = activeAirTarget();
+            targetPlatformId = target ? target.id : null;
+            if (!target) return;
+            const landingX = safeLandingX(target, hero.autoLandingX ?? platformCenter(target));
+            hero.autoLandingX = landingX;
+            hero.autoVx = clamp((landingX - hero.x) * 4.2, -AIR_SPEED, AIR_SPEED);
+            return;
+          }
+
+          const current = platformById(hero.groundId);
+          if (!current) {
+            targetPlatformId = null;
+            hero.autoVx = clamp((worldWidth * 0.5 - hero.x) * 2.8, -RUN_SPEED, RUN_SPEED);
+            return;
+          }
+
+          const route = chooseTargetRoute(current);
+          targetPlatformId = route ? route.target.id : null;
+          if (!route) {
+            hero.autoVx = clamp((platformCenter(current) - hero.x) * 2.8, -RUN_SPEED, RUN_SPEED);
+            return;
+          }
+
+          hero.autoTargetId = route.target.id;
+          hero.autoLaunchX = route.launchX;
+          hero.autoLandingX = route.landingX;
+
+          const launchDx = route.launchX - hero.x;
+          const landingDx = route.landingX - hero.x;
+          const atLaunch = Math.abs(launchDx) < Math.max(10, current.w * 0.07);
+          hero.autoVx = atLaunch
+            ? clamp(landingDx * 3.6, -RUN_SPEED, RUN_SPEED)
+            : clamp(launchDx * 4.8, -RUN_SPEED, RUN_SPEED);
+
+          if (atLaunch && simTime >= hero.jumpCooldownUntil) {
+            jump(false, route);
+          }
+        }
+
+        function activeAirTarget() {
+          const target = platformById(hero.autoTargetId);
+          if (!target) return null;
+          const missedBy = target.y - hero.y;
+          if (missedBy > MAX_TARGET_GAP || hero.y < target.y - 52) return null;
+          return target;
+        }
+
+        function chooseTargetRoute(current, jumpSpeed = JUMP_SPEED) {
+          let best = null;
+          for (const platform of platforms) {
+            if (platform.id === current.id) continue;
+            const route = routeToPlatform(current, platform, jumpSpeed);
+            if (!route) continue;
+            const widthBonus = Math.min(44, platform.w * 0.24);
+            const motionCost = platform.moving ? 28 : 0;
+            route.score = route.gap * 2.4 + route.dx * 0.9 + motionCost - widthBonus + platform.id * 0.0001;
+            if (!best || route.score < best.score) best = route;
+          }
+          return best;
+        }
+
+        function routeToPlatform(current, target, jumpSpeed = JUMP_SPEED) {
+          const gap = target.y - current.y;
+          const maxGap = jumpSpeed > JUMP_SPEED ? MAX_TARGET_GAP + 74 : MAX_TARGET_GAP;
+          if (gap < MIN_TARGET_GAP || gap > maxGap) return null;
+          if (target.w < HERO_W + 54) return null;
+
+          const flightTime = jumpFlightTime(gap, jumpSpeed);
+          if (!flightTime) return null;
+
+          const currentLeft = platformLeft(current);
+          const currentRight = currentLeft + current.w;
+          const targetLeft = platformLeft(target);
+          const targetRight = targetLeft + target.w;
+          const currentMargin = Math.min(LAUNCH_MARGIN, current.w * 0.28);
+          const targetMargin = landingMargin(target);
+          let landingX = platformCenter(target);
+
+          if (targetLeft > currentRight) {
+            landingX = targetLeft + targetMargin;
+          } else if (targetRight < currentLeft) {
+            landingX = targetRight - targetMargin;
+          } else {
+            landingX = clamp(platformCenter(current), targetLeft + targetMargin, targetRight - targetMargin);
+          }
+
+          let launchX = landingX;
+          if (landingX > currentRight - currentMargin) {
+            launchX = currentRight - currentMargin;
+          } else if (landingX < currentLeft + currentMargin) {
+            launchX = currentLeft + currentMargin;
+          } else {
+            launchX = clamp(landingX, currentLeft + currentMargin, currentRight - currentMargin);
+          }
+
+          const dx = Math.abs(landingX - launchX);
+          const maxDx = AIR_SPEED * flightTime * 0.88;
+          if (dx > maxDx) return null;
+
+          return { target, launchX, landingX, gap, dx, flightTime, score: 0 };
+        }
+
+        function jumpFlightTime(gap, speed) {
+          const gravity = -GRAVITY;
+          const disc = speed * speed - 2 * gravity * gap;
+          if (disc <= 0) return 0;
+          return (speed + Math.sqrt(disc)) / gravity;
+        }
+
+        function landingMargin(platform) {
+          return clamp(platform.w * (platform.moving ? 0.32 : 0.24), 20, 38);
+        }
+
+        function safeLandingX(platform, x) {
+          const left = platformLeft(platform) + landingMargin(platform);
+          const right = platformLeft(platform) + platform.w - landingMargin(platform);
+          return clamp(x, left, right);
+        }
+
+        function platformCenter(platform) {
+          return platformLeft(platform) + platform.w * 0.5;
+        }
+
+        function manualDesiredVx() {
+          let desired = 0;
+          if (keys.left) desired -= RUN_SPEED;
+          if (keys.right) desired += RUN_SPEED;
+          if (pointer.active) {
+            const worldX = pointer.x - worldLeft;
+            const dx = worldX - hero.x;
+            if (Math.abs(dx) > 14) desired = clamp(dx * 3.8, -RUN_SPEED, RUN_SPEED);
+          }
+          return desired;
+        }
+
+        function manualActive() {
+          return keys.left || keys.right || keys.jump || pointer.active || simTime < manualUntil;
+        }
+
+        function jump(superJump, route) {
+          hero.vy = superJump ? SPRING_SPEED : JUMP_SPEED;
+          hero.grounded = false;
+          hero.groundId = null;
+          hero.autoTargetId = route ? route.target.id : null;
+          hero.autoLaunchX = route ? route.launchX : null;
+          hero.autoLandingX = route ? route.landingX : null;
+          hero.jumpCooldownUntil = simTime + 0.11;
+          spawnDust(hero.x, hero.y, superJump ? 18 : 11, superJump ? '#39d98a' : COLORS.smoke);
+        }
+
+        function keepHeroInShaft() {
+          const half = HERO_W * 0.5;
+          if (hero.x < half + 4) {
+            hero.x = half + 4;
+            hero.vx = Math.max(0, hero.vx) * 0.24;
+          } else if (hero.x > worldWidth - half - 4) {
+            hero.x = worldWidth - half - 4;
+            hero.vx = Math.min(0, hero.vx) * 0.24;
+          }
+        }
+
+        function collidePlatforms() {
+          const wasGrounded = hero.grounded;
+          const previousGroundId = hero.groundId;
+          hero.grounded = false;
+          let landed = null;
+          if (hero.vy <= 0) {
+            const half = HERO_W * 0.42;
+            for (const platform of platforms) {
+              const left = platformLeft(platform);
+              const right = left + platform.w;
+              if (hero.x + half < left || hero.x - half > right) continue;
+              if (hero.previousY >= platform.y && hero.y <= platform.y + 2) {
+                landed = platform;
+                break;
+              }
+            }
+          }
+
+          if (!landed) return;
+          const isNewLanding = !wasGrounded || previousGroundId !== landed.id;
+          hero.y = landed.y;
+          hero.vy = 0;
+          hero.grounded = true;
+          hero.groundId = landed.id;
+          hero.lastGroundedAt = simTime;
+          if (isNewLanding) {
+            hero.landedAt = simTime;
+            hero.groundedSince = simTime;
+            hero.autoTargetId = null;
+            hero.autoLaunchX = null;
+            hero.autoLandingX = null;
+          }
+          if (!landed.visited) {
+            landed.visited = true;
+            landed.pulseUntil = simTime + 0.24;
+            spawnDust(hero.x, hero.y, 8, COLORS.coin);
+          }
+          if (landed.spring && Math.abs(hero.x - (platformLeft(landed) + landed.w * 0.5)) < landed.w * 0.35) {
+            jump(true, chooseTargetRoute(landed, SPRING_SPEED));
+          }
+        }
+
+        function updateCamera(dt) {
+          const target = hero.y - height * 0.48;
+          highestCameraY = Math.max(highestCameraY, target);
+          cameraY += (highestCameraY - cameraY) * (1 - Math.exp(-2.7 * dt));
+          bestHeight = Math.max(bestHeight, Math.max(0, hero.y - 88));
+          if (bestHeight > lastProgressHeight + 38) {
+            lastProgressHeight = bestHeight;
+            lastProgressAt = simTime;
+          }
+        }
+
+        function rescueIfNeeded() {
+          if (hero.y > cameraY - 210) return;
+          const platform = platforms
+            .filter((p) => p.y > cameraY + height * 0.18 && p.y < cameraY + height * 0.78)
+            .sort((a, b) => a.y - b.y)[0];
+          const landing = platform || platforms[platforms.length - 1];
+          const left = platformLeft(landing);
+          hero.x = left + landing.w * 0.5;
+          hero.y = landing.y + 4;
+          hero.previousY = hero.y;
+          hero.vx = 0;
+          hero.vy = JUMP_SPEED * 0.72;
+          hero.grounded = false;
+          hero.groundId = null;
+          hero.rescuedUntil = simTime + 0.6;
+          rescueCount += 1;
+          lastProgressAt = simTime;
+          spawnDust(hero.x, hero.y, 24, '#ff6b57');
+        }
+
+        function recoverIfStalled() {
+          if (manualActive() || !hero.grounded) return;
+          if (simTime - lastProgressAt < STALL_SECONDS) return;
+          const current = platformById(hero.groundId);
+          if (!current) return;
+          addRecoveryPlatform(current);
+          lastProgressAt = simTime;
+        }
+
+        function updateBarrels(dt) {
+          for (const barrel of barrels) {
+            const platform = platformById(barrel.platformId);
+            if (!platform) {
+              barrel.dead = true;
+              continue;
+            }
+            barrel.offset += barrel.dir * barrel.speed * dt;
+            const min = barrel.radius + 5;
+            const max = platform.w - barrel.radius - 5;
+            if (barrel.offset < min) {
+              barrel.offset = min;
+              barrel.dir = 1;
+            } else if (barrel.offset > max) {
+              barrel.offset = max;
+              barrel.dir = -1;
+            }
+            barrel.roll += (barrel.dir * barrel.speed * dt) / barrel.radius;
+            const bx = platformLeft(platform) + barrel.offset;
+            const by = platform.y + barrel.radius;
+            const dx = hero.x - bx;
+            const dy = hero.y - by;
+            if (Math.abs(dx) < HERO_W * 0.58 + barrel.radius && Math.abs(dy) < HERO_H * 0.45 && simTime > barrel.bumpCooldownUntil) {
+              const push = dx >= 0 ? 1 : -1;
+              hero.vx += push * 190;
+              hero.vy = Math.max(hero.vy, 250);
+              hero.stumbleUntil = simTime + 0.36;
+              hero.blinkUntil = simTime + 0.14;
+              barrel.bumpCooldownUntil = simTime + 0.9;
+              spawnDust(hero.x, hero.y - HERO_H * 0.35, 16, '#ff6b57');
+            }
+          }
+          barrels = barrels.filter((barrel) => !barrel.dead);
+        }
+
+        function updateCoins() {
+          for (const coin of coins) {
+            if (coin.collected) continue;
+            const dx = hero.x - coin.x;
+            const dy = hero.y - coin.y;
+            if (dx * dx + dy * dy < 28 * 28) {
+              coin.collected = true;
+              coinsCollected += 1;
+              spawnDust(coin.x, coin.y, 12, COLORS.coinHot);
+            }
+          }
+        }
+
+        function updateParticles(dt) {
+          for (const particle of particles) {
+            particle.age += dt;
+            particle.x += particle.vx * dt;
+            particle.y += particle.vy * dt;
+            particle.vy += GRAVITY * 0.18 * dt;
+          }
+          particles = particles.filter((particle) => particle.age < particle.life);
+        }
+
+        function extendWorld() {
+          while (highestPlatformY < cameraY + height * 1.75) addPlatform();
+        }
+
+        function trimWorld() {
+          const cutoff = cameraY - 240;
+          platforms = platforms.filter((platform) => platform.y > cutoff || platform.id === hero.groundId);
+          barrels = barrels.filter((barrel) => {
+            const platform = platformById(barrel.platformId);
+            return platform && platform.y > cutoff;
+          });
+          coins = coins.filter((coin) => !coin.collected && coin.y > cutoff);
+        }
+
+        function addPlatform() {
+          const previous = lastPlatform;
+          const gap = rand(height < 620 ? 74 : 82, height < 620 ? 112 : 128);
+          const y = previous.y + gap;
+          const minW = clamp(worldWidth * 0.24, 92, 128);
+          const maxW = clamp(worldWidth * 0.4, 148, 220);
+          const w = rand(minW, maxW) * (rng() < 0.12 ? 1.14 : 1);
+          const maxShift = clamp(gap * 0.92 + (previous.w + w) * 0.26, 112, Math.min(188, worldWidth * 0.36));
+          const previousCenter = platformLeft(previous) + previous.w * 0.5;
+          let center = previousCenter;
+          let foundReachable = false;
+          for (let attempt = 0; attempt < 18; attempt += 1) {
+            const candidateCenter = clamp(previousCenter + rand(-maxShift, maxShift), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+            const candidate = { x: candidateCenter - w * 0.5, y, w, moving: false };
+            center = candidateCenter;
+            if (routeToPlatform(previous, candidate)) {
+              foundReachable = true;
+              break;
+            }
+          }
+          if (!foundReachable) {
+            center = clamp(previousCenter + rand(-72, 72), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+          }
+          const type = rng() < 0.34 ? 'girder' : 'brick';
+          const moving = y > 700 && w > 126 && rng() < 0.1;
+          const platform = makePlatform(center, y, w, type, moving);
+          platform.spring = y > 540 && rng() < 0.13;
+          platforms.push(platform);
+          lastPlatform = platform;
+          highestPlatformY = y;
+
+          if (rng() < 0.72) addCoinsForPlatform(platform, previous);
+          if (y > 420 && rng() < 0.22) addBarrel(platform);
+        }
+
+        function addRecoveryPlatform(current) {
+          const y = current.y + rand(76, 94);
+          const w = clamp(worldWidth * 0.34, 126, 190);
+          const center = clamp(platformCenter(current) + rand(-58, 58), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+          const platform = makePlatform(center, y, w, 'brick', false);
+          platform.pulseUntil = simTime + 0.55;
+          platforms.push(platform);
+          platforms.sort((a, b) => a.y - b.y);
+          if (y > highestPlatformY) {
+            lastPlatform = platform;
+            highestPlatformY = y;
+          }
+          addCoinsForPlatform(platform, current);
+          spawnDust(center, y, 18, COLORS.coin);
+        }
+
+        function makePlatform(center, y, w, type, moving) {
+          const travel = moving ? rand(18, Math.min(42, worldWidth * 0.08)) : 0;
+          return {
+            id: ++platformCount,
+            x: center - w * 0.5,
+            y,
+            w,
+            h: type === 'girder' ? 16 : 18,
+            type,
+            moving,
+            travel,
+            phase: rand(0, TAU),
+            speed: rand(0.55, 0.92),
+            visited: false,
+            pulseUntil: 0,
+            spring: false,
+          };
+        }
+
+        function addCoinsForPlatform(platform, previous) {
+          const count = rng() < 0.22 ? 5 : 3;
+          const start = platformLeft(platform) + platform.w * 0.28;
+          const end = platformLeft(platform) + platform.w * 0.72;
+          const arch = previous ? clamp((platform.y - previous.y) * 0.42, 28, 54) : 34;
+          for (let i = 0; i < count; i += 1) {
+            const t = count === 1 ? 0.5 : i / (count - 1);
+            coins.push({
+              id: ++coinCount,
+              x: lerp(start, end, t),
+              y: platform.y + 36 + Math.sin(t * Math.PI) * arch,
+              phase: rand(0, TAU),
+              collected: false,
+            });
+          }
+        }
+
+        function addBarrel(platform) {
+          barrels.push({
+            id: ++barrelCount,
+            platformId: platform.id,
+            offset: rand(platform.w * 0.22, platform.w * 0.78),
+            dir: rng() < 0.5 ? -1 : 1,
+            speed: rand(42, 74),
+            radius: rand(9, 12),
+            roll: rand(0, TAU),
+            bumpCooldownUntil: 0,
+          });
+        }
+
+        function platformById(id) {
+          if (!id) return null;
+          for (const platform of platforms) {
+            if (platform.id === id) return platform;
+          }
+          return null;
+        }
+
+        function platformLeft(platform) {
+          if (!platform.moving) return platform.x;
+          const drift = Math.sin(simTime * platform.speed + platform.phase) * platform.travel;
+          return clamp(platform.x + drift, 8, worldWidth - platform.w - 8);
+        }
+
+        function spawnDust(x, y, count, color) {
+          if (prefersReducedMotion) return;
+          for (let i = 0; i < count; i += 1) {
+            particles.push({
+              x: x + rand(-12, 12),
+              y: y + rand(-6, 4),
+              vx: rand(-72, 72),
+              vy: rand(40, 150),
+              r: rand(1.6, 4.8),
+              age: 0,
+              life: rand(0.28, 0.62),
+              color,
+            });
+          }
+        }
+
+        function updateHud() {
+          heightReadout.textContent = `${String(Math.floor(bestHeight / 10)).padStart(4, '0')} m`;
+          coinReadout.textContent = String(coinsCollected).padStart(2, '0');
+          if (DEBUG) {
+            debugEl.textContent = [
+              `seed ${seed}`,
+              `height ${Math.floor(bestHeight)}`,
+              `platforms ${platforms.length}`,
+              `barrels ${barrels.length}`,
+              `coins ${coins.length}`,
+              `target ${targetPlatformId || '-'}`,
+              `rescues ${rescueCount}`,
+              `manual ${manualActive() ? 'yes' : 'no'}`,
+            ].join('\n');
+          }
+        }
+
+        function render() {
+          drawBackground();
+          drawBackScaffold();
+          drawCoins();
+          drawPlatforms();
+          drawBarrels();
+          drawParticles();
+          drawHero();
+          drawForegroundMask();
+        }
+
+        function drawBackground() {
+          const gradient = ctx.createLinearGradient(0, 0, 0, height);
+          gradient.addColorStop(0, COLORS.skyTop);
+          gradient.addColorStop(0.56, COLORS.shaft);
+          gradient.addColorStop(1, COLORS.skyBottom);
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, width, height);
+
+          const shaftPad = Math.max(12, Math.min(28, width * 0.035));
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+          ctx.fillRect(worldLeft - shaftPad, 0, worldWidth + shaftPad * 2, height);
+
+          ctx.strokeStyle = COLORS.shaftEdge;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(worldLeft - 2, 0);
+          ctx.lineTo(worldLeft - 2, height);
+          ctx.moveTo(worldLeft + worldWidth + 2, 0);
+          ctx.lineTo(worldLeft + worldWidth + 2, height);
+          ctx.stroke();
+
+          ctx.strokeStyle = COLORS.grid;
+          ctx.lineWidth = 1;
+          const row = 48;
+          const offset = mod(cameraY * 0.24, row);
+          for (let y = -offset; y < height + row; y += row) {
+            ctx.beginPath();
+            ctx.moveTo(worldLeft, Math.round(y) + 0.5);
+            ctx.lineTo(worldLeft + worldWidth, Math.round(y) + 0.5);
+            ctx.stroke();
+          }
+        }
+
+        function drawBackScaffold() {
+          const spacing = 96;
+          const scroll = mod(cameraY * 0.45, spacing);
+          ctx.save();
+          ctx.globalAlpha = 0.42;
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = '#245b58';
+          for (let x = worldLeft + 34; x < worldLeft + worldWidth; x += 86) {
+            ctx.beginPath();
+            ctx.moveTo(x, -20);
+            ctx.lineTo(x, height + 20);
+            ctx.stroke();
+          }
+          ctx.strokeStyle = '#40352a';
+          for (let y = -scroll; y < height + spacing; y += spacing) {
+            ctx.beginPath();
+            ctx.moveTo(worldLeft + 12, y);
+            ctx.lineTo(worldLeft + worldWidth - 12, y + 38);
+            ctx.moveTo(worldLeft + 12, y + 42);
+            ctx.lineTo(worldLeft + worldWidth - 12, y + 4);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        function drawPlatforms() {
+          for (const platform of platforms) {
+            const sy = screenY(platform.y);
+            if (sy < -70 || sy > height + 70) continue;
+            const sx = worldLeft + platformLeft(platform);
+            const pulse = Math.max(0, 1 - (simTime - platform.pulseUntil + 0.24) / 0.24);
+            if (platform.type === 'girder') drawGirderPlatform(platform, sx, sy, pulse);
+            else drawBrickPlatform(platform, sx, sy, pulse);
+            if (platform.spring) drawSpring(sx + platform.w * 0.5, sy - 2);
+            if (platform.id === targetPlatformId && !manualActive()) drawTargetTick(sx + platform.w * 0.5, sy - 24);
+          }
+        }
+
+        function drawBrickPlatform(platform, sx, sy, pulse) {
+          const h = platform.h;
+          ctx.fillStyle = COLORS.shadow;
+          ctx.fillRect(Math.round(sx + 5), Math.round(sy + 7), Math.round(platform.w), 7);
+          ctx.fillStyle = pulse > 0 ? mixColor(COLORS.brick, COLORS.coin, pulse * 0.28) : COLORS.brick;
+          ctx.fillRect(Math.round(sx), Math.round(sy), Math.round(platform.w), h);
+          ctx.fillStyle = COLORS.brickLight;
+          ctx.fillRect(Math.round(sx), Math.round(sy), Math.round(platform.w), 4);
+          ctx.fillStyle = COLORS.brickDark;
+          ctx.fillRect(Math.round(sx), Math.round(sy + h - 4), Math.round(platform.w), 4);
+          ctx.strokeStyle = COLORS.brickDark;
+          ctx.lineWidth = 2;
+          const brickW = 26;
+          for (let x = sx + brickW; x < sx + platform.w - 2; x += brickW) {
+            ctx.beginPath();
+            ctx.moveTo(Math.round(x) + 0.5, Math.round(sy + 4));
+            ctx.lineTo(Math.round(x) + 0.5, Math.round(sy + h));
+            ctx.stroke();
+          }
+        }
+
+        function drawGirderPlatform(platform, sx, sy, pulse) {
+          const h = platform.h;
+          ctx.fillStyle = COLORS.shadow;
+          ctx.fillRect(Math.round(sx + 5), Math.round(sy + 7), Math.round(platform.w), 7);
+          ctx.fillStyle = pulse > 0 ? mixColor(COLORS.girder, COLORS.coin, pulse * 0.22) : COLORS.girder;
+          ctx.fillRect(Math.round(sx), Math.round(sy), Math.round(platform.w), h);
+          ctx.fillStyle = COLORS.girderLight;
+          ctx.fillRect(Math.round(sx), Math.round(sy), Math.round(platform.w), 4);
+          ctx.fillStyle = COLORS.girderDark;
+          ctx.fillRect(Math.round(sx), Math.round(sy + h - 4), Math.round(platform.w), 4);
+          ctx.strokeStyle = COLORS.girderDark;
+          ctx.lineWidth = 3;
+          for (let x = sx + 16; x < sx + platform.w - 12; x += 28) {
+            ctx.beginPath();
+            ctx.moveTo(Math.round(x), Math.round(sy + h - 3));
+            ctx.lineTo(Math.round(x + 18), Math.round(sy + 4));
+            ctx.stroke();
+          }
+          ctx.fillStyle = COLORS.rail;
+          for (let x = sx + 10; x < sx + platform.w - 8; x += 34) {
+            ctx.fillRect(Math.round(x), Math.round(sy + 5), 4, 4);
+          }
+        }
+
+        function drawSpring(cx, sy) {
+          ctx.strokeStyle = COLORS.springDark;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          for (let i = 0; i <= 5; i += 1) {
+            const x = cx + (i % 2 === 0 ? -10 : 10);
+            const y = sy - 4 - i * 4;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          ctx.fillStyle = COLORS.spring;
+          ctx.fillRect(Math.round(cx - 14), Math.round(sy - 3), 28, 5);
+          ctx.fillRect(Math.round(cx - 12), Math.round(sy - 27), 24, 5);
+        }
+
+        function drawTargetTick(cx, sy) {
+          const bob = Math.sin(simTime * 8) * 2;
+          ctx.save();
+          ctx.globalAlpha = 0.82;
+          ctx.fillStyle = COLORS.coin;
+          ctx.beginPath();
+          ctx.moveTo(cx, sy + bob);
+          ctx.lineTo(cx - 8, sy - 10 + bob);
+          ctx.lineTo(cx + 8, sy - 10 + bob);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+
+        function drawCoins() {
+          for (const coin of coins) {
+            const sy = screenY(coin.y);
+            if (sy < -36 || sy > height + 36) continue;
+            const sx = worldLeft + coin.x;
+            const wobble = Math.cos(simTime * 5.2 + coin.phase);
+            const rw = 4 + Math.abs(wobble) * 6;
+            ctx.fillStyle = COLORS.coin;
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, rw, 10, 0, 0, TAU);
+            ctx.fill();
+            ctx.fillStyle = COLORS.coinHot;
+            ctx.fillRect(Math.round(sx - 1), Math.round(sy - 6), 2, 12);
+          }
+        }
+
+        function drawBarrels() {
+          for (const barrel of barrels) {
+            const platform = platformById(barrel.platformId);
+            if (!platform) continue;
+            const bx = worldLeft + platformLeft(platform) + barrel.offset;
+            const by = screenY(platform.y + barrel.radius + 2);
+            if (by < -42 || by > height + 42) continue;
+            ctx.save();
+            ctx.translate(Math.round(bx), Math.round(by));
+            ctx.rotate(barrel.roll);
+            ctx.fillStyle = COLORS.barrelDark;
+            ctx.beginPath();
+            ctx.ellipse(2, 3, barrel.radius + 2, barrel.radius, 0, 0, TAU);
+            ctx.fill();
+            ctx.fillStyle = COLORS.barrel;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, barrel.radius + 1, barrel.radius, 0, 0, TAU);
+            ctx.fill();
+            ctx.strokeStyle = COLORS.barrelBand;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-barrel.radius + 1, -3);
+            ctx.lineTo(barrel.radius - 1, 3);
+            ctx.moveTo(-barrel.radius + 1, 4);
+            ctx.lineTo(barrel.radius - 1, -4);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        function drawParticles() {
+          for (const particle of particles) {
+            const age = particle.age / particle.life;
+            const alpha = 1 - age;
+            const sx = worldLeft + particle.x;
+            const sy = screenY(particle.y);
+            ctx.globalAlpha = alpha * 0.86;
+            ctx.fillStyle = particle.color;
+            ctx.fillRect(Math.round(sx - particle.r * 0.5), Math.round(sy - particle.r * 0.5), Math.ceil(particle.r), Math.ceil(particle.r));
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        function drawHero() {
+          const sx = worldLeft + hero.x;
+          const sy = screenY(hero.y);
+          const blink = hero.blinkUntil > simTime && Math.floor(simTime * 24) % 2 === 0;
+          ctx.save();
+          ctx.translate(Math.round(sx), Math.round(sy));
+          ctx.scale(hero.facing, 1);
+
+          ctx.fillStyle = COLORS.shadow;
+          ctx.beginPath();
+          ctx.ellipse(0, 4, 16, 4, 0, 0, TAU);
+          ctx.fill();
+
+          const jumpPose = hero.grounded ? 0 : clamp(hero.vy / JUMP_SPEED, -0.65, 1);
+          const run = Math.sin(simTime * 16) * (hero.grounded ? clamp(Math.abs(hero.vx) / RUN_SPEED, 0, 1) : 0.25);
+          const red = hero.rescuedUntil > simTime || blink ? '#fff0a8' : COLORS.heroRed;
+
+          ctx.fillStyle = COLORS.boot;
+          ctx.fillRect(-10, -6 + run * 2, 9, 6);
+          ctx.fillRect(2, -6 - run * 2, 10, 6);
+
+          ctx.fillStyle = COLORS.denimDark;
+          ctx.fillRect(-10, -20, 9, 16 + jumpPose * 4);
+          ctx.fillRect(1, -20, 9, 16 - jumpPose * 4);
+          ctx.fillStyle = COLORS.denim;
+          ctx.fillRect(-12, -31, 24, 18);
+          ctx.fillStyle = COLORS.rail;
+          ctx.fillRect(-6, -28, 4, 4);
+          ctx.fillRect(3, -28, 4, 4);
+
+          ctx.fillStyle = red;
+          ctx.fillRect(-14, -40, 28, 14);
+          ctx.fillStyle = COLORS.heroRedDark;
+          ctx.fillRect(-11, -29, 22, 7);
+
+          ctx.fillStyle = COLORS.skin;
+          ctx.fillRect(-10, -52, 21, 15);
+          ctx.fillRect(9, -47, 7, 6);
+          ctx.fillStyle = COLORS.skinDark;
+          ctx.fillRect(1, -43, 12, 4);
+          ctx.fillRect(8, -48, 4, 4);
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(3, -47, 4, 4);
+          ctx.fillRect(4, -41, 13, 3);
+
+          ctx.fillStyle = red;
+          ctx.fillRect(-13, -60, 24, 9);
+          ctx.fillRect(-17, -54, 30, 6);
+          ctx.fillStyle = COLORS.white;
+          ctx.fillRect(-2, -56, 8, 6);
+
+          ctx.fillStyle = COLORS.skin;
+          const armLift = hero.grounded ? 0 : -7;
+          ctx.fillRect(-18, -31 + armLift, 7, 15);
+          ctx.fillRect(12, -31 - armLift * 0.3, 7, 15);
+          ctx.fillStyle = COLORS.white;
+          ctx.fillRect(-19, -17 + armLift, 8, 6);
+          ctx.fillRect(12, -17 - armLift * 0.3, 8, 6);
+          ctx.restore();
+        }
+
+        function drawForegroundMask() {
+          const side = Math.max(0, worldLeft - 3);
+          if (side <= 0) return;
+          const leftGradient = ctx.createLinearGradient(0, 0, side, 0);
+          leftGradient.addColorStop(0, 'rgba(7, 3, 13, 0.92)');
+          leftGradient.addColorStop(1, 'rgba(7, 3, 13, 0.05)');
+          ctx.fillStyle = leftGradient;
+          ctx.fillRect(0, 0, side, height);
+          const rightGradient = ctx.createLinearGradient(width - side, 0, width, 0);
+          rightGradient.addColorStop(0, 'rgba(7, 3, 13, 0.05)');
+          rightGradient.addColorStop(1, 'rgba(7, 3, 13, 0.92)');
+          ctx.fillStyle = rightGradient;
+          ctx.fillRect(width - side, 0, side, height);
+        }
+
+        function screenY(worldY) {
+          return height - (worldY - cameraY);
+        }
+
+        function onKeyDown(event) {
+          if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') {
+            keys.left = true;
+            markManual();
+            event.preventDefault();
+          } else if (event.key === 'ArrowRight' || event.key === 'd' || event.key === 'D') {
+            keys.right = true;
+            markManual();
+            event.preventDefault();
+          } else if (event.key === 'ArrowUp' || event.key === 'w' || event.key === 'W' || event.key === ' ') {
+            keys.jump = true;
+            jumpBufferedUntil = simTime + 0.14;
+            markManual();
+            event.preventDefault();
+          } else if (event.key === 'r' || event.key === 'R') {
+            reset(randomSeed());
+            event.preventDefault();
+          }
+        }
+
+        function onKeyUp(event) {
+          if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') {
+            keys.left = false;
+            event.preventDefault();
+          } else if (event.key === 'ArrowRight' || event.key === 'd' || event.key === 'D') {
+            keys.right = false;
+            event.preventDefault();
+          } else if (event.key === 'ArrowUp' || event.key === 'w' || event.key === 'W' || event.key === ' ') {
+            keys.jump = false;
+            event.preventDefault();
+          }
+        }
+
+        function onPointerDown(event) {
+          canvas.focus({ preventScroll: true });
+          pointer.active = true;
+          pointer.x = event.clientX;
+          pointer.startX = event.clientX;
+          pointer.startY = event.clientY;
+          pointer.downAt = performance.now();
+          pointer.moved = false;
+          markManual();
+          canvas.setPointerCapture(event.pointerId);
+          event.preventDefault();
+        }
+
+        function onPointerMove(event) {
+          if (!pointer.active) return;
+          pointer.x = event.clientX;
+          if (Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) > 8) pointer.moved = true;
+          markManual();
+          event.preventDefault();
+        }
+
+        function onPointerUp(event) {
+          if (!pointer.active) return;
+          const elapsed = performance.now() - pointer.downAt;
+          const wasTap = elapsed < 180 && !pointer.moved;
+          pointer.active = false;
+          if (wasTap) reset(randomSeed());
+          else manualUntil = simTime + 1.2;
+          event.preventDefault();
+        }
+
+        function markManual() {
+          manualUntil = simTime + 3.2;
+        }
+
+        function clamp(value, min, max) {
+          return value < min ? min : value > max ? max : value;
+        }
+
+        function lerp(a, b, t) {
+          return a + (b - a) * t;
+        }
+
+        function rand(min, max) {
+          return min + rng() * (max - min);
+        }
+
+        function mod(value, amount) {
+          return ((value % amount) + amount) % amount;
+        }
+
+        function mixColor(a, b, t) {
+          const ca = hexToRgb(a);
+          const cb = hexToRgb(b);
+          const r = Math.round(lerp(ca.r, cb.r, t));
+          const g = Math.round(lerp(ca.g, cb.g, t));
+          const bl = Math.round(lerp(ca.b, cb.b, t));
+          return `rgb(${r}, ${g}, ${bl})`;
+        }
+
+        function hexToRgb(value) {
+          const hex = value.replace('#', '');
+          return {
+            r: Number.parseInt(hex.slice(0, 2), 16),
+            g: Number.parseInt(hex.slice(2, 4), 16),
+            b: Number.parseInt(hex.slice(4, 6), 16),
+          };
+        }
+      })();
+    </script>
+  </body>
+</html>
