@@ -3,5 +3,5 @@
   "year": 2026,
   "type": "interactive",
   "thumbnail": "thumbnail.svg",
-  "description": "A vertical platformer that never ends. A small red-capped hero named Mario keeps climbing an endless arcade shaft of brick ledges, riveted girders, springs, coins, and rolling barrels. The piece plays itself by default, aiming for the next reachable platform and jumping forever upward, while keyboard or touch input can briefly take over before the climb resumes."
+  "description": "A one-bit vertical platformer inside an endless masonry keep. Mario climbs stone ledges through arched rooms and black stippled chambers, hits question mark boxes from below, uses iron ladders and stairs, and sometimes drops down a ladder or fireman's pole to revisit what he missed."
 }

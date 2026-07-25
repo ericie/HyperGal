@@ -1,51 +1,32 @@
 # Only Ghosts
 
-A Pac-Man riff where the protagonist exists only while the sightlines allow it.
+A Pac-Man riff where Pac survives a threat by becoming it.
 
-The current sketch is intentionally small: one oversized Pac and one oversized
-ghost on a single outer hallway wrapped around a solid inner box. The power
-pellets sit on the outside corners, so the whole piece reads as a slow patrol,
-a panic, and a possible reversal.
+The sketch is intentionally small: one oversized Pac and one oversized Ghost
+on a single outer hallway wrapped around a solid inner box.
 
-## Pac
+## The rule
 
-Pac searches for power pellets. If no power pellets remain, it keeps eating the
-ordinary pellets along the hallway.
+You respond to a threat by becoming the threat.
 
-A powered Pac is invincible for a short burst and seeks ghosts directly. When
-it touches a ghost during that burst, the ghost becomes eyes and returns home.
+Pac sees only forward down a straight corridor. When Pac sees Ghost, Pac turns
+and runs. After a brief retreat, Pac folds into a Ghost without stopping. The
+pursuing Ghost never changes.
 
-A non-powered Pac only sees forward down straight corridor lines. It does not
-see behind itself, around corners, or through walls. If it sees a ghost, it
-runs away. After it believes it has gotten away, it stops, turns back along its
-own path, and checks behind it. If no ghost is there, it becomes a ghost and
-floats back toward the hallway home point. Once that former Pac has a little
-time and enough privacy or distance, it turns yellow again and resumes
-searching for power.
+Contact is the fallback for an encounter that happens around a corner or from
+behind. It causes Pac to change immediately. Nobody dies, becomes eyes, returns
+home, or changes back. The encounter leaves only ghosts.
 
-## Ghost
+## Motion
 
-The ghost wanders by trying to discover the whole map. It keeps a small
-internal record of the cells it has already visited and chooses unexplored
-cells as its next destination.
+The response is one readable sequence: a sightline, a clean retreat, then a
+yellow Pac silhouette closes and compresses while the colored Ghost body rises
+through it and its eyes appear last. Only the threatened figure moves
+differently or changes form.
 
-When a ghost sees Pac, it resets that internal map, speeds up slightly, and
-drifts toward Pac. The ghost keeps seeking that Pac even after line of sight
-breaks. The hunt ends when the ghost kills Pac, the Pac becomes powered, or the
-hunter sees another ghost.
-
-Ghosts pass harmlessly through each other, but the sight of another ghost
-breaks a hunt and steers the ghost away from the other ghost instead of letting
-them trail each other.
-
-## Death
-
-Ghosts kill ordinary Pacs on contact. A dead Pac becomes only eyes, floats
-back to the hallway home point, and is reborn as a ghost waiting for privacy.
-When it gets clear enough, it becomes Pac again.
-
-Powered Pacs reverse the collision: they eat ghosts, which become eyes and
-return to the hallway home point.
+Before the encounter, Pac searches for pellets while Ghost explores and hunts.
+Afterward, the two Ghosts explore the course independently with a slow drift,
+long buoyant bob, and slight body sway.
 
 ## Maze
 
@@ -57,7 +38,7 @@ or tall, so the characters become the main graphic event.
 
 - `?seed=<base36>` - reproduce a specific run.
 - `?warm=<seconds>` - open it already in motion.
-- `?debug` - show identity, behavior mode, death, hunt, and pellet counters.
+- `?debug` - show identity, behavior mode, transformations, and pellet counters.
 
 Click, press Space, or press `r` to reseed. Open `index.html` directly in any
 browser.

@@ -5,14 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>unbreakable · HyperGal</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #0b0c10; overflow: hidden; }
+      html, body { margin: 0; height: 100%; background: #07100d; overflow: hidden; }
       #stage { position: fixed; inset: 0; display: block; }
       .caption {
         position: fixed;
         bottom: 1rem;
         left: 1rem;
-        color: #fff;
-        mix-blend-mode: difference;
+        color: #e8eee8;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: .8rem;
         letter-spacing: .05em;
@@ -22,72 +21,96 @@
     </style>
   </head>
   <body>
-    <canvas id="stage"></canvas>
-    <div class="caption">unbreakable · 2026 · reverse breakout · click to reshuffle</div>
+    <canvas
+      id="stage"
+      role="img"
+      aria-label="Unbreakable: a reverse Breakout machine whose infallible paddle builds Hokusai-colored towers while the ball fills brick corridors. If trapped in the upper wall, it blinks as a bomb, blasts an escape hole, and falls back to the paddle."
+    ></canvas>
+    <div class="caption">unbreakable · 2026 · reverse breakout · click to rebuild</div>
     <script>
       // unbreakable — a Breakout run in reverse.
       //
       // There is no player and no losing. A single paddle patrols the floor,
       // shadowing the ball and physically incapable of missing. The ball flies
       // UP and, where a normal game would chip a brick away, this one lays a
-      // brick down: every impact with the underside of the wall deposits a
-      // block in that column. The wall therefore grows DOWNWARD, toward the
-      // paddle — so the whole world is scrolled upward to keep it off the floor.
-      // The wall is never finished and never breached. Unbreakable.
+      // brick down. An underside hit grows a tower and sends the ball back to
+      // the paddle. A side hit fills one cell of the corridor, reverses the
+      // horizontal motion, and lets the ball keep climbing. The wall therefore
+      // grows DOWNWARD and INWARD, so the whole world is scrolled upward one
+      // small step per real brick impact. It is never finished or breached.
       //
-      // The only real subtlety is keeping the wall solid and roughly level while
-      // a single ball feeds it. Two simple rules do that and need no feedback
-      // controller. The build-front of every column is hard-clamped to a band
-      // well above the paddle, so a column can neither run away downward (it
-      // stops depositing at the band's floor) nor empty out (it keeps depositing
-      // at the band's ceiling) — and the wall can never reach the paddle. On top
-      // of that, the ball steers its small sideways lean toward whichever nearby
-      // column has been starved longest, so the ragged front self-levels. A
-      // steady upward scroll — slow enough that one ball keeps pace — carries
-      // finished bricks off the top, holding the front in a hovering band forever.
+      // The wall lives on one shared integer lattice. Bricks retain a column and
+      // row rather than an independently drifting screen position, while one
+      // global offset scrolls every row together. The paddle favors narrow,
+      // persistent towers, producing corridors where the ball can ricochet
+      // upward while filling empty cells instead of knocking bricks out.
+      // If repeated impacts prove it is trapped in one shallow upper pocket,
+      // the ball blinks three times, clears an elliptical hole, and drops
+      // harmlessly through the wall before the paddle turns it back into a ball.
 
       const canvas = document.getElementById('stage');
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { alpha: false });
 
       // ---- tunables -------------------------------------------------------
       const COL_W_IDEAL = 52;     // px — target column / brick width (snapped to fit)
       const BRICK_H = 24;         // px — brick height (one deposit)
       const BALL_R = 7;           // px — ball radius
       const SPEED = 600;          // px/s — constant ball speed magnitude
-      const MAX_VX_FRAC = 0.62;   // cap horizontal share of velocity (keeps balls vertical-ish)
+      const MAX_VX_FRAC = 0.72;   // enough lateral energy for ricocheting tower corridors
       const PADDLE_H = 12;        // px — paddle thickness
       const PADDLE_PAD = 14;      // px — paddle overhang beyond a column on each side
       const FLOOR_MARGIN = 46;    // px — gap from bottom edge to paddle line
-      const SETPOINT_FRAC = 0.30; // build-front hovers this far down from the top
-      const BAND_UP = 2;          // band reaches this many bricks above the setpoint
-      const BAND_DOWN = 4;        // ...and this many below — the live build zone
-      const SCROLL_PX = 2;        // px/s — steady upward creep of the whole wall
+      const SETPOINT_FRAC = 0.42; // begin with a substantial wall and a shorter return cycle
+      const REPAIR_MARGIN_ROWS = 2; // repair columns that thin above this point
+      const SCROLL_FOLLOW = 4.5;  // how quickly the shared lattice eases after an impact
+      const SCROLL_MAX_SPEED = 120; // px/s — prevents the moving lattice tunneling through the ball
       const BALL_COUNT = 1;       // a single paddle, shadowing a single ball
+      const COLLISION_EPS = 0.05; // px — keeps a resolved ball outside the brick it hit
+      const STUCK_WINDOW_MS = 3200; // a sustained, tight collision pocket arms the bomb
+      const STUCK_MIN_SPAN_MS = 2200;
+      const STUCK_IMPACTS = 10;
+      const STUCK_VERTICAL_RANGE = BRICK_H * 2.5;
+      const BOMB_ARM_MS = 1500;   // six half-beats: blink, blink, blink
+      const BOMB_FALL_SPEED = 480;
+      const BLAST_COL_RADIUS = 3.6;
+      const BLAST_ROW_RADIUS = 4.8;
 
-      // Curated brick colors — saturated but not neon, reads on near-black.
-      const PALETTES = [
-        ['#ef476f', '#ffd166', '#06d6a0', '#118ab2', '#f78c6b', '#c792ea'],
-        ['#ff6b6b', '#ffd93d', '#6bcB77', '#4d96ff', '#ff9f45', '#b983ff'],
-        ['#e63946', '#f4a261', '#e9c46a', '#2a9d8f', '#457b9d', '#a8dadc'],
-        ['#f72585', '#b5179e', '#7209b7', '#4361ee', '#4cc9f0', '#52b788'],
-        ['#ffadad', '#ffd6a5', '#fdffb6', '#caffbf', '#9bf6ff', '#bdb2ff'],
-      ];
+      // Growth Rings' Hokusai palette, held against a deep green-black so the
+      // wheat, Prussian blue, Tyrian purple, and burlywood read as one system.
+      const PALETTE = ['#ffd77b', '#ffffb3', '#004b87', '#a8002c', '#deb887'];
+      const SCENE = {
+        background: '#07100d',
+        paper: '#e8eee8',
+      };
 
       let W = 0, H = 0, dpr = 1;
       let numCols = 0, colW = 0;
       let paddleY = 0, setpointY = 0;
-      let frontMin = 0, frontMax = 0; // band the build-front is confined to
+      let repairLineY = 0;
 
-      let palette = PALETTES[0];
-      let front = [];     // front[c] = screen-y of the wall's lowest brick bottom in column c
-      let bricks = [];    // {c, y, color} — y is the brick's top edge in screen space
+      let gridY = 0;       // screen-y of lattice row 0; shared by every column
+      let gridTargetY = 0; // brick impacts advance this upward by one mean step
+      let front = [];      // front[c] = integer row below the deepest brick in column c
+      let bricks = [];     // {c, row, color} — row never leaves the shared lattice
+      let brickMap = new Map();
+      let pendingDeposits = [];
       let balls = [];     // {x, y, vx, vy, color, trail:[...], paddle:{x,w}}
+      let focus = null;    // temporary { mode, from, to, center, remaining }
+      let focusCooldown = 0;
+      let depositColorBag = [];
+      let impactStats = { underside: 0, side: 0, top: 0, bombs: 0 };
+      let explosions = [];
+      let debris = [];
       let raf = 0;
 
       const rand = (a, b) => a + Math.random() * (b - a);
       const pick = (arr) => arr[(Math.random() * arr.length) | 0];
       const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+      const randInt = (lo, hi) => Math.floor(rand(lo, hi + 1));
       const colOf = (x) => clamp((x / colW) | 0, 0, numCols - 1);
+      const frontY = (c) => gridY + front[c] * BRICK_H;
+      const brickY = (brick) => gridY + brick.row * BRICK_H;
+      const snapPx = (value) => Math.round(value * dpr) / dpr;
 
       // Reflect a coordinate into [lo, hi] as if bouncing off both walls — used
       // to predict where a constant-velocity ball will cross the paddle line.
@@ -122,35 +145,46 @@
         colW = W / numCols;
         paddleY = H - FLOOR_MARGIN;
         setpointY = H * SETPOINT_FRAC;
-        // Keep the build-front in a band well above the paddles. This is the
-        // safety rail that makes the wall genuinely unbreakable: a column can
-        // never grow down far enough to trap a ball against the floor.
-        frontMin = setpointY - BAND_UP * BRICK_H;
-        frontMax = Math.min(setpointY + BAND_DOWN * BRICK_H, paddleY - BRICK_H * 4);
-        palette = pick(PALETTES);
+        // Thin columns get repair priority, but deep towers have no imposed cap.
+        repairLineY = setpointY - REPAIR_MARGIN_ROWS * BRICK_H;
+        gridY = Math.round(setpointY / BRICK_H) * BRICK_H;
+        gridTargetY = gridY;
 
         // Seed a solid wall from the build-front up past the top edge, so the
         // opening frame already reads as a finished wall rather than empty sky.
-        front = new Array(numCols);
+        // Every column may begin on a different row, but every brick shares the
+        // exact same vertical phase.
+        front = new Array(numCols).fill(-Infinity);
         bricks = [];
+        brickMap = new Map();
+        pendingDeposits = [];
         for (let c = 0; c < numCols; c++) {
-          const f = setpointY + rand(-BRICK_H, BRICK_H);
-          front[c] = f;
-          for (let y = f - BRICK_H; y > -BRICK_H * 2; y -= BRICK_H) {
-            bricks.push({ c, y, color: pick(palette) });
+          const bottomRow = pick([-1, 0, 0, 0, 1]);
+          for (let row = bottomRow - 1; gridY + row * BRICK_H > -BRICK_H * 2; row--) {
+            addBrick(c, row, nextColor());
           }
         }
 
+        focus = null;
+        focusCooldown = randInt(2, 4);
+        depositColorBag = [];
+        impactStats = { underside: 0, side: 0, top: 0, bombs: 0 };
+        explosions = [];
+        debris = [];
         const n = BALL_COUNT;
         balls = [];
+        const resetAt = performance.now();
         for (let i = 0; i < n; i++) {
-          const color = pick(palette);
+          const color = nextDepositColor();
           const x = rand(colW, W - colW);
           const { vx, vy } = launchVelocity();
           balls.push({
             x,
             y: rand(setpointY + BRICK_H * 3, paddleY - BRICK_H),
             vx, vy, color,
+            mode: 'ball',
+            impactHistory: [],
+            lastImpactAt: resetAt,
             trail: [],
             paddle: { x, w: colW + PADDLE_PAD * 2 },
           });
@@ -160,24 +194,499 @@
         raf = requestAnimationFrame(tick);
       }
 
-      // Steer a ball toward the column whose front has drifted highest (the most
-      // starved), so deposits self-level into a flat, solid front. A little
-      // noise keeps the whole swarm from stampeding the same gap.
-      function levelingNudge(ball) {
-        let hungriest = 0, best = Infinity;
-        const here = colOf(ball.x);
-        for (let d = -6; d <= 6; d++) {
-          const c = here + d;
-          if (c < 0 || c >= numCols) continue;
-          if (front[c] < best) { best = front[c]; hungriest = c; }
+      function nextColor(previous = '') {
+        const options = PALETTE.filter((color) => color !== previous);
+        return pick(options.length ? options : PALETTE);
+      }
+
+      function shuffle(colors) {
+        const result = colors.slice();
+        for (let i = result.length - 1; i > 0; i--) {
+          const j = randInt(0, i);
+          [result[i], result[j]] = [result[j], result[i]];
         }
-        const targetX = (hungriest + 0.5) * colW;
-        const dir = Math.sign(targetX - ball.x) || (Math.random() < 0.5 ? -1 : 1);
-        let vx = ball.vx * 0.55 + dir * SPEED * 0.32 + rand(-0.12, 0.12) * SPEED;
+        return result;
+      }
+
+      function nextDepositColor() {
+        if (!depositColorBag.length) {
+          const saturated = shuffle(['#004b87', '#a8002c']);
+          const warm = shuffle(['#ffd77b', '#ffffb3', '#deb887']);
+          // Every five deposits contains the entire palette, with the blue and
+          // purple spaced through the warmer Hokusai tones.
+          depositColorBag = [saturated[0], warm[0], saturated[1], warm[1], warm[2]];
+        }
+        return depositColorBag.shift();
+      }
+
+      const brickKey = (c, row) => `${c}:${row}`;
+
+      function hasBrick(c, row) {
+        return brickMap.has(brickKey(c, row));
+      }
+
+      function addBrick(c, row, color) {
+        if (c < 0 || c >= numCols || hasBrick(c, row)) return false;
+        const brick = { c, row, color };
+        bricks.push(brick);
+        brickMap.set(brickKey(c, row), brick);
+        front[c] = Math.max(front[c], row + 1);
+        return true;
+      }
+
+      function removeBrick(index) {
+        const brick = bricks[index];
+        brickMap.delete(brickKey(brick.c, brick.row));
+        bricks.splice(index, 1);
+        return brick;
+      }
+
+      function recomputeFront(c) {
+        let deepest = -Infinity;
+        for (const brick of bricks) {
+          if (brick.c === c) deepest = Math.max(deepest, brick.row + 1);
+        }
+        front[c] = deepest;
+      }
+
+      function canPlaceLiveBrick(c, row) {
+        return c >= 0 && c < numCols && !hasBrick(c, row);
+      }
+
+      function recordImpact(c) {
+        gridTargetY -= BRICK_H / numCols;
+        noteDeposit(c);
+      }
+
+      function maintainBrickCeiling() {
+        // Keep one complete, occupied row straddling the top edge. As impact-
+        // driven creep advances the lattice, this replaces the old row with
+        // real bricks—never an invisible collision plane.
+        const ceilingRow = Math.floor(-gridY / BRICK_H);
+        for (let c = 0; c < numCols; c++) {
+          if (!hasBrick(c, ceilingRow)) addBrick(c, ceilingRow, nextColor());
+        }
+      }
+
+      function circleTouchesCell(ball, c, row) {
+        const left = c * colW;
+        const right = (c + 1) * colW;
+        const top = gridY + row * BRICK_H;
+        const bottom = top + BRICK_H;
+        const nearX = clamp(ball.x, left, right);
+        const nearY = clamp(ball.y, top, bottom);
+        const dx = ball.x - nearX;
+        const dy = ball.y - nearY;
+        return dx * dx + dy * dy <= (BALL_R + COLLISION_EPS) ** 2;
+      }
+
+      function queueDeposit(ball, c, row) {
+        if (!canPlaceLiveBrick(c, row)) return false;
+        const key = brickKey(c, row);
+        if (pendingDeposits.some((deposit) => deposit.key === key)) return false;
+        pendingDeposits.push({ c, row, color: ball.color, key });
+        ball.color = nextDepositColor();
+        return true;
+      }
+
+      function blastDistance(x, y, centerX, centerY) {
+        const dx = (x - centerX) / (colW * BLAST_COL_RADIUS);
+        const dy = (y - centerY) / (BRICK_H * BLAST_ROW_RADIUS);
+        return dx * dx + dy * dy;
+      }
+
+      function armBomb(ball) {
+        if (ball.mode !== 'ball') return;
+        ball.mode = 'arming';
+        ball.bombStarted = lastT;
+        ball.vx = 0;
+        ball.vy = 0;
+        ball.flash = 1;
+        ball.trail.length = 0;
+      }
+
+      function noteBallImpact(ball) {
+        if (ball.mode !== 'ball') return;
+        const now = lastT;
+        // One geometric contact can be reinforced by the ceiling containment
+        // pass in the same frame; it still counts as one impact.
+        if (ball.impactHistory.length && now - ball.lastImpactAt < 20) return;
+        ball.lastImpactAt = now;
+        ball.impactHistory.push({ t: now, y: ball.y });
+        while (ball.impactHistory.length && now - ball.impactHistory[0].t > STUCK_WINDOW_MS) {
+          ball.impactHistory.shift();
+        }
+        if (ball.impactHistory.length < STUCK_IMPACTS) return;
+
+        const first = ball.impactHistory[0];
+        if (now - first.t < STUCK_MIN_SPAN_MS) return;
+        let low = Infinity;
+        let high = -Infinity;
+        for (const hit of ball.impactHistory) {
+          low = Math.min(low, hit.y);
+          high = Math.max(high, hit.y);
+        }
+
+        // A healthy corridor run makes clear vertical progress. Only a ball
+        // ricocheting in a shallow pocket high above the paddle becomes a bomb.
+        const highInWall = ball.y < paddleY - BRICK_H * 5;
+        if (highInWall && high - low <= STUCK_VERTICAL_RANGE) armBomb(ball);
+      }
+
+      function spawnBlastDebris(brick, centerX, centerY) {
+        const x = (brick.c + 0.5) * colW;
+        const y = brickY(brick) + BRICK_H / 2;
+        const angle = Math.atan2(y - centerY, x - centerX) + rand(-0.35, 0.35);
+        const speed = rand(90, 300);
+        debris.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - rand(30, 150),
+          age: 0,
+          life: rand(0.55, 1.05),
+          size: rand(3, 8),
+          color: brick.color,
+          spin: rand(-8, 8),
+          rotation: rand(0, Math.PI * 2),
+        });
+      }
+
+      function detonateBomb(ball) {
+        if (ball.mode !== 'arming') return;
+        const centerX = ball.x;
+        const centerY = ball.y;
+        const affectedColumns = new Set();
+
+        for (let i = bricks.length - 1; i >= 0; i--) {
+          const brick = bricks[i];
+          const x = (brick.c + 0.5) * colW;
+          const y = brickY(brick) + BRICK_H / 2;
+          if (blastDistance(x, y, centerX, centerY) > 1) continue;
+          const removed = removeBrick(i);
+          affectedColumns.add(removed.c);
+          spawnBlastDebris(removed, centerX, centerY);
+        }
+
+        pendingDeposits = pendingDeposits.filter((deposit) => {
+          const x = (deposit.c + 0.5) * colW;
+          const y = gridY + (deposit.row + 0.5) * BRICK_H;
+          return blastDistance(x, y, centerX, centerY) > 1;
+        });
+        for (const c of affectedColumns) recomputeFront(c);
+
+        explosions.push({ x: centerX, y: centerY, age: 0, color: ball.color });
+        impactStats.bombs++;
+        ball.mode = 'fallingBomb';
+        ball.vx = 0;
+        ball.vy = BOMB_FALL_SPEED;
+        ball.impactHistory.length = 0;
+        ball.trail.length = 0;
+        // Re-establish the real top row immediately if the blast reached it.
+        maintainBrickCeiling();
+      }
+
+      function restoreBall(ball) {
+        ball.mode = 'ball';
+        ball.color = nextDepositColor();
+        ball.impactHistory.length = 0;
+        ball.lastImpactAt = lastT;
+        ball.flash = 1;
+        aimAtColumn(ball, chooseTargetColumn());
+      }
+
+      function commitPendingDeposits() {
+        for (let i = pendingDeposits.length - 1; i >= 0; i--) {
+          const deposit = pendingDeposits[i];
+          if (balls.some((ball) => circleTouchesCell(ball, deposit.c, deposit.row))) continue;
+          if (canPlaceLiveBrick(deposit.c, deposit.row)) addBrick(deposit.c, deposit.row, deposit.color);
+          pendingDeposits.splice(i, 1);
+        }
+      }
+
+      function columnsBetween(from, to) {
+        const columns = [];
+        for (let c = Math.max(0, from); c <= Math.min(numCols - 1, to); c++) {
+          columns.push(c);
+        }
+        return columns;
+      }
+
+      function pickByFront(columns, deepest = false) {
+        let best = columns[0];
+        for (const c of columns) {
+          const delta = frontY(c) - frontY(best);
+          if ((deepest && delta > 0.01) || (!deepest && delta < -0.01)) best = c;
+          else if (Math.abs(delta) <= 0.01 && Math.random() < 0.35) best = c;
+        }
+        return best;
+      }
+
+      function startFocus() {
+        const buildBank = numCols >= 6 && Math.random() < 0.28;
+        if (buildBank) {
+          const width = clamp(Math.round(numCols * rand(0.24, 0.36)), 3, numCols - 2);
+          const onLeft = Math.random() < 0.5;
+          const from = onLeft ? 0 : numCols - width;
+          focus = {
+            mode: onLeft ? 'left bank' : 'right bank',
+            from,
+            to: from + width - 1,
+            center: from + (width - 1) / 2,
+            remaining: randInt(width + 2, width * 2 + 2),
+          };
+        } else {
+          const center = randInt(1, Math.max(1, numCols - 2));
+          const width = Math.random() < 0.88 ? 1 : 2;
+          focus = {
+            mode: 'tower',
+            from: clamp(center - (width === 2 ? 1 : 0), 0, numCols - 1),
+            to: clamp(center, 0, numCols - 1),
+            center,
+            remaining: randInt(10, 16),
+          };
+        }
+      }
+
+      function finishFocus() {
+        focus = null;
+        focusCooldown = randInt(4, 8);
+      }
+
+      function noteDeposit(c) {
+        if (focus) {
+          if (c >= focus.from && c <= focus.to) focus.remaining--;
+          if (focus.remaining <= 0 || columnsBetween(focus.from, focus.to).length === 0) finishFocus();
+          return;
+        }
+        focusCooldown--;
+        if (focusCooldown <= 0) startFocus();
+      }
+
+      function chooseTargetColumn() {
+        // A column that thins above the repair line takes precedence over a flourish.
+        const emergency = columnsBetween(0, numCols - 1).filter((c) => frontY(c) < repairLineY);
+        if (emergency.length) return pickByFront(emergency);
+
+        if (focus) {
+          const focused = columnsBetween(focus.from, focus.to);
+          if (focused.length) {
+            // A bank fills evenly; a tower keeps feeding its deepest column.
+            return pickByFront(focused, focus.mode === 'tower');
+          }
+          finishFocus();
+        }
+
+        const growable = columnsBetween(0, numCols - 1);
+        return growable.length ? pickByFront(growable) : randInt(0, numCols - 1);
+      }
+
+      // Aim through the mirrored side walls. Unfolding the court turns every
+      // reflected path into a straight line, so the paddle can send the ball to
+      // the center of a chosen brick column without accumulating alignment error.
+      function aimAtColumn(ball, targetCol) {
+        const minX = BALL_R;
+        const maxX = W - BALL_R;
+        const span = maxX - minX;
+        const desiredX = clamp((targetCol + 0.5) * colW + rand(-colW * 0.28, colW * 0.28), minX, maxX);
+        const targetLocal = desiredX - minX;
+        const startLocal = ball.x - minX;
+        const vertical = Math.max(BRICK_H, (paddleY - BALL_R) - (frontY(targetCol) + BALL_R));
         const maxVx = MAX_VX_FRAC * SPEED;
-        vx = clamp(vx, -maxVx, maxVx);
-        ball.vx = vx;
-        ball.vy = Math.sqrt(SPEED * SPEED - vx * vx); // heading down, out of the paddle
+        let best = null;
+
+        for (let k = -2; k <= 2; k++) {
+          const period = 2 * k * span;
+          for (const unfoldedX of [period + targetLocal, period - targetLocal]) {
+            const dx = unfoldedX - startLocal;
+            const vx = (dx * SPEED) / Math.hypot(vertical, dx);
+            if (Math.abs(vx) > maxVx + 0.001) continue;
+            const cost = Math.abs(dx);
+            if (!best || cost < best.cost) best = { vx, cost };
+          }
+        }
+
+        ball.vx = best ? best.vx : Math.sign(desiredX - ball.x || 1) * maxVx;
+        ball.vy = -Math.sqrt(SPEED * SPEED - ball.vx * ball.vx);
+        ball.paddle.targetCol = targetCol;
+        ball.paddle.targetX = (targetCol + 0.5) * colW;
+      }
+
+      function sweepAxis(position, delta, min, max) {
+        if (Math.abs(delta) < 1e-9) {
+          return position >= min && position <= max ? [-Infinity, Infinity] : null;
+        }
+        const a = (min - position) / delta;
+        const b = (max - position) / delta;
+        return a < b ? [a, b] : [b, a];
+      }
+
+      // Find the first occupied cell crossed by the ball. Expanding each brick
+      // by the ball radius turns the swept-circle test into a swept point test.
+      function findBrickImpact(ball, previousX, previousY) {
+        const dx = ball.x - previousX;
+        const dy = ball.y - previousY;
+        const travelLeft = Math.min(previousX, ball.x) - BALL_R;
+        const travelRight = Math.max(previousX, ball.x) + BALL_R;
+        const travelTop = Math.min(previousY, ball.y) - BALL_R;
+        const travelBottom = Math.max(previousY, ball.y) + BALL_R;
+        const firstCol = clamp(Math.floor(travelLeft / colW) - 1, 0, numCols - 1);
+        const lastCol = clamp(Math.floor(travelRight / colW) + 1, 0, numCols - 1);
+        const firstRow = Math.floor((travelTop - gridY) / BRICK_H) - 1;
+        const lastRow = Math.floor((travelBottom - gridY) / BRICK_H) + 1;
+        let best = null;
+
+        for (let c = firstCol; c <= lastCol; c++) {
+          for (let row = firstRow; row <= lastRow; row++) {
+            const brick = brickMap.get(brickKey(c, row));
+            if (!brick) continue;
+
+            const cellLeft = c * colW;
+            const cellRight = (c + 1) * colW;
+            const cellTop = gridY + row * BRICK_H;
+            const cellBottom = cellTop + BRICK_H;
+            const left = cellLeft - BALL_R;
+            const right = cellRight + BALL_R;
+            const top = cellTop - BALL_R;
+            const bottom = cellBottom + BALL_R;
+            const xTimes = sweepAxis(previousX, dx, left, right);
+            const yTimes = sweepAxis(previousY, dy, top, bottom);
+            if (!xTimes || !yTimes) continue;
+
+            const enter = Math.max(xTimes[0], yTimes[0]);
+            const exit = Math.min(xTimes[1], yTimes[1]);
+            if (enter > 1.0001 || exit < -0.0001 || enter > exit + 0.0001) continue;
+
+            let normalX = 0;
+            let normalY = 0;
+            let impactTime = clamp(enter, 0, 1);
+            if (enter < 0) {
+              // A newly grown brick can place the ball tangent to a deeper
+              // neighbor. Resolve that overlap on the next frame rather than
+              // allowing the ball to tunnel sideways from inside the expanded
+              // collision box.
+              const exits = [];
+              if (previousX <= cellLeft) exits.push({ distance: previousX - left, normalX: -1, normalY: 0 });
+              if (previousX >= cellRight) exits.push({ distance: right - previousX, normalX: 1, normalY: 0 });
+              if (previousY <= cellTop) exits.push({ distance: previousY - top, normalX: 0, normalY: -1 });
+              if (previousY >= cellBottom) exits.push({ distance: bottom - previousY, normalX: 0, normalY: 1 });
+              if (exits.length) {
+                exits.sort((a, b) => a.distance - b.distance);
+                ({ normalX, normalY } = exits[0]);
+              } else if (Math.abs(dx) > Math.abs(dy)) {
+                normalX = dx > 0 ? -1 : 1;
+              } else {
+                normalY = dy > 0 ? -1 : 1;
+              }
+              impactTime = 0;
+            } else if (xTimes[0] > yTimes[0] + 0.0001) {
+              normalX = dx > 0 ? -1 : 1;
+            } else {
+              normalY = dy > 0 ? -1 : 1;
+            }
+
+            // A face is only a collision while the ball is moving into it.
+            // A ball left tangent after resolution can otherwise be found again
+            // at t=0, producing a stream of false impacts that pins the ball and
+            // advances the wall. The outward normal must oppose this frame's
+            // travel; zero or positive dot products are separating motion.
+            if (dx * normalX + dy * normalY >= -1e-7) continue;
+
+            // Shared faces inside a solid run of bricks are not surfaces. The
+            // sweep must resolve against the outer brick, never against the
+            // seam between two occupied cells.
+            if (normalX < 0 && c === 0) continue;
+            if (normalX > 0 && c === numCols - 1) continue;
+            if (normalX && hasBrick(c + normalX, row)) continue;
+            if (normalY > 0 && hasBrick(c, row + 1)) continue;
+            if (normalY < 0 && hasBrick(c, row - 1)) continue;
+
+            if (!best || impactTime < best.time) {
+              best = { brick, time: impactTime, normalX, normalY };
+            }
+          }
+        }
+
+        // The maintained ceiling is a complete row of real bricks. At a
+        // diagonal cell corner, the general sweep can encounter an internal
+        // side seam at the same instant as the exposed underside. Resolve that
+        // tie against the occupied ceiling brick so the top row stays watertight.
+        if (!best && dy < 0) {
+          const ceilingRow = Math.floor(-gridY / BRICK_H);
+          const ceilingBottom = gridY + (ceilingRow + 1) * BRICK_H;
+          const contactY = ceilingBottom + BALL_R;
+          if (previousY >= contactY && ball.y <= contactY) {
+            const time = clamp((contactY - previousY) / dy, 0, 1);
+            const contactX = previousX + dx * time;
+            const c = colOf(contactX);
+            const brick = brickMap.get(brickKey(c, ceilingRow));
+            if (brick) best = { brick, time, normalX: 0, normalY: 1 };
+          }
+        }
+        return best;
+      }
+
+      function resolveBrickImpact(ball, previousX, previousY, impact) {
+        const travelX = ball.x - previousX;
+        const travelY = ball.y - previousY;
+        const hitX = previousX + travelX * impact.time;
+        const hitY = previousY + travelY * impact.time;
+        const brick = impact.brick;
+        const top = brickY(brick);
+        const bottom = top + BRICK_H;
+
+        if (impact.normalX) {
+          const verticalVelocity = ball.vy;
+          const faceX = impact.normalX < 0 ? brick.c * colW : (brick.c + 1) * colW;
+          ball.x = faceX + impact.normalX * (BALL_R + COLLISION_EPS);
+          ball.y = hitY;
+          ball.vx = impact.normalX * Math.abs(ball.vx);
+          ball.vy = verticalVelocity; // side faces never change climb / fall direction
+          queueDeposit(ball, brick.c + impact.normalX, brick.row);
+          recordImpact(brick.c);
+          impactStats.side++;
+          ball.flash = 1;
+          noteBallImpact(ball);
+          return;
+        }
+
+        if (impact.normalY > 0) {
+          const targetRow = brick.row + 1;
+          ball.x = hitX;
+          ball.y = bottom + BALL_R + COLLISION_EPS;
+          ball.vy = Math.abs(ball.vy);
+          queueDeposit(ball, brick.c, targetRow);
+          recordImpact(brick.c);
+          impactStats.underside++;
+          ball.flash = 1;
+          noteBallImpact(ball);
+          return;
+        }
+
+        if (impact.normalY < 0) {
+          ball.x = hitX;
+          ball.y = top - BALL_R - COLLISION_EPS;
+          ball.vy = -Math.abs(ball.vy);
+          recordImpact(brick.c);
+          impactStats.top++;
+          ball.flash = 1;
+          noteBallImpact(ball);
+        }
+      }
+
+      function containBelowBrickCeiling(ball) {
+        const ceilingRow = Math.floor(-gridY / BRICK_H);
+        const brick = brickMap.get(brickKey(colOf(ball.x), ceilingRow));
+        if (!brick) return;
+        const bottom = brickY(brick) + BRICK_H;
+        if (ball.y - BALL_R >= bottom) return;
+
+        ball.y = bottom + BALL_R + COLLISION_EPS;
+        ball.vy = Math.abs(ball.vy);
+        queueDeposit(ball, brick.c, brick.row + 1);
+        recordImpact(brick.c);
+        impactStats.underside++;
+        ball.flash = 1;
+        noteBallImpact(ball);
       }
 
       let lastT = 0;
@@ -187,52 +696,58 @@
         const dt = Math.max(0, Math.min(1 / 30, (now - lastT) / 1000));
         lastT = now;
 
-        // --- global scroll: a steady upward creep. The front can't run away
-        //     because it is hard-clamped to the band [frontMin, frontMax], and
-        //     deposits self-balance against the scroll (a starved column sits
-        //     at frontMin and keeps depositing; an over-served one tops out at
-        //     frontMax and skips). No feedback controller needed. -------------
-        const dy = SCROLL_PX * dt;
-        for (let c = 0; c < numCols; c++) front[c] = clamp(front[c] - dy, frontMin, frontMax);
+        // --- global scroll: each real brick impact advances the one shared
+        //     lattice by 1 / numCols of a brick, keeping the mean front steady.
+        //     No column can ever drift off-grid because no brick owns a y-value. -
+        const easedScroll = (gridTargetY - gridY) * Math.min(1, dt * SCROLL_FOLLOW);
+        gridY += clamp(easedScroll, -SCROLL_MAX_SPEED * dt, SCROLL_MAX_SPEED * dt);
+        maintainBrickCeiling();
         for (let i = bricks.length - 1; i >= 0; i--) {
           const b = bricks[i];
-          b.y -= dy;
-          if (b.y + BRICK_H < -BRICK_H) bricks.splice(i, 1); // cull off the top
+          // Keep each column's deepest brick even if it briefly leaves frame;
+          // every visible collision must still resolve against a real brick.
+          if (brickY(b) + BRICK_H < -BRICK_H && b.row < front[b.c] - 1) removeBrick(i);
         }
 
         // --- balls -------------------------------------------------------
         const minX = BALL_R, maxX = W - BALL_R;
         for (const ball of balls) {
-          ball.x += ball.vx * dt;
-          ball.y += ball.vy * dt;
+          if (ball.mode === 'arming') {
+            if (now - ball.bombStarted >= BOMB_ARM_MS) detonateBomb(ball);
+          } else {
+            const previousX = ball.x;
+            const previousY = ball.y;
+            ball.x += ball.vx * dt;
+            ball.y += ball.vy * dt;
 
-          // side walls
-          if (ball.x < minX) { ball.x = minX; ball.vx = Math.abs(ball.vx); }
-          else if (ball.x > maxX) { ball.x = maxX; ball.vx = -Math.abs(ball.vx); }
+            // side walls
+            if (ball.x < minX) { ball.x = minX; ball.vx = Math.abs(ball.vx); }
+            else if (ball.x > maxX) { ball.x = maxX; ball.vx = -Math.abs(ball.vx); }
 
-          // wall underside: a rising ball reaches its column's front and lays
-          // a brick — unless the column has already filled the band to its
-          // ceiling, in which case it just bounces (no runaway growth).
-          if (ball.vy < 0) {
-            const c = colOf(ball.x);
-            if (ball.y - BALL_R <= front[c]) {
-              if (front[c] < frontMax) {
-                bricks.push({ c, y: front[c], color: ball.color });
-                front[c] += BRICK_H;               // wall grows downward
+            if (ball.mode === 'fallingBomb') {
+              // The spent bomb falls through the hole and all remaining bricks.
+              // It turns back into the normal building ball only at the paddle.
+              if (ball.y + BALL_R >= paddleY) {
+                ball.y = paddleY - BALL_R;
+                restoreBall(ball);
               }
-              ball.y = front[c] + BALL_R;          // sit just under the front
-              ball.vy = Math.abs(ball.vy);          // bounce back down
-              ball.flash = 1;
-            }
-          }
+            } else {
+              // Only occupied brick cells can cause an impact. Side faces collide
+              // during both ascent and descent, preserving the vertical direction.
+              const impact = findBrickImpact(ball, previousX, previousY);
+              if (impact) resolveBrickImpact(ball, previousX, previousY, impact);
+              if (ball.mode === 'ball') containBelowBrickCeiling(ball);
 
-          // paddle line: the paddles never miss — a ball can never pass the
-          // floor. Clamp position unconditionally, and reflect when descending.
-          if (ball.y + BALL_R >= paddleY) {
-            ball.y = paddleY - BALL_R;
-            if (ball.vy > 0) {
-              levelingNudge(ball);                  // sets vx and a downward vy
-              ball.vy = -Math.abs(ball.vy);         // ...flipped back up
+              // Paddle line: it never misses. Reaching it also proves the ball
+              // escaped the upper wall, so any old stuck evidence is discarded.
+              if (ball.y + BALL_R >= paddleY) {
+                ball.y = paddleY - BALL_R;
+                if (ball.vy > 0) {
+                  ball.impactHistory.length = 0;
+                  ball.lastImpactAt = now;
+                  aimAtColumn(ball, chooseTargetColumn());
+                }
+              }
             }
           }
 
@@ -254,6 +769,24 @@
           if (ball.flash) ball.flash = Math.max(0, ball.flash - dt * 4);
         }
 
+        for (let i = explosions.length - 1; i >= 0; i--) {
+          explosions[i].age += dt;
+          if (explosions[i].age > 0.85) explosions.splice(i, 1);
+        }
+        for (let i = debris.length - 1; i >= 0; i--) {
+          const bit = debris[i];
+          bit.age += dt;
+          if (bit.age > bit.life) {
+            debris.splice(i, 1);
+            continue;
+          }
+          bit.x += bit.vx * dt;
+          bit.y += bit.vy * dt;
+          bit.vy += 520 * dt;
+          bit.rotation += bit.spin * dt;
+        }
+
+        commitPendingDeposits();
         draw();
         drawDebug();
         raf = requestAnimationFrame(tick);
@@ -261,32 +794,46 @@
 
       function draw() {
         ctx.clearRect(0, 0, W, H);
-        ctx.fillStyle = '#0b0c10';
+        ctx.fillStyle = SCENE.background;
         ctx.fillRect(0, 0, W, H);
 
         // bricks — flat fill with a lighter top bevel for a touch of relief
         for (const b of bricks) {
-          const x = b.c * colW, y = b.y;
+          const left = snapPx(b.c * colW);
+          const right = snapPx((b.c + 1) * colW);
+          const y = snapPx(brickY(b));
           ctx.fillStyle = b.color;
-          ctx.fillRect(x + 1, y + 1, colW - 2, BRICK_H - 2);
-          ctx.fillStyle = 'rgba(255,255,255,0.16)';
-          ctx.fillRect(x + 1, y + 1, colW - 2, 3);
-          ctx.fillStyle = 'rgba(0,0,0,0.22)';
-          ctx.fillRect(x + 1, y + BRICK_H - 3, colW - 2, 2);
+          ctx.fillRect(left + 1, y + 1, right - left - 2, BRICK_H - 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.20)';
+          ctx.fillRect(left + 1, y + 1, right - left - 2, 3);
+          ctx.fillStyle = 'rgba(7,16,13,0.30)';
+          ctx.fillRect(left + 1, y + BRICK_H - 3, right - left - 2, 2);
         }
 
-        // soft glow line along the live build-front
+        // Blast flash and expanding shock ring.
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (let c = 0; c < numCols; c++) {
-          const x = c * colW, y = front[c];
-          if (c === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-          ctx.lineTo(x + colW, y);
+        for (const blast of explosions) {
+          const p = clamp(blast.age / 0.85, 0, 1);
+          const eased = 1 - (1 - p) ** 3;
+          ctx.strokeStyle = hexA(blast.color, (1 - p) * 0.9);
+          ctx.lineWidth = Math.max(1, 8 * (1 - p));
+          ctx.beginPath();
+          ctx.ellipse(
+            blast.x,
+            blast.y,
+            colW * BLAST_COL_RADIUS * eased,
+            BRICK_H * BLAST_ROW_RADIUS * eased,
+            0, 0, Math.PI * 2
+          );
+          ctx.stroke();
+          if (p < 0.24) {
+            ctx.fillStyle = `rgba(232,238,232,${0.7 * (1 - p / 0.24)})`;
+            ctx.beginPath();
+            ctx.arc(blast.x, blast.y, BALL_R + p * 90, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
-        ctx.strokeStyle = 'rgba(255,255,255,0.10)';
-        ctx.stroke();
         ctx.restore();
 
         // ball trails
@@ -307,6 +854,18 @@
         }
         ctx.restore();
 
+        // Brick-colored fragments make the blast read as a hole in the wall.
+        for (const bit of debris) {
+          const alpha = 1 - bit.age / bit.life;
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.translate(bit.x, bit.y);
+          ctx.rotate(bit.rotation);
+          ctx.fillStyle = bit.color;
+          ctx.fillRect(-bit.size / 2, -bit.size / 2, bit.size, bit.size);
+          ctx.restore();
+        }
+
         // paddles — glowing capsules sliding along the floor
         for (const ball of balls) {
           const p = ball.paddle;
@@ -317,25 +876,72 @@
           ctx.fillStyle = hexA(ball.color, 0.85);
           ctx.fill();
           ctx.restore();
-          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          ctx.fillStyle = SCENE.paper;
           capsule(p.x - p.w / 2, paddleY - PADDLE_H / 2, p.w, 3, 1.5);
           ctx.fill();
+
+          // A small aperture leans toward the column this return is feeding.
+          const lean = clamp(((p.targetX || p.x) - p.x) / Math.max(colW * 4, 1), -1, 1);
+          const apertureX = p.x + lean * p.w * 0.28;
+          ctx.fillStyle = SCENE.paper;
+          ctx.fillRect(apertureX - 3, paddleY - 2, 6, 4);
         }
 
-        // balls — bright core with a colored halo
+        // Normal balls glow; a trapped one becomes a three-beat warning bomb,
+        // then drops as a dark spent shell until the paddle restores it.
         for (const ball of balls) {
+          if (ball.mode === 'ball') {
+            ctx.save();
+            ctx.shadowColor = ball.color;
+            ctx.shadowBlur = 16 + (ball.flash || 0) * 18;
+            ctx.fillStyle = ball.color;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+            ctx.fillStyle = SCENE.paper;
+            ctx.beginPath();
+            ctx.arc(ball.x - BALL_R * 0.25, ball.y - BALL_R * 0.25, BALL_R * 0.45, 0, Math.PI * 2);
+            ctx.fill();
+            continue;
+          }
+
+          const arming = ball.mode === 'arming';
+          const beat = arming ? Math.floor((lastT - ball.bombStarted) / 250) : 0;
+          const visible = !arming || beat % 2 === 0;
+          const bombR = BALL_R * 1.45;
           ctx.save();
+          ctx.globalAlpha = visible ? 1 : 0.18;
           ctx.shadowColor = ball.color;
-          ctx.shadowBlur = 16 + (ball.flash || 0) * 18;
-          ctx.fillStyle = ball.color;
+          ctx.shadowBlur = visible ? 24 : 5;
+          ctx.fillStyle = SCENE.background;
+          ctx.strokeStyle = ball.color;
+          ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+          ctx.arc(ball.x, ball.y, bombR, 0, Math.PI * 2);
           ctx.fill();
+          ctx.stroke();
+
+          // A short fuse and hot tip give the warning silhouette an immediate read.
+          ctx.lineCap = 'round';
+          ctx.strokeStyle = SCENE.paper;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(ball.x + bombR * 0.48, ball.y - bombR * 0.78);
+          ctx.quadraticCurveTo(
+            ball.x + bombR * 0.78,
+            ball.y - bombR * 1.25,
+            ball.x + bombR * 1.05,
+            ball.y - bombR * 1.08
+          );
+          ctx.stroke();
+          if (arming) {
+            ctx.fillStyle = PALETTE[0];
+            ctx.beginPath();
+            ctx.arc(ball.x + bombR * 1.05, ball.y - bombR * 1.08, 2.6, 0, Math.PI * 2);
+            ctx.fill();
+          }
           ctx.restore();
-          ctx.fillStyle = 'rgba(255,255,255,0.9)';
-          ctx.beginPath();
-          ctx.arc(ball.x - BALL_R * 0.25, ball.y - BALL_R * 0.25, BALL_R * 0.45, 0, Math.PI * 2);
-          ctx.fill();
         }
       }
 
@@ -365,13 +971,15 @@
           if (b.y > paddleY + 40) below++;
           if (b.y < -20) above++;
         }
-        for (let c = 0; c < numCols; c++) { lo = Math.min(lo, front[c]); hi = Math.max(hi, front[c]); }
-        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        for (let c = 0; c < numCols; c++) { lo = Math.min(lo, frontY(c)); hi = Math.max(hi, frontY(c)); }
+        ctx.fillStyle = SCENE.paper;
         ctx.font = '13px ui-monospace, monospace';
         const lines = [
           `balls=${balls.length} onscreen=${on} above=${above} below=${below}`,
           `bricks=${bricks.length} front lo=${lo.toFixed(0)} hi=${hi.toFixed(0)} setpoint=${setpointY.toFixed(0)}`,
-          `band=[${frontMin.toFixed(0)},${frontMax.toFixed(0)}] paddleY=${paddleY.toFixed(0)}`,
+          `repairLine=${repairLineY.toFixed(0)} paddleY=${paddleY.toFixed(0)} (tower depth uncapped)`,
+          `grid=${gridY.toFixed(2)} target=${gridTargetY.toFixed(2)} focus=${focus ? `${focus.mode} ${focus.remaining}` : `repair ${focusCooldown}`}`,
+          `impacts underside=${impactStats.underside} side=${impactStats.side} top=${impactStats.top} bombs=${impactStats.bombs} pending=${pendingDeposits.length}`,
         ];
         lines.forEach((s, i) => ctx.fillText(s, 12, 24 + i * 18));
       }

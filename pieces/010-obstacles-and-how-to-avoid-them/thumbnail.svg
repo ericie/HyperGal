@@ -1,39 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
-  <rect width="200" height="200" fill="#f3efe4"/>
-  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.05">
-    <path d="M-4 16 C28 16 53 15 78 16 C100 17 124 15 150 16 C172 17 187 16 204 16" stroke="#b45a45" opacity=".44"/>
-    <path d="M-4 26 C22 26 26 33 39 33 C52 33 58 27 75 27 C91 27 98 32 112 32 C129 32 135 26 151 26 C171 26 184 27 204 27" stroke="#1d1b17" opacity=".62"/>
-    <path d="M-4 38 C20 38 26 45 40 45 C53 45 61 39 76 39 C93 39 100 44 114 44 C130 44 136 39 152 39 C172 39 185 39 204 39" stroke="#5c5a54" opacity=".52"/>
-    <path d="M-4 51 C29 50 57 51 83 50 C111 49 135 51 160 50 C178 50 191 50 204 50" stroke="#c0a04a" opacity=".48"/>
-    <path d="M-4 66 C20 66 25 72 38 73 C52 73 59 66 75 66 C92 66 98 72 113 72 C129 72 137 66 153 66 C174 66 188 66 204 66" stroke="#58748a" opacity=".45"/>
-    <path d="M-4 80 C18 80 27 88 43 88 C59 88 64 81 79 81 C96 81 104 88 119 88 C136 88 143 81 160 81 C179 81 190 82 204 82" stroke="#1d1b17" opacity=".66"/>
-    <path d="M-4 95 C29 94 59 95 86 94 C113 93 139 94 164 94 C181 94 192 95 204 95" stroke="#7d8760" opacity=".48"/>
-    <path d="M-4 111 C18 111 25 119 41 119 C56 119 64 112 80 112 C96 112 104 118 119 118 C135 118 143 112 159 112 C178 112 189 113 204 113" stroke="#5c5a54" opacity=".54"/>
-    <path d="M-4 127 C28 126 58 127 84 126 C111 125 138 127 164 126 C181 126 192 126 204 126" stroke="#b45a45" opacity=".44"/>
-    <path d="M-4 143 C18 143 27 151 43 151 C58 151 66 144 82 144 C98 144 105 150 120 150 C137 150 146 144 161 144 C180 144 190 145 204 145" stroke="#1d1b17" opacity=".66"/>
-    <path d="M-4 160 C30 159 60 160 87 159 C114 158 139 159 164 159 C181 159 192 160 204 160" stroke="#c0a04a" opacity=".47"/>
-    <path d="M-4 178 C27 177 58 178 88 178 C116 178 142 177 167 178 C184 178 194 178 204 178" stroke="#58748a" opacity=".44"/>
+  <rect width="200" height="200" fill="#ffffe4"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-5 11 C34 8 73 15 112 11 C149 8 179 13 205 11" stroke="#001522" stroke-width="1" opacity=".76"/>
+    <path d="M-5 22 C22 20 34 29 48 28 C62 27 70 21 87 22 C108 23 118 29 136 27 C155 25 176 21 205 24" stroke="#004b87" stroke-width="1.8" opacity=".62"/>
+    <path d="M-5 31 C25 30 41 37 58 35 C81 33 94 31 113 34 C138 38 157 30 205 32" stroke="#a8002c" stroke-width=".9" opacity=".56"/>
+    <path d="M-5 52 C26 49 43 57 63 54 C84 51 99 48 119 53 C145 59 164 51 205 53" stroke="#deb887" stroke-width="2.2" opacity=".78"/>
+    <path d="M-5 65 C27 62 44 72 64 68 C82 64 97 62 116 67 C137 73 163 63 205 66" stroke="#001522" stroke-width="1.1" opacity=".74"/>
+    <path d="M-5 78 C30 76 52 83 69 81 C90 78 106 76 126 80 C149 85 173 77 205 79" stroke="#ffd77b" stroke-width="1.7" opacity=".94"/>
+    <path d="M-5 104 C29 101 45 111 65 107 C88 102 103 102 124 106 C146 111 168 102 205 105" stroke="#004b87" stroke-width=".8" opacity=".6"/>
+    <path d="M-5 116 C21 113 38 124 58 120 C81 115 98 114 119 119 C141 125 165 114 205 118" stroke="#a8002c" stroke-width="2" opacity=".54"/>
+    <path d="M-5 126 C30 123 47 132 67 128 C86 124 102 124 122 128 C145 133 170 125 205 128" stroke="#001522" stroke-width="1" opacity=".8"/>
+    <path d="M-5 151 C25 148 42 157 62 153 C85 148 102 148 124 152 C147 157 171 149 205 151" stroke="#deb887" stroke-width="1.5" opacity=".78"/>
+    <path d="M-5 163 C22 160 39 171 59 167 C81 162 99 160 119 166 C143 172 166 161 205 165" stroke="#004b87" stroke-width="2.3" opacity=".6"/>
+    <path d="M-5 184 C28 181 47 190 67 186 C88 182 106 181 126 185 C149 190 174 182 205 184" stroke="#001522" stroke-width="1.1" opacity=".78"/>
   </g>
-  <g stroke="#1d1b17" stroke-width="2.2">
-    <rect x="27" y="27" width="14" height="14" fill="#b45a45"/>
-    <rect x="61" y="24" width="20" height="20" fill="#f3efe4"/>
-    <rect x="103" y="28" width="13" height="13" fill="#5c5a54"/>
-    <rect x="144" y="25" width="18" height="18" fill="#7d8760"/>
-    <rect x="174" y="33" width="10" height="10" fill="#c0a04a"/>
-    <rect x="19" y="70" width="27" height="27" fill="#c0a04a"/>
-    <rect x="67" y="67" width="16" height="16" fill="#1d1b17"/>
-    <rect x="101" y="75" width="24" height="24" fill="#f3efe4"/>
-    <rect x="145" y="68" width="15" height="15" fill="#b45a45"/>
-    <rect x="169" y="83" width="22" height="22" fill="#5c5a54"/>
-    <rect x="27" y="118" width="18" height="18" fill="#7d8760"/>
-    <rect x="57" y="128" width="12" height="12" fill="#f3efe4"/>
-    <rect x="96" y="112" width="31" height="31" fill="#1d1b17"/>
-    <rect x="140" y="124" width="21" height="21" fill="#c0a04a"/>
-    <rect x="176" y="116" width="11" height="11" fill="#b45a45"/>
-    <rect x="18" y="158" width="12" height="12" fill="#5c5a54"/>
-    <rect x="52" y="153" width="24" height="24" fill="#b45a45"/>
-    <rect x="93" y="166" width="13" height="13" fill="#f3efe4"/>
-    <rect x="126" y="154" width="18" height="18" fill="#7d8760"/>
-    <rect x="168" y="161" width="20" height="20" fill="#1d1b17"/>
+  <g>
+    <rect x="147" y="-56" width="18" height="92" fill="#ffd77b" transform="rotate(1 156 -10)"/>
+    <rect x="34" y="43" width="32" height="5" fill="#a8002c" transform="rotate(-30 50 45.5)"/>
+    <rect x="41" y="62" width="84" height="7" fill="#004b87" transform="rotate(-29 83 65.5)"/>
+    <rect x="99" y="83" width="24" height="8" fill="#deb887" transform="rotate(-31 111 87)"/>
+    <circle cx="48" cy="112" r="13" fill="#ffffb3"/>
+    <rect x="113" y="124" width="30" height="30" fill="#001522" transform="rotate(10 128 139)"/>
+    <circle cx="87" cy="151" r="11" fill="#a8002c"/>
+    <rect x="158" y="148" width="24" height="24" fill="#deb887" transform="rotate(-43 170 160)"/>
+    <rect x="48" y="178" width="14" height="92" fill="#004b87" transform="rotate(-1 55 224)"/>
+    <rect x="28" y="168" width="12" height="12" fill="#ffd77b" transform="rotate(3 34 174)"/>
   </g>
 </svg>

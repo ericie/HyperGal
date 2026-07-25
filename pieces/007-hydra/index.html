@@ -5,20 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>hydra · HyperGal</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+      html, body { margin: 0; height: 100%; background: #001827; overflow: hidden; }
       #stage { position: fixed; inset: 0; display: block; image-rendering: pixelated; }
       .caption {
         position: fixed;
         bottom: 1rem;
         left: 1rem;
-        color: #d98a16;
+        color: #ffd77b;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: .8rem;
         letter-spacing: .12em;
         text-transform: uppercase;
         pointer-events: none;
         z-index: 10;
-        text-shadow: 0 0 8px rgba(255, 160, 32, .6);
+        text-shadow: 0 0 9px rgba(255, 215, 123, .58), 0 0 20px rgba(168, 0, 44, .34);
       }
     </style>
   </head>
@@ -26,18 +26,19 @@
     <canvas id="stage"></canvas>
     <div class="caption">hydra · 2026 · five contenders, one mouse · click to reseed</div>
     <script>
-      // hydra — autonomous traditional Snake, rendered as a luminous fossil field.
+      // hydra — autonomous traditional Snake, rendered as a woodblock fossil field.
       //
       // Five contenders hunt one mouse. Snakes enter from beyond the arena with
       // varied length and aggression, which tilt each one between chasing the
       // mouse and preserving room around bodies. Edge, self, and other-snake
       // contact kill one snake; its body becomes a layered stain and bone trace.
       //
-      // The look is saturated snakes over a black arena: connected glowing
-      // bodies, organic colored residue, pale ribs, and a little screen grain.
+      // The look is Growth Rings' Hokusai palette pushed into connected
+      // pigment bodies, rough bitmap remains, dry ribs, and a Prussian field.
 
       const canvas = document.getElementById('stage');
       const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
 
       // ---- tunables -------------------------------------------------------
       const STEP = 0.16;         // starting seconds per snake move
@@ -58,24 +59,26 @@
       const OFF_ROUTE_TURN_MARGIN = 2.5;
       const EDGE_RELIEF_WEIGHT = 6;
 
-      // saturated snake palette on warm black
-      const C_BG = '#0a0600';
-      const C_MOUSE = '#ffe08a';
-      const C_BORDER = '#d98a16';
-      const C_BONE = '245,226,184';
-      const C_CLOT = '34,4,2';
-      const GLOW = '#ff9a1e';
+      // Growth Rings / Hokusai: wheat, pale yellow, Prussian blue,
+      // Tyrian purple, burlywood.
+      const C_BG = '#001827';
+      const C_MOUSE = '#ffffb3';
+      const C_BORDER = '#ffd77b';
+      const C_BONE = '255,255,179';
+      const C_BONE_HOT = '255,215,123';
+      const C_CLOT = '0,24,39';
+      const GLOW = '#ffd77b';
       const SNAKE_PALETTE = [
-        { body: '#b8730c', head: '#ffc23a', glow: '#ff9a1e', ring: '255,194,58' },
-        { body: '#168f86', head: '#6fffe9', glow: '#24d8c8', ring: '111,255,233' },
-        { body: '#2f72c4', head: '#83c5ff', glow: '#4aa3ff', ring: '131,197,255' },
-        { body: '#7f4fc6', head: '#d7b3ff', glow: '#a879ff', ring: '215,179,255' },
-        { body: '#b83b72', head: '#ff8fc1', glow: '#ff5aa5', ring: '255,143,193' },
-        { body: '#579426', head: '#b7ff5a', glow: '#8ee82f', ring: '183,255,90' },
-        { body: '#b8472e', head: '#ff9d76', glow: '#ff6a3d', ring: '255,157,118' },
-        { body: '#b69420', head: '#fff07a', glow: '#ffd84a', ring: '255,240,122' },
-        { body: '#247da0', head: '#75e0ff', glow: '#27c0f0', ring: '117,224,255' },
-        { body: '#9c42b8', head: '#f2a6ff', glow: '#d458ff', ring: '242,166,255' },
+        { body: '#004b87', head: '#ffd77b', glow: '#004b87', ring: '0,75,135', accent: '255,215,123', dark: '0,24,43' },
+        { body: '#a8002c', head: '#ffffb3', glow: '#a8002c', ring: '168,0,44', accent: '222,184,135', dark: '50,0,13' },
+        { body: '#deb887', head: '#a8002c', glow: '#ffd77b', ring: '222,184,135', accent: '168,0,44', dark: '48,37,23' },
+        { body: '#ffd77b', head: '#ffffb3', glow: '#ffd77b', ring: '255,215,123', accent: '0,75,135', dark: '57,42,17' },
+        { body: '#ffffb3', head: '#a8002c', glow: '#ffd77b', ring: '255,255,179', accent: '168,0,44', dark: '55,46,21' },
+        { body: '#a8002c', head: '#ffd77b', glow: '#a8002c', ring: '168,0,44', accent: '255,215,123', dark: '42,0,11' },
+        { body: '#004b87', head: '#ffffb3', glow: '#004b87', ring: '0,75,135', accent: '222,184,135', dark: '0,21,38' },
+        { body: '#deb887', head: '#ffffb3', glow: '#ffd77b', ring: '222,184,135', accent: '0,75,135', dark: '44,34,22' },
+        { body: '#ffd77b', head: '#a8002c', glow: '#a8002c', ring: '255,215,123', accent: '168,0,44', dark: '52,31,12' },
+        { body: '#a8002c', head: '#deb887', glow: '#a8002c', ring: '168,0,44', accent: '0,75,135', dark: '45,0,12' },
       ];
 
       // ---- state ----------------------------------------------------------
@@ -112,6 +115,7 @@
         canvas.width = W * dpr; canvas.height = H * dpr;
         canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.imageSmoothingEnabled = false;
         CELL = Math.max(13, Math.round(Math.min(W, H) / 34));
         GW = Math.max(12, Math.floor((W - CELL * 3) / CELL));
         GH = Math.max(12, Math.floor((H - CELL * 4) / CELL));
@@ -365,6 +369,9 @@
         pools.push({
           body: copyBody(s.body),
           color: colors.ring,
+          accent: colors.accent || colors.ring,
+          dark: colors.dark || C_CLOT,
+          bone: colors.bone || C_BONE,
           seed: Math.random() * 1000,
           spread: rand(0.85, 1.25),
         });
@@ -469,100 +476,154 @@
         return x - Math.floor(x);
       }
 
-      function drawPoolPath(points, color, width, alpha, blur) {
+      function brushUnit() {
+        return Math.max(2, Math.round(CELL * 0.09));
+      }
+
+      function brushRect(cx, cy, w, h, rgb, alpha) {
+        if (alpha <= 0) return;
+        const unit = brushUnit();
+        const x = Math.round((cx - w / 2) / unit) * unit;
+        const y = Math.round((cy - h / 2) / unit) * unit;
+        const ww = Math.max(unit, Math.round(w / unit) * unit);
+        const hh = Math.max(unit, Math.round(h / unit) * unit);
+        ctx.fillStyle = rgba(rgb, Math.min(1, alpha));
+        ctx.fillRect(x, y, ww, hh);
+      }
+
+      function drawBrushLayer(pool, points, rgb, alpha, acrossScale, alongScale, seedOffset, chance = 1) {
         if (points.length < 2) return;
-        ctx.shadowColor = rgba(color, alpha * 1.2);
-        ctx.shadowBlur = blur;
-        ctx.strokeStyle = rgba(color, alpha);
-        ctx.lineWidth = width;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-        ctx.stroke();
-        ctx.shadowBlur = 0;
+        const stepSize = Math.max(brushUnit(), CELL * 0.17);
+        for (let i = 1; i < points.length; i++) {
+          const a = points[i - 1], b = points[i];
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const len = Math.hypot(dx, dy);
+          if (len <= 0) continue;
+          const dirx = dx / len, diry = dy / len;
+          const nx = -diry, ny = dirx;
+          const horizontal = Math.abs(dx) >= Math.abs(dy);
+          const count = Math.max(1, Math.ceil(len / stepSize));
+
+          for (let k = 0; k <= count; k++) {
+            const stamp = i * 131 + k * 17;
+            if (hash01(pool.seed + seedOffset, stamp) > chance) continue;
+            const u = k / count;
+            const wander = (hash01(pool.seed + seedOffset + 7, stamp) - 0.5) * CELL * acrossScale * 0.78;
+            const chatter = (hash01(pool.seed + seedOffset + 13, stamp) - 0.5) * CELL * 0.2;
+            const cx = a.x + dx * u + nx * wander + dirx * chatter;
+            const cy = a.y + dy * u + ny * wander + diry * chatter;
+            const across = CELL * acrossScale * (0.72 + hash01(pool.seed + seedOffset + 19, stamp) * 0.62) * pool.spread;
+            const along = CELL * alongScale * (0.7 + hash01(pool.seed + seedOffset + 23, stamp) * 0.9);
+            const a2 = alpha * (0.78 + hash01(pool.seed + seedOffset + 29, stamp) * 0.32);
+            brushRect(cx, cy, horizontal ? along : across, horizontal ? across : along, rgb, a2);
+          }
+        }
+      }
+
+      function drawDryBristles(pool, points, depth) {
+        if (points.length < 2) return;
+        const baseAlpha = 0.22 + depth * 0.22;
+        const stepSize = Math.max(brushUnit(), CELL * 0.3);
+        for (let i = 1; i < points.length; i++) {
+          const a = points[i - 1], b = points[i];
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const len = Math.hypot(dx, dy);
+          if (len <= 0) continue;
+          const dirx = dx / len, diry = dy / len;
+          const nx = -diry, ny = dirx;
+          const horizontal = Math.abs(dx) >= Math.abs(dy);
+          const count = Math.max(1, Math.ceil(len / stepSize));
+
+          for (let k = 0; k <= count; k++) {
+            const stamp = i * 173 + k * 31;
+            if (hash01(pool.seed + 503, stamp) < 0.38) continue;
+            const u = k / count;
+            const side = hash01(pool.seed + 509, stamp) > 0.5 ? 1 : -1;
+            const reach = CELL * (0.3 + hash01(pool.seed + 521, stamp) * 0.72) * pool.spread;
+            const cx = a.x + dx * u + nx * side * reach;
+            const cy = a.y + dy * u + ny * side * reach;
+            const long = CELL * (0.18 + hash01(pool.seed + 541, stamp) * 0.28);
+            const thin = Math.max(brushUnit(), CELL * (0.045 + hash01(pool.seed + 547, stamp) * 0.06));
+            const rgb = hash01(pool.seed + 557, stamp) > 0.72 ? pool.accent : pool.color;
+            brushRect(cx, cy, horizontal ? thin : long, horizontal ? long : thin, rgb, baseAlpha);
+          }
+        }
+      }
+
+      function drawBrushChips(pool, points, depth) {
+        const chipAlpha = 0.24 + depth * 0.24;
+        for (let i = 0; i < points.length; i++) {
+          const p = points[i];
+          const chips = 2 + ((hash01(pool.seed + 601, i) * 4) | 0);
+          for (let j = 0; j < chips; j++) {
+            const stamp = i * 97 + j * 29;
+            const a = hash01(pool.seed + 607, stamp) * Math.PI * 2;
+            const r = CELL * (0.38 + hash01(pool.seed + 613, stamp) * 0.86) * pool.spread;
+            const size = CELL * (0.08 + hash01(pool.seed + 617, stamp) * 0.18);
+            const rgbRoll = hash01(pool.seed + 619, stamp);
+            const rgb = rgbRoll > 0.78 ? pool.accent : rgbRoll < 0.2 ? pool.dark : pool.color;
+            brushRect(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, size * 1.4, size, rgb, chipAlpha * (0.65 + rgbRoll * 0.35));
+          }
+        }
       }
 
       function drawStain(pool, points, depth) {
-        const ageAlpha = 0.3 + depth * 0.28;
-        drawPoolPath(points, pool.color, CELL * (1.38 + pool.spread * 0.34), ageAlpha * 0.34, CELL * 0.8);
-        drawPoolPath(points, C_CLOT, CELL * (0.72 + pool.spread * 0.18), ageAlpha * 0.25, CELL * 0.32);
-
-        for (let i = 0; i < points.length; i++) {
-          const p = points[i];
-          const wobble = hash01(pool.seed, i);
-          const ox = (hash01(pool.seed + 17, i) - 0.5) * CELL * 0.5;
-          const oy = (hash01(pool.seed + 31, i) - 0.5) * CELL * 0.5;
-          const rx = CELL * (0.34 + wobble * 0.36) * pool.spread;
-          const ry = CELL * (0.24 + hash01(pool.seed + 43, i) * 0.32) * pool.spread;
-
-          ctx.shadowColor = rgba(pool.color, 0.42);
-          ctx.shadowBlur = CELL * 0.24;
-          ctx.fillStyle = rgba(pool.color, ageAlpha * (0.16 + wobble * 0.08));
-          ctx.beginPath();
-          ctx.ellipse(p.x + ox, p.y + oy, rx, ry, hash01(pool.seed + 59, i) * Math.PI, 0, Math.PI * 2);
-          ctx.fill();
-
-          if (i % 3 === 0) {
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = rgba(C_CLOT, ageAlpha * 0.3);
-            ctx.beginPath();
-            ctx.ellipse(p.x - ox * 0.35, p.y - oy * 0.35, rx * 0.45, ry * 0.38, -hash01(pool.seed + 71, i) * Math.PI, 0, Math.PI * 2);
-            ctx.fill();
-          }
-
-          if (hash01(pool.seed + 127, i) > 0.62) {
-            const drops = 1 + ((hash01(pool.seed + 139, i) * 3) | 0);
-            for (let j = 0; j < drops; j++) {
-              const a = hash01(pool.seed + i * 13, j) * Math.PI * 2;
-              const r = CELL * (0.58 + hash01(pool.seed + i * 17, j) * 0.7);
-              const dr = CELL * (0.045 + hash01(pool.seed + i * 19, j) * 0.07);
-              ctx.fillStyle = rgba(pool.color, ageAlpha * 0.12);
-              ctx.beginPath();
-              ctx.ellipse(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, dr * 1.35, dr, a, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          }
-        }
+        const ageAlpha = 0.5 + depth * 0.28;
         ctx.shadowBlur = 0;
+        drawBrushLayer(pool, points, pool.dark, ageAlpha * 0.78, 1.18, 0.52, 211);
+        drawBrushLayer(pool, points, pool.color, ageAlpha * 0.82, 0.82, 0.42, 307, 0.96);
+        drawBrushLayer(pool, points, pool.accent, ageAlpha * 0.5, 0.38, 0.34, 401, 0.64);
+        drawBrushLayer(pool, points, pool.dark, ageAlpha * 0.62, 0.28, 0.22, 463, 0.45);
+        drawDryBristles(pool, points, depth);
+        drawBrushChips(pool, points, depth);
       }
 
       function drawBones(pool, points, depth) {
         if (points.length < 2) return;
-        const alpha = 0.18 + depth * 0.22;
-        ctx.shadowColor = rgba(C_BONE, 0.35);
-        ctx.shadowBlur = CELL * 0.16;
-        ctx.strokeStyle = rgba(C_BONE, alpha);
-        ctx.lineWidth = Math.max(1, CELL * 0.1);
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.setLineDash([CELL * 0.34, CELL * 0.2]);
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        const alpha = 0.26 + depth * 0.24;
+
+        for (let i = 1; i < points.length; i++) {
+          const a = points[i - 1], b = points[i];
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const len = Math.hypot(dx, dy);
+          if (len <= 0) continue;
+          const horizontal = Math.abs(dx) >= Math.abs(dy);
+          const count = Math.max(1, Math.ceil(len / (CELL * 0.38)));
+          for (let k = 0; k <= count; k++) {
+            const stamp = i * 197 + k * 37;
+            if (hash01(pool.seed + 701, stamp) < 0.16) continue;
+            const u = k / count;
+            const cx = a.x + dx * u + (hash01(pool.seed + 709, stamp) - 0.5) * CELL * 0.12;
+            const cy = a.y + dy * u + (hash01(pool.seed + 719, stamp) - 0.5) * CELL * 0.12;
+            const long = CELL * (0.14 + hash01(pool.seed + 727, stamp) * 0.22);
+            const thin = Math.max(brushUnit(), CELL * (0.055 + hash01(pool.seed + 733, stamp) * 0.04));
+            const rgb = hash01(pool.seed + 739, stamp) > 0.78 ? C_BONE_HOT : (pool.bone || C_BONE);
+            brushRect(cx, cy, horizontal ? long : thin, horizontal ? thin : long, rgb, alpha * 0.72);
+          }
+        }
 
         for (let i = 1; i < points.length - 1; i += 2) {
           const prev = points[i - 1], cur = points[i], next = points[i + 1];
           const dx = next.x - prev.x, dy = next.y - prev.y;
           const len = Math.hypot(dx, dy) || 1;
           const nx = -dy / len, ny = dx / len;
-          const rib = CELL * (0.2 + hash01(pool.seed + 101, i) * 0.17);
-          const notch = (hash01(pool.seed + 113, i) - 0.5) * CELL * 0.12;
+          const horizontal = Math.abs(dx) >= Math.abs(dy);
+          const rib = CELL * (0.22 + hash01(pool.seed + 751, i) * 0.22);
+          const pieces = 2 + ((hash01(pool.seed + 757, i) * 3) | 0);
 
-          ctx.strokeStyle = rgba(C_BONE, alpha * 0.82);
-          ctx.lineWidth = Math.max(1, CELL * 0.075);
-          ctx.beginPath();
-          ctx.moveTo(cur.x - nx * rib + dx / len * notch, cur.y - ny * rib + dy / len * notch);
-          ctx.lineTo(cur.x + nx * rib + dx / len * notch, cur.y + ny * rib + dy / len * notch);
-          ctx.stroke();
+          for (const side of [-1, 1]) {
+            for (let j = 1; j <= pieces; j++) {
+              const f = j / pieces;
+              const jitter = (hash01(pool.seed + 761 + side, i * 11 + j) - 0.5) * CELL * 0.1;
+              const cx = cur.x + nx * side * rib * f + (dx / len) * jitter;
+              const cy = cur.y + ny * side * rib * f + (dy / len) * jitter;
+              const long = CELL * (0.1 + hash01(pool.seed + 769, i * 13 + j) * 0.12);
+              const thin = Math.max(brushUnit(), CELL * 0.06);
+              brushRect(cx, cy, horizontal ? thin : long, horizontal ? long : thin, pool.bone || C_BONE, alpha * (0.52 + f * 0.24));
+            }
+          }
 
-          ctx.fillStyle = rgba(C_BONE, alpha * 0.95);
-          ctx.beginPath();
-          ctx.ellipse(cur.x, cur.y, CELL * 0.08, CELL * 0.055, Math.atan2(dy, dx), 0, Math.PI * 2);
-          ctx.fill();
+          brushRect(cur.x, cur.y, CELL * 0.14, CELL * 0.1, C_BONE_HOT, alpha * 0.58);
         }
         ctx.shadowBlur = 0;
       }
@@ -593,7 +654,7 @@
       }
 
       function render() {
-        // warm-black ground
+        // ink-dark Prussian ground
         ctx.shadowBlur = 0;
         ctx.fillStyle = C_BG; ctx.fillRect(0, 0, W, H);
 
@@ -629,10 +690,8 @@
           ctx.fillRect(ex + s.dir.y * CELL * 0.16 - e / 2, ey + s.dir.x * CELL * 0.16 - e / 2, e, e);
         }
 
-        // faint grain + a soft vignette
+        // soft vignette
         ctx.shadowBlur = 0;
-        ctx.fillStyle = `rgba(0,0,0,${0.13 + Math.sin(frame * 0.7) * 0.02})`;
-        for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1);
         const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
         vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)');
         ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);

@@ -1,47 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" shape-rendering="crispEdges">
-  <rect width="200" height="200" fill="#0b0c10"/>
-  <!-- wall: solid rows up top, ragged build-front along the bottom edge -->
+  <rect width="200" height="200" fill="#07100d"/>
+
+  <!-- One shared lattice, with a deep left bank and a narrow tower. -->
   <g>
-    <rect x="0"   y="0"  width="34" height="16" fill="#ef476f"/>
-    <rect x="34"  y="0"  width="34" height="16" fill="#ffd166"/>
-    <rect x="68"  y="0"  width="34" height="16" fill="#06d6a0"/>
-    <rect x="102" y="0"  width="34" height="16" fill="#118ab2"/>
-    <rect x="136" y="0"  width="34" height="16" fill="#f78c6b"/>
-    <rect x="170" y="0"  width="34" height="16" fill="#c792ea"/>
-
-    <rect x="0"   y="16" width="34" height="16" fill="#118ab2"/>
-    <rect x="34"  y="16" width="34" height="16" fill="#06d6a0"/>
-    <rect x="68"  y="16" width="34" height="16" fill="#c792ea"/>
-    <rect x="102" y="16" width="34" height="16" fill="#ffd166"/>
-    <rect x="136" y="16" width="34" height="16" fill="#ef476f"/>
-    <rect x="170" y="16" width="34" height="16" fill="#06d6a0"/>
-
-    <rect x="0"   y="32" width="34" height="16" fill="#ffd166"/>
-    <rect x="34"  y="32" width="34" height="32" fill="#ef476f"/>
-    <rect x="68"  y="32" width="34" height="16" fill="#118ab2"/>
-    <rect x="102" y="32" width="34" height="32" fill="#c792ea"/>
-    <rect x="136" y="32" width="34" height="16" fill="#06d6a0"/>
-    <rect x="170" y="32" width="34" height="32" fill="#f78c6b"/>
-
-    <rect x="0"   y="48" width="34" height="16" fill="#06d6a0"/>
-    <rect x="68"  y="48" width="34" height="16" fill="#ffd166"/>
-    <rect x="136" y="48" width="34" height="16" fill="#118ab2"/>
+    <path fill="#ffd77b" d="M0 0h19v13H0zM60 14h19v13H60zM120 28h19v13h-19zM180 42h19v13h-19zM20 56h19v13H20zM60 70h19v13H60z"/>
+    <path fill="#ffffb3" d="M20 0h19v13H20zM80 14h19v13H80zM140 28h19v13h-19zM0 42h19v13H0zM40 56h19v13H40zM140 56h19v13h-19zM140 84h19v13h-19z"/>
+    <path fill="#004b87" d="M40 0h19v13H40zM100 14h19v13h-19zM160 28h19v13h-19zM20 42h19v13H20zM60 56h19v13H60zM0 70h19v13H0z"/>
+    <path fill="#a8002c" d="M60 0h19v13H60zM120 14h19v13h-19zM180 28h19v13h-19zM40 42h19v13H40zM140 42h19v13h-19zM20 70h19v13H20zM140 70h19v13h-19z"/>
+    <path fill="#deb887" d="M80 0h19v13H80zM100 0h19v13h-19zM120 0h19v13h-19zM140 0h19v13h-19zM160 0h19v13h-19zM180 0h19v13h-19zM0 14h19v13H0zM20 14h19v13H20zM40 14h19v13H40zM140 14h19v13h-19zM160 14h19v13h-19zM180 14h19v13h-19zM0 28h19v13H0zM20 28h19v13H20zM40 28h19v13H40zM60 28h19v13H60zM80 28h19v13H80zM100 28h19v13h-19zM60 42h19v13H60zM80 42h19v13H80zM100 42h19v13h-19zM120 42h19v13h-19zM160 42h19v13h-19zM180 42h19v13h-19zM0 56h19v13H0zM40 70h19v13H40z"/>
   </g>
 
-  <!-- balls in flight, with short trails -->
-  <g>
-    <rect x="22"  y="92"  width="3" height="22" fill="#ffd166" opacity="0.35"/>
-    <circle cx="23.5" cy="90" r="5" fill="#ffd166"/>
-    <rect x="96"  y="104" width="3" height="26" fill="#06d6a0" opacity="0.35"/>
-    <circle cx="97.5" cy="102" r="5" fill="#06d6a0"/>
-    <rect x="150" y="118" width="3" height="20" fill="#ef476f" opacity="0.35"/>
-    <circle cx="151.5" cy="116" r="5" fill="#ef476f"/>
-  </g>
-
-  <!-- paddles on the floor -->
-  <g>
-    <rect x="6"   y="178" width="46" height="9" rx="4" fill="#ffd166"/>
-    <rect x="80"  y="178" width="46" height="9" rx="4" fill="#06d6a0"/>
-    <rect x="138" y="178" width="46" height="9" rx="4" fill="#ef476f"/>
-  </g>
+  <!-- One ball, one return path, one infallible paddle. -->
+  <path d="M154 116v38" stroke="#ffd77b" stroke-width="3" opacity=".28"/>
+  <circle cx="154" cy="112" r="6" fill="#ffd77b"/>
+  <circle cx="152" cy="110" r="2" fill="#e8eee8"/>
+  <rect x="123" y="176" width="62" height="10" rx="5" fill="#a8002c"/>
+  <rect x="123" y="176" width="62" height="3" rx="1.5" fill="#e8eee8"/>
+  <rect x="165" y="179" width="7" height="4" fill="#e8eee8"/>
 </svg>

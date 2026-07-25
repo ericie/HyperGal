@@ -45,7 +45,7 @@
 
       const BASE_MAZE = [
         '#################',
-        '#o.............o#',
+        '#...............#',
         '#.#############.#',
         '#.#############.#',
         '#.#############.#',
@@ -53,7 +53,7 @@
         '#.#############.#',
         '#.#############.#',
         '#.#############.#',
-        '#o.............o#',
+        '#...............#',
         '#################',
       ];
 
@@ -71,11 +71,9 @@
         wallEdgeSoft: 'rgba(69, 103, 255, .28)',
         gate: 'rgba(255, 153, 218, .82)',
         pellet: '#ffdf82',
-        power: '#f7fbff',
         fruit: '#ff3b7d',
         fruitStem: '#4dff9f',
         pac: '#ffe94a',
-        pacHot: '#fff9c9',
         eye: '#f9fbff',
         pupil: '#263bff',
         text: 'rgba(245, 247, 255, .78)',
@@ -95,9 +93,6 @@
       ];
 
       const HOME = { x: 8.5, y: 1.5, c: 8, r: 1 };
-      const POWER_PELLET_SECONDS = 3.1;
-      const POWER_EAT_BONUS_SECONDS = .25;
-      const POWER_MAX_SECONDS = 3.4;
       const params = new URLSearchParams(location.search);
       const DEBUG = params.has('debug');
       const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -116,14 +111,10 @@
       let fruit = null;
       let nextFruitAt = 0;
       let particles = [];
-      let stains = [];
       let sightLines = [];
-      let pairCooldowns = new Map();
       let boardClears = 0;
       let eatenPellets = 0;
-      let ghostCollisions = 0;
-      let deaths = 0;
-      let powerEats = 0;
+      let transformations = 0;
 
       function randomSeed() {
         return Math.floor(Math.random() * 0xffffffff).toString(36);
@@ -171,14 +162,10 @@
         rebuildCellCaches();
         now = 0;
         eatenPellets = 0;
-        ghostCollisions = 0;
-        deaths = 0;
-        powerEats = 0;
+        transformations = 0;
         boardClears = 0;
         particles = [];
-        stains = [];
         sightLines = [];
-        pairCooldowns = new Map();
         fruit = null;
         nextFruitAt = rand(7, 14);
         resizeCanvas();
@@ -267,11 +254,10 @@
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS; c++) {
             const ch = maze[r][c];
-            if (ch !== '.' && ch !== 'o') continue;
+            if (ch !== '.') continue;
             const p = {
               c,
               r,
-              type: ch === 'o' ? 'power' : 'dot',
               pulse: rand(0, TAU),
               alive: true,
             };
@@ -294,18 +280,11 @@
           target: null,
           state: spec.pac ? 'pac' : 'ghost',
           confidence: spec.pac ? .86 : rand(.22, .58),
-          power: 0,
           speedBias: rand(-.18, .18),
           huntUntil: 0,
           huntTargetId: null,
-          panicUntil: 0,
-          panicTargetId: null,
-          escapeCheckAt: 0,
-          checkingBehindUntil: 0,
-          checkDir: null,
-          returningHome: false,
-          rebirthPending: false,
-          rebirthStartedAt: 0,
+          threatId: null,
+          transformAt: 0,
           exploredCells: new Set(),
           exploreTarget: null,
           turnAt: 0,
@@ -314,13 +293,13 @@
           seenBy: null,
           seenFlash: 0,
           spawnFlash: rand(.3, 1.1),
-          bumpFlash: 0,
           pelletEats: 0,
-          kills: 0,
-          targetAge: 0,
           lastTransform: -9,
-          lastCollision: -9,
-          eyeSpin: rand(0, TAU),
+          transformLockUntil: 0,
+          morphStartedAt: 0,
+          morphUntil: 0,
+          morphFrom: null,
+          morphPartnerId: null,
         };
       }
 
@@ -360,68 +339,16 @@
         fruit = null;
       }
 
-      function pickFruitCell() {
-        for (let tries = 0; tries < 60; tries++) {
-          const p = foodCells[randi(0, foodCells.length - 1)];
-          if (isOpenCell(p.c, p.r)) return p;
-        }
-        return { c: HOME.c, r: HOME.r };
-      }
-
       function updateConfidence(dt) {
         for (const a of agents) {
-          if (a.state === 'eyes') continue;
-          a.power = Math.max(0, a.power - dt);
-          if (a.power > 0) {
-            a.panicTargetId = null;
-            a.panicUntil = 0;
-            a.escapeCheckAt = 0;
-            a.checkingBehindUntil = 0;
-          }
           a.seenFlash = Math.max(0, a.seenFlash - dt * 4);
           a.spawnFlash = Math.max(0, a.spawnFlash - dt * 1.6);
-          a.bumpFlash = Math.max(0, a.bumpFlash - dt * 3);
         }
-      }
-
-      function nearbyFoodScore(a) {
-        let score = 0;
-        const ac = Math.floor(a.x);
-        const ar = Math.floor(a.y);
-        for (let dr = -5; dr <= 5; dr++) {
-          for (let dc = -5; dc <= 5; dc++) {
-            const dist = Math.abs(dc) + Math.abs(dr);
-            if (dist > 5) continue;
-            const p = pellets.get(keyOf(ac + dc, ar + dr));
-            if (p && p.alive) score += (p.type === 'power' ? 2.8 : .55) / (1 + dist * .55);
-          }
-        }
-        if (fruit) {
-          const d = Math.abs(fruit.c - ac) + Math.abs(fruit.r - ar);
-          if (d <= 7) score += 3.4 / (1 + d * .45);
-        }
-        return clamp(score / 4.8, 0, 1.2);
       }
 
       function updateAgent(a, dt) {
-        a.mouth += dt * (a.power > 0 ? 18 : 11);
-        a.wobble += dt * (a.state === 'ghost' ? 1.35 : 3.4);
-        if (a.state === 'eyes') {
-          updateEyes(a, dt);
-          return;
-        }
-        if (a.state === 'ghost') {
-          if (a.returningHome && gridDistance(a.x, a.y, HOME.x, HOME.y) <= .55) {
-            a.x = HOME.x;
-            a.y = HOME.y;
-            a.returningHome = false;
-            resetExploration(a);
-          }
-          if (a.rebirthPending && rebirthIsSafe(a)) {
-            becomePacAfterPrivacy(a);
-            return;
-          }
-        }
+        a.mouth += dt * 11;
+        a.wobble += dt * (a.state === 'ghost' ? .45 : 3.4);
         if (a.state === 'ghost') markExplored(a);
 
         if (atCellCenter(a) || !canContinue(a)) {
@@ -453,56 +380,24 @@
         }
       }
 
-      function updateEyes(a, dt) {
-        const dx = HOME.x - a.x;
-        const dy = HOME.y - a.y;
-        const dist = Math.hypot(dx, dy);
-        const speed = 5.8 + a.speedBias;
-        if (dist < .16) {
-          a.x = HOME.x;
-          a.y = HOME.y;
-          a.state = 'ghost';
-          a.confidence = .10;
-          a.power = 0;
-          a.panicTargetId = null;
-          a.panicUntil = 0;
-          a.escapeCheckAt = 0;
-          a.checkingBehindUntil = 0;
-          a.returningHome = false;
-          resetExploration(a);
-          clearHuntTarget(a);
-          a.dir = DIRS[randi(0, DIRS.length - 1)];
-          a.turnAt = 0;
-          a.spawnFlash = 1;
-          a.lastTransform = now;
-          spawnBurst(a.x, a.y, a.color, 24, .7);
-          return;
-        }
-        a.x += (dx / Math.max(.001, dist)) * speed * dt;
-        a.y += (dy / Math.max(.001, dist)) * speed * dt;
-        a.eyeSpin += dt * 11;
-      }
-
       function agentSpeed(a) {
-        if (a.state === 'pac' && now < a.checkingBehindUntil) return 0;
         if (a.state === 'pac') {
-          const panicBoost = a.panicTargetId !== null ? .55 : 0;
-          return (a.power > 0 ? 4.25 : 3.1 + panicBoost) + a.speedBias * .6;
+          const fleeBoost = a.threatId !== null ? .65 : 0;
+          return 3.1 + fleeBoost + a.speedBias * .6;
         }
-        const huntBoost = isHunting(a) ? .45 : 0;
-        const homeBoost = a.returningHome || a.rebirthPending ? .25 : 0;
-        return 2.15 + huntBoost + homeBoost + a.speedBias * .35;
+        const huntBoost = isHunting(a) ? .3 : 0;
+        return 1.35 + huntBoost + a.speedBias * .22;
       }
 
       function decisionDelay(a) {
-        if (a.state === 'pac') return a.panicTargetId !== null || a.power > 0 ? rand(.42, .76) : rand(.92, 1.42);
-        if (isHunting(a)) return rand(.46, .78);
-        return rand(1.6, 3.05);
+        if (a.state === 'pac') return a.threatId !== null ? rand(.32, .56) : rand(.92, 1.42);
+        if (isHunting(a)) return rand(.8, 1.25);
+        return rand(2.2, 4);
       }
 
       function randomTurnChance(a) {
         if (!canContinue(a)) return 1;
-        if (a.state === 'pac') return a.panicTargetId !== null ? .025 : 0;
+        if (a.state === 'pac') return 0;
         return isHunting(a) ? .01 : .003;
       }
 
@@ -530,7 +425,7 @@
       function huntTargetFor(ghost) {
         if (ghost.huntTargetId === null) return null;
         const target = agents.find((a) => a.id === ghost.huntTargetId);
-        if (!target || target.state !== 'pac' || target.power > 0) {
+        if (!target || target.state !== 'pac') {
           clearHuntTarget(ghost);
           return null;
         }
@@ -542,22 +437,6 @@
         if (isOpenCell(cell.c, cell.r)) a.exploredCells.add(keyOf(cell.c, cell.r));
       }
 
-      function visibleGhostFor(a) {
-        return nearestAgent(a, (b) => b.state === 'ghost' && canSee(a, b));
-      }
-
-      function ghostPrivacyThreat(a) {
-        return visibleGhostFor(a) || nearestAgent(a, (b) => b.state === 'ghost' && canSee(b, a));
-      }
-
-      function rebirthIsSafe(a) {
-        const waited = now - a.rebirthStartedAt;
-        if (waited < .85) return false;
-        const threat = ghostPrivacyThreat(a);
-        if (!threat) return true;
-        return waited > 1.35 && gridDistance(a.x, a.y, threat.x, threat.y) > 5.4;
-      }
-
       function resetExploration(a) {
         a.exploredCells = new Set();
         a.exploreTarget = null;
@@ -566,11 +445,6 @@
 
       function exploreTargetFor(a) {
         markExplored(a);
-        if (a.returningHome) {
-          if (gridDistance(a.x, a.y, HOME.x, HOME.y) > .55) return { c: HOME.c, r: HOME.r };
-          a.returningHome = false;
-          resetExploration(a);
-        }
         if (a.exploreTarget && !a.exploredCells.has(keyOf(a.exploreTarget.c, a.exploreTarget.r))) return a.exploreTarget;
         const start = cellOf(a.x, a.y);
         const target = bfsNearest(start, (c, r) => isOpenCell(c, r) && !a.exploredCells.has(keyOf(c, r)));
@@ -583,27 +457,21 @@
       }
 
       function pickTarget(a) {
+        if (now < a.transformLockUntil && a.morphPartnerId !== null) {
+          const partner = agents.find((b) => b.id === a.morphPartnerId);
+          if (partner) return fleeTargetFrom(partner, a);
+        }
+
         if (a.state === 'pac') {
-          if (a.power > 0) {
-            const ghost = nearestAgent(a, (b) => b.state === 'ghost');
-            if (ghost) return cellOf(ghost.x, ghost.y);
-          }
-          const panicTarget = panicTargetFor(a);
-          if (panicTarget) return fleeTargetFrom(panicTarget, a);
-          return nearestPowerTarget(a) || nearestFoodTarget(a, false);
+          const threat = threatFor(a);
+          if (threat) return fleeTargetFrom(threat, a);
+          return nearestFoodTarget(a);
         }
 
         const visiblePac = nearestAgent(a, (b) => b.state === 'pac' && canSee(a, b));
         if (visiblePac) {
           setHuntTarget(a, visiblePac);
           return cellOf(visiblePac.x, visiblePac.y);
-        }
-
-        const visibleGhost = visibleGhostFor(a);
-        if (visibleGhost) {
-          clearHuntTarget(a);
-          reactToSeenGhost(a, visibleGhost);
-          return fleeTargetFrom(visibleGhost, a);
         }
 
         const huntedPac = huntTargetFor(a);
@@ -613,41 +481,7 @@
       }
 
       function facingDir(a) {
-        return a.state === 'pac' && a.checkingBehindUntil > 0 && a.checkDir ? a.checkDir : a.dir;
-      }
-
-      function beginBehindCheck(pac) {
-        pac.checkDir = oppositeDir(pac.dir);
-        pac.dir = pac.checkDir;
-        pac.checkingBehindUntil = now + .48;
-        pac.target = null;
-        pac.nextDir = null;
-        pac.turnAt = now + .48;
-        pac.seenFlash = 1;
-      }
-
-      function resumeFleeAfterBackCheck(pac, ghost) {
-        pac.checkingBehindUntil = 0;
-        pac.checkDir = null;
-        pac.escapeCheckAt = now + 1;
-        steerFleeFrom(pac, ghost, .12);
-      }
-
-      function steerFleeFrom(pac, ghost, turnSoon) {
-        const awayDir = dirAwayFrom(pac, ghost);
-        pac.target = fleeTargetFrom(ghost, pac);
-        const routeDir = firstDirToward(pac, pac.target);
-        pac.nextDir = canMoveDir(pac, awayDir) ? awayDir : routeDir || awayDir;
-        if (canMoveDir(pac, pac.nextDir)) pac.dir = pac.nextDir;
-        pac.turnAt = Math.min(pac.turnAt, now + turnSoon);
-      }
-
-      function steerGhostAwayFrom(ghost, other, turnSoon) {
-        const awayDir = dirAwayFrom(ghost, other);
-        ghost.target = fleeTargetFrom(other, ghost);
-        const routeDir = firstDirToward(ghost, ghost.target);
-        ghost.nextDir = canMoveDir(ghost, awayDir) ? awayDir : routeDir || awayDir;
-        ghost.turnAt = Math.min(ghost.turnAt, now + turnSoon);
+        return a.dir;
       }
 
       function dirAwayFrom(a, threat) {
@@ -676,34 +510,11 @@
         return DIRS.find((d) => d.x === -dir.x && d.y === -dir.y) || DIRS[0];
       }
 
-      function panicTargetFor(a) {
-        if (a.panicTargetId === null) return null;
-        const target = agents.find((b) => b.id === a.panicTargetId);
-        if (!target || target.state !== 'ghost' || a.power > 0) {
-          a.panicTargetId = null;
-          a.panicUntil = 0;
-          a.escapeCheckAt = 0;
-          a.checkingBehindUntil = 0;
-          a.checkDir = null;
-          return null;
-        }
-        return target;
-      }
-
-      function nearestPowerTarget(a) {
-        const start = cellOf(a.x, a.y);
-        return bfsNearest(start, (c, r) => {
-          const p = pellets.get(keyOf(c, r));
-          return !!(p && p.alive && p.type === 'power');
-        });
-      }
-
-      function nearestFoodTarget(a, preferPower) {
+      function nearestFoodTarget(a) {
         const start = cellOf(a.x, a.y);
         const result = bfsNearest(start, (c, r) => {
           const p = pellets.get(keyOf(c, r));
-          if (!p || !p.alive) return false;
-          return preferPower ? p.type === 'power' : true;
+          return !!(p && p.alive);
         });
         if (result) return result;
         return foodCells[randi(0, foodCells.length - 1)];
@@ -732,13 +543,6 @@
           }
         }
         return best || { c: HOME.c, r: HOME.r };
-      }
-
-      function reactToSeenGhost(a, ghost) {
-        a.bumpFlash = Math.max(a.bumpFlash, .55);
-        a.seenFlash = Math.max(a.seenFlash, .6);
-        spawnSightLine(a, ghost, a.color);
-        return true;
       }
 
       function nearestAgent(a, predicate) {
@@ -771,13 +575,8 @@
           pelletCount--;
           eatenPellets++;
           a.pelletEats++;
-          a.confidence = clamp(a.confidence + (p.type === 'power' ? .34 : .045), 0, 1);
-          if (p.type === 'power') {
-            a.power = POWER_PELLET_SECONDS;
-            a.confidence = 1;
-            a.seenFlash = 1;
-            spawnBurst(cellCenterX(c), cellCenterY(r), COLORS.power, 42, .95);
-          } else if (rng() < .22) {
+          a.confidence = clamp(a.confidence + .045, 0, 1);
+          if (rng() < .22) {
             spawnParticle(cellCenterX(c), cellCenterY(r), COLORS.pellet, .8, rand(.25, .42));
           }
         }
@@ -791,262 +590,108 @@
       }
 
       function resolveCollisions() {
-        for (let i = 0; i < agents.length; i++) {
-          for (let j = i + 1; j < agents.length; j++) {
-            const a = agents[i];
-            const b = agents[j];
-            if (a.state === 'eyes' || b.state === 'eyes') continue;
-            const bothGhosts = a.state === 'ghost' && b.state === 'ghost';
-            const hitRange = bothGhosts ? .82 : 1.26;
-            if (gridDistance(a.x, a.y, b.x, b.y) > hitRange) continue;
-            const k = i + ':' + j;
-            if ((pairCooldowns.get(k) || 0) > now) continue;
-            pairCooldowns.set(k, now + (bothGhosts ? 1.35 : .75));
-
-            if (bothGhosts) {
-              ghostCollisions++;
-              ghostBump(a, b);
-              continue;
-            }
-
-            if (a.state === 'pac' && b.state === 'pac') {
-              pacsStartle(a, b);
-              continue;
-            }
-
-            const pac = a.state === 'pac' ? a : b;
-            const ghost = a.state === 'ghost' ? a : b;
-            if (pac.power > 0) {
-              eatGhost(pac, ghost);
-            } else {
-              killPac(pac, ghost);
-            }
-          }
+        const pac = agents.find((a) => a.state === 'pac');
+        const ghost = agents.find((a) => a.state === 'ghost');
+        if (!pac || !ghost) return;
+        if (gridDistance(pac.x, pac.y, ghost.x, ghost.y) <= 1.18) {
+          if (pac.threatId === null) spawnSightLine(pac, ghost, COLORS.sight);
+          becomeGhostFromThreat(pac, ghost);
         }
-      }
-
-      function ghostBump(a, b) {
-        clearHuntTarget(a);
-        clearHuntTarget(b);
-        steerGhostAwayFrom(a, b, .42);
-        steerGhostAwayFrom(b, a, .42);
-        a.bumpFlash = b.bumpFlash = 1;
-        a.lastCollision = b.lastCollision = now;
-        spawnBurst((a.x + b.x) / 2, (a.y + b.y) / 2, '#9da7ff', 16, .45);
-      }
-
-      function pacsStartle(a, b) {
-        a.state = 'ghost';
-        b.state = 'ghost';
-        a.power = b.power = 0;
-        a.confidence = 0;
-        b.confidence = 0;
-        a.panicTargetId = b.panicTargetId = null;
-        a.panicUntil = b.panicUntil = 0;
-        a.escapeCheckAt = b.escapeCheckAt = 0;
-        a.checkingBehindUntil = b.checkingBehindUntil = 0;
-        a.checkDir = b.checkDir = null;
-        a.returningHome = b.returningHome = true;
-        a.rebirthPending = b.rebirthPending = true;
-        a.rebirthStartedAt = b.rebirthStartedAt = now;
-        clearHuntTarget(a);
-        clearHuntTarget(b);
-        resetExploration(a);
-        resetExploration(b);
-        a.target = b.target = { c: HOME.c, r: HOME.r };
-        a.nextDir = firstDirToward(a, a.target);
-        b.nextDir = firstDirToward(b, b.target);
-        a.seenFlash = b.seenFlash = 1;
-        a.lastTransform = b.lastTransform = now;
-        spawnSightLine(a, b, '#fff7b0');
-        spawnBurst((a.x + b.x) / 2, (a.y + b.y) / 2, '#fff7b0', 24, .62);
-      }
-
-      function killPac(pac, ghost) {
-        deaths++;
-        ghost.kills++;
-        pac.state = 'eyes';
-        pac.power = 0;
-        pac.confidence = 0;
-        pac.panicTargetId = null;
-        pac.panicUntil = 0;
-        pac.escapeCheckAt = 0;
-        pac.checkingBehindUntil = 0;
-        pac.checkDir = null;
-        pac.returningHome = false;
-        pac.rebirthPending = true;
-        pac.rebirthStartedAt = now;
-        clearHuntsFor(pac);
-        clearHuntTarget(ghost);
-        pac.seenFlash = 0;
-        pac.lastTransform = now;
-        ghost.confidence = clamp(ghost.confidence + .12, 0, 1);
-        stains.push({ x: pac.x, y: pac.y, color: ghost.color, life: 18, maxLife: 18, r: rand(.28, .48) });
-        spawnBurst(pac.x, pac.y, ghost.color, 38, .9);
-      }
-
-      function eatGhost(pac, ghost) {
-        powerEats++;
-        pac.kills++;
-        pac.power = Math.min(POWER_MAX_SECONDS, pac.power + POWER_EAT_BONUS_SECONDS);
-        pac.confidence = 1;
-        ghost.state = 'eyes';
-        ghost.power = 0;
-        ghost.confidence = 0;
-        ghost.panicTargetId = null;
-        ghost.panicUntil = 0;
-        ghost.escapeCheckAt = 0;
-        ghost.checkingBehindUntil = 0;
-        ghost.checkDir = null;
-        ghost.returningHome = false;
-        ghost.rebirthPending = false;
-        ghost.rebirthStartedAt = 0;
-        clearHuntTarget(ghost);
-        ghost.lastTransform = now;
-        stains.push({ x: ghost.x, y: ghost.y, color: COLORS.power, life: 12, maxLife: 12, r: rand(.34, .62) });
-        spawnBurst(ghost.x, ghost.y, COLORS.power, 46, 1);
       }
 
       function applyVisibilityRules() {
-        for (const pac of agents) {
-          if (pac.state !== 'pac' || pac.power > 0) continue;
-          const panicTarget = panicTargetFor(pac);
-          if (panicTarget) {
-            if (gridDistance(pac.x, pac.y, panicTarget.x, panicTarget.y) < 1.18) {
-              killPac(pac, panicTarget);
-              spawnSightLine(pac, panicTarget, panicTarget.color);
-              continue;
-            }
-            if (now < pac.checkingBehindUntil) {
-              pac.dir = pac.checkDir || oppositeDir(pac.dir);
-              const ghostBehind = firstGhostSeenByPac(pac);
-              if (ghostBehind && ghostBehind.state === 'ghost') {
-                resumeFleeAfterBackCheck(pac, ghostBehind);
-              }
-              continue;
-            }
-            if (pac.checkingBehindUntil > 0) {
-              const ghostBehind = firstGhostSeenByPac(pac);
-              if (!ghostBehind || ghostBehind.state !== 'ghost') {
-                becomeGhostAfterEscape(pac, panicTarget);
-              } else {
-                resumeFleeAfterBackCheck(pac, ghostBehind);
-              }
-              continue;
-            }
-            if (!canSee(pac, panicTarget)) {
-              if (now >= pac.escapeCheckAt) beginBehindCheck(pac);
-              else pac.turnAt = Math.min(pac.turnAt, now + .42);
-              continue;
-            }
-            steerFleeFrom(pac, panicTarget, .22);
-            continue;
+        const pac = agents.find((a) => a.state === 'pac');
+        if (!pac) return;
+        const ghost = agents.find((a) => a.state === 'ghost');
+        if (!ghost) return;
+
+        const threat = threatFor(pac);
+        if (threat) {
+          if (now >= pac.transformAt) {
+            becomeGhostFromThreat(pac, threat);
+            return;
           }
-          const target = firstGhostSeenByPac(pac);
-          if (!target) continue;
-          if (target.state === 'ghost' && gridDistance(pac.x, pac.y, target.x, target.y) < 1.18) {
-            killPac(pac, target);
-            spawnSightLine(pac, target, target.color);
-            continue;
-          }
-          if (target.state === 'ghost') {
-            pac.panicTargetId = target.id;
-            pac.panicUntil = now + 4.2;
-            pac.escapeCheckAt = now + 1.05;
-            pac.checkingBehindUntil = 0;
-            pac.checkDir = null;
-            pac.seenBy = target.id;
-            pac.seenFlash = 1;
-            steerFleeFrom(pac, target, .18);
-            setHuntTarget(target, pac);
-            spawnSightLine(pac, target, COLORS.sight);
-            spawnBurst(pac.x, pac.y, COLORS.sight, 10, .34);
-          } else {
-            continue;
-          }
+          steerPacAway(pac, threat);
+          setHuntTarget(threat, pac);
+          return;
         }
 
-        for (const ghost of agents) {
-          if (ghost.state !== 'ghost') continue;
-          const visiblePac = nearestAgent(ghost, (b) => b.state === 'pac' && canSee(ghost, b));
-          if (visiblePac) {
-            setHuntTarget(ghost, visiblePac);
-            ghost.target = cellOf(visiblePac.x, visiblePac.y);
-            ghost.nextDir = firstDirToward(ghost, ghost.target);
-            ghost.turnAt = Math.min(ghost.turnAt, now + .24);
-            continue;
-          }
-          const visibleGhost = visibleGhostFor(ghost);
-          if (visibleGhost) {
-            clearHuntTarget(ghost);
-            reactToSeenGhost(ghost, visibleGhost);
-            steerGhostAwayFrom(ghost, visibleGhost, .34);
-            continue;
-          }
-          const huntedPac = huntTargetFor(ghost);
-          if (huntedPac) {
-            ghost.target = cellOf(huntedPac.x, huntedPac.y);
-            ghost.nextDir = firstDirToward(ghost, ghost.target);
-            ghost.turnAt = Math.min(ghost.turnAt, now + .24);
-            continue;
-          }
+        if (canSee(pac, ghost)) {
+          beginThreatResponse(pac, ghost);
+          return;
+        }
+
+        if (canSee(ghost, pac)) {
+          setHuntTarget(ghost, pac);
+          ghost.target = cellOf(pac.x, pac.y);
+          ghost.nextDir = firstDirToward(ghost, ghost.target);
+          ghost.turnAt = Math.min(ghost.turnAt, now + .24);
+          return;
+        }
+
+        const huntedPac = huntTargetFor(ghost);
+        if (huntedPac) {
+          ghost.target = cellOf(huntedPac.x, huntedPac.y);
+          ghost.nextDir = firstDirToward(ghost, ghost.target);
+          ghost.turnAt = Math.min(ghost.turnAt, now + .24);
         }
       }
 
-      function becomeGhostAfterEscape(pac, witness) {
-        pac.state = 'ghost';
-        pac.power = 0;
-        pac.confidence = 0;
-        pac.panicTargetId = null;
-        pac.panicUntil = 0;
-        pac.escapeCheckAt = 0;
-        pac.checkingBehindUntil = 0;
-        pac.checkDir = null;
-        pac.returningHome = true;
-        pac.rebirthPending = true;
-        pac.rebirthStartedAt = now;
+      function threatFor(pac) {
+        if (pac.threatId === null) return null;
+        const threat = agents.find((a) => a.id === pac.threatId && a.state === 'ghost');
+        if (threat) return threat;
+        pac.threatId = null;
+        pac.transformAt = 0;
+        return null;
+      }
+
+      function beginThreatResponse(pac, ghost) {
+        pac.threatId = ghost.id;
+        pac.transformAt = now + 1.08;
+        pac.seenBy = ghost.id;
+        pac.seenFlash = .7;
+        steerPacAway(pac, ghost);
+        setHuntTarget(ghost, pac);
+        ghost.target = cellOf(pac.x, pac.y);
+        ghost.nextDir = firstDirToward(ghost, ghost.target);
+        ghost.turnAt = Math.min(ghost.turnAt, now + .24);
+        spawnSightLine(pac, ghost, COLORS.sight);
+      }
+
+      function steerPacAway(pac, ghost) {
+        pac.target = fleeTargetFrom(ghost, pac);
+        const awayDir = dirAwayFrom(pac, ghost);
+        const routeDir = firstDirToward(pac, pac.target);
+        pac.nextDir = canMoveDir(pac, awayDir) ? awayDir : routeDir || awayDir;
+        if (canMoveDir(pac, pac.nextDir)) pac.dir = pac.nextDir;
+        pac.turnAt = Math.min(pac.turnAt, now + .12);
+      }
+
+      function becomeGhostFromThreat(pac, ghost) {
+        if (pac.state !== 'pac') return;
+        const morphUntil = now + (REDUCED ? .01 : .72);
+
+        transformations++;
         clearHuntsFor(pac);
         clearHuntTarget(pac);
-        resetExploration(pac);
+
+        pac.state = 'ghost';
+        pac.threatId = null;
+        pac.transformAt = 0;
+        pac.confidence = .24;
+        pac.morphFrom = 'pac';
+        pac.morphStartedAt = now;
+        pac.morphUntil = morphUntil;
+        pac.morphPartnerId = ghost.id;
+        pac.transformLockUntil = now + .95;
         pac.lastTransform = now;
-        pac.seenBy = witness ? witness.id : null;
-        pac.seenFlash = 1;
-        pac.target = { c: HOME.c, r: HOME.r };
-        pac.nextDir = firstDirToward(pac, pac.target);
-        pac.turnAt = now + rand(.32, .62);
-        if (witness) spawnSightLine(pac, witness, COLORS.sight);
-        spawnBurst(pac.x, pac.y, pac.color, 18, .48);
-      }
-
-      function becomePacAfterPrivacy(ghost) {
-        ghost.state = 'pac';
-        ghost.power = 0;
-        ghost.confidence = Math.max(ghost.confidence, .72);
-        ghost.panicTargetId = null;
-        ghost.panicUntil = 0;
-        ghost.escapeCheckAt = 0;
-        ghost.checkingBehindUntil = 0;
-        ghost.checkDir = null;
-        ghost.returningHome = false;
-        ghost.rebirthPending = false;
-        ghost.rebirthStartedAt = 0;
-        clearHuntTarget(ghost);
-        clearHuntsFor(ghost);
-        ghost.lastTransform = now;
-        ghost.seenBy = null;
-        ghost.seenFlash = 1;
-        ghost.target = nearestPowerTarget(ghost) || nearestFoodTarget(ghost, false);
-        ghost.nextDir = firstDirToward(ghost, ghost.target);
-        ghost.turnAt = now + rand(.36, .7);
-        spawnBurst(ghost.x, ghost.y, COLORS.pac, 24, .56);
-      }
-
-      function firstGhostSeenByPac(pac) {
-        for (const b of agents) {
-          if (pac === b || b.state !== 'ghost') continue;
-          if (canSee(pac, b)) return b;
-        }
-        return null;
+        pac.seenBy = ghost.id;
+        pac.seenFlash = .48;
+        resetExploration(pac);
+        pac.target = fleeTargetFrom(ghost, pac);
+        pac.nextDir = firstDirToward(pac, pac.target) || pac.dir;
+        pac.turnAt = pac.transformLockUntil;
       }
 
       function canSee(viewer, target) {
@@ -1105,10 +750,6 @@
           p.vy *= Math.pow(.08, dt);
           if (p.life <= 0) particles.splice(i, 1);
         }
-        for (let i = stains.length - 1; i >= 0; i--) {
-          stains[i].life -= dt * .18;
-          if (stains[i].life <= 0) stains.splice(i, 1);
-        }
         for (let i = sightLines.length - 1; i >= 0; i--) {
           sightLines[i].life -= dt * 1.7;
           if (sightLines[i].life <= 0) sightLines.splice(i, 1);
@@ -1144,7 +785,6 @@
         ctx.fillRect(0, 0, W, H);
         drawBackdrop();
         drawMaze();
-        drawStains();
         drawPellets();
         drawFruit();
         drawSightLines();
@@ -1254,49 +894,15 @@
         ctx.stroke();
       }
 
-      function drawStains() {
-        ctx.save();
-        for (const s of stains) {
-          const a = clamp(s.life / s.maxLife, 0, 1);
-          ctx.globalAlpha = .08 + a * .24;
-          ctx.fillStyle = s.color;
-          ctx.beginPath();
-          ctx.arc(px(s.x), py(s.y), cell * (s.r + (1 - a) * .65), 0, TAU);
-          ctx.fill();
-          ctx.globalAlpha = .15 * a;
-          ctx.strokeStyle = s.color;
-          ctx.lineWidth = Math.max(1, cell * .045);
-          ctx.beginPath();
-          ctx.arc(px(s.x), py(s.y), cell * (s.r + (1 - a) * 1.5), 0, TAU);
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
-
       function drawPellets() {
         ctx.save();
         for (const p of pellets.values()) {
           if (!p.alive) continue;
           const x = px(cellCenterX(p.c));
           const y = py(cellCenterY(p.r));
-          if (p.type === 'power') {
-            const pulse = .5 + .5 * Math.sin(now * 4.5 + p.pulse);
-            ctx.globalAlpha = .55 + pulse * .35;
-            ctx.fillStyle = COLORS.power;
-            ctx.beginPath();
-            ctx.arc(x, y, cell * (.18 + pulse * .035), 0, TAU);
-            ctx.fill();
-            ctx.globalAlpha = .28;
-            ctx.strokeStyle = COLORS.power;
-            ctx.lineWidth = Math.max(1, cell * .045);
-            ctx.beginPath();
-            ctx.arc(x, y, cell * (.31 + pulse * .08), 0, TAU);
-            ctx.stroke();
-          } else {
-            ctx.globalAlpha = .82;
-            ctx.fillStyle = COLORS.pellet;
-            ctx.fillRect(Math.round(x - cell * .055), Math.round(y - cell * .055), Math.max(2, Math.round(cell * .11)), Math.max(2, Math.round(cell * .11)));
-          }
+          ctx.globalAlpha = .82;
+          ctx.fillStyle = COLORS.pellet;
+          ctx.fillRect(Math.round(x - cell * .055), Math.round(y - cell * .055), Math.max(2, Math.round(cell * .11)), Math.max(2, Math.round(cell * .11)));
         }
         ctx.restore();
       }
@@ -1342,10 +948,8 @@
       }
 
       function drawAgents() {
-        const ordered = [...agents].sort((a, b) => (a.state === 'eyes') - (b.state === 'eyes'));
-        for (const a of ordered) {
-          if (a.state === 'eyes') drawEyes(a);
-          else if (a.state === 'pac') drawPac(a);
+        for (const a of agents) {
+          if (a.state === 'pac') drawPac(a);
           else drawGhost(a);
         }
       }
@@ -1354,22 +958,30 @@
         const x = px(a.x);
         const y = py(a.y);
         const r = cell * .72;
-        const angle = facingDir(a).angle;
-        const mouth = .18 + Math.abs(Math.sin(a.mouth)) * (a.power > 0 ? .33 : .23);
-        const hot = a.power > 0;
 
         ctx.save();
         drawConfidenceHalo(a, x, y, r * 1.12);
-        if (a.seenFlash > 0 || hot) {
-          ctx.globalAlpha = (hot ? .32 : .18) + a.seenFlash * .22;
-          ctx.fillStyle = hot ? COLORS.power : a.color;
+        if (a.seenFlash > 0) {
+          ctx.globalAlpha = .18 + a.seenFlash * .22;
+          ctx.fillStyle = a.color;
           ctx.beginPath();
           ctx.arc(x, y, r * (1.55 + .12 * Math.sin(now * 8)), 0, TAU);
           ctx.fill();
         }
+        drawPacBody(a, x, y, r, 1, 0);
+        ctx.restore();
+      }
 
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = hot ? COLORS.pacHot : COLORS.pac;
+      function drawPacBody(a, x, y, r, alpha, collapse) {
+        const angle = facingDir(a).angle;
+        const mouth = (.18 + Math.abs(Math.sin(a.mouth)) * .23) * (1 - collapse * .78);
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(1 + collapse * .16, 1 - collapse * .48);
+        ctx.translate(-x, -y);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = COLORS.pac;
         ctx.beginPath();
         ctx.moveTo(x, y);
         ctx.arc(x, y, r, angle + mouth, angle - mouth, false);
@@ -1377,19 +989,10 @@
         ctx.fill();
 
         ctx.fillStyle = a.color;
-        ctx.globalAlpha = .84;
+        ctx.globalAlpha = alpha * .84;
         ctx.beginPath();
         ctx.arc(x - Math.sin(angle) * r * .34 + Math.cos(angle) * r * .10, y + Math.cos(angle) * r * .34 + Math.sin(angle) * r * .10, r * .11, 0, TAU);
         ctx.fill();
-
-        if (hot) {
-          ctx.globalAlpha = .8;
-          ctx.strokeStyle = COLORS.power;
-          ctx.lineWidth = Math.max(1, cell * .08);
-          ctx.beginPath();
-          ctx.arc(x, y, r * (1.15 + .08 * Math.sin(now * 10)), 0, TAU);
-          ctx.stroke();
-        }
         ctx.restore();
       }
 
@@ -1397,62 +1000,87 @@
         const x = px(a.x);
         const y = py(a.y);
         const r = cell * .68;
-        const bob = Math.sin(now * 2.4 + a.wobble) * cell * .055;
+        const morphing = now < a.morphUntil && a.morphFrom === 'pac';
+        const progress = morphing ? morphProgress(a) : 1;
+        const emergence = 1 - Math.pow(1 - progress, 3);
+        const bob = Math.sin(now * .72 + a.wobble) * cell * .075 * emergence;
+        const sway = Math.sin(now * .58 + a.wobble * .8) * .035 * emergence;
 
         ctx.save();
-        drawConfidenceHalo(a, x, y + bob, r * 1.13);
-        if (a.bumpFlash > 0 || a.spawnFlash > 0) {
-          ctx.globalAlpha = .15 + Math.max(a.bumpFlash, a.spawnFlash) * .22;
-          ctx.fillStyle = a.bumpFlash > 0 ? '#ffffff' : a.color;
+        if (morphing) {
+          drawMorphEcho(a, x, y, r);
+          const pacExit = clamp(progress / .68, 0, 1);
+          drawPacBody(a, x, y, r * 1.06, 1 - pacExit, pacExit);
+        }
+
+        const haloAlpha = morphing ? clamp(progress / .45, 0, 1) : 1;
+        drawConfidenceHalo(a, x, y + bob, r * 1.13, haloAlpha);
+        if (a.spawnFlash > 0) {
+          ctx.globalAlpha = .15 + a.spawnFlash * .22;
+          ctx.fillStyle = a.color;
           ctx.beginPath();
           ctx.arc(x, y + bob, r * 1.5, 0, TAU);
           ctx.fill();
         }
 
+        const ghostAlpha = morphing ? clamp((progress - .06) / .68, 0, 1) : 1;
+        const eyesAlpha = morphing ? clamp((progress - .24) / .42, 0, 1) : 1;
+        drawGhostBody(a, x, y + bob, r, ghostAlpha, emergence, sway, eyesAlpha);
+        ctx.restore();
+      }
+
+      function drawGhostBody(a, x, y, r, alpha, emergence, sway, eyesAlpha) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(sway);
+        ctx.scale(.88 + emergence * .12, .58 + emergence * .42);
+        ctx.translate(-x, -y);
+
         ctx.fillStyle = a.color;
-        ctx.globalAlpha = .94;
+        ctx.globalAlpha = alpha * .94;
         ctx.beginPath();
-        ctx.arc(x, y + bob - r * .05, r, Math.PI, 0, false);
-        ctx.lineTo(x + r, y + bob + r * .66);
+        ctx.arc(x, y - r * .05, r, Math.PI, 0, false);
+        ctx.lineTo(x + r, y + r * .66);
         const foot = r / 3;
         for (let i = 0; i < 3; i++) {
           const fx = x + r - foot * (i * 2 + 1);
-          ctx.quadraticCurveTo(fx, y + bob + r * .34, fx - foot, y + bob + r * .66);
+          ctx.quadraticCurveTo(fx, y + r * .34, fx - foot, y + r * .66);
         }
-        ctx.lineTo(x - r, y + bob - r * .05);
+        ctx.lineTo(x - r, y - r * .05);
         ctx.closePath();
         ctx.fill();
 
-        ctx.globalAlpha = .22;
+        ctx.globalAlpha = alpha * .22;
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(x - r * .58, y + bob + r * .05, r * 1.16, Math.max(1, cell * .05));
+        ctx.fillRect(x - r * .58, y + r * .05, r * 1.16, Math.max(1, cell * .05));
 
-        drawAgentEyes(a, x, y + bob - r * .16, r);
+        drawAgentEyes(a, x, y - r * .16, r, eyesAlpha);
         ctx.restore();
       }
 
-      function drawEyes(a) {
-        const x = px(a.x);
-        const y = py(a.y);
-        const r = cell * .54;
+      function morphProgress(a) {
+        if (a.morphUntil <= a.morphStartedAt || now >= a.morphUntil) return 1;
+        return clamp((now - a.morphStartedAt) / (a.morphUntil - a.morphStartedAt), 0, 1);
+      }
+
+      function drawMorphEcho(a, x, y, r) {
+        if (now >= a.morphUntil) return;
+        const progress = morphProgress(a);
         ctx.save();
-        ctx.globalAlpha = .28;
-        ctx.strokeStyle = a.color;
-        ctx.lineWidth = Math.max(1, cell * .05);
+        ctx.globalAlpha = (1 - progress) * .72;
+        ctx.strokeStyle = a.morphFrom === 'pac' ? COLORS.pac : a.color;
+        ctx.lineWidth = Math.max(1, cell * .055);
         ctx.beginPath();
-        ctx.arc(x, y, r * (1.1 + .2 * Math.sin(a.eyeSpin)), 0, TAU);
+        ctx.arc(x, y, r * (.92 + progress * .78), 0, TAU);
         ctx.stroke();
-        drawAgentEyes(a, x, y, r * 1.15);
         ctx.restore();
       }
 
-      function drawAgentEyes(a, x, y, r) {
-        const look = a.state === 'eyes'
-          ? Math.atan2(HOME.y - a.y, HOME.x - a.x)
-          : facingDir(a).angle;
+      function drawAgentEyes(a, x, y, r, alpha = 1) {
+        const look = facingDir(a).angle;
         const lx = Math.cos(look) * r * .12;
         const ly = Math.sin(look) * r * .12;
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = alpha;
         ctx.fillStyle = COLORS.eye;
         ctx.beginPath();
         ctx.ellipse(x - r * .33, y, r * .23, r * .30, 0, 0, TAU);
@@ -1465,17 +1093,17 @@
         ctx.fill();
       }
 
-      function drawConfidenceHalo(a, x, y, r) {
+      function drawConfidenceHalo(a, x, y, r, alpha = 1) {
         const start = -Math.PI / 2;
         const end = start + TAU * a.confidence;
         ctx.save();
-        ctx.globalAlpha = .18 + a.confidence * .25;
+        ctx.globalAlpha = (.18 + a.confidence * .25) * alpha;
         ctx.strokeStyle = a.state === 'pac' ? COLORS.pac : a.color;
         ctx.lineWidth = Math.max(1, cell * .045);
         ctx.beginPath();
         ctx.arc(x, y, r, start, end);
         ctx.stroke();
-        ctx.globalAlpha = .11;
+        ctx.globalAlpha = .11 * alpha;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, TAU);
         ctx.stroke();
@@ -1503,8 +1131,7 @@
         ctx.textBaseline = 'top';
         const pacs = agents.filter((a) => a.state === 'pac').length;
         const ghosts = agents.filter((a) => a.state === 'ghost').length;
-        const eyes = agents.filter((a) => a.state === 'eyes').length;
-        const label = `PAC ${pacs}  GHOST ${ghosts}  EYES ${eyes}`;
+        const label = `PAC ${pacs}  GHOST ${ghosts}  CHANGES ${transformations}`;
         ctx.globalAlpha = .42;
         ctx.fillText(label, ox, Math.max(8, oy - cell * .85));
         ctx.textAlign = 'right';
@@ -1517,14 +1144,14 @@
         const lines = [
           `seed ${seed}`,
           `pellets ${pelletCount} eaten ${eatenPellets} clears ${boardClears}`,
-          `deaths ${deaths} power-eats ${powerEats} ghost-bumps ${ghostCollisions}`,
+          `transformations ${transformations}`,
           ...agents.map((a) => {
-            const mode = a.state === 'pac'
-              ? (a.power > 0 ? 'power' : a.panicTargetId !== null ? 'flee' : 'seek')
-              : a.state === 'ghost'
-                ? (isHunting(a) ? 'hunt' : a.returningHome ? 'home' : a.rebirthPending ? 'hide' : 'explore')
-                : 'eyes';
-            return `${a.name.padEnd(6)} ${a.state.padEnd(5)} ${mode.padEnd(7)} power ${a.power.toFixed(1)} explored ${a.exploredCells.size} @ ${Math.floor(a.x)},${Math.floor(a.y)}`;
+            const mode = now < a.transformLockUntil
+              ? 'settle'
+              : a.state === 'pac'
+                ? (a.threatId !== null ? 'flee' : 'seek')
+                : (isHunting(a) ? 'hunt' : 'explore');
+            return `${a.name.padEnd(6)} ${a.state.padEnd(5)} ${mode.padEnd(7)} explored ${a.exploredCells.size} @ ${Math.floor(a.x)},${Math.floor(a.y)}`;
           }),
         ];
         debugEl.textContent = lines.join('\n');

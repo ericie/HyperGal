@@ -4,51 +4,52 @@
       <feGaussianBlur stdDeviation="2.2" result="b"/>
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
+    <radialGradient id="vig" cx="50%" cy="50%" r="75%">
+      <stop offset="55%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0.55"/>
+    </radialGradient>
   </defs>
-  <rect width="200" height="200" fill="#0a0600"/>
+  <rect width="200" height="200" fill="#001827"/>
   <g filter="url(#glow)">
-    <rect x="18" y="18" width="164" height="164" fill="none" stroke="#d98a16" stroke-width="2"/>
-    <g shape-rendering="geometricPrecision">
-      <path d="M34 136h18 18 18v-16h18" fill="none" stroke="#168f86" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" opacity="0.2"/>
-      <path d="M34 136h18 18 18v-16h18" fill="none" stroke="#240402" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity="0.28"/>
-      <path d="M34 136h18 18 18v-16h18" fill="none" stroke="#f5e2b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 4" opacity="0.58"/>
-      <g stroke="#f5e2b8" stroke-width="1.8" stroke-linecap="round" opacity="0.48">
-        <path d="M44 130v12M58 130v12M72 130v12M86 130v12M96 114v12"/>
+    <rect x="18" y="18" width="164" height="164" fill="none" stroke="#ffd77b" stroke-width="2"/>
+
+    <g opacity="0.92">
+      <rect x="28" y="126" width="29" height="22" fill="#00182b"/>
+      <rect x="51" y="128" width="30" height="18" fill="#00182b"/>
+      <rect x="74" y="126" width="29" height="20" fill="#00182b"/>
+      <rect x="94" y="112" width="22" height="35" fill="#00182b"/>
+      <rect x="32" y="131" width="19" height="12" fill="#004b87" opacity="0.82"/>
+      <rect x="55" y="133" width="23" height="10" fill="#004b87" opacity="0.72"/>
+      <rect x="79" y="130" width="20" height="12" fill="#deb887" opacity="0.72"/>
+      <rect x="99" y="116" width="11" height="27" fill="#a8002c" opacity="0.68"/>
+      <rect x="39" y="124" width="9" height="5" fill="#ffd77b" opacity="0.65"/>
+      <rect x="63" y="146" width="14" height="4" fill="#a8002c" opacity="0.8"/>
+      <rect x="89" y="121" width="8" height="5" fill="#ffffb3" opacity="0.78"/>
+      <rect x="109" y="111" width="5" height="10" fill="#004b87" opacity="0.72"/>
+      <rect x="33" y="153" width="8" height="5" fill="#004b87" opacity="0.55"/>
+      <rect x="83" y="151" width="6" height="5" fill="#deb887" opacity="0.54"/>
+      <rect x="112" y="137" width="9" height="4" fill="#a8002c" opacity="0.66"/>
+
+      <g fill="#ffffb3" opacity="0.78">
+        <rect x="41" y="136" width="12" height="2"/>
+        <rect x="60" y="137" width="10" height="2"/>
+        <rect x="80" y="135" width="11" height="2"/>
+        <rect x="102" y="122" width="2" height="13"/>
+        <rect x="43" y="130" width="2" height="13"/>
+        <rect x="63" y="131" width="2" height="13"/>
+        <rect x="83" y="129" width="2" height="13"/>
+        <rect x="97" y="122" width="12" height="2"/>
       </g>
-      <ellipse cx="54" cy="139" rx="8" ry="5" fill="#6fffe9" opacity="0.13"/>
-      <ellipse cx="86" cy="133" rx="10" ry="6" fill="#6fffe9" opacity="0.12"/>
-      <ellipse cx="99" cy="120" rx="5" ry="8" fill="#240402" opacity="0.24"/>
     </g>
-    <polyline points="71 91 87 91 103 91 119 91 119 107 119 123 119 139" fill="none" stroke="#ffc23a" stroke-width="18" stroke-linecap="square" stroke-linejoin="round"/>
-    <polyline points="71 91 87 91 103 91 119 91 119 107 119 123 119 139" fill="none" stroke="#b8730c" stroke-width="12" stroke-linecap="square" stroke-linejoin="round"/>
-    <rect x="112" y="132" width="14" height="14" fill="#ffc23a"/>
-    <polyline points="136 68 120 68 104 68 104 52 88 52" fill="none" stroke="#6fffe9" stroke-width="18" stroke-linecap="square" stroke-linejoin="round"/>
-    <polyline points="136 68 120 68 104 68 104 52 88 52" fill="none" stroke="#168f86" stroke-width="12" stroke-linecap="square" stroke-linejoin="round"/>
-    <rect x="81" y="45" width="14" height="14" fill="#6fffe9"/>
-    <rect x="148" y="52" width="8" height="8" fill="#ffe08a"/>
+
+    <polyline points="70 91 86 91 102 91 118 91 118 107 118 123 118 139" fill="none" stroke="#ffd77b" stroke-width="18" stroke-linecap="square" stroke-linejoin="round"/>
+    <polyline points="70 91 86 91 102 91 118 91 118 107 118 123 118 139" fill="none" stroke="#004b87" stroke-width="12" stroke-linecap="square" stroke-linejoin="round"/>
+    <rect x="111" y="132" width="14" height="14" fill="#ffd77b"/>
+
+    <polyline points="136 68 120 68 104 68 104 52 88 52" fill="none" stroke="#ffffb3" stroke-width="18" stroke-linecap="square" stroke-linejoin="round"/>
+    <polyline points="136 68 120 68 104 68 104 52 88 52" fill="none" stroke="#a8002c" stroke-width="12" stroke-linecap="square" stroke-linejoin="round"/>
+    <rect x="81" y="45" width="14" height="14" fill="#ffffb3"/>
+    <rect x="148" y="52" width="8" height="8" fill="#ffffb3"/>
   </g>
-  <g fill="#000" opacity="0.28">
-    <rect x="0" y="2" width="200" height="1.4"/><rect x="0" y="8" width="200" height="1.4"/>
-    <rect x="0" y="14" width="200" height="1.4"/><rect x="0" y="20" width="200" height="1.4"/>
-    <rect x="0" y="26" width="200" height="1.4"/><rect x="0" y="32" width="200" height="1.4"/>
-    <rect x="0" y="38" width="200" height="1.4"/><rect x="0" y="44" width="200" height="1.4"/>
-    <rect x="0" y="50" width="200" height="1.4"/><rect x="0" y="56" width="200" height="1.4"/>
-    <rect x="0" y="62" width="200" height="1.4"/><rect x="0" y="68" width="200" height="1.4"/>
-    <rect x="0" y="74" width="200" height="1.4"/><rect x="0" y="80" width="200" height="1.4"/>
-    <rect x="0" y="86" width="200" height="1.4"/><rect x="0" y="92" width="200" height="1.4"/>
-    <rect x="0" y="98" width="200" height="1.4"/><rect x="0" y="104" width="200" height="1.4"/>
-    <rect x="0" y="110" width="200" height="1.4"/><rect x="0" y="116" width="200" height="1.4"/>
-    <rect x="0" y="122" width="200" height="1.4"/><rect x="0" y="128" width="200" height="1.4"/>
-    <rect x="0" y="134" width="200" height="1.4"/><rect x="0" y="140" width="200" height="1.4"/>
-    <rect x="0" y="146" width="200" height="1.4"/><rect x="0" y="152" width="200" height="1.4"/>
-    <rect x="0" y="158" width="200" height="1.4"/><rect x="0" y="164" width="200" height="1.4"/>
-    <rect x="0" y="170" width="200" height="1.4"/><rect x="0" y="176" width="200" height="1.4"/>
-    <rect x="0" y="182" width="200" height="1.4"/><rect x="0" y="188" width="200" height="1.4"/>
-    <rect x="0" y="194" width="200" height="1.4"/>
-  </g>
-  <radialGradient id="vig" cx="50%" cy="50%" r="75%">
-    <stop offset="55%" stop-color="#000" stop-opacity="0"/>
-    <stop offset="100%" stop-color="#000" stop-opacity="0.55"/>
-  </radialGradient>
   <rect width="200" height="200" fill="url(#vig)"/>
 </svg>

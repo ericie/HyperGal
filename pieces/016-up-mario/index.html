@@ -6,11 +6,12 @@
     <title>Up Mario · HyperGal</title>
     <style>
       :root {
-        color-scheme: dark;
-        --bg: #07030d;
-        --ink: #fff5dd;
-        --muted: rgba(255, 245, 221, 0.68);
-        --hot: #ffd447;
+        color-scheme: light;
+        --bg: #ffffff;
+        --ink: #000000;
+        --muted: #4a4a4a;
+        --hot: #000000;
+        --hud-height: 58px;
       }
 
       html,
@@ -23,7 +24,7 @@
       }
 
       body {
-        font-family: ui-rounded, Avenir Next, system-ui, sans-serif;
+        font-family: Geneva, "Lucida Grande", ui-sans-serif, system-ui, sans-serif;
         overscroll-behavior: none;
       }
 
@@ -34,7 +35,7 @@
         width: 100%;
         height: 100%;
         background: var(--bg);
-        cursor: crosshair;
+        cursor: pointer;
         image-rendering: pixelated;
         touch-action: none;
       }
@@ -46,53 +47,134 @@
 
       .hud {
         position: fixed;
-        inset: clamp(0.75rem, 2vw, 1.1rem) clamp(0.8rem, 2.2vw, 1.4rem) auto;
-        display: flex;
-        align-items: start;
-        justify-content: space-between;
-        gap: 1rem;
+        inset: auto 0 0;
+        min-height: var(--hud-height);
+        display: grid;
+        grid-template-columns: minmax(132px, 0.9fr) minmax(0, 2.1fr);
+        align-items: stretch;
         pointer-events: none;
-        color: var(--ink);
-        font-size: clamp(0.78rem, 1.3vw, 0.95rem);
-        line-height: 1.2;
-        text-shadow: 0 2px 0 #000;
+        color: #000;
+        background: #fff;
+        border-top: 3px solid #000;
+        font-size: 11px;
+        line-height: 1.05;
+        z-index: 2;
       }
 
-      .hud strong,
-      .hud span {
+      .hud__title {
+        display: grid;
+        align-content: center;
+        padding: 5px clamp(10px, 2.4vw, 18px) 6px;
+        border-right: 3px solid #000;
+      }
+
+      .hud__title strong {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(17px, 2.3vw, 25px);
+        line-height: 0.9;
+        font-weight: 900;
+      }
+
+      .hud__title span {
+        margin-top: 4px;
+        color: #222;
+        font-size: 9px;
+        font-weight: 700;
+      }
+
+      .hud__stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        align-items: center;
+      }
+
+      .hud__stat {
+        min-width: 0;
+        height: 100%;
+        display: grid;
+        align-content: center;
+        gap: 4px;
+        padding: 4px clamp(8px, 2vw, 16px);
+        border-right: 1px solid #000;
+        font-size: 9px;
+        font-weight: 800;
+        overflow: hidden;
+      }
+
+      .hud__stat:last-child {
+        border-right: 0;
+      }
+
+      .hud__stat b {
         display: block;
+        overflow: hidden;
+        font-size: clamp(12px, 1.8vw, 16px);
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
-      .hud strong {
-        font-weight: 850;
-        letter-spacing: 0;
+      .hud__meter {
+        width: 100%;
+        height: 5px;
+        border: 1px solid #000;
+      }
+
+      .hud__meter::before {
+        content: "";
+        display: block;
+        width: 68%;
+        height: 100%;
+        background: #000;
       }
 
       .hud span {
-        color: var(--muted);
-        margin-top: 0.12rem;
         font-variant-numeric: tabular-nums;
       }
 
-      .hud__right {
-        text-align: right;
+      .hud [hidden] {
+        display: none;
       }
 
       .debug {
         position: fixed;
         left: 0.85rem;
-        bottom: 0.75rem;
+        bottom: calc(var(--hud-height) + 0.75rem);
         margin: 0;
-        color: rgba(255, 245, 221, 0.74);
+        padding: 5px 7px;
+        color: #fff;
+        background: #000;
         font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         pointer-events: none;
         white-space: pre;
-        text-shadow: 0 1px 0 #000;
+        z-index: 3;
       }
 
       @media (max-width: 520px) {
+        :root {
+          --hud-height: 64px;
+        }
+
         .hud {
-          font-size: 0.78rem;
+          grid-template-columns: 124px minmax(0, 1fr);
+        }
+
+        .hud__title {
+          padding-inline: 9px;
+        }
+
+        .hud__title strong {
+          font-size: 16px;
+        }
+
+        .hud__stat {
+          padding-inline: 6px;
+          font-size: 8px;
+        }
+
+        .hud__stat b {
+          font-size: 11px;
         }
       }
 
@@ -108,16 +190,27 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Up Mario: a small red-capped platform hero keeps jumping upward through an endless arcade scaffold of brick and girder platforms."
+      aria-label="Up Mario: a black-and-white castle platform hero climbs an endless masonry keep of stone ledges, iron ladders, stairs, poles, and question mark boxes."
     ></canvas>
     <div class="hud" aria-hidden="true">
-      <div>
+      <div class="hud__title">
         <strong>UP MARIO</strong>
-        <span id="heightReadout">0000 m</span>
+        <span>THE ENDLESS KEEP</span>
       </div>
-      <div class="hud__right">
-        <strong id="coinReadout">00</strong>
-        <span id="seedReadout">seed</span>
+      <div class="hud__stats">
+        <span class="hud__stat">
+          HEIGHT
+          <b id="heightReadout">0000 M</b>
+        </span>
+        <span class="hud__stat">
+          BOXES
+          <b id="coinReadout">? 00</b>
+        </span>
+        <span class="hud__stat">
+          GRIP
+          <i class="hud__meter"></i>
+          <b id="seedReadout" hidden>seed</b>
+        </span>
       </div>
     </div>
     <pre id="debug" class="debug" hidden></pre>
@@ -139,48 +232,63 @@
         const DEBUG = params.has('debug');
         const TAU = Math.PI * 2;
         const GRAVITY = -1580;
-        const RUN_SPEED = 275;
-        const AIR_SPEED = 238;
+        const RUN_SPEED = 286;
+        const AIR_SPEED = 246;
         const JUMP_SPEED = 735;
         const SPRING_SPEED = 870;
-        const HERO_W = 26;
-        const HERO_H = 42;
+        const HERO_W = 28;
+        const HERO_H = 44;
         const LAUNCH_MARGIN = 20;
         const MIN_TARGET_GAP = 30;
         const MAX_TARGET_GAP = 156;
-        const STALL_SECONDS = 5.2;
+        const STALL_SECONDS = 2.35;
+        const NO_ROUTE_SECONDS = 1.05;
+        const BOX_ATTEMPT_SECONDS = 1.75;
+        const BOX_SIZE = 26;
+        const BOX_BOTTOM_OFFSET = 60;
+        const LINK_REACH = 14;
+        const LINK_SPEEDS = {
+          ladder: 112,
+          stairs: 148,
+          pole: 330,
+        };
         const COLORS = {
-          skyTop: '#08020f',
-          skyBottom: '#111205',
-          shaft: '#130818',
-          shaftEdge: '#342029',
-          grid: 'rgba(255, 212, 71, 0.12)',
-          brick: '#b34432',
-          brickDark: '#71271f',
-          brickLight: '#f07b45',
-          girder: '#d23a3a',
-          girderDark: '#731c2a',
-          girderLight: '#ff7956',
-          rail: '#ffd447',
-          railDark: '#8a5a12',
-          coin: '#ffd447',
-          coinHot: '#fff0a8',
-          spring: '#39d98a',
-          springDark: '#14794c',
-          barrel: '#a46531',
-          barrelDark: '#4a2416',
-          barrelBand: '#f2b15e',
-          heroRed: '#e43a2f',
-          heroRedDark: '#8d1d25',
-          skin: '#f1aa6b',
-          skinDark: '#7a3825',
-          denim: '#285fd6',
-          denimDark: '#132d75',
-          boot: '#47271e',
-          ink: '#150b10',
-          white: '#fff8df',
+          paper: '#ffffff',
+          paperDim: '#d8d8d8',
+          ink: '#000000',
+          softInk: 'rgba(0, 0, 0, 0.55)',
+          faint: 'rgba(0, 0, 0, 0.16)',
+          lighter: 'rgba(0, 0, 0, 0.08)',
+          white: '#ffffff',
           shadow: 'rgba(0, 0, 0, 0.34)',
-          smoke: 'rgba(255, 245, 221, 0.52)',
+          skyTop: '#ffffff',
+          skyBottom: '#ffffff',
+          shaft: '#ffffff',
+          shaftEdge: '#000000',
+          grid: 'rgba(0, 0, 0, 0.16)',
+          brick: '#ffffff',
+          brickDark: '#000000',
+          brickLight: '#ffffff',
+          girder: '#ffffff',
+          girderDark: '#000000',
+          girderLight: '#ffffff',
+          rail: '#000000',
+          railDark: '#000000',
+          coin: '#000000',
+          coinHot: '#ffffff',
+          spring: '#ffffff',
+          springDark: '#000000',
+          barrel: '#ffffff',
+          barrelDark: '#000000',
+          barrelBand: '#000000',
+          heroRed: '#ffffff',
+          heroRedDark: '#000000',
+          skin: '#ffffff',
+          skinDark: '#000000',
+          denim: '#ffffff',
+          denimDark: '#000000',
+          boot: '#000000',
+          smoke: 'rgba(0, 0, 0, 0.5)',
         };
 
         let width = 1;
@@ -201,7 +309,8 @@
         let hero = null;
         let platforms = [];
         let barrels = [];
-        let coins = [];
+        let boxes = [];
+        let links = [];
         let particles = [];
         let keys = {
           left: false,
@@ -219,14 +328,23 @@
         let manualUntil = 0;
         let jumpBufferedUntil = 0;
         let bestHeight = 0;
-        let coinsCollected = 0;
+        let boxesHit = 0;
         let platformCount = 0;
         let barrelCount = 0;
-        let coinCount = 0;
+        let boxCount = 0;
+        let linkCount = 0;
         let targetPlatformId = null;
+        let targetBoxId = null;
+        let targetLinkId = null;
         let rescueCount = 0;
+        let downTrips = 0;
+        let ladderTrips = 0;
+        let stairTrips = 0;
+        let poleSlides = 0;
         let lastProgressAt = 0;
         let lastProgressHeight = 0;
+        let skippedBoxes = 0;
+        let recoveryCount = 0;
 
         debugEl.hidden = !DEBUG;
         resize();
@@ -283,18 +401,29 @@
           cameraY = 0;
           highestCameraY = 0;
           bestHeight = 0;
-          coinsCollected = 0;
+          boxesHit = 0;
           platformCount = 0;
           barrelCount = 0;
-          coinCount = 0;
+          boxCount = 0;
+          linkCount = 0;
           rescueCount = 0;
+          downTrips = 0;
+          ladderTrips = 0;
+          stairTrips = 0;
+          poleSlides = 0;
+          skippedBoxes = 0;
+          recoveryCount = 0;
           targetPlatformId = null;
+          targetBoxId = null;
+          targetLinkId = null;
           platforms = [];
           barrels = [];
-          coins = [];
+          boxes = [];
+          links = [];
           particles = [];
           lastPlatform = makePlatform(worldWidth * 0.5, 88, Math.min(230, worldWidth * 0.74), 'brick', false);
           platforms.push(lastPlatform);
+          addQuestionBoxesForPlatform(lastPlatform);
           highestPlatformY = lastPlatform.y;
           while (highestPlatformY < height * 1.75) addPlatform();
           hero = {
@@ -316,6 +445,17 @@
             autoTargetId: null,
             autoLaunchX: null,
             autoLandingX: null,
+            routeAttemptTargetId: null,
+            routeAttemptFromId: null,
+            routeAttemptStartedAt: 0,
+            onLink: null,
+            boxTargetId: null,
+            boxAttemptId: null,
+            boxAttemptStartedAt: 0,
+            boxAttemptJumps: 0,
+            revisitPlatformId: null,
+            revisitCooldownUntil: 0,
+            noRouteSince: 0,
           };
           lastProgressAt = 0;
           lastProgressHeight = 0;
@@ -338,7 +478,7 @@
           canvas.style.height = `${height}px`;
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           ctx.imageSmoothingEnabled = false;
-          worldWidth = Math.round(clamp(width * (width < 560 ? 0.9 : 0.62), 300, 700));
+          worldWidth = Math.round(clamp(width * (width < 560 ? 0.94 : 0.74), 300, 820));
           worldLeft = Math.round((width - worldWidth) / 2);
         }
 
@@ -358,7 +498,7 @@
           updateControls(dt);
           updateHero(dt);
           updateBarrels(dt);
-          updateCoins();
+          updateQuestionBoxes();
           updateParticles(dt);
           updateCamera(dt);
           rescueIfNeeded();
@@ -378,6 +518,11 @@
 
         function updateHero(dt) {
           hero.previousY = hero.y;
+          if (hero.onLink) {
+            updateLinkTravel(dt);
+            return;
+          }
+
           let desiredVx = 0;
           const manual = manualActive();
 
@@ -412,11 +557,14 @@
 
         function planAutopilot() {
           hero.autoVx = 0;
+          targetBoxId = null;
+          targetLinkId = null;
 
           if (!hero.grounded) {
-            const target = activeAirTarget();
+            const target = activeAirTarget() || chooseAirLandingTarget();
             targetPlatformId = target ? target.id : null;
             if (!target) return;
+            hero.noRouteSince = 0;
             const landingX = safeLandingX(target, hero.autoLandingX ?? platformCenter(target));
             hero.autoLandingX = landingX;
             hero.autoVx = clamp((landingX - hero.x) * 4.2, -AIR_SPEED, AIR_SPEED);
@@ -430,12 +578,42 @@
             return;
           }
 
+          const localBox = chooseLocalQuestionBox(current);
+          if (localBox) {
+            planQuestionBox(current, localBox);
+            return;
+          }
+          clearBoxAttempt();
+
+          const downLink = chooseDownRevisitLink(current);
+          if (downLink) {
+            hero.noRouteSince = 0;
+            followLinkPlan(current, downLink, -1);
+            return;
+          }
+
+          const upLink = chooseUpLink(current);
+          if (upLink) {
+            hero.noRouteSince = 0;
+            followLinkPlan(current, upLink, 1);
+            return;
+          }
+
           const route = chooseTargetRoute(current);
           targetPlatformId = route ? route.target.id : null;
           if (!route) {
+            if (!hero.noRouteSince) hero.noRouteSince = simTime;
             hero.autoVx = clamp((platformCenter(current) - hero.x) * 2.8, -RUN_SPEED, RUN_SPEED);
+            if (simTime - hero.noRouteSince > NO_ROUTE_SECONDS && simTime > (current.recoveryCooldownUntil || 0)) {
+              if (addRecoveryPlatform(current)) {
+                current.recoveryCooldownUntil = simTime + 2.4;
+                hero.noRouteSince = simTime;
+                lastProgressAt = simTime;
+              }
+            }
             return;
           }
+          hero.noRouteSince = 0;
 
           hero.autoTargetId = route.target.id;
           hero.autoLaunchX = route.launchX;
@@ -453,6 +631,53 @@
           }
         }
 
+        function planQuestionBox(current, box) {
+          targetBoxId = box.id;
+          hero.boxTargetId = box.id;
+          hero.noRouteSince = 0;
+
+          if (hero.boxAttemptId !== box.id) {
+            hero.boxAttemptId = box.id;
+            hero.boxAttemptStartedAt = simTime;
+            hero.boxAttemptJumps = 0;
+          }
+
+          const attemptAge = simTime - hero.boxAttemptStartedAt;
+          if (attemptAge > BOX_ATTEMPT_SECONDS || hero.boxAttemptJumps >= 3) {
+            skipQuestionBox(current, box);
+            return;
+          }
+
+          const left = platformLeft(current) + HERO_W * 0.65 + 6;
+          const right = platformLeft(current) + current.w - HERO_W * 0.65 - 6;
+          const targetX = clamp(box.x, left, right);
+          const dx = targetX - hero.x;
+          hero.autoVx = clamp(dx * 4.8, -RUN_SPEED, RUN_SPEED);
+          if (Math.abs(dx) < 11 && simTime >= hero.jumpCooldownUntil) {
+            hero.boxAttemptJumps += 1;
+            jump(false);
+          }
+        }
+
+        function skipQuestionBox(current, box) {
+          box.skipUntil = simTime + 8;
+          box.failedAt = simTime;
+          skippedBoxes += 1;
+          clearBoxAttempt();
+          targetBoxId = null;
+          current.boxSkips = (current.boxSkips || 0) + 1;
+          if ((current.boxHits || 0) + current.boxSkips >= current.boxQuota) {
+            current.boxQuota = current.boxHits || 0;
+          }
+        }
+
+        function clearBoxAttempt() {
+          hero.boxTargetId = null;
+          hero.boxAttemptId = null;
+          hero.boxAttemptStartedAt = 0;
+          hero.boxAttemptJumps = 0;
+        }
+
         function activeAirTarget() {
           const target = platformById(hero.autoTargetId);
           if (!target) return null;
@@ -461,10 +686,160 @@
           return target;
         }
 
+        function chooseAirLandingTarget() {
+          let best = null;
+          for (const platform of platforms) {
+            if (platform.y > hero.y + 34 || platform.y < hero.y - 210) continue;
+            const left = platformLeft(platform) + landingMargin(platform);
+            const right = platformLeft(platform) + platform.w - landingMargin(platform);
+            const xGap = hero.x < left ? left - hero.x : hero.x > right ? hero.x - right : 0;
+            const timeBias = hero.vy > 0 && platform.y < hero.y - 30 ? 70 : 0;
+            if (xGap > AIR_SPEED * 1.05) continue;
+            const score = xGap * 1.8 + Math.abs(hero.y - platform.y) * 0.22 + timeBias - platform.y * 0.02;
+            if (!best || score < best.score) best = { ...platform, score };
+          }
+          return best;
+        }
+
+        function chooseLocalQuestionBox(current) {
+          const available = boxes
+            .filter((box) => !box.hit && box.platformId === current.id && (!box.skipUntil || box.skipUntil < simTime))
+            .sort((a, b) => Math.abs(a.x - hero.x) - Math.abs(b.x - hero.x));
+          if (!available.length) {
+            if (hero.revisitPlatformId === current.id) {
+              hero.revisitPlatformId = null;
+              hero.revisitCooldownUntil = simTime + rand(8, 14);
+            }
+            return null;
+          }
+
+          if (current.boxQuota == null) {
+            const quotaRoll = rng();
+            current.boxQuota = quotaRoll < 0.18 ? 0 : quotaRoll < 0.78 ? 1 : Math.min(2, available.length);
+            current.boxHits = current.boxHits || 0;
+          }
+          if (hero.revisitPlatformId === current.id) current.boxQuota = Math.max(current.boxQuota, current.boxHits + 1);
+          if ((current.boxHits || 0) >= current.boxQuota) return null;
+          return available[0];
+        }
+
+        function chooseDownRevisitLink(current) {
+          if (simTime < hero.revisitCooldownUntil || hero.revisitPlatformId) return null;
+          if (!current.revisitChecked) {
+            current.revisitChecked = true;
+            current.revisitIntent = rng() < 0.46;
+          }
+          if (!current.revisitIntent) return null;
+
+          const candidates = links
+            .filter((link) => link.upperId === current.id)
+            .filter((link) => {
+              const lower = platformById(link.lowerId);
+              if (!lower || lower.y <= cameraY - 120) return false;
+              if (platformHasUnhitBoxes(link.lowerId)) return true;
+              return link.kind === 'pole' && routeToPlatform(lower, current);
+            })
+            .sort((a, b) => linkDownScore(a) - linkDownScore(b));
+          if (!candidates.length) return null;
+          current.revisitIntent = false;
+          hero.revisitPlatformId = candidates[0].lowerId;
+          return candidates[0];
+        }
+
+        function chooseUpLink(current) {
+          const candidates = links
+            .filter((link) => link.lowerId === current.id && link.kind !== 'pole')
+            .filter((link) => platformById(link.upperId))
+            .sort((a, b) => platformById(a.upperId).y - platformById(b.upperId).y);
+          if (!candidates.length) return null;
+          return candidates[0];
+        }
+
+        function followLinkPlan(current, link, dir) {
+          targetLinkId = link.id;
+          targetPlatformId = dir > 0 ? link.upperId : link.lowerId;
+          const entryX = dir > 0 ? link.x1 : link.x2;
+          const dx = entryX - hero.x;
+          hero.autoVx = clamp(dx * 4.4, -RUN_SPEED, RUN_SPEED);
+          if (Math.abs(dx) < LINK_REACH && simTime >= hero.jumpCooldownUntil) startLink(link, dir);
+        }
+
+        function startLink(link, dir) {
+          hero.onLink = { linkId: link.id, dir, t: dir > 0 ? 0 : 1 };
+          clearRouteAttempt();
+          hero.grounded = false;
+          hero.groundId = null;
+          hero.vx = 0;
+          hero.vy = 0;
+          hero.x = dir > 0 ? link.x1 : link.x2;
+          hero.y = dir > 0 ? link.y1 : link.y2;
+          targetLinkId = link.id;
+          if (dir < 0) downTrips += 1;
+          if (link.kind === 'ladder') ladderTrips += 1;
+          else if (link.kind === 'stairs') stairTrips += 1;
+          else if (link.kind === 'pole' && dir < 0) poleSlides += 1;
+          spawnDust(hero.x, hero.y, 8, COLORS.smoke);
+        }
+
+        function updateLinkTravel(dt) {
+          const link = linkById(hero.onLink.linkId);
+          if (!link) {
+            hero.onLink = null;
+            return;
+          }
+          const span = Math.max(1, link.y2 - link.y1);
+          const dir = hero.onLink.dir;
+          const baseSpeed = link.kind === 'pole' && dir < 0 ? LINK_SPEEDS.pole : LINK_SPEEDS[link.kind];
+          hero.onLink.t = clamp(hero.onLink.t + (dir * baseSpeed * dt) / span, 0, 1);
+          hero.previousY = hero.y;
+          hero.x = lerp(link.x1, link.x2, hero.onLink.t);
+          hero.y = lerp(link.y1, link.y2, hero.onLink.t);
+          hero.facing = link.x2 >= link.x1 ? 1 : -1;
+
+          if ((dir > 0 && hero.onLink.t >= 1) || (dir < 0 && hero.onLink.t <= 0)) {
+            finishLink(link, dir);
+          }
+        }
+
+        function finishLink(link, dir) {
+          const platform = platformById(dir > 0 ? link.upperId : link.lowerId);
+          hero.onLink = null;
+          if (!platform) return;
+          hero.x = dir > 0 ? link.x2 : link.x1;
+          hero.y = platform.y;
+          hero.previousY = hero.y;
+          hero.vx = 0;
+          hero.vy = 0;
+          hero.grounded = true;
+          hero.groundId = platform.id;
+          hero.lastGroundedAt = simTime;
+          hero.landedAt = simTime;
+          hero.groundedSince = simTime;
+          hero.autoTargetId = null;
+          hero.autoLaunchX = null;
+          hero.autoLandingX = null;
+          clearRouteAttempt();
+          platform.visited = true;
+          platform.pulseUntil = simTime + 0.18;
+          if (dir > 0 && hero.revisitPlatformId === platform.id) hero.revisitPlatformId = null;
+          spawnDust(hero.x, hero.y, 8, COLORS.smoke);
+        }
+
+        function linkDownScore(link) {
+          const lower = platformById(link.lowerId);
+          if (!lower) return Infinity;
+          return (link.kind === 'pole' ? -32 : 0) + Math.abs(link.x2 - hero.x) + (hero.y - lower.y) * 0.15;
+        }
+
+        function platformHasUnhitBoxes(platformId) {
+          return boxes.some((box) => box.platformId === platformId && !box.hit);
+        }
+
         function chooseTargetRoute(current, jumpSpeed = JUMP_SPEED) {
           let best = null;
           for (const platform of platforms) {
             if (platform.id === current.id) continue;
+            if (platform.avoidUntil && platform.avoidUntil > simTime) continue;
             const route = routeToPlatform(current, platform, jumpSpeed);
             if (!route) continue;
             const widthBonus = Math.min(44, platform.w * 0.24);
@@ -555,13 +930,17 @@
 
         function jump(superJump, route) {
           hero.vy = superJump ? SPRING_SPEED : JUMP_SPEED;
+          const fromId = hero.groundId;
           hero.grounded = false;
           hero.groundId = null;
           hero.autoTargetId = route ? route.target.id : null;
           hero.autoLaunchX = route ? route.launchX : null;
           hero.autoLandingX = route ? route.landingX : null;
+          hero.routeAttemptTargetId = route ? route.target.id : null;
+          hero.routeAttemptFromId = route ? fromId : null;
+          hero.routeAttemptStartedAt = route ? simTime : 0;
           hero.jumpCooldownUntil = simTime + 0.11;
-          spawnDust(hero.x, hero.y, superJump ? 18 : 11, superJump ? '#39d98a' : COLORS.smoke);
+          spawnDust(hero.x, hero.y, superJump ? 18 : 11, COLORS.smoke);
         }
 
         function keepHeroInShaft() {
@@ -601,6 +980,7 @@
           hero.groundId = landed.id;
           hero.lastGroundedAt = simTime;
           if (isNewLanding) {
+            markRouteAttemptResult(landed);
             hero.landedAt = simTime;
             hero.groundedSince = simTime;
             hero.autoTargetId = null;
@@ -615,6 +995,24 @@
           if (landed.spring && Math.abs(hero.x - (platformLeft(landed) + landed.w * 0.5)) < landed.w * 0.35) {
             jump(true, chooseTargetRoute(landed, SPRING_SPEED));
           }
+        }
+
+        function markRouteAttemptResult(landed) {
+          if (!hero.routeAttemptTargetId) return;
+          if (landed.id !== hero.routeAttemptTargetId && simTime - hero.routeAttemptStartedAt > 0.22) {
+            const missed = platformById(hero.routeAttemptTargetId);
+            if (missed) {
+              missed.missCount = (missed.missCount || 0) + 1;
+              missed.avoidUntil = simTime + clamp(2.5 + missed.missCount * 1.6, 3, 8);
+            }
+          }
+          clearRouteAttempt();
+        }
+
+        function clearRouteAttempt() {
+          hero.routeAttemptTargetId = null;
+          hero.routeAttemptFromId = null;
+          hero.routeAttemptStartedAt = 0;
         }
 
         function updateCamera(dt) {
@@ -642,19 +1040,56 @@
           hero.vy = JUMP_SPEED * 0.72;
           hero.grounded = false;
           hero.groundId = null;
+          clearRouteAttempt();
           hero.rescuedUntil = simTime + 0.6;
           rescueCount += 1;
           lastProgressAt = simTime;
-          spawnDust(hero.x, hero.y, 24, '#ff6b57');
+          spawnDust(hero.x, hero.y, 24, COLORS.ink);
         }
 
         function recoverIfStalled() {
-          if (manualActive() || !hero.grounded) return;
+          if (manualActive()) return;
           if (simTime - lastProgressAt < STALL_SECONDS) return;
+          if (!hero.grounded) {
+            if (hero.onLink) return;
+            const landing = chooseAirLandingTarget() || nearestLowerPlatform();
+            if (!landing) return;
+            hero.x = safeLandingX(landing, hero.x);
+            hero.y = landing.y;
+            hero.previousY = hero.y;
+            hero.vx = 0;
+            hero.vy = 0;
+            hero.grounded = true;
+            hero.groundId = landing.id;
+            hero.lastGroundedAt = simTime;
+            hero.landedAt = simTime;
+            hero.groundedSince = simTime;
+            hero.autoTargetId = null;
+            hero.autoLaunchX = null;
+            hero.autoLandingX = null;
+            clearRouteAttempt();
+            lastProgressAt = simTime;
+            addRecoveryPlatform(landing);
+            spawnDust(hero.x, hero.y, 16, COLORS.ink);
+            return;
+          }
           const current = platformById(hero.groundId);
           if (!current) return;
-          addRecoveryPlatform(current);
-          lastProgressAt = simTime;
+          if (addRecoveryPlatform(current)) {
+            current.recoveryCooldownUntil = simTime + 2.4;
+            lastProgressAt = simTime;
+          }
+        }
+
+        function nearestLowerPlatform() {
+          let best = null;
+          for (const platform of platforms) {
+            if (platform.y > hero.y + 28 || platform.y < cameraY - 120) continue;
+            const x = safeLandingX(platform, hero.x);
+            const score = Math.abs(x - hero.x) * 1.4 + Math.abs(hero.y - platform.y) * 0.3 - platform.y * 0.015;
+            if (!best || score < best.score) best = { ...platform, score };
+          }
+          return best;
         }
 
         function updateBarrels(dt) {
@@ -686,23 +1121,41 @@
               hero.stumbleUntil = simTime + 0.36;
               hero.blinkUntil = simTime + 0.14;
               barrel.bumpCooldownUntil = simTime + 0.9;
-              spawnDust(hero.x, hero.y - HERO_H * 0.35, 16, '#ff6b57');
+              spawnDust(hero.x, hero.y - HERO_H * 0.35, 16, COLORS.ink);
             }
           }
           barrels = barrels.filter((barrel) => !barrel.dead);
         }
 
-        function updateCoins() {
-          for (const coin of coins) {
-            if (coin.collected) continue;
-            const dx = hero.x - coin.x;
-            const dy = hero.y - coin.y;
-            if (dx * dx + dy * dy < 28 * 28) {
-              coin.collected = true;
-              coinsCollected += 1;
-              spawnDust(coin.x, coin.y, 12, COLORS.coinHot);
+        function updateQuestionBoxes() {
+          const headY = hero.y + HERO_H + 12;
+          const previousHeadY = hero.previousY + HERO_H + 12;
+          for (const box of boxes) {
+            if (box.hit) continue;
+            const withinX = Math.abs(hero.x - box.x) < BOX_SIZE * 0.62;
+            const hitFromBelow = hero.vy > 0 && previousHeadY <= box.y && headY >= box.y;
+            if (withinX && hitFromBelow) {
+              hitQuestionBox(box);
+              break;
             }
           }
+        }
+
+        function hitQuestionBox(box) {
+          box.hit = true;
+          box.hitAt = simTime;
+          boxesHit += 1;
+          hero.vy = Math.min(hero.vy, 96);
+          hero.blinkUntil = simTime + 0.12;
+          clearBoxAttempt();
+          targetBoxId = null;
+          const platform = platformById(box.platformId);
+          if (platform) platform.boxHits = (platform.boxHits || 0) + 1;
+          if (hero.revisitPlatformId === box.platformId && !platformHasUnhitBoxes(box.platformId)) {
+            hero.revisitPlatformId = null;
+            hero.revisitCooldownUntil = simTime + rand(8, 15);
+          }
+          spawnDust(box.x, box.y + BOX_SIZE * 0.5, 18, COLORS.ink);
         }
 
         function updateParticles(dt) {
@@ -726,12 +1179,13 @@
             const platform = platformById(barrel.platformId);
             return platform && platform.y > cutoff;
           });
-          coins = coins.filter((coin) => !coin.collected && coin.y > cutoff);
+          boxes = boxes.filter((box) => box.y > cutoff);
+          links = links.filter((link) => link.y2 > cutoff && platformById(link.lowerId) && platformById(link.upperId));
         }
 
         function addPlatform() {
           const previous = lastPlatform;
-          const gap = rand(height < 620 ? 74 : 82, height < 620 ? 112 : 128);
+          const gap = rand(height < 620 ? 112 : 118, height < 620 ? 138 : 150);
           const y = previous.y + gap;
           const minW = clamp(worldWidth * 0.24, 92, 128);
           const maxW = clamp(worldWidth * 0.4, 148, 220);
@@ -740,44 +1194,144 @@
           const previousCenter = platformLeft(previous) + previous.w * 0.5;
           let center = previousCenter;
           let foundReachable = false;
-          for (let attempt = 0; attempt < 18; attempt += 1) {
+          for (let attempt = 0; attempt < 28; attempt += 1) {
             const candidateCenter = clamp(previousCenter + rand(-maxShift, maxShift), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
-            const candidate = { x: candidateCenter - w * 0.5, y, w, moving: false };
+            const candidate = { x: candidateCenter - w * 0.5, y, w, h: 18, moving: false, travel: 0 };
             center = candidateCenter;
-            if (routeToPlatform(previous, candidate)) {
+            if (routeToPlatform(previous, candidate) && canPlacePlatform(candidate)) {
               foundReachable = true;
               break;
             }
           }
           if (!foundReachable) {
-            center = clamp(previousCenter + rand(-72, 72), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+            for (let attempt = 0; attempt < 12; attempt += 1) {
+              const candidateCenter = clamp(previousCenter + rand(-72, 72), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+              const candidate = { x: candidateCenter - w * 0.5, y, w, h: 18, moving: false, travel: 0 };
+              if (routeToPlatform(previous, candidate) && canPlacePlatform(candidate)) {
+                center = candidateCenter;
+                foundReachable = true;
+                break;
+              }
+            }
+            if (!foundReachable) center = clamp(previousCenter, w * 0.5 + 12, worldWidth - w * 0.5 - 12);
           }
-          const type = rng() < 0.34 ? 'girder' : 'brick';
-          const moving = y > 700 && w > 126 && rng() < 0.1;
+          const type = rng() < 0.18 ? 'girder' : 'brick';
+          const moving = y > 800 && w > 136 && rng() < 0.06;
           const platform = makePlatform(center, y, w, type, moving);
-          platform.spring = y > 540 && rng() < 0.13;
+          platform.spring = false;
           platforms.push(platform);
+          maybeAddLink(previous, platform);
           lastPlatform = platform;
           highestPlatformY = y;
 
-          if (rng() < 0.72) addCoinsForPlatform(platform, previous);
-          if (y > 420 && rng() < 0.22) addBarrel(platform);
+          addQuestionBoxesForPlatform(platform);
+          addBranchPlatforms(previous, platform);
+          if (y > 520 && !platform.moving && rng() < 0.08) addBarrel(platform);
         }
 
         function addRecoveryPlatform(current) {
-          const y = current.y + rand(76, 94);
-          const w = clamp(worldWidth * 0.34, 126, 190);
-          const center = clamp(platformCenter(current) + rand(-58, 58), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
-          const platform = makePlatform(center, y, w, 'brick', false);
+          const w = clamp(worldWidth * 0.34, 118, 184);
+          let platform = null;
+          for (const relaxed of [false, true]) {
+            for (let attempt = 0; attempt < 28; attempt += 1) {
+              const y = current.y + rand(98, 150);
+              const center = clamp(platformCenter(current) + rand(-82, 82), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+              const candidate = { x: center - w * 0.5, y, w, h: 18, moving: false, travel: 0 };
+              if (routeToPlatform(current, candidate) && canPlacePlatform(candidate, relaxed ? 'relaxed' : 'strict')) {
+                platform = makePlatform(center, y, w, 'brick', false);
+                break;
+              }
+            }
+            if (platform) break;
+          }
+          if (!platform) {
+            const y = current.y + 150;
+            const center = clamp(platformCenter(current), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+            const candidate = { x: center - w * 0.5, y, w, h: 18, moving: false, travel: 0 };
+            if (routeToPlatform(current, candidate) && canPlacePlatform(candidate, 'relaxed')) {
+              platform = makePlatform(center, y, w, 'brick', false);
+            }
+          }
+          if (!platform) return false;
           platform.pulseUntil = simTime + 0.55;
           platforms.push(platform);
           platforms.sort((a, b) => a.y - b.y);
-          if (y > highestPlatformY) {
+          recoveryCount += 1;
+          if (platform.y > highestPlatformY) {
             lastPlatform = platform;
-            highestPlatformY = y;
+            highestPlatformY = platform.y;
           }
-          addCoinsForPlatform(platform, current);
-          spawnDust(center, y, 18, COLORS.coin);
+          maybeAddLink(current, platform, 'ladder');
+          addQuestionBoxesForPlatform(platform, true);
+          spawnDust(platformCenter(platform), platform.y, 18, COLORS.coin);
+          return true;
+        }
+
+        function addBranchPlatforms(previous, trunk) {
+          const roll = rng();
+          const branchCount = roll < 0.34 ? 1 : 0;
+          for (let i = 0; i < branchCount; i += 1) {
+            const base = trunk;
+            const baseCenter = platformCenter(base);
+            const side = baseCenter < worldWidth * 0.5 ? 1 : -1;
+            let chosen = null;
+            for (let attempt = 0; attempt < 14; attempt += 1) {
+              const gap = rand(98, MAX_TARGET_GAP - 8);
+              const y = base.y + gap;
+              const w = rand(clamp(worldWidth * 0.18, 78, 112), clamp(worldWidth * 0.29, 118, 166));
+              const center = clamp(baseCenter + side * rand(96, Math.min(198, worldWidth * 0.34)), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+              const candidate = { x: center - w * 0.5, y, w, h: 16, moving: false, travel: 0 };
+              if (routeToPlatform(base, candidate) && canPlacePlatform(candidate)) {
+                chosen = { center, y, w };
+                break;
+              }
+            }
+            if (!chosen) continue;
+            const platform = makePlatform(chosen.center, chosen.y, chosen.w, rng() < 0.5 ? 'brick' : 'girder', false);
+            platform.branch = true;
+            platforms.push(platform);
+            maybeAddLink(base, platform);
+            addQuestionBoxesForPlatform(platform);
+            if (rng() < 0.07) addBarrel(platform);
+          }
+        }
+
+        function maybeAddLink(lower, upper, forcedKind) {
+          if (!lower || !upper || lower.moving || upper.moving) return;
+          const gap = upper.y - lower.y;
+          if (gap < 46 || gap > 236) return;
+          const roll = rng();
+          if (!forcedKind && roll > 0.42) return;
+          const kind = forcedKind || (roll < 0.14 ? 'pole' : roll < 0.28 ? 'stairs' : 'ladder');
+          if (kind === 'pole' && gap < 76) return;
+          const lowerLeft = platformLeft(lower);
+          const lowerRight = lowerLeft + lower.w;
+          const upperLeft = platformLeft(upper);
+          const upperRight = upperLeft + upper.w;
+          let x1 = clamp(platformCenter(upper), lowerLeft + 22, lowerRight - 22);
+          let x2 = clamp(x1, upperLeft + 22, upperRight - 22);
+          if (kind === 'stairs') {
+            x1 = clamp(platformCenter(lower) + (platformCenter(upper) > platformCenter(lower) ? 30 : -30), lowerLeft + 24, lowerRight - 24);
+            x2 = clamp(platformCenter(upper) + (x1 < platformCenter(upper) ? -30 : 30), upperLeft + 24, upperRight - 24);
+          } else if (kind === 'pole') {
+            x2 = clamp(platformCenter(upper), upperLeft + 24, upperRight - 24);
+            x1 = clamp(x2, lowerLeft + 24, lowerRight - 24);
+          }
+          const link = {
+            id: ++linkCount,
+            kind,
+            lowerId: lower.id,
+            upperId: upper.id,
+            x1,
+            x2,
+            y1: lower.y,
+            y2: upper.y,
+          };
+          if (!canPlaceLink(link)) {
+            linkCount -= 1;
+            return;
+          }
+          links.push(link);
         }
 
         function makePlatform(center, y, w, type, moving) {
@@ -799,20 +1353,30 @@
           };
         }
 
-        function addCoinsForPlatform(platform, previous) {
-          const count = rng() < 0.22 ? 5 : 3;
-          const start = platformLeft(platform) + platform.w * 0.28;
-          const end = platformLeft(platform) + platform.w * 0.72;
-          const arch = previous ? clamp((platform.y - previous.y) * 0.42, 28, 54) : 34;
+        function addQuestionBoxesForPlatform(platform, force = false) {
+          if (platform.moving && !force) return;
+          if (!force && rng() > 0.62) return;
+          const count = !force && platform.w > 142 && rng() < 0.16 ? 2 : 1;
+          const left = platformLeft(platform) + platform.w * 0.3;
+          const right = platformLeft(platform) + platform.w * 0.7;
+          const slots = count === 1 ? [0.5] : [0.26, 0.74];
           for (let i = 0; i < count; i += 1) {
-            const t = count === 1 ? 0.5 : i / (count - 1);
-            coins.push({
-              id: ++coinCount,
-              x: lerp(start, end, t),
-              y: platform.y + 36 + Math.sin(t * Math.PI) * arch,
+            const t = slots[i];
+            const candidate = {
+              id: ++boxCount,
+              platformId: platform.id,
+              x: lerp(left, right, t) + rand(-8, 8),
+              y: platform.y + BOX_BOTTOM_OFFSET,
+              size: BOX_SIZE,
+              hit: false,
+              hitAt: 0,
               phase: rand(0, TAU),
-              collected: false,
-            });
+            };
+            if (canPlaceQuestionBox(candidate, platform)) {
+              boxes.push(candidate);
+            } else {
+              boxCount -= 1;
+            }
           }
         }
 
@@ -829,10 +1393,106 @@
           });
         }
 
+        function canPlacePlatform(candidate, mode = 'strict') {
+          const rect = platformVisualRect(candidate, 8);
+          const relaxed = mode === 'relaxed';
+          if (rect.left < 8 || rect.right > worldWidth - 8) return false;
+          for (const platform of platforms) {
+            const other = platformVisualRect(platform, 0);
+            const horizontalGap = Math.max(other.left - rect.right, rect.left - other.right, 0);
+            const verticalGap = Math.abs(candidate.y - platform.y);
+            if (verticalGap < (relaxed ? 42 : 74) && horizontalGap < (relaxed ? 18 : 30)) return false;
+            if (rectsOverlap(rect, platformVisualRect(platform, 10))) return false;
+          }
+          for (const box of boxes) {
+            if (box.hit && simTime - box.hitAt > 0.45) continue;
+            if (rectsOverlap(rect, boxVisualRect(box, 7))) return false;
+          }
+          if (!relaxed) {
+            for (const link of links) {
+              if (rectsOverlap(rect, linkVisualRect(link, 4))) return false;
+            }
+          }
+          return true;
+        }
+
+        function canPlaceQuestionBox(box, platform) {
+          const left = platformLeft(platform) + 18;
+          const right = platformLeft(platform) + platform.w - 18;
+          if (box.x - box.size * 0.5 < left || box.x + box.size * 0.5 > right) return false;
+          const rect = boxVisualRect(box, 5);
+          if (rect.left < 10 || rect.right > worldWidth - 10) return false;
+          for (const other of platforms) {
+            if (other.id !== platform.id && rectsOverlap(rect, platformVisualRect(other, 7))) return false;
+          }
+          for (const other of boxes) {
+            if (rectsOverlap(rect, boxVisualRect(other, 9))) return false;
+          }
+          for (const link of links) {
+            if (rectsOverlap(rect, linkVisualRect(link, 5))) return false;
+          }
+          return true;
+        }
+
+        function canPlaceLink(link) {
+          const rect = linkVisualRect(link, 3);
+          for (const platform of platforms) {
+            if (platform.id === link.lowerId || platform.id === link.upperId) continue;
+            if (rectsOverlap(rect, platformVisualRect(platform, 4))) return false;
+          }
+          for (const box of boxes) {
+            if (rectsOverlap(rect, boxVisualRect(box, 7))) return false;
+          }
+          return true;
+        }
+
+        function platformVisualRect(platform, pad = 0) {
+          const travel = platform.travel || 0;
+          const h = platform.h || 18;
+          return {
+            left: platform.x - travel - pad,
+            right: platform.x + platform.w + travel + pad,
+            bottom: platform.y - h - pad,
+            top: platform.y + pad,
+          };
+        }
+
+        function boxVisualRect(box, pad = 0) {
+          const half = box.size * 0.5;
+          return {
+            left: box.x - half - pad,
+            right: box.x + half + pad,
+            bottom: box.y - pad,
+            top: box.y + box.size + pad,
+          };
+        }
+
+        function linkVisualRect(link, pad = 0) {
+          const reach = (link.kind === 'stairs' ? 15 : 11) + pad;
+          return {
+            left: Math.min(link.x1, link.x2) - reach,
+            right: Math.max(link.x1, link.x2) + reach,
+            bottom: Math.min(link.y1, link.y2) - 6 - pad,
+            top: Math.max(link.y1, link.y2) + 6 + pad,
+          };
+        }
+
+        function rectsOverlap(a, b) {
+          return a.left < b.right && a.right > b.left && a.bottom < b.top && a.top > b.bottom;
+        }
+
         function platformById(id) {
           if (!id) return null;
           for (const platform of platforms) {
             if (platform.id === id) return platform;
+          }
+          return null;
+        }
+
+        function linkById(id) {
+          if (!id) return null;
+          for (const link of links) {
+            if (link.id === id) return link;
           }
           return null;
         }
@@ -860,17 +1520,31 @@
         }
 
         function updateHud() {
-          heightReadout.textContent = `${String(Math.floor(bestHeight / 10)).padStart(4, '0')} m`;
-          coinReadout.textContent = String(coinsCollected).padStart(2, '0');
+          heightReadout.textContent = `${String(Math.floor(bestHeight / 10)).padStart(4, '0')} M`;
+          coinReadout.textContent = `? ${String(boxesHit).padStart(2, '0')}`;
           if (DEBUG) {
             debugEl.textContent = [
               `seed ${seed}`,
               `height ${Math.floor(bestHeight)}`,
               `platforms ${platforms.length}`,
+              `links ${links.length}`,
               `barrels ${barrels.length}`,
-              `coins ${coins.length}`,
+              `boxes ${boxes.length}`,
+              `hit ${boxesHit}`,
               `target ${targetPlatformId || '-'}`,
+              `box ${targetBoxId || '-'}`,
+              `link ${targetLinkId || '-'}`,
+              `ground ${hero.grounded ? hero.groundId || '-' : '-'}`,
+              `y ${Math.round(hero.y)}`,
+              `vy ${Math.round(hero.vy)}`,
+              `noRoute ${hero.noRouteSince ? (simTime - hero.noRouteSince).toFixed(1) : '-'}`,
+              `down ${downTrips}`,
+              `ladders ${ladderTrips}`,
+              `stairs ${stairTrips}`,
+              `poles ${poleSlides}`,
               `rescues ${rescueCount}`,
+              `recoveries ${recoveryCount}`,
+              `skips ${skippedBoxes}`,
               `manual ${manualActive() ? 'yes' : 'no'}`,
             ].join('\n');
           }
@@ -879,8 +1553,9 @@
         function render() {
           drawBackground();
           drawBackScaffold();
-          drawCoins();
+          drawLinks();
           drawPlatforms();
+          drawQuestionBoxes();
           drawBarrels();
           drawParticles();
           drawHero();
@@ -888,61 +1563,177 @@
         }
 
         function drawBackground() {
-          const gradient = ctx.createLinearGradient(0, 0, 0, height);
-          gradient.addColorStop(0, COLORS.skyTop);
-          gradient.addColorStop(0.56, COLORS.shaft);
-          gradient.addColorStop(1, COLORS.skyBottom);
-          ctx.fillStyle = gradient;
+          ctx.fillStyle = COLORS.paper;
           ctx.fillRect(0, 0, width, height);
 
-          const shaftPad = Math.max(12, Math.min(28, width * 0.035));
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
-          ctx.fillRect(worldLeft - shaftPad, 0, worldWidth + shaftPad * 2, height);
+          const playHeight = height - (width <= 520 ? 64 : 58);
+          const shaftPad = Math.max(10, Math.min(24, width * 0.03));
+          ctx.fillStyle = COLORS.white;
+          ctx.fillRect(worldLeft - shaftPad, 0, worldWidth + shaftPad * 2, playHeight);
+          drawBrickField(
+            worldLeft - shaftPad,
+            -16,
+            worldWidth + shaftPad * 2,
+            playHeight + 32,
+            cameraY * 0.18,
+            0.19,
+          );
 
-          ctx.strokeStyle = COLORS.shaftEdge;
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(worldLeft - 2, 0);
-          ctx.lineTo(worldLeft - 2, height);
-          ctx.moveTo(worldLeft + worldWidth + 2, 0);
-          ctx.lineTo(worldLeft + worldWidth + 2, height);
-          ctx.stroke();
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(0, 0, Math.max(0, worldLeft - shaftPad), playHeight);
+          ctx.fillRect(worldLeft + worldWidth + shaftPad, 0, width, playHeight);
 
-          ctx.strokeStyle = COLORS.grid;
-          ctx.lineWidth = 1;
-          const row = 48;
-          const offset = mod(cameraY * 0.24, row);
-          for (let y = -offset; y < height + row; y += row) {
-            ctx.beginPath();
-            ctx.moveTo(worldLeft, Math.round(y) + 0.5);
-            ctx.lineTo(worldLeft + worldWidth, Math.round(y) + 0.5);
-            ctx.stroke();
-          }
+          drawEdgeMasonry(worldLeft - shaftPad, playHeight, -1);
+          drawEdgeMasonry(worldLeft + worldWidth + shaftPad, playHeight, 1);
         }
 
         function drawBackScaffold() {
-          const spacing = 96;
-          const scroll = mod(cameraY * 0.45, spacing);
+          const playHeight = height - (width <= 520 ? 64 : 58);
+          const spacing = 268;
+          const scroll = mod(cameraY * 0.28, spacing);
           ctx.save();
-          ctx.globalAlpha = 0.42;
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = '#245b58';
-          for (let x = worldLeft + 34; x < worldLeft + worldWidth; x += 86) {
-            ctx.beginPath();
-            ctx.moveTo(x, -20);
-            ctx.lineTo(x, height + 20);
-            ctx.stroke();
+          ctx.beginPath();
+          ctx.rect(worldLeft + 3, 0, worldWidth - 6, playHeight);
+          ctx.clip();
+          for (let y = -scroll - 70; y < playHeight + spacing; y += spacing) {
+            const roomIndex = Math.floor((cameraY * 0.28 + y) / spacing);
+            if (mod(roomIndex, 2) === 1) {
+              const chamberW = worldWidth * (worldWidth < 390 ? 0.48 : 0.42);
+              const chamberX =
+                worldLeft + (mod(roomIndex, 2) === 0 ? worldWidth * 0.08 : worldWidth - chamberW - worldWidth * 0.08);
+              drawDarkChamber(chamberX, y + 13, chamberW, 143, roomIndex);
+            }
+            const archCount = worldWidth < 390 ? 2 : 3;
+            const bay = worldWidth / archCount;
+            for (let i = 0; i < archCount; i += 1) {
+              const narrow = (roomIndex + i) % 3 === 0;
+              const archW = Math.min(narrow ? 46 : 58, bay * 0.5);
+              const archH = narrow ? 86 : 108;
+              const cx = worldLeft + bay * (i + 0.5);
+              drawCastleArch(cx, y + 36 + ((roomIndex + i) % 2) * 11, archW, archH, roomIndex + i);
+            }
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+            for (let x = worldLeft + 4; x < worldLeft + worldWidth - 8; x += 32) {
+              ctx.fillRect(Math.round(x), Math.round(y + 164), 22, 2);
+            }
           }
-          ctx.strokeStyle = '#40352a';
-          for (let y = -scroll; y < height + spacing; y += spacing) {
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.38)';
+          ctx.lineWidth = 1;
+          for (let x = worldLeft + worldWidth * 0.25; x < worldLeft + worldWidth; x += worldWidth * 0.25) {
             ctx.beginPath();
-            ctx.moveTo(worldLeft + 12, y);
-            ctx.lineTo(worldLeft + worldWidth - 12, y + 38);
-            ctx.moveTo(worldLeft + 12, y + 42);
-            ctx.lineTo(worldLeft + worldWidth - 12, y + 4);
+            ctx.moveTo(Math.round(x) + 0.5, -20);
+            ctx.lineTo(Math.round(x) + 0.5, playHeight + 20);
             ctx.stroke();
           }
           ctx.restore();
+        }
+
+        function drawBrickField(x, y, w, h, scroll, alpha) {
+          const courseH = 12;
+          const brickW = 28;
+          const offsetY = mod(scroll, courseH);
+          ctx.save();
+          ctx.strokeStyle = `rgba(0, 0, 0, ${alpha})`;
+          ctx.lineWidth = 1;
+          for (let rowY = y - offsetY, row = 0; rowY < y + h; rowY += courseH, row += 1) {
+            ctx.beginPath();
+            ctx.moveTo(x, Math.round(rowY) + 0.5);
+            ctx.lineTo(x + w, Math.round(rowY) + 0.5);
+            for (let jointX = x + (row % 2 ? brickW * 0.5 : brickW); jointX < x + w; jointX += brickW) {
+              ctx.moveTo(Math.round(jointX) + 0.5, Math.round(rowY) + 0.5);
+              ctx.lineTo(Math.round(jointX) + 0.5, Math.round(rowY + courseH) + 0.5);
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        function drawCastleArch(cx, top, w, h, index) {
+          const radius = w * 0.5;
+          const bottom = top + h;
+          ctx.save();
+          ctx.fillStyle = index % 4 === 0 ? 'rgba(0, 0, 0, 0.28)' : 'rgba(0, 0, 0, 0.18)';
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.48)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(cx - radius, bottom);
+          ctx.lineTo(cx - radius, top + radius);
+          ctx.arc(cx, top + radius, radius, Math.PI, 0);
+          ctx.lineTo(cx + radius, bottom);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.72)';
+          ctx.lineWidth = 1;
+          const bars = index % 3 === 0 ? 2 : 3;
+          for (let i = 1; i <= bars; i += 1) {
+            const x = cx - radius + (w * i) / (bars + 1);
+            ctx.beginPath();
+            ctx.moveTo(Math.round(x) + 0.5, top + radius * 0.76);
+            ctx.lineTo(Math.round(x) + 0.5, bottom - 4);
+            ctx.stroke();
+          }
+          ctx.beginPath();
+          ctx.moveTo(cx - radius + 4, top + radius + 11);
+          ctx.lineTo(cx + radius - 4, top + radius + 11);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        function drawDarkChamber(x, top, w, h, index) {
+          const radius = Math.min(34, w * 0.18);
+          ctx.save();
+          ctx.fillStyle = COLORS.ink;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x, top + h);
+          ctx.lineTo(x, top + radius);
+          ctx.quadraticCurveTo(x + w * 0.5, top - radius * 0.55, x + w, top + radius);
+          ctx.lineTo(x + w, top + h);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = COLORS.white;
+          ctx.globalAlpha = 0.48;
+          for (let py = top + radius + 7, row = 0; py < top + h - 6; py += 8, row += 1) {
+            for (let px = x + 7 + (row % 2) * 4; px < x + w - 5; px += 12) {
+              if (mod(Math.round(px + py) + index, 3) !== 0) continue;
+              ctx.fillRect(Math.round(px), Math.round(py), 1, 1);
+            }
+          }
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = COLORS.white;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x + w * 0.25, top + 12);
+          ctx.quadraticCurveTo(x + w * 0.57, top + h * 0.42, x + w * 0.7, top + h - 10);
+          ctx.stroke();
+          for (let i = 1; i < 7; i += 1) {
+            const t = i / 7;
+            const px = lerp(x + w * 0.25, x + w * 0.7, t);
+            const py = lerp(top + 12, top + h - 10, t);
+            ctx.strokeRect(Math.round(px) - 2, Math.round(py) - 2, 4, 5);
+          }
+          ctx.restore();
+        }
+
+        function drawEdgeMasonry(edgeX, playHeight, side) {
+          const widthPx = Math.max(8, Math.min(17, worldLeft * 0.22));
+          const x = side < 0 ? edgeX - widthPx : edgeX;
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(Math.round(x), 0, Math.ceil(widthPx), playHeight);
+          ctx.strokeStyle = COLORS.white;
+          ctx.lineWidth = 1;
+          const offset = mod(cameraY * 0.24, 24);
+          for (let y = -offset; y < playHeight + 24; y += 24) {
+            ctx.beginPath();
+            ctx.moveTo(x, Math.round(y) + 0.5);
+            ctx.lineTo(x + widthPx, Math.round(y) + 0.5);
+            ctx.stroke();
+          }
         }
 
         function drawPlatforms() {
@@ -952,6 +1743,7 @@
             const sx = worldLeft + platformLeft(platform);
             const pulse = Math.max(0, 1 - (simTime - platform.pulseUntil + 0.24) / 0.24);
             if (platform.type === 'girder') drawGirderPlatform(platform, sx, sy, pulse);
+            else if (platform.type === 'open') drawOpenPlatform(platform, sx, sy, pulse);
             else drawBrickPlatform(platform, sx, sy, pulse);
             if (platform.spring) drawSpring(sx + platform.w * 0.5, sy - 2);
             if (platform.id === targetPlatformId && !manualActive()) drawTargetTick(sx + platform.w * 0.5, sy - 24);
@@ -960,52 +1752,103 @@
 
         function drawBrickPlatform(platform, sx, sy, pulse) {
           const h = platform.h;
-          ctx.fillStyle = COLORS.shadow;
-          ctx.fillRect(Math.round(sx + 5), Math.round(sy + 7), Math.round(platform.w), 7);
-          ctx.fillStyle = pulse > 0 ? mixColor(COLORS.brick, COLORS.coin, pulse * 0.28) : COLORS.brick;
-          ctx.fillRect(Math.round(sx), Math.round(sy), Math.round(platform.w), h);
-          ctx.fillStyle = COLORS.brickLight;
-          ctx.fillRect(Math.round(sx), Math.round(sy), Math.round(platform.w), 4);
-          ctx.fillStyle = COLORS.brickDark;
-          ctx.fillRect(Math.round(sx), Math.round(sy + h - 4), Math.round(platform.w), 4);
-          ctx.strokeStyle = COLORS.brickDark;
-          ctx.lineWidth = 2;
-          const brickW = 26;
-          for (let x = sx + brickW; x < sx + platform.w - 2; x += brickW) {
+          drawPlatformShadow(sx, sy, platform.w);
+          ctx.fillStyle = pulse > 0 ? COLORS.paperDim : COLORS.white;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 1.5;
+          ctx.fillRect(Math.round(sx), Math.round(sy), Math.round(platform.w), h + 3);
+          ctx.strokeRect(Math.round(sx) + 0.5, Math.round(sy) + 0.5, Math.round(platform.w), h + 3);
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(Math.round(sx - 2), Math.round(sy - 3), Math.round(platform.w + 4), 5);
+          ctx.fillStyle = COLORS.white;
+          ctx.fillRect(Math.round(sx + 3), Math.round(sy - 2), Math.max(0, Math.round(platform.w - 6)), 1);
+
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(Math.round(sx), Math.round(sy + 10) + 0.5);
+          ctx.lineTo(Math.round(sx + platform.w), Math.round(sy + 10) + 0.5);
+          ctx.stroke();
+          const brickW = 30;
+          for (let x = sx + brickW; x < sx + platform.w - 3; x += brickW) {
             ctx.beginPath();
-            ctx.moveTo(Math.round(x) + 0.5, Math.round(sy + 4));
-            ctx.lineTo(Math.round(x) + 0.5, Math.round(sy + h));
+            ctx.moveTo(Math.round(x) + 0.5, Math.round(sy + 2));
+            ctx.lineTo(Math.round(x) + 0.5, Math.round(sy + 10));
             ctx.stroke();
+          }
+          for (let x = sx + brickW * 0.5; x < sx + platform.w - 3; x += brickW) {
+            ctx.beginPath();
+            ctx.moveTo(Math.round(x) + 0.5, Math.round(sy + 11));
+            ctx.lineTo(Math.round(x) + 0.5, Math.round(sy + h + 3));
+            ctx.stroke();
+          }
+          ctx.fillStyle = COLORS.ink;
+          for (let x = sx + 7 + (platform.id % 4); x < sx + platform.w - 4; x += 19) {
+            ctx.fillRect(Math.round(x), Math.round(sy + h - 1 + ((x / 19) % 2)), 2, 1);
           }
         }
 
         function drawGirderPlatform(platform, sx, sy, pulse) {
           const h = platform.h;
-          ctx.fillStyle = COLORS.shadow;
-          ctx.fillRect(Math.round(sx + 5), Math.round(sy + 7), Math.round(platform.w), 7);
-          ctx.fillStyle = pulse > 0 ? mixColor(COLORS.girder, COLORS.coin, pulse * 0.22) : COLORS.girder;
+          drawPlatformShadow(sx, sy, platform.w);
+          ctx.fillStyle = pulse > 0 ? COLORS.paperDim : COLORS.white;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 1.5;
           ctx.fillRect(Math.round(sx), Math.round(sy), Math.round(platform.w), h);
-          ctx.fillStyle = COLORS.girderLight;
-          ctx.fillRect(Math.round(sx), Math.round(sy), Math.round(platform.w), 4);
-          ctx.fillStyle = COLORS.girderDark;
-          ctx.fillRect(Math.round(sx), Math.round(sy + h - 4), Math.round(platform.w), 4);
-          ctx.strokeStyle = COLORS.girderDark;
-          ctx.lineWidth = 3;
-          for (let x = sx + 16; x < sx + platform.w - 12; x += 28) {
+          ctx.strokeRect(Math.round(sx) + 0.5, Math.round(sy) + 0.5, Math.round(platform.w), h);
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(Math.round(sx - 2), Math.round(sy - 3), Math.round(platform.w + 4), 5);
+          ctx.fillRect(Math.round(sx), Math.round(sy + h - 3), Math.round(platform.w), 4);
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 1;
+          for (let x = sx + 3; x < sx + platform.w - 21; x += 28) {
             ctx.beginPath();
-            ctx.moveTo(Math.round(x), Math.round(sy + h - 3));
-            ctx.lineTo(Math.round(x + 18), Math.round(sy + 4));
+            ctx.moveTo(Math.round(x), Math.round(sy + 3));
+            ctx.lineTo(Math.round(x + 24), Math.round(sy + h - 4));
+            ctx.moveTo(Math.round(x + 24), Math.round(sy + 3));
+            ctx.lineTo(Math.round(x), Math.round(sy + h - 4));
             ctx.stroke();
           }
-          ctx.fillStyle = COLORS.rail;
-          for (let x = sx + 10; x < sx + platform.w - 8; x += 34) {
-            ctx.fillRect(Math.round(x), Math.round(sy + 5), 4, 4);
+          ctx.fillStyle = COLORS.white;
+          for (let x = sx + 8; x < sx + platform.w - 5; x += 24) {
+            ctx.fillRect(Math.round(x), Math.round(sy - 2), 2, 1);
           }
         }
 
+        function drawOpenPlatform(platform, sx, sy, pulse) {
+          drawPlatformShadow(sx, sy, platform.w);
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(Math.round(sx), Math.round(sy) - 1.5);
+          ctx.lineTo(Math.round(sx + platform.w), Math.round(sy) - 1.5);
+          ctx.stroke();
+          ctx.lineWidth = 1.1;
+          for (let x = sx + 14; x < sx + platform.w; x += 28) {
+            ctx.beginPath();
+            ctx.moveTo(Math.round(x), Math.round(sy + 1));
+            ctx.lineTo(Math.round(x - 9), Math.round(sy + platform.h + 4));
+            ctx.lineTo(Math.round(x + 5), Math.round(sy + platform.h + 4));
+            ctx.stroke();
+          }
+          if (pulse > 0) {
+            ctx.fillStyle = COLORS.ink;
+            ctx.globalAlpha = pulse * 0.22;
+            ctx.fillRect(Math.round(sx), Math.round(sy - 5), Math.round(platform.w), 7);
+            ctx.globalAlpha = 1;
+          }
+        }
+
+        function drawPlatformShadow(sx, sy, w) {
+          ctx.fillStyle = COLORS.ink;
+          ctx.globalAlpha = 0.26;
+          ctx.fillRect(Math.round(sx + 5), Math.round(sy + 8), Math.round(w), 12);
+          ctx.globalAlpha = 1;
+        }
+
         function drawSpring(cx, sy) {
-          ctx.strokeStyle = COLORS.springDark;
-          ctx.lineWidth = 3;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 2;
           ctx.beginPath();
           for (let i = 0; i <= 5; i += 1) {
             const x = cx + (i % 2 === 0 ? -10 : 10);
@@ -1014,38 +1857,177 @@
             else ctx.lineTo(x, y);
           }
           ctx.stroke();
-          ctx.fillStyle = COLORS.spring;
-          ctx.fillRect(Math.round(cx - 14), Math.round(sy - 3), 28, 5);
-          ctx.fillRect(Math.round(cx - 12), Math.round(sy - 27), 24, 5);
+          ctx.strokeRect(Math.round(cx - 14) + 0.5, Math.round(sy - 3) + 0.5, 28, 5);
+          ctx.strokeRect(Math.round(cx - 12) + 0.5, Math.round(sy - 27) + 0.5, 24, 5);
         }
 
         function drawTargetTick(cx, sy) {
           const bob = Math.sin(simTime * 8) * 2;
           ctx.save();
-          ctx.globalAlpha = 0.82;
-          ctx.fillStyle = COLORS.coin;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.fillStyle = COLORS.ink;
+          ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(cx, sy + bob);
           ctx.lineTo(cx - 8, sy - 10 + bob);
           ctx.lineTo(cx + 8, sy - 10 + bob);
           ctx.closePath();
           ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = COLORS.white;
+          ctx.fillRect(Math.round(cx) - 1, Math.round(sy - 7 + bob), 2, 3);
           ctx.restore();
         }
 
-        function drawCoins() {
-          for (const coin of coins) {
-            const sy = screenY(coin.y);
-            if (sy < -36 || sy > height + 36) continue;
-            const sx = worldLeft + coin.x;
-            const wobble = Math.cos(simTime * 5.2 + coin.phase);
-            const rw = 4 + Math.abs(wobble) * 6;
-            ctx.fillStyle = COLORS.coin;
+        function drawLinks() {
+          for (const link of links) {
+            const y1 = screenY(link.y1);
+            const y2 = screenY(link.y2);
+            if (Math.max(y1, y2) < -60 || Math.min(y1, y2) > height + 60) continue;
+            const x1 = worldLeft + link.x1;
+            const x2 = worldLeft + link.x2;
+            if (link.kind === 'stairs') drawStairs(x1, y1, x2, y2, link.id === targetLinkId);
+            else if (link.kind === 'pole') drawPole(x1, y1, x2, y2, link.id === targetLinkId);
+            else drawLadder(x1, y1, x2, y2, link.id === targetLinkId);
+          }
+        }
+
+        function drawLadder(x1, y1, x2, y2, active) {
+          const x = Math.round((x1 + x2) * 0.5);
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = active ? 4.5 : 3;
+          ctx.beginPath();
+          ctx.moveTo(x - 9, y1);
+          ctx.lineTo(x - 9, y2);
+          ctx.moveTo(x + 9, y1);
+          ctx.lineTo(x + 9, y2);
+          ctx.stroke();
+          ctx.strokeStyle = COLORS.white;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x - 9.5, y1);
+          ctx.lineTo(x - 9.5, y2);
+          ctx.moveTo(x + 8.5, y1);
+          ctx.lineTo(x + 8.5, y2);
+          ctx.stroke();
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = active ? 2 : 1.4;
+          const top = Math.min(y1, y2);
+          const bottom = Math.max(y1, y2);
+          for (let y = top + 13; y < bottom - 8; y += 15) {
             ctx.beginPath();
-            ctx.ellipse(sx, sy, rw, 10, 0, 0, TAU);
-            ctx.fill();
-            ctx.fillStyle = COLORS.coinHot;
-            ctx.fillRect(Math.round(sx - 1), Math.round(sy - 6), 2, 12);
+            ctx.moveTo(x - 9, Math.round(y) + 0.5);
+            ctx.lineTo(x + 9, Math.round(y) + 0.5);
+            ctx.stroke();
+          }
+        }
+
+        function drawStairs(x1, y1, x2, y2, active) {
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = active ? 3.5 : 2.2;
+          const steps = Math.max(4, Math.floor(Math.abs(y2 - y1) / 15));
+          const dx = (x2 - x1) / steps;
+          const dy = (y2 - y1) / steps;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          for (let i = 1; i <= steps; i += 1) {
+            const nextX = x1 + dx * i;
+            const nextY = y1 + dy * i;
+            ctx.lineTo(nextX, y1 + dy * (i - 1));
+            ctx.lineTo(nextX, nextY);
+          }
+          ctx.stroke();
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1 + 7);
+          ctx.lineTo(x2, y2 + 7);
+          ctx.stroke();
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1 - 14);
+          ctx.lineTo(x2, y2 - 14);
+          ctx.stroke();
+          for (let i = 0; i <= steps; i += 2) {
+            const x = x1 + dx * i;
+            const y = y1 + dy * i;
+            ctx.beginPath();
+            ctx.moveTo(x, y - 14);
+            ctx.lineTo(x, y + 5);
+            ctx.stroke();
+          }
+        }
+
+        function drawPole(x1, y1, x2, y2, active) {
+          const x = Math.round((x1 + x2) * 0.5);
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = active ? 5 : 3.4;
+          ctx.beginPath();
+          ctx.moveTo(x, y1);
+          ctx.lineTo(x, y2);
+          ctx.stroke();
+          ctx.strokeStyle = COLORS.white;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x - 0.5, y1 + 4);
+          ctx.lineTo(x - 0.5, y2 - 4);
+          ctx.stroke();
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(x, y2 - 10, 7, 0, TAU);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(x, y2);
+          ctx.quadraticCurveTo(x + 17, y2, x + 17, y2 + 14);
+          ctx.stroke();
+        }
+
+        function drawQuestionBoxes() {
+          for (const box of boxes) {
+            const sy = screenY(box.y + box.size);
+            if (sy < -44 || sy > height + 44) continue;
+            const sx = worldLeft + box.x - box.size * 0.5;
+            const lift = box.hit ? Math.max(0, 1 - (simTime - box.hitAt) / 0.18) * 8 : 0;
+            ctx.save();
+            ctx.translate(Math.round(sx) + 0.5, Math.round(sy - lift) + 0.5);
+            ctx.fillStyle = box.hit ? COLORS.white : COLORS.ink;
+            ctx.strokeStyle = COLORS.ink;
+            ctx.lineWidth = box.id === targetBoxId ? 3 : 1.8;
+            ctx.fillRect(0, 0, box.size, box.size);
+            ctx.strokeRect(0, 0, box.size, box.size);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = box.hit ? COLORS.ink : COLORS.white;
+            ctx.strokeRect(3, 3, box.size - 6, box.size - 6);
+            ctx.beginPath();
+            ctx.moveTo(1, 7);
+            ctx.lineTo(5, 7);
+            ctx.moveTo(box.size - 1, 7);
+            ctx.lineTo(box.size - 5, 7);
+            ctx.moveTo(1, box.size - 7);
+            ctx.lineTo(5, box.size - 7);
+            ctx.moveTo(box.size - 1, box.size - 7);
+            ctx.lineTo(box.size - 5, box.size - 7);
+            ctx.stroke();
+            ctx.font = '900 18px Geneva, system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = box.hit ? COLORS.ink : COLORS.white;
+            ctx.fillText(box.hit ? '-' : '?', box.size * 0.5, box.size * 0.52);
+            if (box.id === targetBoxId) {
+              ctx.strokeStyle = COLORS.ink;
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(2, box.size + 6);
+              ctx.lineTo(box.size - 2, box.size + 6);
+              ctx.stroke();
+            } else if (box.failedAt && simTime - box.failedAt < 0.35) {
+              ctx.strokeStyle = COLORS.softInk;
+              ctx.beginPath();
+              ctx.moveTo(6, box.size + 5);
+              ctx.lineTo(box.size - 6, box.size + 5);
+              ctx.stroke();
+            }
+            ctx.restore();
           }
         }
 
@@ -1059,16 +2041,15 @@
             ctx.save();
             ctx.translate(Math.round(bx), Math.round(by));
             ctx.rotate(barrel.roll);
-            ctx.fillStyle = COLORS.barrelDark;
-            ctx.beginPath();
-            ctx.ellipse(2, 3, barrel.radius + 2, barrel.radius, 0, 0, TAU);
-            ctx.fill();
-            ctx.fillStyle = COLORS.barrel;
+            ctx.fillStyle = COLORS.ink;
+            ctx.strokeStyle = COLORS.ink;
+            ctx.lineWidth = 1.8;
             ctx.beginPath();
             ctx.ellipse(0, 0, barrel.radius + 1, barrel.radius, 0, 0, TAU);
             ctx.fill();
-            ctx.strokeStyle = COLORS.barrelBand;
-            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.strokeStyle = COLORS.white;
+            ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(-barrel.radius + 1, -3);
             ctx.lineTo(barrel.radius - 1, 3);
@@ -1085,9 +2066,10 @@
             const alpha = 1 - age;
             const sx = worldLeft + particle.x;
             const sy = screenY(particle.y);
-            ctx.globalAlpha = alpha * 0.86;
+            ctx.globalAlpha = alpha * 0.72;
             ctx.fillStyle = particle.color;
-            ctx.fillRect(Math.round(sx - particle.r * 0.5), Math.round(sy - particle.r * 0.5), Math.ceil(particle.r), Math.ceil(particle.r));
+            const size = Math.max(1, Math.round(particle.r * 0.55));
+            ctx.fillRect(Math.round(sx), Math.round(sy), size, size);
           }
           ctx.globalAlpha = 1;
         }
@@ -1099,77 +2081,110 @@
           ctx.save();
           ctx.translate(Math.round(sx), Math.round(sy));
           ctx.scale(hero.facing, 1);
+          ctx.lineCap = 'square';
+          ctx.lineJoin = 'miter';
 
           ctx.fillStyle = COLORS.shadow;
           ctx.beginPath();
-          ctx.ellipse(0, 4, 16, 4, 0, 0, TAU);
+          ctx.ellipse(1, 4, 16, 3, 0, 0, TAU);
           ctx.fill();
 
+          const climb = hero.onLink ? Math.sin(simTime * 9) * 4 : 0;
           const jumpPose = hero.grounded ? 0 : clamp(hero.vy / JUMP_SPEED, -0.65, 1);
-          const run = Math.sin(simTime * 16) * (hero.grounded ? clamp(Math.abs(hero.vx) / RUN_SPEED, 0, 1) : 0.25);
-          const red = hero.rescuedUntil > simTime || blink ? '#fff0a8' : COLORS.heroRed;
-
-          ctx.fillStyle = COLORS.boot;
-          ctx.fillRect(-10, -6 + run * 2, 9, 6);
-          ctx.fillRect(2, -6 - run * 2, 10, 6);
-
-          ctx.fillStyle = COLORS.denimDark;
-          ctx.fillRect(-10, -20, 9, 16 + jumpPose * 4);
-          ctx.fillRect(1, -20, 9, 16 - jumpPose * 4);
-          ctx.fillStyle = COLORS.denim;
-          ctx.fillRect(-12, -31, 24, 18);
-          ctx.fillStyle = COLORS.rail;
-          ctx.fillRect(-6, -28, 4, 4);
-          ctx.fillRect(3, -28, 4, 4);
-
-          ctx.fillStyle = red;
-          ctx.fillRect(-14, -40, 28, 14);
-          ctx.fillStyle = COLORS.heroRedDark;
-          ctx.fillRect(-11, -29, 22, 7);
-
-          ctx.fillStyle = COLORS.skin;
-          ctx.fillRect(-10, -52, 21, 15);
-          ctx.fillRect(9, -47, 7, 6);
-          ctx.fillStyle = COLORS.skinDark;
-          ctx.fillRect(1, -43, 12, 4);
-          ctx.fillRect(8, -48, 4, 4);
+          const run =
+            Math.sin(simTime * 16) *
+            (hero.grounded ? clamp(Math.abs(hero.vx) / RUN_SPEED, 0, 1) : 0.25);
+          ctx.strokeStyle = COLORS.ink;
           ctx.fillStyle = COLORS.ink;
-          ctx.fillRect(3, -47, 4, 4);
-          ctx.fillRect(4, -41, 13, 3);
+          ctx.lineWidth = 4;
 
-          ctx.fillStyle = red;
-          ctx.fillRect(-13, -60, 24, 9);
-          ctx.fillRect(-17, -54, 30, 6);
-          ctx.fillStyle = COLORS.white;
-          ctx.fillRect(-2, -56, 8, 6);
+          const leftFoot = run * 4.5 - jumpPose * 3;
+          const rightFoot = -run * 4.5 + jumpPose * 2;
+          ctx.beginPath();
+          ctx.moveTo(-6, -9);
+          ctx.lineTo(-10 + leftFoot, 0);
+          ctx.moveTo(6, -9);
+          ctx.lineTo(12 + rightFoot, 0);
+          ctx.stroke();
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(-14 + leftFoot, 0);
+          ctx.lineTo(-7 + leftFoot, 0);
+          ctx.moveTo(8 + rightFoot, 0);
+          ctx.lineTo(16 + rightFoot, 0);
+          ctx.stroke();
 
-          ctx.fillStyle = COLORS.skin;
-          const armLift = hero.grounded ? 0 : -7;
-          ctx.fillRect(-18, -31 + armLift, 7, 15);
-          ctx.fillRect(12, -31 - armLift * 0.3, 7, 15);
+          ctx.fillStyle = COLORS.ink;
+          ctx.beginPath();
+          ctx.moveTo(-12, -26);
+          ctx.lineTo(11, -26);
+          ctx.lineTo(9, -8);
+          ctx.lineTo(-10, -8);
+          ctx.closePath();
+          ctx.fill();
+
           ctx.fillStyle = COLORS.white;
-          ctx.fillRect(-19, -17 + armLift, 8, 6);
-          ctx.fillRect(12, -17 - armLift * 0.3, 8, 6);
+          ctx.fillRect(-5, -24, 3, 12);
+          ctx.fillRect(4, -24, 3, 12);
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(-3, -14, 8, 3);
+
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(-10, -23);
+          ctx.lineTo(-18, -17 + (hero.onLink ? climb : jumpPose * -6));
+          ctx.moveTo(10, -23);
+          ctx.lineTo(18, -16 - (hero.onLink ? climb : jumpPose * -4));
+          ctx.stroke();
+
+          ctx.fillStyle = blink ? COLORS.ink : COLORS.white;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(0, -35, 11, 11.5, 0, 0, TAU);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(5, -38, 3, 3);
+          ctx.fillRect(1, -31, 9, 3);
+          ctx.fillRect(8, -34, 5, 4);
+
+          ctx.fillStyle = COLORS.ink;
+          ctx.beginPath();
+          ctx.moveTo(-13, -43);
+          ctx.lineTo(8, -47);
+          ctx.lineTo(13, -42);
+          ctx.lineTo(17, -40);
+          ctx.lineTo(-13, -40);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillRect(-15, -41, 31, 3);
+          ctx.fillStyle = COLORS.white;
+          ctx.fillRect(-6, -43, 10, 1);
+
           ctx.restore();
         }
 
         function drawForegroundMask() {
-          const side = Math.max(0, worldLeft - 3);
-          if (side <= 0) return;
-          const leftGradient = ctx.createLinearGradient(0, 0, side, 0);
-          leftGradient.addColorStop(0, 'rgba(7, 3, 13, 0.92)');
-          leftGradient.addColorStop(1, 'rgba(7, 3, 13, 0.05)');
-          ctx.fillStyle = leftGradient;
-          ctx.fillRect(0, 0, side, height);
-          const rightGradient = ctx.createLinearGradient(width - side, 0, width, 0);
-          rightGradient.addColorStop(0, 'rgba(7, 3, 13, 0.05)');
-          rightGradient.addColorStop(1, 'rgba(7, 3, 13, 0.92)');
-          ctx.fillStyle = rightGradient;
-          ctx.fillRect(width - side, 0, side, height);
+          const playHeight = height - (width <= 520 ? 64 : 58);
+          const trim = Math.max(3, Math.min(8, worldLeft * 0.12));
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(worldLeft - trim, 0, trim, playHeight);
+          ctx.fillRect(worldLeft + worldWidth, 0, trim, playHeight);
+          ctx.fillRect(worldLeft - trim, 0, worldWidth + trim * 2, 3);
+          ctx.fillStyle = COLORS.white;
+          const offset = mod(cameraY * 0.31, 34);
+          for (let y = -offset; y < playHeight; y += 34) {
+            ctx.fillRect(Math.round(worldLeft - trim), Math.round(y), trim, 1);
+            ctx.fillRect(Math.round(worldLeft + worldWidth), Math.round(y + 17), trim, 1);
+          }
         }
 
         function screenY(worldY) {
-          return height - (worldY - cameraY);
+          const hudHeight = width <= 520 ? 64 : 58;
+          return height - hudHeight - (worldY - cameraY);
         }
 
         function onKeyDown(event) {

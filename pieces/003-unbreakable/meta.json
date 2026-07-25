@@ -3,5 +3,5 @@
   "year": 2026,
   "type": "interactive",
   "thumbnail": "thumbnail.svg",
-  "description": "Breakout in reverse. A single paddle that cannot miss bounces one ball upward; every impact lays a brick instead of breaking one, so the wall grows downward and a steady scroll carries it off the top. The build-front is clamped to a band far above the floor — so the wall can never reach the paddle — while the ball steers toward the most starved column to keep the front level. No player, no losing, no finish. Click to reshuffle."
+  "description": "Breakout in reverse. An infallible paddle favors uncapped Hokusai-colored towers. Brick impacts fill adjacent cells while solid faces preserve true ricochets, and every real impact creeps the aligned lattice upward. If the ball becomes trapped in a tight upper pocket, it stops, blinks three times, blasts an escape hole through the wall, then falls back to the paddle and becomes the building ball again. No player, no losing. Click to rebuild."
 }

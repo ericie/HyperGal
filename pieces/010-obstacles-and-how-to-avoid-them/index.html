@@ -5,11 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Obstacles and How to Avoid Them · HyperGal</title>
     <style>
+      :root {
+        --paper: #ffffe4;
+        --ink: #001522;
+        --prussian: #004b87;
+        --tyrian: #a8002c;
+        --wheat: #ffd77b;
+        --burlywood: #deb887;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
       html,
       body {
         margin: 0;
         height: 100%;
-        background: #f3efe4;
+        background: var(--paper);
         overflow: hidden;
       }
 
@@ -19,14 +32,274 @@
         display: block;
         width: 100%;
         height: 100%;
-        background: #f3efe4;
+        background: var(--paper);
         cursor: crosshair;
         touch-action: manipulation;
       }
 
       canvas:focus-visible {
-        outline: 2px solid #1d1b17;
+        outline: 2px solid var(--ink);
         outline-offset: -8px;
+      }
+
+      .gestalt-panel {
+        position: fixed;
+        z-index: 10;
+        top: 14px;
+        left: 14px;
+        width: min(278px, calc(100vw - 28px));
+        padding: 8px 10px 10px;
+        border: 2px solid var(--ink);
+        border-radius: 5px;
+        background: rgba(255, 255, 228, 0.96);
+        box-shadow: 5px 5px 0 rgba(0, 75, 135, 0.82);
+        color: var(--ink);
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 11px;
+        line-height: 1;
+        user-select: none;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-height: 30px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid rgba(0, 21, 34, 0.3);
+        cursor: grab;
+        touch-action: none;
+      }
+
+      .panel-header h1 {
+        margin: 0;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .panel-actions {
+        display: flex;
+        flex: 0 0 auto;
+        gap: 4px;
+      }
+
+      .reseed-button,
+      .collapse-button {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        place-items: center;
+        border: 0;
+        border-radius: 3px;
+        background: var(--ink);
+        color: var(--paper);
+        font: inherit;
+        font-size: 18px;
+        line-height: 1;
+        cursor: pointer;
+      }
+
+      .collapse-button {
+        border: 1px solid var(--ink);
+        background: var(--paper);
+        color: var(--ink);
+        font-size: 16px;
+      }
+
+      .reseed-button:hover,
+      .collapse-button:hover {
+        background: var(--prussian);
+        color: var(--paper);
+      }
+
+      .reseed-button:focus-visible,
+      .collapse-button:focus-visible,
+      .gestalt-toggle:focus-visible,
+      .gestalt-strength:focus-visible {
+        outline: 2px solid var(--tyrian);
+        outline-offset: 2px;
+      }
+
+      .gestalt-panel.is-dragging .panel-header {
+        cursor: grabbing;
+      }
+
+      .gestalt-panel.is-collapsed {
+        width: 175px;
+        padding-bottom: 8px;
+      }
+
+      .gestalt-panel.is-collapsed .panel-header {
+        padding-bottom: 0;
+        border-bottom: 0;
+      }
+
+      .gestalt-panel.is-collapsed .panel-controls {
+        display: none;
+      }
+
+      .gestalt-control {
+        --tone: var(--prussian);
+        --strength: 72%;
+        display: grid;
+        grid-template-columns: 18px minmax(0, 1fr) 34px;
+        align-items: center;
+        column-gap: 7px;
+        min-height: 35px;
+        padding-top: 4px;
+        color: var(--tone);
+      }
+
+      .gestalt-control[data-gestalt="scale"] {
+        --tone: var(--tyrian);
+      }
+
+      .gestalt-control[data-gestalt="scaleVariety"] {
+        --tone: #765523;
+      }
+
+      .gestalt-control[data-count] {
+        --tone: var(--ink);
+        min-height: 39px;
+      }
+
+      .gestalt-control[data-lines] {
+        --tone: var(--prussian);
+        min-height: 39px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid rgba(0, 21, 34, 0.3);
+      }
+
+      .gestalt-control[data-gestalt="proximity"] {
+        --tone: #8f5d00;
+      }
+
+      .gestalt-control[data-gestalt="closure"] {
+        --tone: #765523;
+      }
+
+      .gestalt-control[data-gestalt="offpage"] {
+        --tone: var(--ink);
+      }
+
+      .gestalt-toggle {
+        width: 15px;
+        height: 15px;
+        margin: 0;
+        border-radius: 2px;
+        accent-color: var(--tone);
+        cursor: pointer;
+      }
+
+      .count-mark {
+        color: var(--tyrian);
+        font-size: 13px;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      [data-lines] .count-mark {
+        color: var(--prussian);
+      }
+
+      .gestalt-name {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--ink);
+        font-weight: 650;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .gestalt-value {
+        color: var(--tone);
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+      }
+
+      .gestalt-strength {
+        grid-column: 2 / 4;
+        width: 100%;
+        height: 12px;
+        margin: -2px 0 0;
+        padding: 0;
+        appearance: none;
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .gestalt-strength::-webkit-slider-runnable-track {
+        height: 3px;
+        border-radius: 0;
+        background: linear-gradient(
+          to right,
+          var(--tone) 0 var(--strength),
+          rgba(0, 21, 34, 0.18) var(--strength) 100%
+        );
+      }
+
+      .gestalt-strength::-webkit-slider-thumb {
+        width: 10px;
+        height: 10px;
+        margin-top: -3.5px;
+        border: 2px solid var(--paper);
+        border-radius: 50%;
+        appearance: none;
+        background: var(--tone);
+        box-shadow: 0 0 0 1px var(--tone);
+      }
+
+      .gestalt-strength::-moz-range-track {
+        height: 3px;
+        border: 0;
+        border-radius: 0;
+        background: rgba(0, 21, 34, 0.18);
+      }
+
+      .gestalt-strength::-moz-range-progress {
+        height: 3px;
+        background: var(--tone);
+      }
+
+      .gestalt-strength::-moz-range-thumb {
+        width: 8px;
+        height: 8px;
+        border: 2px solid var(--paper);
+        border-radius: 50%;
+        background: var(--tone);
+        box-shadow: 0 0 0 1px var(--tone);
+      }
+
+      .gestalt-control.is-off {
+        opacity: 0.45;
+      }
+
+      .gestalt-control.is-off .gestalt-strength {
+        cursor: default;
+      }
+
+      @media (max-width: 520px) {
+        .gestalt-panel {
+          top: 10px;
+          left: 10px;
+          width: min(234px, calc(100vw - 20px));
+          padding: 6px 8px 8px;
+          box-shadow: 4px 4px 0 rgba(0, 75, 135, 0.82);
+        }
+
+        .panel-header {
+          min-height: 28px;
+          padding-bottom: 4px;
+        }
+
+        .gestalt-control {
+          min-height: 32px;
+        }
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -41,40 +314,142 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Obstacles and How to Avoid Them: muted geometric obstacles sway up and down while horizontal wall-drawing lines redraw around them."
+      aria-label="Obstacles and How to Avoid Them: small drawing heads animate fluid field lines around borderless Hokusai-toned walls, squares, and circles."
     ></canvas>
+
+    <aside class="gestalt-panel" aria-label="Gestalt controls">
+      <div class="panel-header">
+        <h1>Composition</h1>
+        <div class="panel-actions">
+          <button
+            class="collapse-button"
+            id="collapse-panel"
+            type="button"
+            aria-controls="composition-controls"
+            aria-expanded="true"
+            aria-label="Collapse composition controls"
+            title="Collapse controls"
+          >-</button>
+          <button class="reseed-button" id="reseed" type="button" aria-label="New composition" title="New composition">
+            &#8635;
+          </button>
+        </div>
+      </div>
+
+      <div class="panel-controls" id="composition-controls">
+        <div class="gestalt-control" data-count>
+          <span class="count-mark" aria-hidden="true">#</span>
+          <span class="gestalt-name">Count</span>
+          <output class="gestalt-value">19</output>
+          <input class="gestalt-strength" type="range" min="0" max="100" value="42" aria-label="Obstacle count" />
+        </div>
+
+        <div class="gestalt-control" data-lines>
+          <span class="count-mark" aria-hidden="true">&#8801;</span>
+          <span class="gestalt-name">Lines</span>
+          <output class="gestalt-value">32</output>
+          <input class="gestalt-strength" type="range" min="8" max="64" step="1" value="32" aria-label="Line count" />
+        </div>
+
+        <div class="gestalt-control" data-gestalt="scale">
+          <input class="gestalt-toggle" type="checkbox" aria-label="Scale on" />
+          <span class="gestalt-name">Scale</span>
+          <output class="gestalt-value">38%</output>
+          <input class="gestalt-strength" type="range" min="0" max="100" value="38" aria-label="Scale strength" />
+        </div>
+
+        <div class="gestalt-control" data-gestalt="scaleVariety">
+          <input class="gestalt-toggle" type="checkbox" aria-label="Scale variety on" />
+          <span class="gestalt-name">Scale variety</span>
+          <output class="gestalt-value">82%</output>
+          <input class="gestalt-strength" type="range" min="0" max="100" value="82" aria-label="Scale variety strength" />
+        </div>
+
+        <div class="gestalt-control" data-gestalt="implied">
+          <input class="gestalt-toggle" type="checkbox" aria-label="Implied line on" />
+          <span class="gestalt-name">Implied line</span>
+          <output class="gestalt-value">74%</output>
+          <input class="gestalt-strength" type="range" min="0" max="100" value="74" aria-label="Implied line strength" />
+        </div>
+
+        <div class="gestalt-control" data-gestalt="proximity">
+          <input class="gestalt-toggle" type="checkbox" aria-label="Proximity on" />
+          <span class="gestalt-name">Proximity</span>
+          <output class="gestalt-value">58%</output>
+          <input class="gestalt-strength" type="range" min="0" max="100" value="58" aria-label="Proximity strength" />
+        </div>
+
+        <div class="gestalt-control" data-gestalt="closure">
+          <input class="gestalt-toggle" type="checkbox" aria-label="Closure on" />
+          <span class="gestalt-name">Closure</span>
+          <output class="gestalt-value">46%</output>
+          <input class="gestalt-strength" type="range" min="0" max="100" value="46" aria-label="Closure strength" />
+        </div>
+
+        <div class="gestalt-control" data-gestalt="offpage">
+          <input class="gestalt-toggle" type="checkbox" aria-label="Off-page on" />
+          <span class="gestalt-name">Off-page</span>
+          <output class="gestalt-value">66%</output>
+          <input class="gestalt-strength" type="range" min="0" max="100" value="66" aria-label="Off-page strength" />
+        </div>
+      </div>
+    </aside>
 
     <script>
       const canvas = document.getElementById('stage');
       const ctx = canvas.getContext('2d', { alpha: false });
+      const compositionPanel = document.querySelector('.gestalt-panel');
+      const panelHeader = compositionPanel.querySelector('.panel-header');
+      const collapseButton = document.getElementById('collapse-panel');
+      const reseedButton = document.getElementById('reseed');
+      const reducedMotionQuery =
+        typeof matchMedia === 'function'
+          ? matchMedia('(prefers-reduced-motion: reduce)')
+          : null;
       const TAU = Math.PI * 2;
 
       const COLORS = {
-        wall: '#f3efe4',
-        ink: '#1d1b17',
-        graphite: '#5c5a54',
-        clay: '#b45a45',
-        slate: '#58748a',
-        moss: '#7d8760',
-        ochre: '#c0a04a',
-        fog: '#d8d1c2',
+        paper: '#ffffe4',
+        ink: '#001522',
+        wheat: '#ffd77b',
+        paleYellow: '#ffffb3',
+        prussian: '#004b87',
+        tyrian: '#a8002c',
+        burlywood: '#deb887',
       };
 
-      const SHAPE_COLORS = [COLORS.clay, COLORS.graphite, COLORS.moss, COLORS.ochre, COLORS.ink, COLORS.wall];
-      const LINE_COLORS = [
-        'rgba(29, 27, 23, 0.78)',
-        'rgba(92, 90, 84, 0.56)',
-        'rgba(180, 90, 69, 0.48)',
-        'rgba(29, 27, 23, 0.64)',
-        'rgba(88, 116, 138, 0.5)',
-        'rgba(92, 90, 84, 0.42)',
-        'rgba(29, 27, 23, 0.7)',
-        'rgba(125, 135, 96, 0.5)',
-        'rgba(192, 160, 74, 0.5)',
-        'rgba(29, 27, 23, 0.58)',
+      const WALL_COLORS = [
+        COLORS.prussian,
+        COLORS.wheat,
+        COLORS.tyrian,
+        COLORS.burlywood,
+        COLORS.paleYellow,
+        COLORS.prussian,
+        COLORS.ink,
+        COLORS.wheat,
       ];
-      const TARGET_LINE_FPS = 12;
-      const LINE_EASE_RATE = 16;
+      const LINE_COLORS = [
+        'rgba(0, 21, 34, 0.88)',
+        'rgba(0, 75, 135, 0.7)',
+        'rgba(168, 0, 44, 0.6)',
+        'rgba(0, 21, 34, 0.78)',
+        'rgba(222, 184, 135, 0.86)',
+        'rgba(0, 75, 135, 0.58)',
+        'rgba(168, 0, 44, 0.54)',
+        'rgba(255, 215, 123, 0.94)',
+        'rgba(0, 21, 34, 0.84)',
+        'rgba(222, 184, 135, 0.72)',
+      ];
+      const GESTALTS = {
+        scale: { enabled: true, strength: 0.38 },
+        scaleVariety: { enabled: true, strength: 0.82 },
+        implied: { enabled: true, strength: 0.74 },
+        proximity: { enabled: true, strength: 0.58 },
+        closure: { enabled: true, strength: 0.46 },
+        offpage: { enabled: true, strength: 0.66 },
+      };
+      const COUNT_SETTING = { strength: 0.42 };
+      const LINE_SETTING = { count: 32 };
 
       let width = 1;
       let height = 1;
@@ -83,15 +458,15 @@
       let random = mulberry32(seed);
       let obstacles = [];
       let lines = [];
-      let targetLines = [];
       let lineTemplates = [];
       let resizeTimer = 0;
-      let raf = 0;
-      let startedAt = 0;
-      let lastFrameAt = 0;
-      let lastTargetAt = 0;
-      const reducedMotionQuery = matchMedia('(prefers-reduced-motion: reduce)');
-      let prefersReducedMotion = reducedMotionQuery.matches;
+      let compositionFrame = 0;
+      let lineAnimationFrame = 0;
+      let lineAnimationStartedAt = 0;
+      let lineAnimationDuration = 1;
+      let lastAnimationRender = 0;
+      let prefersReducedMotion = reducedMotionQuery ? reducedMotionQuery.matches : false;
+      let panelDrag = null;
 
       function seedFromLocation() {
         const params = new URLSearchParams(location.search);
@@ -126,6 +501,14 @@
         return Math.max(min, Math.min(max, value));
       }
 
+      function mix(from, to, amount) {
+        return from + (to - from) * clamp(amount, 0, 1);
+      }
+
+      function gestaltStrength(name) {
+        return GESTALTS[name].enabled ? GESTALTS[name].strength : 0;
+      }
+
       function smootherStep(value) {
         const t = clamp(value, 0, 1);
         return t * t * t * (t * (t * 6 - 15) + 10);
@@ -150,67 +533,63 @@
       }
 
       function compose() {
-        cancelAnimationFrame(raf);
         random = mulberry32((seed ^ Math.round(width * 17) ^ Math.round(height * 31)) >>> 0);
         obstacles = makeObstacles();
         lineTemplates = makeLineTemplates();
-        startedAt = performance.now();
-        lastFrameAt = startedAt;
-        lastTargetAt = startedAt;
-        updateObstacleWaves(0);
-        targetLines = makeLines();
-        lines = cloneLines(targetLines);
-        render();
-        if (!prefersReducedMotion) raf = requestAnimationFrame(tick);
+        lines = makeLines();
+        updateCountOutput();
+        updateLineOutput();
+        restartLineAnimation();
       }
 
       function makeObstacles() {
         const minSide = Math.min(width, height);
-        const grid = makeGridSpec();
-        const desired = grid.count;
-        const cellSpan = Math.min(width / (grid.cols + 1), height / (grid.rows + 1));
-        const base = clamp(cellSpan * 0.62, 30, 104);
+        const spec = makeCompositionSpec();
+        const desired = spec.count;
         const lineGap = clamp(height / 44, 14, 22);
-        const clearance = clamp(lineGap * 0.7 + minSide * 0.004, 10, 18);
-        const boundary = clamp(minSide * (width < 520 ? 0.075 : 0.055), 28, 76);
-        const corridor = clamp(lineGap * 0.85, 12, 20);
+        const clearance = clamp(lineGap * 0.36 + minSide * 0.0015, 6, 11);
+        const horizontalBoundary = horizontalSafeZone();
+        const verticalBoundary = clamp(minSide * (width < 520 ? 0.045 : 0.035), 16, 44);
+        const corridor = clamp(minSide * 0.032, 20, 42);
         const placed = [];
-        const anchors = makeAnchors(grid);
+        const anchors = makeGestaltAnchors(spec).sort(
+          (a, b) => anchorPriority(b) - anchorPriority(a)
+        );
 
         for (let i = 0; i < anchors.length && placed.length < desired; i++) {
           const anchor = anchors[i];
-          const type = 'square';
-          const fill = anchor.fill || SHAPE_COLORS[(i + randInt(0, SHAPE_COLORS.length - 1)) % SHAPE_COLORS.length];
-          const obstacle = makeObstacle(type, base, fill, placed.length, anchor.tier);
-          const safeRadius = obstacle.bodyRadius + clearance;
+          const fill = anchor.fill || WALL_COLORS[(i + randInt(0, WALL_COLORS.length - 1)) % WALL_COLORS.length];
+          const obstacle = makeObstacle(spec.base, fill, placed.length, anchor.scale, anchor.shape);
           let candidate = null;
 
-          for (let attempt = 0; attempt < 80; attempt++) {
-            const jitter = attempt < 48 ? anchor.jitter : anchor.jitter * 1.7;
+          for (let attempt = 0; attempt < 120; attempt++) {
+            const jitter = attempt < 72 ? anchor.jitter : anchor.jitter * 1.65;
             const trial = {
               ...obstacle,
-              x: anchor.x * width + rand(-jitter, jitter),
-              y: anchor.y * height + rand(-jitter, jitter),
-              rotation: 0,
-              wavePhase: rand(0, TAU),
-              waveSpeed: rand(0.42, 0.72),
-              waveDrift: rand(0.15, 0.27),
-              fieldRadius: safeRadius,
-              placeRadius: safeRadius + corridor * 0.5,
+              x: anchor.x + rand(-jitter, jitter),
+              y: anchor.y + rand(-jitter, jitter),
+              rotation: anchor.angle + rand(-anchor.angleJitter, anchor.angleJitter),
+              layoutMode: anchor.mode,
+              guideX: anchor.guideX,
+              guideY: anchor.guideY,
+              guideAngle: anchor.guideAngle,
             };
 
-            const minX = boundary + trial.placeRadius;
-            const maxX = width - boundary - trial.placeRadius;
-            const minY = boundary + trial.placeRadius;
-            const maxY = height - boundary - trial.placeRadius;
-            if (maxX <= minX || maxY <= minY) continue;
-            trial.x = clamp(trial.x, minX, maxX);
-            trial.y = clamp(trial.y, minY, maxY);
+            const bounds = wallHalfBounds(trial, clearance);
+            if (anchor.edge) {
+              if (!positionOffPage(trial, anchor, bounds)) continue;
+            } else {
+              const minX = horizontalBoundary + bounds.x;
+              const maxX = width - horizontalBoundary - bounds.x;
+              const minY = verticalBoundary + bounds.y;
+              const maxY = height - verticalBoundary - bounds.y;
+              if (maxX <= minX || maxY <= minY) continue;
+              trial.x = clamp(trial.x, minX, maxX);
+              trial.y = clamp(trial.y, minY, maxY);
+            }
+
             trial.baseX = trial.x;
             trial.baseY = trial.y;
-            trial.waveAmp = clamp(lineGap * rand(0.55, 1.15) + trial.bodyRadius * 0.045, 7, 18);
-            trial.minY = minY;
-            trial.maxY = maxY;
             if (!overlapsPlaced(trial, placed, corridor)) {
               candidate = trial;
               break;
@@ -220,168 +599,430 @@
           if (candidate) placed.push(candidate);
         }
 
-        tuneWaveAmplitudes(placed);
         return placed;
       }
 
-      function tuneWaveAmplitudes(placed) {
-        const edgeGap = clamp(Math.min(width, height) * 0.025, 8, 20);
-        for (const obstacle of placed) {
-          const topRoom = obstacle.baseY - obstacle.bodyRadius - edgeGap;
-          const bottomRoom = height - obstacle.baseY - obstacle.bodyRadius - edgeGap;
-          obstacle.waveAmp = Math.min(obstacle.waveAmp, Math.max(0, topRoom), Math.max(0, bottomRoom));
-        }
-
-        for (let i = 0; i < placed.length; i++) {
-          for (let j = i + 1; j < placed.length; j++) {
-            const a = placed[i];
-            const b = placed[j];
-            const baseDistance = Math.hypot(a.baseX - b.baseX, a.baseY - b.baseY);
-            const safeTravel = Math.max(0, baseDistance - a.bodyRadius - b.bodyRadius - edgeGap);
-            const maxPairAmp = safeTravel * 0.42;
-            if (a.waveAmp + b.waveAmp > maxPairAmp) {
-              const scale = maxPairAmp / Math.max(1, a.waveAmp + b.waveAmp);
-              a.waveAmp *= scale;
-              b.waveAmp *= scale;
-            }
-          }
-        }
+      function horizontalSafeZone() {
+        return width < 520
+          ? clamp(width * 0.11, 30, 48)
+          : clamp(width * 0.075, 56, 112);
       }
 
-      function overlapsPlaced(candidate, placed, corridor) {
-        for (const existing of placed) {
-          const dx = candidate.x - existing.x;
-          const dy = candidate.y - existing.y;
-          const minDistance = candidate.placeRadius + existing.placeRadius + corridor * 0.32;
-          if (dx * dx + dy * dy < minDistance * minDistance) return true;
-        }
-        return false;
+      function anchorPriority(anchor) {
+        if (anchor.edge) return 4;
+        if (anchor.mode === 'implied') return 3;
+        if (anchor.mode === 'closure' && anchor.shape === 'square') return 2.5;
+        if (anchor.mode === 'closure' && anchor.shape === 'circle') return 2.4;
+        if (anchor.shape === 'square') return 2.3;
+        if (anchor.shape !== 'wall') return 2;
+        if (anchor.mode === 'closure') return 1;
+        return 0;
       }
 
-      function makeGridSpec() {
-        const cols =
+      function makeCompositionSpec() {
+        const minSide = Math.min(width, height);
+        const capacity =
           width < 520
-            ? 3
-            : Math.round(clamp(Math.round(width / 210), 5, width > 1600 ? 8 : 7));
-        const rows =
+            ? Math.round(clamp((width * height) / 16000, 14, 26))
+            : Math.round(clamp((width * height) / 30000, 28, 48));
+        const count = Math.round(mix(6, capacity, smootherStep(COUNT_SETTING.strength)));
+        const countScale = mix(1.14, 0.72, smootherStep(COUNT_SETTING.strength));
+        const placementScale = GESTALTS.scale.enabled
+          ? smootherStep(GESTALTS.scale.strength)
+          : 0;
+        const mainAngles =
           width < 520
-            ? Math.round(clamp(Math.round(height / 165), 5, 6))
-            : Math.round(clamp(Math.round(height / 215), 4, 5));
-        return { cols, rows, count: cols * rows };
-      }
-
-      function makeAnchors(grid) {
-        const { cols, rows } = grid;
-        const marginX = width < 520 ? 0.2 : 0.1;
-        const marginY = width < 520 ? 0.11 : 0.14;
-        const spanX = cols > 1 ? (1 - marginX * 2) / (cols - 1) : 0;
-        const spanY = rows > 1 ? (1 - marginY * 2) / (rows - 1) : 0;
-        const cellSpan = Math.min(width / (cols + 1), height / (rows + 1));
-        const jitter = clamp(cellSpan * 0.032, 4, 10);
-        const tiers = width < 520
-          ? ['small', 'medium', 'tiny', 'large', 'small', 'tiny', 'medium', 'small', 'tiny']
-          : ['tiny', 'small', 'medium', 'small', 'tiny', 'large', 'small', 'medium', 'tiny', 'small', 'medium', 'small'];
-        const fills = [
-          COLORS.clay,
-          COLORS.wall,
-          COLORS.graphite,
-          COLORS.moss,
-          COLORS.ochre,
-          COLORS.moss,
-          COLORS.wall,
-          COLORS.clay,
-          COLORS.ink,
-          COLORS.wall,
-          COLORS.graphite,
-          COLORS.ochre,
+            ? [-1.12, -0.94, 0.94, 1.12]
+            : [-0.62, -0.46, 0.38, 0.56];
+        const mainAngle = pick(mainAngles) + rand(-0.07, 0.07);
+        const center = {
+          x: width * rand(0.46, 0.62),
+          y: height * rand(0.4, 0.62),
+        };
+        const guides = [
+          {
+            x: center.x,
+            y: center.y,
+            angle: mainAngle,
+          },
+          {
+            x: width * rand(0.34, 0.7),
+            y: height * rand(0.32, 0.72),
+            angle: mainAngle + pick([0.82, 1.06, Math.PI / 2]),
+          },
         ];
+        const clusterSeed = rand(0, TAU);
+        const clusters = [0, 1, 2].map((index) => {
+          const theta = clusterSeed + index * (TAU / 3) + rand(-0.34, 0.34);
+          return {
+            x: center.x + Math.cos(theta) * width * rand(0.13, 0.25),
+            y: center.y + Math.sin(theta) * height * rand(0.12, 0.23),
+          };
+        });
+        const closure = {
+          x: width * rand(0.46, 0.67),
+          y: height * rand(0.43, 0.64),
+          rx: clamp(width * rand(0.18, 0.3), minSide * 0.28, width * 0.34),
+          ry: clamp(height * rand(0.19, 0.31), minSide * 0.22, height * 0.36),
+          start: rand(-Math.PI, Math.PI),
+        };
+
+        return {
+          count,
+          anchorCount: Math.ceil(count * mix(2, 3.2, placementScale)),
+          base: clamp(minSide * (width < 520 ? 0.155 : 0.145) * countScale, 44, 138),
+          guides,
+          clusters,
+          closure,
+        };
+      }
+
+      function makeGestaltAnchors(spec) {
+        const minSide = Math.min(width, height);
+        const implied = gestaltStrength('implied');
+        const proximity = gestaltStrength('proximity');
+        const closure = gestaltStrength('closure');
+        const offpage = gestaltStrength('offpage');
+        const scaleVariety = gestaltStrength('scaleVariety');
+        const overallScale = GESTALTS.scale.enabled
+          ? mix(0.2, 3.6, Math.pow(GESTALTS.scale.strength, 1.65))
+          : 1;
+        const impliedForce = smootherStep(implied);
+        const closureCount =
+          closure > 0 ? Math.round(clamp(spec.count * mix(0.12, 0.29, closure), 3, 7)) : 0;
+        const impliedCount =
+          implied > 0
+            ? Math.round(clamp(spec.count * mix(0.18, 0.7, impliedForce), 3, spec.count - 2))
+            : 0;
+        const offpageCount =
+          offpage > 0 ? Math.round(clamp(spec.count * mix(0.06, 0.17, offpage), 1, 4)) : 0;
+        const scalePattern = [0.1, 1.16, 0.25, 3.4, 0.5, 8.8, 1.7, 0.14, 6.2, 0.36, 2.6, 0.18];
+        const impliedScalePattern = [0.12, 0.3, 0.72, 0.16, 1.15, 0.4, 0.88, 0.14, 0.58, 0.22];
+        const impliedColors = [COLORS.prussian, COLORS.prussian, COLORS.ink, COLORS.prussian, COLORS.tyrian];
+        const shapePattern = ['wall', 'circle', 'square', 'wall', 'circle', 'wall', 'square', 'circle'];
+        const edgePattern = ['top', 'bottom'];
+        const orientations = [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4];
         const anchors = [];
 
-        for (let row = 0; row < rows; row++) {
-          const rowLean = (row - (rows - 1) / 2) * 0.0035;
-          for (let col = 0; col < cols; col++) {
-            const i = anchors.length;
-            const colBreathe = (col - (cols - 1) / 2) * 0.0025;
-            const staggerX =
-              (row + col) % 5 === 0 ? spanX * 0.16 : (row * 2 + col) % 7 === 0 ? -spanX * 0.14 : 0;
-            const staggerY =
-              (row * 3 + col) % 6 === 0 ? spanY * 0.1 : (row + col * 2) % 8 === 0 ? -spanY * 0.09 : 0;
-            const x = marginX + col * spanX + staggerX + rand(-0.006, 0.006);
-            const y = marginY + row * spanY + staggerY + rowLean + colBreathe + rand(-0.006, 0.006);
-            anchors.push({
-              x: clamp(x, marginX * 0.86, 1 - marginX * 0.86),
-              y: clamp(y, marginY * 0.86, 1 - marginY * 0.86),
-              tier: tiers[i % tiers.length],
-              fill: fills[i % fills.length],
-              jitter,
-            });
+        for (let i = 0; i < spec.anchorCount; i++) {
+          const scatter = {
+            x: width * rand(0.06, 0.94),
+            y: height * rand(0.07, 0.93),
+          };
+          let x = scatter.x;
+          let y = scatter.y;
+          let angle = pick(orientations);
+          let angleJitter = 0.08;
+          let jitter = minSide * 0.025;
+          let mode = 'scatter';
+          let modeIndex = i;
+          let activeGuide = null;
+
+          if (i < closureCount) {
+            mode = 'closure';
+            modeIndex = i;
+            const progress = closureCount <= 1 ? 0.5 : i / (closureCount - 1);
+            const arcSpan = mix(TAU * 0.5, TAU * 0.82, closure);
+            const theta = spec.closure.start + progress * arcSpan + rand(-0.08, 0.08);
+            const targetX = spec.closure.x + Math.cos(theta) * spec.closure.rx;
+            const targetY = spec.closure.y + Math.sin(theta) * spec.closure.ry;
+            const attraction = smootherStep(closure);
+            x = mix(x, targetX, attraction);
+            y = mix(y, targetY, attraction);
+            const tangent = Math.atan2(
+              spec.closure.ry * Math.cos(theta),
+              -spec.closure.rx * Math.sin(theta)
+            );
+            angle = mix(angle, tangent, attraction);
+            angleJitter = mix(0.16, 0.035, attraction);
+            jitter = minSide * mix(0.055, 0.012, attraction);
+          } else if (i < closureCount + impliedCount) {
+            const localIndex = i - closureCount;
+            const guide = spec.guides[0];
+            const guideIndex = localIndex;
+            const guideSlots = impliedCount;
+            mode = 'implied';
+            modeIndex = guideIndex;
+            activeGuide = guide;
+
+            let progress = (guideIndex + 0.5) / Math.max(1, guideSlots);
+            const gapHalf = mix(0.045, 0.12, impliedForce);
+            if (progress < 0.5) {
+              progress = (progress / 0.5) * (0.5 - gapHalf);
+            } else {
+              progress = 0.5 + gapHalf + ((progress - 0.5) / 0.5) * (0.5 - gapHalf);
+            }
+
+            const usableWidth = width - horizontalSafeZone() * 2;
+            const usableHeight = height - minSide * 0.18;
+            const spanAcrossWidth = usableWidth / Math.max(0.08, Math.abs(Math.cos(guide.angle)));
+            const spanAcrossHeight = usableHeight / Math.max(0.08, Math.abs(Math.sin(guide.angle)));
+            const span = Math.min(spanAcrossWidth, spanAcrossHeight) * 0.94;
+            const along = (progress - 0.5) * span;
+            const attraction = 1 - Math.pow(1 - impliedForce, 1.7);
+            const normal = rand(-1, 1) * minSide * mix(0.15, 0.004, attraction);
+            const targetX =
+              guide.x + Math.cos(guide.angle) * along - Math.sin(guide.angle) * normal;
+            const targetY =
+              guide.y + Math.sin(guide.angle) * along + Math.cos(guide.angle) * normal;
+            x = mix(x, targetX, attraction);
+            y = mix(y, targetY, attraction);
+            const targetAngle = guide.angle;
+            angle = mix(angle, targetAngle, attraction);
+            angleJitter = mix(0.16, 0.012, attraction);
+            jitter = minSide * mix(0.07, 0.007, attraction);
+          } else if (proximity > 0 && i < spec.count) {
+            mode = 'proximity';
+            modeIndex = i - closureCount - impliedCount;
+            const cluster = spec.clusters[(i - closureCount - impliedCount) % spec.clusters.length];
+            const theta = rand(0, TAU);
+            const radius = Math.sqrt(random()) * minSide * mix(0.28, 0.055, proximity);
+            const targetX = cluster.x + Math.cos(theta) * radius * rand(0.8, 1.5);
+            const targetY = cluster.y + Math.sin(theta) * radius * rand(0.7, 1.15);
+            const attraction = smootherStep(proximity);
+            x = mix(x, targetX, attraction);
+            y = mix(y, targetY, attraction);
+            jitter = minSide * mix(0.055, 0.018, proximity);
           }
+
+          const selectedScale =
+            mode === 'implied'
+              ? impliedScalePattern[modeIndex % impliedScalePattern.length]
+              : scalePattern[i % scalePattern.length];
+          let scaleFactor = mix(1, selectedScale, scaleVariety) * overallScale;
+          if (mode === 'implied') {
+            scaleFactor *= mix(1, 0.58, impliedForce);
+          }
+          const offpageStart = spec.anchorCount - offpageCount;
+          const isOffpage = i >= offpageStart;
+          const offpageIndex = isOffpage ? i - offpageStart : -1;
+          const edge = isOffpage ? edgePattern[offpageIndex % edgePattern.length] : null;
+          if (edge) {
+            angle = Math.PI / 2;
+            angleJitter = 0.025;
+          }
+          if (offpageIndex === 0) {
+            scaleFactor = Math.max(
+              scaleFactor,
+              mix(1, 8.8, scaleVariety) * overallScale
+            );
+          }
+          const shape =
+            edge || mode === 'implied'
+              ? 'wall'
+              : mode === 'closure'
+                ? ['circle', 'square', 'circle', 'wall'][modeIndex % 4]
+                : shapePattern[i % shapePattern.length];
+          anchors.push({
+            x,
+            y,
+            angle,
+            angleJitter,
+            jitter,
+            edge,
+            edgeDepth: offpageIndex >= 0 ? mix(0.16, 0.64, offpage) : 0,
+            scale: edge ? scaleFactor * mix(1.02, 1.32, offpage) : scaleFactor,
+            shape,
+            fill: mode === 'implied' ? impliedColors[modeIndex % impliedColors.length] : WALL_COLORS[i % WALL_COLORS.length],
+            mode,
+            guideX: activeGuide ? activeGuide.x : null,
+            guideY: activeGuide ? activeGuide.y : null,
+            guideAngle: activeGuide ? activeGuide.angle : null,
+          });
         }
 
         return anchors;
       }
 
-      function makeObstacle(type, base, fill, id, tier = 'small') {
-        const ranges = {
-          tiny: {
-            circle: [0.12, 0.24],
-            square: [0.18, 0.28],
-            triangleW: [0.2, 0.4],
-            triangleH: [0.2, 0.42],
-            rectW: [0.26, 0.58],
-            rectH: [0.13, 0.3],
-          },
-          small: {
-            circle: [0.24, 0.46],
-            square: [0.34, 0.5],
-            triangleW: [0.4, 0.72],
-            triangleH: [0.38, 0.72],
-            rectW: [0.5, 0.9],
-            rectH: [0.18, 0.42],
-          },
-          medium: {
-            circle: [0.46, 0.74],
-            square: [0.5, 0.66],
-            triangleW: [0.74, 1.2],
-            triangleH: [0.68, 1.1],
-            rectW: [0.92, 1.48],
-            rectH: [0.32, 0.68],
-          },
-          large: {
-            circle: [0.76, 1.02],
-            square: [0.66, 0.84],
-            triangleW: [1.08, 1.56],
-            triangleH: [0.96, 1.42],
-            rectW: [1.28, 1.9],
-            rectH: [0.48, 0.82],
-          },
-        }[tier];
+      function positionOffPage(trial, anchor, bounds) {
+        if (anchor.edge === 'left' || anchor.edge === 'right') return false;
 
-        if (type === 'circle') {
-          const radius = scaled(base * ranges.circle[0], base * ranges.circle[1], 1.08);
-          return { id, type, fill, radius, bodyRadius: radius };
+        const depth = anchor.edgeDepth * rand(0.72, 1.08);
+        const safeX = horizontalSafeZone();
+        const minX = safeX + bounds.x;
+        const maxX = width - safeX - bounds.x;
+        if (maxX <= minX) return false;
+
+        trial.x = clamp(trial.x, minX, maxX);
+        trial.y = anchor.edge === 'top' ? -bounds.y * depth : height + bounds.y * depth;
+        return true;
+      }
+
+      function overlapsPlaced(candidate, placed, corridor) {
+        const a = centerSegment(candidate);
+        for (const existing of placed) {
+          const b = centerSegment(existing);
+          const minDistance =
+            obstacleCollisionRadius(candidate) + obstacleCollisionRadius(existing) + corridor;
+          if (segmentDistance(a, b) < minDistance) return true;
         }
-        if (type === 'square') {
-          const size = scaled(base * ranges.square[0], base * ranges.square[1], 1.08);
-          return { id, type, fill, width: size, height: size, bodyRadius: Math.SQRT2 * size * 0.5 + 2 };
+        return false;
+      }
+
+      function centerSegment(obstacle) {
+        if (obstacle.type !== 'wall') {
+          return {
+            ax: obstacle.x,
+            ay: obstacle.y,
+            bx: obstacle.x,
+            by: obstacle.y,
+          };
         }
-        if (type === 'triangle') {
-          const w = scaled(base * ranges.triangleW[0], base * ranges.triangleW[1], 1.08);
-          const h = scaled(base * ranges.triangleH[0], base * ranges.triangleH[1], 1.08);
-          const bodyRadius = Math.max(Math.hypot(w * 0.55, h * 0.56), Math.hypot(w * 0.55, h * 0.46));
-          return { id, type, fill, width: w, height: h, bodyRadius: bodyRadius + 2 };
+
+        const cos = Math.cos(obstacle.rotation);
+        const sin = Math.sin(obstacle.rotation);
+        const half = obstacle.width * 0.5;
+        return {
+          ax: obstacle.x - cos * half,
+          ay: obstacle.y - sin * half,
+          bx: obstacle.x + cos * half,
+          by: obstacle.y + sin * half,
+        };
+      }
+
+      function obstacleCollisionRadius(obstacle) {
+        return obstacle.type === 'wall' ? obstacle.height * 0.5 : obstacle.collisionRadius;
+      }
+
+      function segmentDistance(a, b) {
+        if (segmentsIntersect(a, b)) return 0;
+        return Math.sqrt(
+          Math.min(
+            pointSegmentDistanceSq(a.ax, a.ay, b.ax, b.ay, b.bx, b.by),
+            pointSegmentDistanceSq(a.bx, a.by, b.ax, b.ay, b.bx, b.by),
+            pointSegmentDistanceSq(b.ax, b.ay, a.ax, a.ay, a.bx, a.by),
+            pointSegmentDistanceSq(b.bx, b.by, a.ax, a.ay, a.bx, a.by)
+          )
+        );
+      }
+
+      function pointSegmentDistanceSq(px, py, ax, ay, bx, by) {
+        const dx = bx - ax;
+        const dy = by - ay;
+        const lengthSq = dx * dx + dy * dy;
+        if (lengthSq <= 0.0001) {
+          const ex = px - ax;
+          const ey = py - ay;
+          return ex * ex + ey * ey;
         }
-        const w = scaled(base * ranges.rectW[0], base * ranges.rectW[1], 1.08);
-        const h = scaled(base * ranges.rectH[0], base * ranges.rectH[1], 1.08);
-        return { id, type, fill, width: w, height: h, bodyRadius: Math.hypot(w, h) * 0.5 + 2 };
+        const t = clamp(((px - ax) * dx + (py - ay) * dy) / lengthSq, 0, 1);
+        const x = ax + dx * t;
+        const y = ay + dy * t;
+        const ex = px - x;
+        const ey = py - y;
+        return ex * ex + ey * ey;
+      }
+
+      function segmentsIntersect(a, b) {
+        const d1 = direction(a.ax, a.ay, a.bx, a.by, b.ax, b.ay);
+        const d2 = direction(a.ax, a.ay, a.bx, a.by, b.bx, b.by);
+        const d3 = direction(b.ax, b.ay, b.bx, b.by, a.ax, a.ay);
+        const d4 = direction(b.ax, b.ay, b.bx, b.by, a.bx, a.by);
+        if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+          return true;
+        }
+        return (
+          (Math.abs(d1) < 0.0001 && onSegment(a.ax, a.ay, a.bx, a.by, b.ax, b.ay)) ||
+          (Math.abs(d2) < 0.0001 && onSegment(a.ax, a.ay, a.bx, a.by, b.bx, b.by)) ||
+          (Math.abs(d3) < 0.0001 && onSegment(b.ax, b.ay, b.bx, b.by, a.ax, a.ay)) ||
+          (Math.abs(d4) < 0.0001 && onSegment(b.ax, b.ay, b.bx, b.by, a.bx, a.by))
+        );
+      }
+
+      function direction(ax, ay, bx, by, px, py) {
+        return (px - ax) * (by - ay) - (py - ay) * (bx - ax);
+      }
+
+      function onSegment(ax, ay, bx, by, px, py) {
+        return (
+          px >= Math.min(ax, bx) - 0.0001 &&
+          px <= Math.max(ax, bx) + 0.0001 &&
+          py >= Math.min(ay, by) - 0.0001 &&
+          py <= Math.max(ay, by) + 0.0001
+        );
+      }
+
+      function makeObstacle(base, fill, id, scaleFactor = 1, shape = 'wall') {
+        const scaleVariety = gestaltStrength('scaleVariety');
+        const mildVariation = rand(0.86, 1.16);
+        const expressiveVariation = scaled(0.72, 1.44, 0.92);
+        const lengthVariation = mix(mildVariation, expressiveVariation, scaleVariety);
+        if (shape === 'circle' || shape === 'square') {
+          const shapeVariation = mix(
+            rand(0.56, 0.82),
+            rand(0.38, 1.08),
+            scaleVariety
+          );
+          const size = clamp(
+            base * Math.pow(scaleFactor, 0.72) * shapeVariation,
+            width < 520 ? 16 : 22,
+            Math.min(width, height) * 0.7
+          );
+          const radius = size * 0.5;
+          return {
+            id,
+            type: shape,
+            fill,
+            width: size,
+            height: size,
+            radius,
+            collisionRadius: shape === 'circle' ? radius : Math.SQRT2 * radius,
+            bodyRadius: (shape === 'circle' ? radius : Math.SQRT2 * radius) + 2,
+          };
+        }
+
+        const thicknessRatio = mix(
+          rand(0.11, 0.17),
+          rand(0.07, 0.26),
+          scaleVariety
+        );
+        const thickness = clamp(
+          base * Math.sqrt(scaleFactor) * thicknessRatio,
+          width < 520 ? 5 : 6,
+          width < 520 ? 72 : 120
+        );
+        const aspectPattern = [3.2, 7.5, 12, 4.5, 18, 6, 9.5, 3.8, 14, 5.5, 22, 8];
+        const mildAspect = rand(3.2, 5.8);
+        const expressiveAspect = aspectPattern[id % aspectPattern.length];
+        const targetAspect = mix(
+          mildAspect,
+          expressiveAspect,
+          mix(0.55, 0.92, scaleVariety)
+        );
+        const scaledLength = base * scaleFactor * lengthVariation;
+        const length = clamp(
+          Math.max(scaledLength, thickness * targetAspect),
+          width < 520 ? 18 : 24,
+          Math.max(width, height) * 1.25
+        );
+        return {
+          id,
+          type: 'wall',
+          fill,
+          width: length,
+          height: thickness,
+          collisionRadius: thickness * 0.5,
+          bodyRadius: Math.hypot(length, thickness) * 0.5 + 2,
+        };
+      }
+
+      function wallHalfBounds(obstacle, margin = 0) {
+        const halfW = obstacle.width * 0.5 + margin;
+        const halfH = obstacle.height * 0.5 + margin;
+        const cos = Math.abs(Math.cos(obstacle.rotation));
+        const sin = Math.abs(Math.sin(obstacle.rotation));
+        return {
+          x: halfW * cos + halfH * sin,
+          y: halfW * sin + halfH * cos,
+        };
       }
 
       function makeLines() {
-        const lineGap = clamp(height / 44, 14, 22);
-        const xStep = clamp(width / 190, 5.4, 8.2);
-        const stroke = clamp(Math.min(width, height) / 520, 1.05, 2.25);
+        const lineGap = lineSpacing();
+        const xStep = clamp(width / 360, 3, 4.2);
+        const stroke = clamp(Math.min(width, height) / 760, 0.72, 1.55);
         const clearance = clamp(lineGap * 0.42, 5, 8);
-        const approach = clamp(lineGap * 1.2, 14, 24);
+        const approach = clamp(lineGap * 2.1, 32, 72);
         prepareObstacleCaches(clearance, approach);
         const made = [];
 
@@ -389,50 +1030,76 @@
           const template = lineTemplates[i];
           const baseY = template.baseY;
           const points = [];
-          const activeObstacles = obstacles.filter(
-            (obstacle) => Math.abs(baseY - obstacle.y) < obstacle.bodyRadius + approach + lineGap * 3.2
-          );
+          let displacement = 0;
+          const activeObstacles = obstacles;
 
           for (let x = -8; x <= width + 8; x += xStep) {
-            let y =
+            const naturalY =
               baseY +
               Math.sin(x * template.waveA + template.phaseA) * template.wobble +
               Math.sin(x * template.waveB + template.phaseB) * template.wobble * 0.38;
+            let y = naturalY + displacement;
+            let constrained = false;
+            let hardConstrained = false;
 
             for (let o = 0; o < activeObstacles.length; o++) {
               const obstacle = activeObstacles[o];
               const exact = shapeIntervalAtX(obstacle, x, clearance);
-              const soft = shapeIntervalAtX(obstacle, x, clearance + approach);
+              const soft = fluidIntervalAtX(obstacle, x);
               if (!soft) continue;
 
-              const side = sideForLine(baseY, i, obstacle);
               const lane = lineLaneOffset(baseY, lineGap);
-              const softLane = lane * 0.45;
+              const softLane = lane * 0.32;
+              const side = sideForRoute(baseY, i, obstacle, soft, lineGap, softLane);
               const softTarget = side < 0 ? soft.top - softLane : soft.bottom + softLane;
               const insideSoft = y > soft.top && y < soft.bottom;
 
               if (insideSoft) {
                 const depth = side < 0 ? (y - soft.top) / soft.height : (soft.bottom - y) / soft.height;
-                const strength = smootherStep(depth) * 0.52;
-                y += (softTarget - y) * strength;
+                const strength = mix(0.09, 0.48, smootherStep(depth));
+                const correction = (softTarget - y) * strength;
+                if (Math.abs(correction) > 0.01) constrained = true;
+                y += correction;
               }
 
               if (exact) {
                 const exactTarget = side < 0 ? exact.top - lane : exact.bottom + lane;
-                if ((side < 0 && y > exactTarget) || (side > 0 && y < exactTarget)) y = exactTarget;
+                if ((side < 0 && y > exactTarget) || (side > 0 && y < exactTarget)) {
+                  y = exactTarget;
+                  constrained = true;
+                  hardConstrained = true;
+                }
               }
+            }
+
+            if (hardConstrained) {
+              displacement = y - naturalY;
+            } else if (constrained) {
+              displacement = mix(displacement, y - naturalY, 0.56);
+              y = naturalY + displacement;
+            } else {
+              displacement *= template.release;
+              y = naturalY + displacement;
             }
 
             points.push({ x, y });
           }
 
           relaxAndConstrain(points, baseY, i, lineGap, activeObstacles);
+          const curves = makeLineCurves(points);
+          const pathLength = curves.totalLength;
           made.push({
             baseY,
             index: i,
             points,
-            stroke,
+            curves,
+            pathLength,
+            stroke: stroke * template.weight,
             color: template.color,
+            spriteColor: WALL_COLORS[i % WALL_COLORS.length],
+            drawDelay: template.drawDelay,
+            drawDuration:
+              template.drawDuration * (pathLength / Math.max(1, width)),
           });
         }
 
@@ -440,91 +1107,52 @@
       }
 
       function makeLineTemplates() {
-        const lineGap = clamp(height / 44, 14, 22);
-        const count = Math.ceil(height / lineGap) + 4;
+        const count = LINE_SETTING.count;
+        const lineGap = lineSpacing();
+        const overscan = clamp(height * 0.035, 18, 42);
+        const span = height + overscan * 2;
+        const gaps = Array.from({ length: count - 1 }, (_, index) => {
+          const pattern = [0.76, 1.08, 1.34, 0.86, 1.58, 0.8, 1.14, 0.94];
+          return pattern[index % pattern.length] * rand(0.88, 1.12);
+        });
+        const gapTotal = gaps.reduce((sum, gap) => sum + gap, 0);
+        const flowPhaseA = rand(0, TAU);
+        const flowPhaseB = rand(0, TAU);
+        const flowWaveA = rand(0.0032, 0.0052);
+        const flowWaveB = rand(0.0075, 0.011);
         const templates = [];
+        let baseY = -overscan;
+
         for (let i = 0; i < count; i++) {
           templates.push({
-            baseY: -lineGap * 1.5 + i * lineGap,
-            phaseA: rand(0, TAU),
-            phaseB: rand(0, TAU),
-            waveA: rand(0.0035, 0.008),
-            waveB: rand(0.009, 0.018),
-            wobble: lineGap * rand(0.08, 0.22),
+            baseY,
+            phaseA: flowPhaseA + i * 0.085 + rand(-0.035, 0.035),
+            phaseB: flowPhaseB - i * 0.13 + rand(-0.05, 0.05),
+            waveA: flowWaveA * rand(0.94, 1.06),
+            waveB: flowWaveB * rand(0.92, 1.08),
+            wobble: lineGap * rand(0.08, 0.18),
+            release: rand(0.995, 0.998),
+            weight: lineWeight(i),
             color: LINE_COLORS[i % LINE_COLORS.length],
+            drawDelay:
+              (i / Math.max(1, count - 1)) * mix(2.6, 4.4, count / 64) +
+              rand(0, 0.32),
+            drawDuration: rand(6.2, 9.2),
           });
+          if (i < gaps.length) baseY += (gaps[i] / gapTotal) * span;
         }
+
         return templates;
       }
 
-      function tick(time) {
-        raf = requestAnimationFrame(tick);
-        const deltaSeconds = clamp((time - lastFrameAt) / 1000, 0, 0.08);
-        lastFrameAt = time;
-        const seconds = (time - startedAt) / 1000;
-
-        updateObstacleWaves(seconds);
-        if (time - lastTargetAt >= 1000 / TARGET_LINE_FPS) {
-          lastTargetAt = time;
-          targetLines = makeLines();
-        }
-        advanceLines(deltaSeconds);
-        render();
+      function lineSpacing() {
+        const overscan = clamp(height * 0.035, 18, 42);
+        return (height + overscan * 2) / Math.max(1, LINE_SETTING.count - 1);
       }
 
-      function cloneLines(source) {
-        return source.map((line) => ({
-          baseY: line.baseY,
-          index: line.index,
-          stroke: line.stroke,
-          color: line.color,
-          points: line.points.map((point) => ({ x: point.x, y: point.y })),
-        }));
-      }
-
-      function advanceLines(deltaSeconds) {
-        if (!targetLines.length) return;
-        if (lines.length !== targetLines.length) {
-          lines = cloneLines(targetLines);
-          return;
-        }
-
-        const ease = 1 - Math.exp(-LINE_EASE_RATE * deltaSeconds);
-        for (let i = 0; i < targetLines.length; i++) {
-          const line = lines[i];
-          const target = targetLines[i];
-
-          if (line.points.length !== target.points.length) {
-            lines[i] = cloneLines([target])[0];
-            continue;
-          }
-
-          line.baseY = target.baseY;
-          line.index = target.index;
-          line.stroke += (target.stroke - line.stroke) * ease;
-          line.color = target.color;
-
-          for (let p = 0; p < target.points.length; p++) {
-            line.points[p].x = target.points[p].x;
-            line.points[p].y += (target.points[p].y - line.points[p].y) * ease;
-          }
-        }
-      }
-
-      function updateObstacleWaves(seconds) {
-        const slowCurrent = seconds * 0.18;
-        for (const obstacle of obstacles) {
-          if (obstacle.waveAmp <= 0) {
-            obstacle.x = obstacle.baseX;
-            obstacle.y = obstacle.baseY;
-            continue;
-          }
-          const mainWave = Math.sin(seconds * obstacle.waveSpeed + obstacle.wavePhase);
-          const secondary = Math.sin(seconds * obstacle.waveDrift + obstacle.wavePhase * 0.7 + obstacle.baseX * 0.004);
-          const y = obstacle.baseY + mainWave * obstacle.waveAmp + secondary * obstacle.waveAmp * 0.32;
-          obstacle.y = clamp(y, obstacle.minY, obstacle.maxY);
-          obstacle.x = obstacle.baseX + Math.sin(slowCurrent + obstacle.wavePhase) * 1.4;
-        }
+      function lineWeight(index) {
+        const pattern = [0.72, 1.08, 0.84, 1.46, 0.76, 1.2, 0.92, 1.72, 0.8, 1.3, 1, 0.68];
+        return pattern[index % pattern.length] * rand(0.92, 1.08);
       }
 
       function sideForLine(baseY, lineIndex, obstacle) {
@@ -534,6 +1162,17 @@
         return h < 0 ? -1 : 1;
       }
 
+      function sideForRoute(baseY, lineIndex, obstacle, interval, lineGap, padding = 0) {
+        const minY = -lineGap * 2.2;
+        const maxY = height + lineGap * 2.2;
+        const top = interval.top - padding;
+        const bottom = interval.bottom + padding;
+        let side = sideForLine(baseY, lineIndex, obstacle);
+        if (side < 0 && top < minY && bottom <= maxY) side = 1;
+        if (side > 0 && bottom > maxY && top >= minY) side = -1;
+        return side;
+      }
+
       function lineLaneOffset(baseY, lineGap) {
         return clamp(lineGap * 0.42, 4.5, 8);
       }
@@ -541,68 +1180,62 @@
       function relaxAndConstrain(points, baseY, lineIndex, lineGap, activeObstacles) {
         const scratch = points.map((p) => p.y);
         const clearance = clamp(lineGap * 0.42, 5, 8);
-        for (let pass = 0; pass < 3; pass++) {
-          for (let i = 2; i < points.length - 2; i++) {
+        for (let pass = 0; pass < 6; pass++) {
+          for (let i = 3; i < points.length - 3; i++) {
             scratch[i] =
-              points[i].y * 0.5 +
-              (points[i - 1].y + points[i + 1].y) * 0.19 +
-              (points[i - 2].y + points[i + 2].y) * 0.06;
+              points[i].y * 0.34 +
+              (points[i - 1].y + points[i + 1].y) * 0.22 +
+              (points[i - 2].y + points[i + 2].y) * 0.08 +
+              (points[i - 3].y + points[i + 3].y) * 0.03;
           }
-          for (let i = 2; i < points.length - 2; i++) points[i].y = scratch[i];
+          for (let i = 3; i < points.length - 3; i++) points[i].y = scratch[i];
           constrain(points, baseY, lineIndex, lineGap, activeObstacles);
         }
         constrain(points, baseY, lineIndex, lineGap, activeObstacles);
-        constrainSegments(points, baseY, lineIndex, lineGap, clearance, activeObstacles);
-        constrain(points, baseY, lineIndex, lineGap, activeObstacles);
+        softenFreeSegments(points, clearance, activeObstacles);
+      }
+
+      function softenFreeSegments(points, clearance, activeObstacles) {
+        const scratch = points.map((point) => point.y);
+        for (let pass = 0; pass < 7; pass++) {
+          for (let i = 4; i < points.length - 4; i++) {
+            const desired =
+              points[i].y * 0.2 +
+              (points[i - 1].y + points[i + 1].y) * 0.22 +
+              (points[i - 2].y + points[i + 2].y) * 0.1 +
+              (points[i - 3].y + points[i + 3].y) * 0.05 +
+              (points[i - 4].y + points[i + 4].y) * 0.03;
+            scratch[i] = pointIsClear(points[i].x, desired, clearance, activeObstacles)
+              ? desired
+              : points[i].y;
+          }
+          for (let i = 4; i < points.length - 4; i++) points[i].y = scratch[i];
+        }
+      }
+
+      function pointIsClear(x, y, clearance, activeObstacles) {
+        for (const obstacle of activeObstacles) {
+          const interval = shapeIntervalAtX(obstacle, x, clearance);
+          if (interval && y > interval.top && y < interval.bottom) return false;
+        }
+        return true;
       }
 
       function constrain(points, baseY, lineIndex, lineGap, activeObstacles) {
         const minY = -lineGap * 2.2;
         const maxY = height + lineGap * 2.2;
         const clearance = clamp(lineGap * 0.42, 5, 8);
+        const lane = lineLaneOffset(baseY, lineGap);
+
         for (const p of points) {
           for (const obstacle of activeObstacles) {
             const interval = shapeIntervalAtX(obstacle, p.x, clearance);
-            if (interval) {
-              const side = sideForLine(baseY, lineIndex, obstacle);
-              const lane = lineLaneOffset(baseY, lineGap);
-              const target = side < 0 ? interval.top - lane : interval.bottom + lane;
-              if ((side < 0 && p.y > target) || (side > 0 && p.y < target)) p.y = target;
-            }
+            if (!interval) continue;
+            const side = sideForRoute(baseY, lineIndex, obstacle, interval, lineGap, lane);
+            const target = side < 0 ? interval.top - lane : interval.bottom + lane;
+            if ((side < 0 && p.y > target) || (side > 0 && p.y < target)) p.y = target;
           }
           p.y = clamp(p.y, minY, maxY);
-        }
-      }
-
-      function constrainSegments(points, baseY, lineIndex, lineGap, clearance, activeObstacles) {
-        for (let pass = 0; pass < 1; pass++) {
-          let changed = false;
-          for (let i = 1; i < points.length; i++) {
-            const a = points[i - 1];
-            const b = points[i];
-            for (let s = 1; s < 8; s++) {
-              const t = s / 8;
-              const x = a.x + (b.x - a.x) * t;
-              const y = a.y + (b.y - a.y) * t;
-              for (const obstacle of activeObstacles) {
-                const interval = shapeIntervalAtX(obstacle, x, clearance);
-                if (!interval || y <= interval.top || y >= interval.bottom) continue;
-
-                const side = sideForLine(baseY, lineIndex, obstacle);
-                const lane = lineLaneOffset(baseY, lineGap);
-                const target = side < 0 ? interval.top - lane : interval.bottom + lane;
-                if (side < 0) {
-                  if (a.y > target) a.y = target;
-                  if (b.y > target) b.y = target;
-                } else {
-                  if (a.y < target) a.y = target;
-                  if (b.y < target) b.y = target;
-                }
-                changed = true;
-              }
-            }
-          }
-          if (!changed) return;
         }
       }
 
@@ -691,13 +1324,23 @@
       function prepareObstacleCaches(clearance, approach) {
         const softMargin = clearance + approach;
         for (const obstacle of obstacles) {
+          const bounds = wallHalfBounds(obstacle, clearance);
           obstacle._exactMargin = clearance;
           obstacle._softMargin = softMargin;
+          obstacle._fluidRadiusX = bounds.x + approach * 3.4;
+          obstacle._fluidRadiusY = bounds.y + approach * 1.2;
           obstacle._exactGeometry =
             obstacle.type === 'circle' ? null : makeGeometryCache(obstacleVertices(obstacle, clearance));
           obstacle._softGeometry =
             obstacle.type === 'circle' ? null : makeGeometryCache(obstacleVertices(obstacle, softMargin));
         }
+      }
+
+      function fluidIntervalAtX(obstacle, x) {
+        const normalizedX = (x - obstacle.x) / obstacle._fluidRadiusX;
+        if (Math.abs(normalizedX) >= 1) return null;
+        const span = obstacle._fluidRadiusY * Math.sqrt(1 - normalizedX * normalizedX);
+        return makeInterval(obstacle.y - span, obstacle.y + span);
       }
 
       function cachedGeometry(obstacle, margin) {
@@ -716,105 +1359,334 @@
         return { vertices, minX, maxX };
       }
 
-      function render() {
-        ctx.fillStyle = COLORS.wall;
+      function render(time = lineAnimationStartedAt) {
+        ctx.fillStyle = COLORS.paper;
         ctx.fillRect(0, 0, width, height);
-        drawRegistrationMarks();
-        drawLines();
+        drawLines(time);
         drawObstacles();
       }
 
-      function drawRegistrationMarks() {
-        const step = clamp(Math.min(width, height) * 0.075, 34, 86);
-        ctx.save();
-        ctx.globalAlpha = 0.14;
-        ctx.strokeStyle = COLORS.ink;
-        ctx.lineWidth = 1;
-        for (let x = step; x < width; x += step) {
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, 5);
-          ctx.moveTo(x, height - 5);
-          ctx.lineTo(x, height);
-          ctx.stroke();
-        }
-        for (let y = step; y < height; y += step) {
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(5, y);
-          ctx.moveTo(width - 5, y);
-          ctx.lineTo(width, y);
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
+      function drawLines(time) {
+        const elapsed = Math.max(0, (time - lineAnimationStartedAt) / 1000);
+        const animationTime = prefersReducedMotion ? lineAnimationDuration : elapsed;
 
-      function drawLines() {
         ctx.save();
         for (const line of lines) {
+          const progress = prefersReducedMotion
+            ? 1
+            : clamp((animationTime - line.drawDelay) / line.drawDuration, 0, 1);
+          if (progress <= 0) continue;
+
           ctx.beginPath();
           ctx.lineWidth = line.stroke;
           ctx.strokeStyle = line.color;
-          drawSmoothLine(line.points);
+          const head = drawSmoothLine(line, progress);
           ctx.stroke();
+          if (head && progress < 1) drawLineSprite(line, head);
         }
         ctx.restore();
       }
 
-      function drawSmoothLine(points) {
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length - 2; i++) {
-          const midX = (points[i].x + points[i + 1].x) * 0.5;
-          const midY = (points[i].y + points[i + 1].y) * 0.5;
-          ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+      function makeLineCurves(points) {
+        const curves = [];
+        let totalLength = 0;
+        for (let i = 0; i < points.length - 1; i++) {
+          const p0 = points[Math.max(0, i - 1)];
+          const p1 = points[i];
+          const p2 = points[i + 1];
+          const p3 = points[Math.min(points.length - 1, i + 2)];
+          const curve = {
+            startX: p1.x,
+            startY: p1.y,
+            control1X: p1.x + (p2.x - p0.x) / 6,
+            control1Y: p1.y + (p2.y - p0.y) / 6,
+            control2X: p2.x - (p3.x - p1.x) / 6,
+            control2Y: p2.y - (p3.y - p1.y) / 6,
+            endX: p2.x,
+            endY: p2.y,
+            startLength: totalLength,
+            lengthLut: [{ t: 0, length: 0 }],
+          };
+          let curveLength = 0;
+          let previousX = curve.startX;
+          let previousY = curve.startY;
+
+          for (let sample = 1; sample <= 16; sample++) {
+            const t = sample / 16;
+            const point = cubicPoint(curve, t);
+            curveLength += Math.hypot(point.x - previousX, point.y - previousY);
+            curve.lengthLut.push({ t, length: curveLength });
+            previousX = point.x;
+            previousY = point.y;
+          }
+
+          curve.length = curveLength;
+          totalLength += curveLength;
+          curve.endLength = totalLength;
+          curves.push(curve);
         }
-        const last = points[points.length - 1];
-        const prev = points[points.length - 2];
-        ctx.quadraticCurveTo(prev.x, prev.y, last.x, last.y);
+        curves.totalLength = totalLength;
+        return curves;
+      }
+
+      function cubicPoint(curve, t) {
+        const inverse = 1 - t;
+        const inverse2 = inverse * inverse;
+        const t2 = t * t;
+        return {
+          x:
+            inverse2 * inverse * curve.startX +
+            3 * inverse2 * t * curve.control1X +
+            3 * inverse * t2 * curve.control2X +
+            t2 * t * curve.endX,
+          y:
+            inverse2 * inverse * curve.startY +
+            3 * inverse2 * t * curve.control1Y +
+            3 * inverse * t2 * curve.control2Y +
+            t2 * t * curve.endY,
+        };
+      }
+
+      function drawSmoothLine(line, progress) {
+        const curves = line.curves;
+        if (!curves.length) return null;
+
+        const targetLength = clamp(progress, 0, 1) * line.pathLength;
+        let completed = 0;
+        while (
+          completed < curves.length &&
+          targetLength >= curves[completed].endLength
+        ) {
+          completed++;
+        }
+        ctx.moveTo(curves[0].startX, curves[0].startY);
+
+        for (let i = 0; i < completed; i++) {
+          const curve = curves[i];
+          ctx.bezierCurveTo(
+            curve.control1X,
+            curve.control1Y,
+            curve.control2X,
+            curve.control2Y,
+            curve.endX,
+            curve.endY
+          );
+        }
+
+        if (completed < curves.length) {
+          const curve = curves[completed];
+          const localLength = targetLength - curve.startLength;
+          let sample = 1;
+          while (
+            sample < curve.lengthLut.length - 1 &&
+            curve.lengthLut[sample].length < localLength
+          ) {
+            sample++;
+          }
+          const before = curve.lengthLut[sample - 1];
+          const after = curve.lengthLut[sample];
+          const sampleSpan = Math.max(0.0001, after.length - before.length);
+          const partial = mix(
+            before.t,
+            after.t,
+            clamp((localLength - before.length) / sampleSpan, 0, 1)
+          );
+          const aX = mix(curve.startX, curve.control1X, partial);
+          const aY = mix(curve.startY, curve.control1Y, partial);
+          const bX = mix(curve.control1X, curve.control2X, partial);
+          const bY = mix(curve.control1Y, curve.control2Y, partial);
+          const cX = mix(curve.control2X, curve.endX, partial);
+          const cY = mix(curve.control2Y, curve.endY, partial);
+          const dX = mix(aX, bX, partial);
+          const dY = mix(aY, bY, partial);
+          const eX = mix(bX, cX, partial);
+          const eY = mix(bY, cY, partial);
+          const endX = mix(dX, eX, partial);
+          const endY = mix(dY, eY, partial);
+          ctx.bezierCurveTo(aX, aY, dX, dY, endX, endY);
+          return {
+            x: endX,
+            y: endY,
+            angle: Math.atan2(endY - dY, endX - dX),
+          };
+        }
+
+        const headCurve = curves[Math.max(0, completed - 1)];
+        return {
+          x: headCurve.endX,
+          y: headCurve.endY,
+          angle: Math.atan2(
+            headCurve.endY - headCurve.control2Y,
+            headCurve.endX - headCurve.control2X
+          ),
+        };
+      }
+
+      function drawLineSprite(line, head) {
+        const radius = clamp(2.4 + line.stroke * 0.9, 3, 5.4);
+        ctx.save();
+        ctx.translate(head.x, head.y);
+        ctx.rotate(head.angle);
+        ctx.fillStyle = line.spriteColor;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, radius * 1.7, radius * 0.72, 0, 0, TAU);
+        ctx.fill();
+        ctx.restore();
       }
 
       function drawObstacles() {
-        const outline = clamp(Math.min(width, height) / 360, 1.5, 3);
         for (const obstacle of obstacles) {
           ctx.save();
           ctx.translate(obstacle.x, obstacle.y);
           ctx.rotate(obstacle.rotation);
           ctx.fillStyle = obstacle.fill;
-          ctx.strokeStyle = COLORS.ink;
-          ctx.lineWidth = outline;
 
-          if (obstacle.type === 'circle') drawCircleObstacle(obstacle);
-          else if (obstacle.type === 'triangle') drawTriangleObstacle(obstacle);
-          else drawRectObstacle(obstacle);
+          drawObstacleShape(obstacle);
 
           ctx.restore();
         }
       }
 
-      function drawCircleObstacle(obstacle) {
-        ctx.beginPath();
-        ctx.arc(0, 0, obstacle.radius, 0, TAU);
-        ctx.fill();
-        ctx.stroke();
-      }
+      function drawObstacleShape(obstacle) {
+        if (obstacle.type === 'circle') {
+          ctx.beginPath();
+          ctx.arc(0, 0, obstacle.radius, 0, TAU);
+          ctx.fill();
+          return;
+        }
 
-      function drawRectObstacle(obstacle) {
         const x = -obstacle.width * 0.5;
         const y = -obstacle.height * 0.5;
-        ctx.beginPath();
-        ctx.rect(x, y, obstacle.width, obstacle.height);
-        ctx.fill();
-        ctx.stroke();
+        ctx.fillRect(x, y, obstacle.width, obstacle.height);
       }
 
-      function drawTriangleObstacle(obstacle) {
-        ctx.beginPath();
-        ctx.moveTo(0, -obstacle.height * 0.56);
-        ctx.lineTo(obstacle.width * 0.55, obstacle.height * 0.46);
-        ctx.lineTo(-obstacle.width * 0.55, obstacle.height * 0.46);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+      function bindCountControl() {
+        const control = document.querySelector('[data-count]');
+        const slider = control.querySelector('.gestalt-strength');
+        slider.value = Math.round(COUNT_SETTING.strength * 100);
+        control.style.setProperty('--strength', `${slider.value}%`);
+
+        slider.addEventListener('input', () => {
+          COUNT_SETTING.strength = Number(slider.value) / 100;
+          control.style.setProperty('--strength', `${slider.value}%`);
+          scheduleCompose();
+        });
+      }
+
+      function updateCountOutput() {
+        const control = document.querySelector('[data-count]');
+        const slider = control.querySelector('.gestalt-strength');
+        const output = control.querySelector('.gestalt-value');
+        output.value = String(obstacles.length);
+        output.textContent = output.value;
+        slider.setAttribute('aria-valuetext', `${obstacles.length} obstacles`);
+      }
+
+      function bindLineControl() {
+        const control = document.querySelector('[data-lines]');
+        const slider = control.querySelector('.gestalt-strength');
+        slider.value = LINE_SETTING.count;
+        updateLineControl(control, slider);
+
+        slider.addEventListener('input', () => {
+          LINE_SETTING.count = Number(slider.value);
+          updateLineControl(control, slider);
+          scheduleCompose();
+        });
+      }
+
+      function updateLineControl(control, slider) {
+        const minimum = Number(slider.min);
+        const maximum = Number(slider.max);
+        const strength = ((LINE_SETTING.count - minimum) / (maximum - minimum)) * 100;
+        control.style.setProperty('--strength', `${strength}%`);
+        const output = control.querySelector('.gestalt-value');
+        output.value = String(LINE_SETTING.count);
+        output.textContent = output.value;
+        slider.setAttribute('aria-valuetext', `${LINE_SETTING.count} lines`);
+      }
+
+      function updateLineOutput() {
+        const control = document.querySelector('[data-lines]');
+        updateLineControl(control, control.querySelector('.gestalt-strength'));
+      }
+
+      function bindGestaltControls() {
+        document.querySelectorAll('[data-gestalt]').forEach((control) => {
+          const name = control.dataset.gestalt;
+          const toggle = control.querySelector('.gestalt-toggle');
+          const slider = control.querySelector('.gestalt-strength');
+          const output = control.querySelector('.gestalt-value');
+          const setting = GESTALTS[name];
+
+          toggle.checked = setting.enabled;
+          slider.value = Math.round(setting.strength * 100);
+          updateControl(control, toggle, slider, output, setting);
+
+          toggle.addEventListener('change', () => {
+            setting.enabled = toggle.checked;
+            updateControl(control, toggle, slider, output, setting);
+            scheduleCompose();
+          });
+
+          slider.addEventListener('input', () => {
+            setting.strength = Number(slider.value) / 100;
+            updateControl(control, toggle, slider, output, setting);
+            scheduleCompose();
+          });
+        });
+      }
+
+      function updateControl(control, toggle, slider, output, setting) {
+        const percentage = Math.round(setting.strength * 100);
+        control.classList.toggle('is-off', !setting.enabled);
+        control.style.setProperty('--strength', `${percentage}%`);
+        slider.disabled = !setting.enabled;
+        toggle.setAttribute('aria-label', `${control.querySelector('.gestalt-name').textContent} ${setting.enabled ? 'on' : 'off'}`);
+        output.value = setting.enabled ? `${percentage}%` : 'off';
+        output.textContent = output.value;
+      }
+
+      function scheduleCompose() {
+        cancelAnimationFrame(compositionFrame);
+        compositionFrame = requestAnimationFrame(() => {
+          compositionFrame = 0;
+          compose();
+        });
+      }
+
+      function restartLineAnimation() {
+        cancelAnimationFrame(lineAnimationFrame);
+        lineAnimationFrame = 0;
+        lastAnimationRender = 0;
+        lineAnimationStartedAt = performance.now();
+        lineAnimationDuration = Math.max(
+          1,
+          ...lines.map((line) => line.drawDelay + line.drawDuration)
+        );
+
+        if (prefersReducedMotion) {
+          render(lineAnimationStartedAt);
+          return;
+        }
+
+        render(lineAnimationStartedAt);
+        lineAnimationFrame = requestAnimationFrame(animateLineField);
+      }
+
+      function animateLineField(time) {
+        if (time - lastAnimationRender < 1000 / 45) {
+          lineAnimationFrame = requestAnimationFrame(animateLineField);
+          return;
+        }
+        lastAnimationRender = time;
+        render(time);
+        const elapsed = (time - lineAnimationStartedAt) / 1000;
+        if (elapsed < lineAnimationDuration) {
+          lineAnimationFrame = requestAnimationFrame(animateLineField);
+        } else {
+          lineAnimationFrame = 0;
+        }
       }
 
       function reseed() {
@@ -822,23 +1694,77 @@
         compose();
       }
 
-      addEventListener('resize', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(resize, 120);
-      });
+      function bindCompositionPanel() {
+        collapseButton.addEventListener('click', () => {
+          const collapsed = compositionPanel.classList.toggle('is-collapsed');
+          collapseButton.textContent = collapsed ? '+' : '-';
+          collapseButton.setAttribute('aria-expanded', String(!collapsed));
+          collapseButton.setAttribute(
+            'aria-label',
+            collapsed ? 'Expand composition controls' : 'Collapse composition controls'
+          );
+          collapseButton.title = collapsed ? 'Expand controls' : 'Collapse controls';
+          requestAnimationFrame(keepPanelInView);
+        });
 
-      if (typeof reducedMotionQuery.addEventListener === 'function') {
-        reducedMotionQuery.addEventListener('change', (event) => {
-          prefersReducedMotion = event.matches;
-          compose();
+        panelHeader.addEventListener('pointerdown', (event) => {
+          if (event.button !== 0 || event.target.closest('button')) return;
+          const bounds = compositionPanel.getBoundingClientRect();
+          panelDrag = {
+            pointerId: event.pointerId,
+            offsetX: event.clientX - bounds.left,
+            offsetY: event.clientY - bounds.top,
+          };
+          compositionPanel.style.left = `${bounds.left}px`;
+          compositionPanel.style.top = `${bounds.top}px`;
+          compositionPanel.classList.add('is-dragging');
+          panelHeader.setPointerCapture(event.pointerId);
+          event.preventDefault();
         });
-      } else if (typeof reducedMotionQuery.addListener === 'function') {
-        reducedMotionQuery.addListener((event) => {
-          prefersReducedMotion = event.matches;
-          compose();
+
+        panelHeader.addEventListener('pointermove', (event) => {
+          if (!panelDrag || event.pointerId !== panelDrag.pointerId) return;
+          setPanelPosition(
+            event.clientX - panelDrag.offsetX,
+            event.clientY - panelDrag.offsetY
+          );
         });
+
+        panelHeader.addEventListener('pointerup', endPanelDrag);
+        panelHeader.addEventListener('pointercancel', endPanelDrag);
       }
 
+      function endPanelDrag(event) {
+        if (!panelDrag || event.pointerId !== panelDrag.pointerId) return;
+        if (panelHeader.hasPointerCapture(event.pointerId)) {
+          panelHeader.releasePointerCapture(event.pointerId);
+        }
+        panelDrag = null;
+        compositionPanel.classList.remove('is-dragging');
+      }
+
+      function setPanelPosition(x, y) {
+        const margin = width < 520 ? 8 : 10;
+        const maxX = Math.max(margin, width - compositionPanel.offsetWidth - margin);
+        const maxY = Math.max(margin, height - compositionPanel.offsetHeight - margin);
+        compositionPanel.style.left = `${clamp(x, margin, maxX)}px`;
+        compositionPanel.style.top = `${clamp(y, margin, maxY)}px`;
+      }
+
+      function keepPanelInView() {
+        const bounds = compositionPanel.getBoundingClientRect();
+        setPanelPosition(bounds.left, bounds.top);
+      }
+
+      addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          resize();
+          keepPanelInView();
+        }, 120);
+      });
+
+      reseedButton.addEventListener('click', reseed);
       canvas.addEventListener('click', reseed);
       canvas.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -847,6 +1773,22 @@
         }
       });
 
+      if (reducedMotionQuery) {
+        const updateMotionPreference = (event) => {
+          prefersReducedMotion = event.matches;
+          restartLineAnimation();
+        };
+        if (typeof reducedMotionQuery.addEventListener === 'function') {
+          reducedMotionQuery.addEventListener('change', updateMotionPreference);
+        } else if (typeof reducedMotionQuery.addListener === 'function') {
+          reducedMotionQuery.addListener(updateMotionPreference);
+        }
+      }
+
+      bindCountControl();
+      bindLineControl();
+      bindGestaltControls();
+      bindCompositionPanel();
       resize();
     </script>
   </body>

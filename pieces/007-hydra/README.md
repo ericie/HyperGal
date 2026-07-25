@@ -21,10 +21,11 @@ by the same snake increase its growth multiplier. The rule set stays small:
 
 ## The look
 
-Bright saturated bodies on black: outlined continuous snakes, one blinking
-mouse, bright-eyed heads, a soft vignette, and a clear border around the arena.
-Deaths accumulate into translucent color stains, darker clots, and pale snake
-bones that layer under the living hunt.
+Growth Rings' Hokusai palette: wheat, pale yellow, Prussian blue, Tyrian
+purple, and burlywood. The living snakes read as thick pigment marks on an
+ink-dark Prussian field with one pale mouse and a wheat border. Dead snakes
+accumulate like distressed woodblock impressions: rough bitmap brushstrokes,
+dry bristles, dark chips, and pale bone fragments under the living hunt.
 
 ## Interaction
 

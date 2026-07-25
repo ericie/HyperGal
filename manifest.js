@@ -23,7 +23,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "Breakout in reverse. A single paddle that cannot miss bounces one ball upward; every impact lays a brick instead of breaking one, so the wall grows downward and a steady scroll carries it off the top. The build-front is clamped to a band far above the floor — so the wall can never reach the paddle — while the ball steers toward the most starved column to keep the front level. No player, no losing, no finish. Click to reshuffle."
+      "description": "Breakout in reverse. An infallible paddle favors uncapped Hokusai-colored towers. Brick impacts fill adjacent cells while solid faces preserve true ricochets, and every real impact creeps the aligned lattice upward. If the ball becomes trapped in a tight upper pocket, it stops, blinks three times, blasts an escape hole through the wall, then falls back to the paddle and becomes the building ball again. No player, no losing. Click to rebuild."
     },
     {
       "slug": "004-hunt-prey-paint",
@@ -55,7 +55,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "Autonomous traditional Snake on a luminous black field. Five contenders with random starting lengths and aggression values enter from offscreen to hunt one mouse. Eating grows a snake; consecutive catches by the same snake raise its growth multiplier, larger snakes move faster and become more aggressive, and any snake may box when another snake's available space is small relative to its own length. Touching the border, itself, or another snake kills one snake. Dead snakes leave layered color stain, darker clots, and pale bone memory; once only one survivor remains, new contenders enter from beyond the border. Outlined bodies, clear arena border, glow. Click to reseed."
+      "description": "Autonomous traditional Snake on an ink-dark Prussian field. Five contenders with random starting lengths and aggression values enter from offscreen to hunt one mouse. Eating grows a snake; consecutive catches by the same snake raise its growth multiplier, larger snakes move faster and become more aggressive, and any snake may box when another snake's available space is small relative to its own length. Touching the border, itself, or another snake kills one snake. Dead snakes remain as distressed bitmap brushstrokes, dry bristles, dark chips, and pale bone fragments in Growth Rings' Hokusai palette. Click to reseed."
     },
     {
       "slug": "008-vectrex-asteroids",
@@ -79,7 +79,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "A full-window wall drawing of tight, city-like square obstacles and left-to-right field lines. Muted pigment blocks sit on a rough offset grid, sway up and down like objects riding a slow ocean, and make the lines continually redraw around their actual silhouettes. Click to reseed."
+      "description": "A full-window drawing of borderless Hokusai-toned walls, squares, and circles composed by adjustable gestalt forces. Open side safe zones, extreme scale, and a dominant broken continuation shape the obstacles while adjustable fine lines flow through tight passages and slowly fan out again."
     },
     {
       "slug": "011-switch-stack",
@@ -111,7 +111,7 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "A stripped-down Pac-Man riff with one oversized Pac and one oversized ghost on a fixed 17-by-11 course: one outer hallway around one solid inner box, with power pellets on the outside corners. Pac searches for power, flees if it sees a ghost ahead, checks behind after escaping, then becomes a ghost until it has enough privacy or distance to turn yellow again. Ghosts explore their own internal map, hunt visible Pacs, and steer away from other ghosts instead of chasing them."
+      "description": "A two-body Pac-Man inversion on a fixed 17-by-11 course. When Pac sees a slow, floating Ghost as a threat, Pac turns and runs; its yellow silhouette compresses while a Ghost body and eyes emerge in motion. The pursuer never changes. The encounter leaves only ghosts."
     },
     {
       "slug": "015-growth-rings",
@@ -127,7 +127,15 @@ window.HYPERGAL_MANIFEST = {
       "year": 2026,
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "A vertical platformer that never ends. A small red-capped hero named Mario keeps climbing an endless arcade shaft of brick ledges, riveted girders, springs, coins, and rolling barrels. The piece plays itself by default, aiming for the next reachable platform and jumping forever upward, while keyboard or touch input can briefly take over before the climb resumes."
+      "description": "A one-bit vertical platformer inside an endless masonry keep. Mario climbs stone ledges through arched rooms and black stippled chambers, hits question mark boxes from below, uses iron ladders and stairs, and sometimes drops down a ladder or fireman's pole to revisit what he missed."
+    },
+    {
+      "slug": "017-knot-work",
+      "title": "Knot Work",
+      "year": 2026,
+      "type": "generative",
+      "thumbnail": "thumbnail.svg",
+      "description": "An edge-to-edge field of loose Celtic interlace printed in dark brown on worn paper. Continuous rounded cords pass through a Truchet-like knot grid, alternating over and under at crossings and running beyond every side of the browser. Click or press Enter/Space to reseed."
     }
   ]
 };

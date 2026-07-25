@@ -6,41 +6,67 @@ Strip out the player, the score, and the possibility of losing, and Breakout
 inverts cleanly: the paddle's job stops being *defense* and becomes *supply*.
 A single paddle patrols the floor — shadowing the ball, physically incapable of
 missing — and lobs it upward over and over. Where the original game chips a
-brick away on contact, this one lays a brick down. The wall is built from below
-by the very thing that would have destroyed it.
+brick away on contact, this one lays a brick down. An underside hit extends a
+tower and returns the ball to the paddle. A side hit fills an adjacent corridor
+cell and reverses only the horizontal motion. A climbing ball keeps climbing; a
+returning ball keeps falling instead of cutting through the tower.
 
-Because every hit adds a brick to the underside, the wall grows *downward*,
-toward the paddle. So the whole world is scrolled upward to keep the
-build-front off the floor, and old bricks stream off the top. The wall is
-never finished and never breached. Unbreakable.
+The wall therefore grows *downward* toward the paddle and *inward* through its
+own passages. Each real brick impact creeps the shared lattice upward, carrying
+old bricks off the top. The opening wall already fills roughly the top
+two-fifths of the screen, which shortens the ball's return cycle. It is never
+finished and never breached. Unbreakable.
 
-## Keeping it solid
+## Keeping it solid — and giving it shape
 
-A single ball feeding a whole wall wants to drift into gaps and spikes — and,
-worse, a column that grows too far down can trap the ball against the floor and
-run away to infinity. Two simple rules prevent all of that without any feedback
-controller:
+A single ball feeding a whole wall needs precise geometry without invisible
+guard rails. Three rules keep the construction coherent without sanding all of
+its character away:
 
-- **The front lives in a band.** Every column's build-front is hard-clamped to
-  a band well above the paddle. A column can't run away downward — it stops
-  depositing at the band's floor — and it can't empty out — it keeps depositing
-  at the band's ceiling. Because the band sits far above the floor, the wall can
-  never reach the paddle. This is the safety rail that makes it *unbreakable*.
-- **The ball steers to the hungriest column.** On each paddle bounce the ball
-  aims its small horizontal lean toward whichever nearby column has been starved
-  longest — the one whose front has drifted highest. Deposits self-level into a
-  flat front instead of piling into towers. A little noise keeps it from fixating
-  on a single gap.
+- **Every brick is a real occupied cell.** Bricks store integer rows and
+  columns, never freeform screen positions. Empty corridor cells have no hidden
+  collision line; only a swept contact with an occupied brick can make an
+  impact. As old rows leave the screen, the moving lattice completes one real
+  occupied row across the top, keeping the ceiling watertight without a hidden
+  boundary.
+- **Brick faces behave differently.** An underside impact reserves the next
+  block beneath that brick and sends the ball down. A side impact reserves the
+  empty cell on the approached side while preserving the ball's vertical
+  direction. In both cases the new block locks in after the ball clears it, so
+  growth never embeds or teleports the ball. Corridors close behind the ricochet
+  instead of opening in front of it. A top-face contact also reflects; no
+  direction of travel is allowed to pass through a brick.
+- **The paddle develops temporary intentions.** It now favors longer, narrow
+  tower-building runs, occasionally switching to a deeper bank or repairing a
+  starved column. Taller towers create the side faces that turn the upper wall
+  into a reverse-Breakout pinball corridor. Tower depth has no imposed maximum.
 
-A steady upward scroll — slow enough that one ball can keep pace — then carries
-finished bricks off the top. Deposition and scroll find their own loose
-equilibrium inside the band, whatever the screen size.
+Every brick impact advances the shared lattice upward by one column's fraction
+of a brick. No timer or invisible boundary moves the wall, and tower depth has
+no placement limit.
 
-Add `?debug` to the URL for a live overlay of ball, brick, and front stats.
+The bomb is not a power-up or a random event. It is a recovery rule for the rare
+case where the ball becomes trapped in the upper brickwork and cannot fall back
+down. Repeated brick impacts must remain confined to roughly two and a half rows
+for more than two seconds before it arms. Ordinary corridor runs make vertical
+progress and never qualify. A trapped ball stops, blinks three times, and blows
+an elliptical hole through nearby occupied cells. The spent bomb then falls
+through the wall without colliding; the paddle catches it and relaunches it as
+the normal building ball.
+
+Add `?debug` to the URL for a live overlay of ball, brick, front, underside-hit,
+side-hit, top-hit, bomb, and pending-deposit stats.
+
+## Color
+
+The wall uses Growth Rings' Hokusai palette: wheat, pale yellow, Prussian blue,
+Tyrian purple, and burlywood against a deep green-black field. The opening wall
+is loosely randomized, while every five paddle-made bricks contain all five
+swatches with the blue and purple interleaved among the warmer tones.
 
 ## Interaction
 
-- **Click** — reshuffle the palette and rebuild the wall.
+- **Click** — rebuild the wall.
 
 ## Archival rule
 

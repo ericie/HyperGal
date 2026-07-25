@@ -2,125 +2,490 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>HyperGal</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="HyperMedia Club is an evolving index of browser artworks."
+    />
+    <title>HyperMedia Club — Digital Art Index</title>
     <style>
       :root {
-        color-scheme: light dark;
-        --bg: light-dark(#fafafa, #0a0a0c);
-        --fg: light-dark(#111, #eee);
-        --muted: light-dark(#666, #888);
-        --thumb-bg: light-dark(#eee, #1a1a1f);
+        color-scheme: light;
+        --paper: oklch(96% 0 0);
+        --ink: oklch(16% .01 275);
+        --muted: oklch(43% .015 275);
+        --rule: oklch(72% .01 275);
+        --blue: oklch(48% .27 266);
+        --white: oklch(99% 0 0);
+        --sans: "Helvetica Neue", "Nimbus Sans L", "Arial Nova", Arial,
+          sans-serif;
+        --mono: "SFMono-Regular", "Cascadia Mono", "Liberation Mono", Menlo,
+          Consolas, monospace;
+        --text-caption: .75rem;
+        --text-body: 1rem;
+        --text-title: clamp(1.35rem, 2.2vw, 2rem);
+        --text-section: clamp(2.5rem, 5vw, 4.75rem);
+        --space-xs: .5rem;
+        --space-sm: .75rem;
+        --space-md: 1rem;
+        --space-lg: 1.5rem;
+        --space-xl: clamp(2.5rem, 6vw, 5rem);
+        --ease-out: cubic-bezier(.22, 1, .36, 1);
       }
-      html, body { margin: 0; background: var(--bg); color: var(--fg); }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        background: var(--paper);
+      }
+
       body {
-        font-family: ui-sans-serif, system-ui, sans-serif;
-        padding: 3rem 2rem;
-        max-width: 1200px;
-        margin-inline: auto;
+        min-width: 300px;
         min-height: 100vh;
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-kerning: normal;
+        -webkit-font-smoothing: antialiased;
       }
-      header { margin-bottom: 3rem; }
-      h1 { font-weight: 500; font-size: 2rem; margin: 0 0 .25rem; letter-spacing: -.02em; }
-      .subtitle { color: var(--muted); margin: 0; }
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: 2rem 1.5rem;
+
+      ::selection {
+        background: var(--blue);
+        color: var(--white);
       }
-      .piece {
+
+      .skip-link {
+        position: fixed;
+        z-index: 10;
+        top: .75rem;
+        left: .75rem;
+        padding: .65rem .85rem;
+        background: var(--ink);
+        color: var(--white);
+        font-family: var(--mono);
+        font-size: var(--text-caption);
+        font-weight: 700;
+        text-decoration: none;
+        transform: translateY(-180%);
+        transition: transform .2s var(--ease-out);
+      }
+
+      .skip-link:focus {
+        transform: translateY(0);
+      }
+
+      .page {
+        width: min(100%, 96rem);
+        margin-inline: auto;
+        padding:
+          max(1rem, env(safe-area-inset-top))
+          max(1rem, env(safe-area-inset-right))
+          max(2rem, env(safe-area-inset-bottom))
+          max(1rem, env(safe-area-inset-left));
+      }
+
+      .folio {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-md);
+        border-bottom: 1px solid var(--ink);
+        padding-bottom: var(--space-sm);
+        font-family: var(--mono);
+        font-size: var(--text-caption);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.4;
+      }
+
+      .folio p {
+        margin: 0;
+      }
+
+      .folio-name {
+        font-family: var(--sans);
+        font-weight: 800;
+        letter-spacing: -.02em;
+      }
+
+      .folio-path {
+        color: var(--muted);
+        text-align: right;
+      }
+
+      .banner {
+        border-bottom: 1px solid var(--ink);
+      }
+
+      .banner iframe {
         display: block;
+        width: 100%;
+        height: clamp(25rem, 62vw, 42rem);
+        border: 0;
+        background: var(--paper);
+      }
+
+      .index-heading {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: var(--space-lg);
+        padding: var(--space-xl) 0 clamp(1.5rem, 4vw, 3rem);
+      }
+
+      .index-heading h1 {
+        margin: 0;
+        font-size: var(--text-section);
+        font-weight: 760;
+        letter-spacing: -.04em;
+        line-height: .95;
+        text-wrap: balance;
+      }
+
+      .index-heading p {
+        margin: 0;
+        font-family: var(--mono);
+        font-size: var(--text-caption);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.5;
+        text-align: right;
+      }
+
+      .index-heading b {
+        color: var(--blue);
+      }
+
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: clamp(2rem, 5vw, 4.5rem) var(--space-sm);
+        border-top: 1px solid var(--ink);
+        padding-top: var(--space-md);
+      }
+
+      .piece {
+        min-width: 0;
         color: inherit;
         text-decoration: none;
       }
+
       .piece-thumb {
+        position: relative;
         aspect-ratio: 1;
-        background: var(--thumb-bg);
-        border-radius: .5rem;
         overflow: hidden;
-        margin-bottom: .6rem;
-        transition: transform .15s ease;
+        background: var(--blue);
       }
-      .piece:hover .piece-thumb { transform: translateY(-2px); }
+
+      .piece-thumb::after {
+        content: "[OPEN]";
+        position: absolute;
+        top: var(--space-xs);
+        right: var(--space-xs);
+        padding: .35rem .45rem;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: .625rem;
+        font-weight: 700;
+        letter-spacing: .03em;
+        opacity: 0;
+        transform: translateY(-.25rem);
+        transition:
+          opacity .15s linear,
+          transform .2s var(--ease-out);
+      }
+
       .piece-thumb img {
+        display: block;
         width: 100%;
         height: 100%;
         object-fit: cover;
-        display: block;
+        filter: grayscale(1) contrast(1.15);
+        mix-blend-mode: multiply;
+        opacity: .96;
+        transition:
+          filter .22s linear,
+          opacity .22s linear,
+          transform .35s var(--ease-out);
       }
-      .piece-title { font-weight: 500; }
-      .piece-meta { font-size: .85rem; color: var(--muted); margin-top: .15rem; }
-      .empty {
+
+      .piece-caption {
+        padding-top: var(--space-sm);
+      }
+
+      .piece-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-sm);
         color: var(--muted);
-        padding: 3rem 0;
-        text-align: center;
+        font-family: var(--mono);
+        font-size: var(--text-caption);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.4;
       }
+
+      .piece-meta span:last-child {
+        overflow: hidden;
+        text-align: right;
+        text-overflow: ellipsis;
+        text-transform: lowercase;
+        white-space: nowrap;
+      }
+
+      .piece-title {
+        margin: var(--space-xs) 0 0;
+        font-size: var(--text-title);
+        font-weight: 700;
+        letter-spacing: -.035em;
+        line-height: 1;
+        text-wrap: pretty;
+      }
+
+      .piece:hover .piece-thumb img,
+      .piece:focus-visible .piece-thumb img,
+      .piece:active .piece-thumb img {
+        filter: none;
+        mix-blend-mode: normal;
+        opacity: 1;
+        transform: scale(1.018);
+      }
+
+      .piece:hover .piece-thumb::after,
+      .piece:focus-visible .piece-thumb::after {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .piece:hover .piece-title,
+      .piece:focus-visible .piece-title {
+        color: var(--blue);
+      }
+
+      .piece:focus-visible {
+        outline: 3px solid var(--blue);
+        outline-offset: 5px;
+      }
+
+      .empty {
+        grid-column: 1 / -1;
+        padding: 3rem 0;
+        color: var(--muted);
+        font-size: var(--text-body);
+        line-height: 1.6;
+      }
+
+      .empty strong {
+        color: var(--ink);
+      }
+
       .empty code {
-        background: var(--thumb-bg);
-        padding: .1rem .35rem;
-        border-radius: .25rem;
+        color: var(--blue);
+        font-family: var(--mono);
         font-size: .9em;
+      }
+
+      footer {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-md);
+        margin-top: clamp(4rem, 9vw, 8rem);
+        border-top: 1px solid var(--ink);
+        padding: var(--space-md) 0;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: var(--text-caption);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.5;
+      }
+
+      footer p {
+        margin: 0;
+      }
+
+      @media (min-width: 44rem) {
+        .page {
+          padding-inline:
+            max(2rem, env(safe-area-inset-left))
+            max(2rem, env(safe-area-inset-right));
+        }
+
+        .gallery {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          column-gap: var(--space-md);
+        }
+      }
+
+      @media (min-width: 70rem) {
+        .gallery {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 32rem) {
+        .folio {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: .25rem;
+        }
+
+        .folio-path,
+        .index-heading p {
+          text-align: left;
+        }
+
+        .index-heading {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: var(--space-md);
+        }
+
+        footer {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+
+      @media (hover: none) {
+        .piece-thumb::after {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: .01ms !important;
+        }
       }
     </style>
   </head>
   <body>
-    <header>
-      <h1>HyperGal</h1>
-      <p class="subtitle">A digital gallery of self-contained pieces.</p>
-    </header>
-    <main id="gallery" class="grid"></main>
+    <a class="skip-link" href="#gallery">Skip to the works</a>
+
+    <div class="page">
+      <header>
+        <div class="folio">
+          <p>
+            <span class="folio-name">HyperMedia Club</span> / Digital Art Index
+          </p>
+          <p class="folio-path">
+            C:\HMC\INDEX · <span id="folio-range">001—---</span>
+          </p>
+        </div>
+
+        <div class="banner">
+          <iframe
+            src="./banner/index.html"
+            title="Interactive HyperMedia Club banner"
+          ></iframe>
+        </div>
+      </header>
+
+      <main>
+        <div class="index-heading">
+          <h1>Archive</h1>
+          <p><b id="piece-count">--</b> works / 2026—ongoing</p>
+        </div>
+        <div id="gallery" class="gallery" aria-live="polite"></div>
+      </main>
+
+      <footer>
+        <p>HyperMedia Club / 2026—ongoing</p>
+        <p>C:\HMC\ · No dependencies</p>
+      </footer>
+    </div>
+
     <script>
       (() => {
         const gallery = document.getElementById('gallery');
+        const count = document.getElementById('piece-count');
+        const range = document.getElementById('folio-range');
         const script = document.createElement('script');
         script.src = `./manifest.js?v=${Date.now()}`;
         script.onload = renderGallery;
-        script.onerror = () => gallery.replaceWith(emptyState());
+        script.onerror = () => gallery.replaceChildren(emptyState());
         document.head.append(script);
 
         function renderGallery() {
           const data = window.HYPERGAL_MANIFEST;
           if (!data || !Array.isArray(data.pieces) || data.pieces.length === 0) {
-            gallery.replaceWith(emptyState());
+            count.textContent = '00';
+            range.textContent = '000—000';
+            gallery.replaceChildren(emptyState());
             return;
           }
-          for (const p of data.pieces) gallery.append(pieceCard(p));
+
+          const total = data.pieces.length;
+          count.textContent = String(total).padStart(2, '0');
+          range.textContent = `001—${String(total).padStart(3, '0')}`;
+
+          const fragment = document.createDocumentFragment();
+          data.pieces.forEach((piece, index) => {
+            fragment.append(pieceCard(piece, index));
+          });
+          gallery.append(fragment);
         }
 
-        function pieceCard(p) {
-          const a = document.createElement('a');
-          a.className = 'piece';
-          a.href = `./pieces/${p.slug}/index.html`;
+        function pieceCard(piece, index) {
+          const titleText = piece.title || piece.slug;
+          const link = document.createElement('a');
+          link.className = 'piece';
+          link.href = `./pieces/${piece.slug}/index.html`;
+          link.setAttribute(
+            'aria-label',
+            `Open ${titleText}${piece.year ? `, ${piece.year}` : ''}`
+          );
 
           const thumb = document.createElement('div');
           thumb.className = 'piece-thumb';
-          if (p.thumbnail) {
-            const img = document.createElement('img');
-            img.src = `./pieces/${p.slug}/${p.thumbnail}`;
-            img.alt = p.title || p.slug;
-            img.loading = 'lazy';
-            thumb.append(img);
+          if (piece.thumbnail) {
+            const image = document.createElement('img');
+            image.src = `./pieces/${piece.slug}/${piece.thumbnail}`;
+            image.alt = '';
+            image.loading = index < 4 ? 'eager' : 'lazy';
+            image.decoding = 'async';
+            thumb.append(image);
           }
-          a.append(thumb);
+          link.append(thumb);
 
-          const title = document.createElement('div');
-          title.className = 'piece-title';
-          title.textContent = p.title || p.slug;
-          a.append(title);
+          const caption = document.createElement('div');
+          caption.className = 'piece-caption';
 
           const meta = document.createElement('div');
           meta.className = 'piece-meta';
-          meta.textContent = [p.year, p.type].filter(Boolean).join(' · ');
-          a.append(meta);
+          meta.append(
+            metaItem(String(index + 1).padStart(2, '0')),
+            metaItem([piece.year, piece.type].filter(Boolean).join(' / '))
+          );
+          caption.append(meta);
 
-          return a;
+          const title = document.createElement('h2');
+          title.className = 'piece-title';
+          title.textContent = titleText;
+          caption.append(title);
+
+          link.append(caption);
+          return link;
+        }
+
+        function metaItem(value) {
+          const span = document.createElement('span');
+          span.textContent = value || 'unfiled';
+          return span;
         }
 
         function emptyState() {
           const wrap = document.createElement('div');
           wrap.className = 'empty';
           wrap.innerHTML =
-            'No pieces yet. Copy <code>pieces/_template/</code> to start one, then run <code>node scripts/build-manifest.mjs</code>.';
+            '<strong>No works found.</strong> Copy <code>pieces/_template/</code> to begin one, then run <code>node scripts/build-manifest.mjs</code>.';
           return wrap;
         }
       })();

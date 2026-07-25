@@ -106,7 +106,7 @@
           invuln: 2.2,
           deadFor: 0,
           lastShot: -Infinity,
-          nextAutoShot: 1.8,
+          nextAutoShot: .45,
           autoBurstLeft: 0,
           autoBurstAt: 0,
           autoAimAngle: -Math.PI / 2,
@@ -120,6 +120,8 @@
           autoAvoidSide: 1,
           autoAvoidSideUntil: 0,
           autoBrakeUntil: 0,
+          autoBrakeBurstUntil: 0,
+          autoBrakeNextBurst: 0,
           autoPauseUntil: rand(1.1, 2.8),
           autoCruiseUntil: 0,
           cruiseAngle: rand(-Math.PI, Math.PI),
@@ -198,7 +200,7 @@
           mergeAge: opts.mergeAge ?? 1,
           mergeDuration: opts.mergeDuration ?? 0,
           mergeGhosts: opts.mergeGhosts ? opts.mergeGhosts.map(copyMergeGhost) : [],
-          mergeAbsorb: opts.mergeAbsorb ? copyMergeAbsorb(opts.mergeAbsorb) : null,
+          mergeMorph: opts.mergeMorph ? copyMergeMorph(opts.mergeMorph) : null,
         };
       }
 
@@ -228,19 +230,12 @@
         };
       }
 
-      function copyMergeAbsorb(anim) {
+      function copyMergeMorph(anim) {
         return {
-          bigX: anim.bigX,
-          bigY: anim.bigY,
-          bigRot: anim.bigRot || 0,
-          bigHull: copyHull(anim.bigHull),
-          bigRadius: anim.bigRadius,
-          smallX: anim.smallX,
-          smallY: anim.smallY,
-          smallRot: anim.smallRot || 0,
-          smallHull: copyHull(anim.smallHull),
-          smallRadius: anim.smallRadius,
-          targetScale: anim.targetScale,
+          startHull: copyHull(anim.startHull),
+          endHull: copyHull(anim.endHull),
+          drawBounds: anim.drawBounds,
+          seam: anim.seam ? { ...anim.seam } : null,
         };
       }
 
@@ -351,6 +346,38 @@
         return hull;
       }
 
+      function makeStuckMergeHull(lobes) {
+        const pts = [];
+        for (const lobe of lobes) pts.push(...lobeRockPoints(lobe));
+        const base = convexHull(pts);
+        if (base.length <= 3) return base;
+
+        const n = clamp(Math.round(base.length * 2 + lobes.length * 5), 32, 76);
+        const phase = rand(0, TAU);
+        const radii = [];
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * TAU;
+          const ux = Math.cos(a), uy = Math.sin(a);
+          const ray = rayPolygonRadius(base, ux, uy);
+          const support = supportRadius(pts, ux, uy);
+          const r = Math.max(MIN_ROCK_R, ray || support);
+          const memory = lobeAngularMemory(lobes, a);
+          const waist = .56 + memory * .46;
+          const wobble = 1 +
+            Math.sin(a * 4 + phase) * .035 +
+            Math.sin(a * 9 - phase) * .025 +
+            rand(-.018, .018);
+          radii.push(r * waist * wobble);
+        }
+
+        const hull = [];
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * TAU;
+          hull.push([Math.cos(a) * radii[i], Math.sin(a) * radii[i]]);
+        }
+        return hull;
+      }
+
       function lobeAngularMemory(lobes, a) {
         let best = 0;
         for (const lobe of lobes) {
@@ -378,6 +405,45 @@
           });
         }
         return out;
+      }
+
+      function resampleRadialHull(hull, n) {
+        const pts = [];
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * TAU;
+          const ux = Math.cos(a), uy = Math.sin(a);
+          const r = Math.max(MIN_ROCK_R, rayPolygonRadius(hull, ux, uy) || supportRadius(hull, ux, uy));
+          pts.push([ux * r, uy * r]);
+        }
+        return pts;
+      }
+
+      function relaxHull(hull, passes = 2, roundness = .14) {
+        const n = clamp(Math.round(hull.length), 28, 72);
+        const sampled = resampleRadialHull(hull, n);
+        let radii = sampled.map(([x, y]) => Math.hypot(x, y));
+        const avg = radii.reduce((sum, r) => sum + r, 0) / Math.max(1, radii.length);
+        radii = smoothRing(radii, passes).map((r) => r * (1 - roundness) + avg * roundness);
+        return radii.map((r, i) => {
+          const a = (i / n) * TAU;
+          return [Math.cos(a) * r, Math.sin(a) * r];
+        });
+      }
+
+      function mergeMorphHulls(startHull, endHull) {
+        const n = clamp(Math.max(startHull.length, endHull.length, 36), 36, 84);
+        return {
+          startHull: resampleRadialHull(startHull, n),
+          endHull: resampleRadialHull(endHull, n),
+        };
+      }
+
+      function interpolateHulls(a, b, t) {
+        const p = easeInOutCubic(t);
+        return a.map(([x, y], i) => [
+          x + (b[i][0] - x) * p,
+          y + (b[i][1] - y) * p,
+        ]);
       }
 
       function rayPolygonRadius(poly, ux, uy) {
@@ -506,31 +572,46 @@
         let evading = false;
         let escapeBurn = false;
         let braking = false;
+        let fireUnsafe = false;
         let urgentSteer = false;
         let steerMode = 'cruise';
         const speed = shipSpeed();
         const threat = danger ? Math.min(danger.clearance, danger.predictedClearance) : Infinity;
-        const openingClear = danger && danger.closing < -12 && danger.clearance > 52 && danger.predictedClearance > 72;
+        const openingClear = danger && danger.closing < -8 && danger.clearance > 25 && danger.predictedClearance > 45;
+        const hardDanger = danger && !openingClear && (
+          threat < 86 + speed * .06 ||
+          danger.predictedClearance < 42 ||
+          (danger.closing > 30 && threat < 150)
+        );
         const pausing = now < ship.autoPauseUntil && threat > 170;
-        if (speed > 18 && threat > 105) ship.autoBrakeUntil = Math.max(ship.autoBrakeUntil || 0, now + .9);
-        if (speed < 6 || threat <= 130) ship.autoBrakeUntil = Math.min(ship.autoBrakeUntil || 0, now);
-        const wantsStationary = speed > 7 && threat > 95 && now < (ship.autoBrakeUntil || 0);
+        if (speed > 8 && !hardDanger) ship.autoBrakeUntil = Math.max(ship.autoBrakeUntil || 0, now + .9);
+        if (speed < 1.8 || hardDanger) ship.autoBrakeUntil = Math.min(ship.autoBrakeUntil || 0, now);
+        const wantsStationary = speed > 2 && threat > 95 && now < (ship.autoBrakeUntil || 0);
+        const brakeWindow = wantsStationary && (!danger || openingClear || danger.closing <= 8 || danger.predictedClearance > 170 || threat > 210);
 
-        if (danger && !openingClear && threat < 130 + speed * .16) {
-          desired = evasionAngle(danger, true);
+        if (hardDanger) {
+          const plan = avoidancePlan(danger, true);
+          desired = plan.angle;
           evading = true;
-          escapeBurn = threat < 34 || danger.predictedClearance < 24 ||
+          fireUnsafe = true;
+          escapeBurn = plan.thrust || threat < 34 || danger.predictedClearance < 24 ||
             (danger.closing > 12 && (threat < 90 || danger.predictedClearance < 84)) ||
             (danger.closing > 34 && threat < 150);
           urgentSteer = true;
           steerMode = 'avoid';
+        } else if (brakeWindow) {
+          desired = Math.atan2(-ship.vy, -ship.vx);
+          steerMode = 'brake';
+          braking = true;
         } else if (danger && !openingClear && threat < 340 + speed * .18) {
-          desired = evasionAngle(danger, false);
+          const plan = avoidancePlan(danger, false);
+          desired = plan.angle;
           evading = true;
+          fireUnsafe = threat < 92 || danger.predictedClearance < 88 || (danger.closing > 30 && threat < 150);
           steerMode = 'avoid';
           const aim = Math.abs(normAngle(desired - ship.a));
           escapeBurn = danger.closing > 8 || danger.predictedClearance < 160 || threat < 180;
-          thrust = escapeBurn && aim < 1.05 && speed < 190 && danger.dist > 65;
+          thrust = (plan.thrust || escapeBurn) && aim < 1.05 && speed < 220 && danger.dist > 65;
         } else if (wantsStationary) {
           desired = Math.atan2(-ship.vy, -ship.vx);
           steerMode = 'brake';
@@ -551,43 +632,133 @@
 
         desired = holdAutoSteer(desired, steerMode, urgentSteer);
         const delta = normAngle(desired - ship.a);
-        if (evading) thrust = escapeBurn && Math.abs(delta) < 1.25 && speed < 230 && danger.dist > 46;
-        if (braking) thrust = Math.abs(delta) < .62 && speed > 5.5;
-        const patient = now - ship.lastShot > 2.2 && bullets.length < MAX_BULLETS;
+        if (evading) thrust = escapeBurn && Math.abs(delta) < 1.25 && speed < (urgentSteer ? 260 : 220) && danger.dist > 40;
+        if (braking) thrust = brakeBurstThrust(delta, speed);
+        else {
+          ship.autoBrakeBurstUntil = Math.min(ship.autoBrakeBurstUntil || 0, now);
+          ship.autoBrakeNextBurst = Math.max(ship.autoBrakeNextBurst || 0, now + .08);
+        }
+        const patient = now - ship.lastShot > .85 && bullets.length < MAX_BULLETS;
         const shotReady = now >= ship.nextAutoShot && ship.fireCd <= 0 && bullets.length < MAX_BULLETS;
         let shoot = false;
-        let fireAngle = null;
         if (ship.autoBurstLeft > 0 && now - ship.autoBurstAt > .9) ship.autoBurstLeft = 0;
-        if (evading && threat < 170) ship.autoBurstLeft = 0;
-        if (!evading && ship.autoBurstLeft > 0 && now >= ship.autoBurstAt && threat > 80 && ship.fireCd <= 0 && bullets.length < MAX_BULLETS) {
+        if (fireUnsafe) ship.autoBurstLeft = 0;
+        if (!fireUnsafe && ship.autoBurstLeft > 0 && now >= ship.autoBurstAt && threat > 95 && ship.fireCd <= 0 && bullets.length < MAX_BULLETS) {
           const burstShot = autoShot();
-          if (burstShot && burstShot.aim < burstShot.cone * 1.24) {
+          if (burstShot && burstShot.aim < Math.max(burstShot.cone * 1.25, burstShot.small ? .3 : .24)) {
             shoot = true;
-            fireAngle = burstShot.angle;
             ship.autoBurstLeft--;
-            ship.autoBurstAt = now + rand(.11, .2);
+            ship.autoBurstAt = now + rand(.08, .14);
           } else {
             ship.autoBurstLeft = 0;
           }
-        } else if (!braking && !evading && threat > 90 && shotReady && !!shot && (shot.aim < shot.cone || (patient && shot.aim < shot.cone * 1.22))) {
+        } else if (!fireUnsafe && threat > 100 && shotReady && !!shot && (shot.aim < Math.max(shot.cone * 1.2, shot.small ? .3 : .24) || (patient && shot.aim < Math.max(shot.cone * 1.7, shot.small ? .44 : .34)))) {
           shoot = true;
-          fireAngle = shot.angle;
           const burst = autoBurstCountForShot(shot);
           ship.autoBurstLeft = Math.max(0, burst - 1);
-          ship.autoBurstAt = now + rand(.1, .18);
-          ship.nextAutoShot = now + rand(burst > 1 ? .52 : .34, burst > 1 ? 1.05 : .72);
+          ship.autoBurstAt = now + rand(.08, .13);
+          ship.nextAutoShot = now + rand(burst > 1 ? .3 : .22, burst > 1 ? .62 : .48);
         }
-        const turnGain = evading ? (urgentSteer ? 2.05 : 1.75) : 1.12;
-        const maxTurn = evading ? (urgentSteer ? 1 : .92) : .68;
+        const aiming = steerMode === 'aim' || steerMode === 'target';
+        const turnGain = evading ? (urgentSteer ? 2.05 : 1.75) : braking ? 1.75 : aiming ? 1.55 : 1.12;
+        const maxTurn = evading ? (urgentSteer ? 1 : .92) : braking ? .9 : aiming ? .84 : .68;
         let turn = clamp(delta * turnGain, -maxTurn, maxTurn);
-        if (Math.abs(delta) < (evading ? AUTO_TURN_DEADZONE : .12)) turn = 0;
-        else if (!evading && Math.abs(delta) < .36) turn *= .16;
+        if (Math.abs(delta) < (evading ? AUTO_TURN_DEADZONE : braking ? .055 : .12)) turn = 0;
+        else if (!evading && !braking && !aiming && Math.abs(delta) < .36) turn *= .16;
         return {
           turn,
           thrust,
           fire: shoot,
-          fireAngle,
         };
+      }
+
+      function brakeBurstThrust(delta, speed) {
+        const aligned = Math.abs(delta) < .38;
+        if (speed <= 1.8) {
+          ship.autoBrakeBurstUntil = Math.min(ship.autoBrakeBurstUntil || 0, now);
+          ship.autoBrakeNextBurst = now + rand(.2, .45);
+          return false;
+        }
+        if (!aligned) return false;
+        if (now >= (ship.autoBrakeBurstUntil || 0) && now >= (ship.autoBrakeNextBurst || 0)) {
+          const desiredDelta = speed > 55 ? clamp(speed * .34, 18, 44) : clamp(speed * .72, 3.2, 18);
+          const duration = clamp(desiredDelta / SHIP_ACCEL, 1 / 60, .15);
+          ship.autoBrakeBurstUntil = now + duration;
+          ship.autoBrakeNextBurst = ship.autoBrakeBurstUntil + (speed > 55 ? rand(.1, .26) : rand(.16, .38));
+        }
+        return now < (ship.autoBrakeBurstUntil || 0);
+      }
+
+      function avoidancePlan(danger, urgent) {
+        const speed = shipSpeed();
+        const px = danger.pdx ?? danger.dx;
+        const py = danger.pdy ?? danger.dy;
+        const away = Math.atan2(-py, -px);
+        const retro = speed > 1 ? Math.atan2(-ship.vy, -ship.vx) : away;
+        const candidates = [
+          away,
+          away + .5,
+          away - .5,
+          away + 1.05,
+          away - 1.05,
+          retro,
+          retro + .42,
+          retro - .42,
+          ship.a,
+          ship.a + .8,
+          ship.a - .8,
+          ship.a + 1.6,
+          ship.a - 1.6,
+        ];
+        const sweep = urgent ? 24 : 18;
+        for (let i = 0; i < sweep; i++) candidates.push(i * TAU / sweep);
+
+        const burnTime = urgent ? .46 : .34;
+        const coast = projectedClearance(ship.a, 0, urgent);
+        let best = null;
+        for (const candidate of candidates) {
+          const angle = normAngle(candidate);
+          const projection = projectedClearance(angle, burnTime, urgent);
+          const turnCost = Math.abs(normAngle(angle - ship.a)) * (urgent ? 8 : 16);
+          const brakeBonus = 18 - Math.abs(normAngle(angle - retro)) * 10;
+          const speedCost = Math.max(0, projection.finalSpeed - 185) * .08;
+          const score = projection.min + Math.min(18, brakeBonus) - turnCost - speedCost;
+          if (!best || score > best.score) best = { angle, score, projection };
+        }
+
+        const improves = best.projection.min > coast.min + (urgent ? -10 : 8);
+        const mustBurn = urgent && best.projection.min < 115;
+        const tooFast = speed > (urgent ? 150 : 125) && best.projection.min > coast.min - 18;
+        return {
+          angle: best.angle,
+          thrust: improves || mustBurn || tooFast,
+          clearance: best.projection.min,
+        };
+      }
+
+      function projectedClearance(angle, burnTime, urgent) {
+        const ax = Math.cos(angle) * SHIP_ACCEL;
+        const ay = Math.sin(angle) * SHIP_ACCEL;
+        const horizons = urgent ? [.22, .45, .75, 1.1, 1.55, 2.15] : [.45, .85, 1.25, 1.75, 2.35];
+        let min = Infinity;
+        let finalVx = ship.vx;
+        let finalVy = ship.vy;
+        for (const t of horizons) {
+          const bt = Math.min(t, burnTime);
+          const sx = ship.x + ship.vx * t + ax * bt * (t - bt * .5);
+          const sy = ship.y + ship.vy * t + ay * bt * (t - bt * .5);
+          finalVx = ship.vx + ax * bt;
+          finalVy = ship.vy + ay * bt;
+          for (const rock of rocks) {
+            const rx = rock.x + rock.vx * t;
+            const ry = rock.y + rock.vy * t;
+            const dx = wrapDelta(rx - sx, W);
+            const dy = wrapDelta(ry - sy, H);
+            const clearance = Math.hypot(dx, dy) - rockExtent(rock) - SHIP_R;
+            min = Math.min(min, clearance);
+          }
+        }
+        return { min, finalSpeed: Math.hypot(finalVx, finalVy) };
       }
 
       function updateAutoMood(danger) {
@@ -743,8 +914,8 @@
       }
 
       function leadRock(rock, dx, dy, dist) {
-        const rvx = rock.vx - ship.vx;
-        const rvy = rock.vy - ship.vy;
+        const rvx = rock.vx;
+        const rvy = rock.vy;
         const a = rvx * rvx + rvy * rvy - BULLET_SPEED * BULLET_SPEED;
         const b = 2 * (dx * rvx + dy * rvy);
         const c = dx * dx + dy * dy;
@@ -766,9 +937,9 @@
         const available = MAX_BULLETS - bullets.length;
         if (available <= 0) return 0;
         const aimRatio = shot.aim / Math.max(.001, shot.cone);
-        if (shot.small && aimRatio < .9 && shot.dist < 720) return Math.min(3, available);
-        if (aimRatio < .48 && shot.dist < 820) return Math.min(3, available);
-        if (aimRatio < .82 && shot.dist < 760) return Math.min(2, available);
+        if (shot.small && aimRatio < 1.15 && shot.dist < 780) return Math.min(3, available);
+        if (aimRatio < .7 && shot.dist < 860) return Math.min(3, available);
+        if (aimRatio < 1.05 && shot.dist < 820) return Math.min(2, available);
         return 1;
       }
 
@@ -794,7 +965,7 @@
         ship.invuln = 2;
         ship.fireCd = .25;
         ship.lastShot = now;
-        ship.nextAutoShot = now + rand(1.2, 2.3);
+        ship.nextAutoShot = now + rand(.45, .8);
         ship.autoBurstLeft = 0;
         ship.autoBurstAt = now;
         ship.autoAimAngle = ship.a;
@@ -808,6 +979,8 @@
         ship.autoAvoidSide = 1;
         ship.autoAvoidSideUntil = now;
         ship.autoBrakeUntil = now;
+        ship.autoBrakeBurstUntil = 0;
+        ship.autoBrakeNextBurst = now;
         ship.autoPauseUntil = now + rand(1.1, 2.6);
         ship.autoCruiseUntil = now + rand(.8, 1.8);
         ship.cruiseAngle = rand(-Math.PI, Math.PI);
@@ -834,9 +1007,9 @@
           y: wrap(ship.y + ny * 17, H),
           px: ship.x,
           py: ship.y,
-          vx: ship.vx + nx * BULLET_SPEED,
-          vy: ship.vy + ny * BULLET_SPEED,
-          life: .92,
+          vx: nx * BULLET_SPEED,
+          vy: ny * BULLET_SPEED,
+          life: 1.18,
           wrapped: false,
         });
         ship.lastShot = now;
@@ -875,9 +1048,14 @@
           r.mergeFlash = Math.max(0, r.mergeFlash - dt * 1.25);
           if (r.mergeDuration > 0 && r.mergeAge < r.mergeDuration) {
             r.mergeAge = Math.min(r.mergeDuration, r.mergeAge + dt);
+            if (r.mergeMorph) updateMergeMorph(r);
             if (r.mergeAge >= r.mergeDuration) {
               r.mergeGhosts = [];
-              r.mergeAbsorb = null;
+              if (r.mergeMorph) {
+                r.hull = copyHull(r.mergeMorph.endHull);
+                r.bounds = Math.max(r.radius, hullRadius(r.hull), compoundBounds(r.lobes));
+              }
+              r.mergeMorph = null;
             }
           }
           for (const seam of r.seams) seam.life = Math.max(0, seam.life - dt * SEAM_DECAY);
@@ -887,6 +1065,13 @@
         resolveRockCollisions(dt);
         mergeTouchingRocks(dt);
         condenseOverflow();
+      }
+
+      function updateMergeMorph(rock) {
+        const t = clamp(rock.mergeAge / rock.mergeDuration, 0, 1);
+        const collapse = clamp((t - .26) / .74, 0, 1);
+        rock.hull = interpolateHulls(rock.mergeMorph.startHull, rock.mergeMorph.endHull, collapse);
+        rock.bounds = Math.max(rock.radius, hullRadius(rock.hull), rock.mergeMorph.drawBounds);
       }
 
       function applyRockGravity(dt) {
@@ -1080,34 +1265,21 @@
           ...carryLobes(b, x, y, 0),
         ];
         const lobes = compactMergedLobes(carried, Math.sqrt(total));
-        const bigSource = a.radius >= b.radius ? a : b;
-        const smallSource = bigSource === a ? b : a;
-        const bigLocal = bigSource === a ? aLocal : bLocal;
-        const smallLocal = bigSource === a ? bLocal : aLocal;
-        const bigRadius = rockExtent(bigSource);
-        const smallRadius = rockExtent(smallSource);
-        const centerGap = Math.hypot(smallLocal.x - bigLocal.x, smallLocal.y - bigLocal.y);
-        const targetScale = clamp((centerGap + smallRadius * 1.08) / Math.max(1, bigRadius), 1.08, 2.65);
-        const mergeAbsorb = {
-          bigX: bigLocal.x,
-          bigY: bigLocal.y,
-          bigRot: bigSource.rot,
-          bigHull: copyHull(bigSource.hull),
-          bigRadius,
-          smallX: smallLocal.x,
-          smallY: smallLocal.y,
-          smallRot: smallSource.rot,
-          smallHull: copyHull(smallSource.hull),
-          smallRadius,
-          targetScale,
+        const stuckHullRaw = makeStuckMergeHull(carried);
+        const finalHullRaw = relaxHull(makeCompoundHull(lobes), 3, .26);
+        const morphHulls = mergeMorphHulls(stuckHullRaw, finalHullRaw);
+        const mergeSeam = makeMergeSeam(aLocal, rockExtent(a), bLocal, rockExtent(b));
+        const mergeMorph = {
+          ...morphHulls,
+          seam: mergeSeam,
+          drawBounds: Math.max(hullRadius(morphHulls.startHull), hullRadius(morphHulls.endHull), compoundBounds(carried)),
         };
         const radius = clamp(Math.sqrt(total), MIN_ROCK_R, maxRockRadius());
-        const hull = makeCompoundHull(lobes);
-        const bounds = Math.max(radius, hullRadius(hull), compoundBounds(carried));
+        const hull = copyHull(morphHulls.startHull);
+        const bounds = Math.max(radius, hullRadius(morphHulls.endHull), compoundBounds(lobes));
         const seams = [
           ...carrySeams(a, x, y, 0),
           ...carrySeams(b, x, y, 0),
-          makeMergeSeam(aLocal, rockExtent(a), bLocal, rockExtent(b)),
         ].filter((seam) => seam.life > .02);
         const merged = makeRock(x, y, radius, {
           vx: (a.vx * a.mass + b.vx * b.mass) / total,
@@ -1118,12 +1290,12 @@
           hull,
           mass: total,
           bounds,
-          crack: Math.max(a.crack, b.crack, .35),
+          crack: Math.max(a.crack, b.crack),
           mergeFlash: 0,
           seams,
           mergeAge: 0,
-          mergeDuration: .78,
-          mergeAbsorb,
+          mergeDuration: 1.8,
+          mergeMorph,
         });
         clearContactsFor(a, b);
         burst(x, y, 11, 70);
@@ -1134,8 +1306,8 @@
 
       function compactMergedLobes(lobes, radius) {
         const bounds = compoundBounds(lobes);
-        const target = radius * (lobes.length <= 2 ? 1.92 : 1.74);
-        const scale = bounds > target ? clamp(target / bounds, .88, .99) : 1;
+        const target = radius * (lobes.length <= 2 ? 1.42 : 1.58);
+        const scale = bounds > target ? clamp(target / bounds, .68, .99) : 1;
         return lobes.map((lobe) => ({
           ...lobe,
           x: lobe.x * scale,
@@ -1601,23 +1773,23 @@
 
       function rockDrawExtent(rock) {
         let extent = rockExtent(rock) + 12;
-        const anim = rock.mergeAbsorb;
+        const anim = rock.mergeMorph;
         if (rock.mergeDuration > 0 && rock.mergeAge < rock.mergeDuration && anim) {
-          const bigReach = Math.hypot(anim.bigX, anim.bigY) + anim.bigRadius * anim.targetScale;
-          const smallReach = Math.hypot(anim.smallX, anim.smallY) + anim.smallRadius;
-          extent = Math.max(extent, bigReach, smallReach) + 16;
+          extent = Math.max(extent, anim.drawBounds + 16);
         }
         return extent;
       }
 
       function drawRockAt(rock, cx, cy) {
-        const absorbing = rock.mergeDuration > 0 && rock.mergeAge < rock.mergeDuration && rock.mergeAbsorb;
-        if (absorbing) {
+        const merging = rock.mergeDuration > 0 && rock.mergeAge < rock.mergeDuration && rock.mergeMorph;
+        if (merging) {
           const t = clamp(rock.mergeAge / rock.mergeDuration, 0, 1);
-          drawAbsorbAt(rock, cx, cy, t);
+          drawHullAt(rock, cx, cy, .74);
+          drawMergeMorphSeamAt(rock, cx, cy, t);
           return;
+        } else {
+          drawHullAt(rock, cx, cy, .7 + rock.mergeFlash * .22);
         }
-        drawHullAt(rock, cx, cy, .7 + rock.mergeFlash * .22);
         if (rock.seams.length) drawSeamsAt(rock, cx, cy);
         if (rock.crack > .02) drawCracksAt(rock, cx, cy);
       }
@@ -1626,19 +1798,26 @@
         return 1 - Math.pow(1 - clamp(t, 0, 1), 3);
       }
 
-      function drawAbsorbAt(rock, cx, cy, t) {
-        const anim = rock.mergeAbsorb;
-        const reach = easeOutCubic(clamp(t / .9, 0, 1));
-        const push = .22 * reach;
-        const bigX = anim.bigX + (anim.smallX - anim.bigX) * push;
-        const bigY = anim.bigY + (anim.smallY - anim.bigY) * push;
-        const bigRot = normAngle(anim.bigRot + normAngle(anim.smallRot - anim.bigRot) * .06 * reach);
-        const scale = 1 + (anim.targetScale - 1) * reach;
-        const gap = Math.hypot(anim.smallX - bigX, anim.smallY - bigY);
-        const coversSmall = scale * anim.bigRadius >= gap + anim.smallRadius * .86;
+      function easeInOutCubic(t) {
+        t = clamp(t, 0, 1);
+        return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      }
 
-        if (!coversSmall) drawLocalHullAt(rock, cx, cy, anim.smallX, anim.smallY, anim.smallRot, anim.smallHull, .62, 1);
-        drawLocalHullAt(rock, cx, cy, bigX, bigY, bigRot, anim.bigHull, .82, scale);
+      function drawMergeMorphSeamAt(rock, cx, cy, t) {
+        const seam = rock.mergeMorph?.seam;
+        if (!seam) return;
+        const life = 1 - easeOutCubic(clamp(t / .42, 0, 1));
+        if (life <= .02) return;
+        const ca = Math.cos(rock.rot), sa = Math.sin(rock.rot);
+        const p1 = {
+          x: cx + seam.x1 * ca - seam.y1 * sa,
+          y: cy + seam.x1 * sa + seam.y1 * ca,
+        };
+        const p2 = {
+          x: cx + seam.x2 * ca - seam.y2 * sa,
+          y: cy + seam.x2 * sa + seam.y2 * ca,
+        };
+        drawDissolvingLine(p1, p2, life, .5);
       }
 
       function drawAttractionBridges() {
@@ -1723,8 +1902,7 @@
         }
       }
 
-      function drawDissolvingLine(p1, p2, life) {
-        const alpha = .36;
+      function drawDissolvingLine(p1, p2, life, alpha = .36) {
         if (life > .58) {
           strokePath([p1, p2], false, .85, alpha);
           return;
@@ -1781,8 +1959,8 @@
         for (const b of bullets) {
           drawWrappedObject(b.x, b.y, 20, (x, y) => {
             const tail = {
-              x: x - b.vx * .018,
-              y: y - b.vy * .018,
+              x: x - b.vx * .022,
+              y: y - b.vy * .022,
             };
             strokePath([tail, { x, y }], false, 1.25, .94);
           });
