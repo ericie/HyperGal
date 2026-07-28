@@ -1,6 +1,8 @@
 {
   "title": "Switch Stack",
   "year": 2026,
+  "date": "2026-07-01",
+  "category": "generative",
   "type": "interactive",
   "thumbnail": "thumbnail.svg",
   "description": "A pure black-and-white scroll stack. Each row holds one or two boxes; as a box reaches the viewport midpoint, its binary dither has finished clearing from black to white and its block-letter state flips from ON to OFF."

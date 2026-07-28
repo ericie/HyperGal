@@ -514,6 +514,19 @@
         return t * t * t * (t * (t * 6 - 15) + 10);
       }
 
+      function rectPerimeterPoint(rect, u) {
+        const w = rect.a * 2;
+        const h = rect.b * 2;
+        let t = ((u % rect.perimeter) + rect.perimeter) % rect.perimeter;
+        if (t < w) return { x: rect.x - rect.a + t, y: rect.y - rect.b, angle: 0 };
+        t -= w;
+        if (t < h) return { x: rect.x + rect.a, y: rect.y - rect.b + t, angle: Math.PI / 2 };
+        t -= h;
+        if (t < w) return { x: rect.x + rect.a - t, y: rect.y + rect.b, angle: 0 };
+        t -= w;
+        return { x: rect.x - rect.a, y: rect.y + rect.b - t, angle: Math.PI / 2 };
+      }
+
       function scaled(min, max, bias = 1.32) {
         return min + (max - min) * Math.pow(random(), bias);
       }
@@ -610,12 +623,10 @@
 
       function anchorPriority(anchor) {
         if (anchor.edge) return 4;
+        if (anchor.mode === 'closure') return 3.2;
         if (anchor.mode === 'implied') return 3;
-        if (anchor.mode === 'closure' && anchor.shape === 'square') return 2.5;
-        if (anchor.mode === 'closure' && anchor.shape === 'circle') return 2.4;
         if (anchor.shape === 'square') return 2.3;
         if (anchor.shape !== 'wall') return 2;
-        if (anchor.mode === 'closure') return 1;
         return 0;
       }
 
@@ -688,8 +699,43 @@
           ? mix(0.2, 3.6, Math.pow(GESTALTS.scale.strength, 1.65))
           : 1;
         const impliedForce = smootherStep(implied);
-        const closureCount =
-          closure > 0 ? Math.round(clamp(spec.count * mix(0.12, 0.29, closure), 3, 7)) : 0;
+        const closureCoverage = mix(0.62, 0.86, closure);
+        const closureSpacing =
+          spec.base * 1.6 * clamp(Math.pow(overallScale, 0.72), 0.45, 1.6);
+        let closureCount =
+          closure > 0
+            ? Math.round(clamp(spec.count * mix(0.2, 1, closure), 3, spec.count))
+            : 0;
+        let rect = null;
+        if (closureCount > 0) {
+          const aspect = clamp(spec.closure.ry / spec.closure.rx, 0.6, 1.6);
+          const marginX = horizontalSafeZone() + spec.base * 0.8;
+          const marginY = spec.base * 0.9;
+          const wanted = (closureCount * closureSpacing) / closureCoverage;
+          const a = clamp(
+            wanted / (4 * (1 + aspect)),
+            spec.base * 1.2,
+            (width - marginX * 2) * 0.45
+          );
+          const b = clamp(a * aspect, spec.base * 1.2, (height - marginY * 2) * 0.42);
+          const perimeter = 4 * (a + b);
+          const fit = Math.floor((perimeter * closureCoverage) / (closureSpacing * 0.6));
+          closureCount = clamp(closureCount, 3, Math.max(3, fit));
+          rect = {
+            a,
+            b,
+            x: clamp(spec.closure.x, marginX + a, width - marginX - a),
+            y: clamp(spec.closure.y, marginY + b, height - marginY - b),
+            perimeter,
+          };
+        }
+        let scatterBudget =
+          closureCount > 0
+            ? Math.max(
+                0,
+                Math.round((spec.count - closureCount) * (1 - smootherStep(closure)))
+              )
+            : Infinity;
         const impliedCount =
           implied > 0
             ? Math.round(clamp(spec.count * mix(0.18, 0.7, impliedForce), 3, spec.count - 2))
@@ -698,7 +744,9 @@
           offpage > 0 ? Math.round(clamp(spec.count * mix(0.06, 0.17, offpage), 1, 4)) : 0;
         const scalePattern = [0.1, 1.16, 0.25, 3.4, 0.5, 8.8, 1.7, 0.14, 6.2, 0.36, 2.6, 0.18];
         const impliedScalePattern = [0.12, 0.3, 0.72, 0.16, 1.15, 0.4, 0.88, 0.14, 0.58, 0.22];
+        const closureScalePattern = [0.74, 0.62, 0.8, 0.68, 0.88, 0.7];
         const impliedColors = [COLORS.prussian, COLORS.prussian, COLORS.ink, COLORS.prussian, COLORS.tyrian];
+        const closureColors = [COLORS.tyrian, COLORS.prussian, COLORS.tyrian, COLORS.ink];
         const shapePattern = ['wall', 'circle', 'square', 'wall', 'circle', 'wall', 'square', 'circle'];
         const edgePattern = ['top', 'bottom'];
         const orientations = [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4];
@@ -721,21 +769,28 @@
           if (i < closureCount) {
             mode = 'closure';
             modeIndex = i;
-            const progress = closureCount <= 1 ? 0.5 : i / (closureCount - 1);
-            const arcSpan = mix(TAU * 0.5, TAU * 0.82, closure);
-            const theta = spec.closure.start + progress * arcSpan + rand(-0.08, 0.08);
-            const targetX = spec.closure.x + Math.cos(theta) * spec.closure.rx;
-            const targetY = spec.closure.y + Math.sin(theta) * spec.closure.ry;
+            const gapLength = (1 - closureCoverage) * rect.perimeter;
+            const edgeMids = [
+              rect.a,
+              rect.a * 2 + rect.b,
+              rect.a * 3 + rect.b * 2,
+              rect.a * 4 + rect.b * 3,
+            ];
+            const gapCenter =
+              edgeMids[Math.floor(((spec.closure.start + Math.PI) / TAU) * 4) % 4];
+            const covered = rect.perimeter - gapLength;
+            const u =
+              gapCenter +
+              gapLength / 2 +
+              ((i + 0.5) / closureCount) * covered +
+              rand(-0.05, 0.05) * closureSpacing;
+            const point = rectPerimeterPoint(rect, u);
             const attraction = smootherStep(closure);
-            x = mix(x, targetX, attraction);
-            y = mix(y, targetY, attraction);
-            const tangent = Math.atan2(
-              spec.closure.ry * Math.cos(theta),
-              -spec.closure.rx * Math.sin(theta)
-            );
-            angle = mix(angle, tangent, attraction);
-            angleJitter = mix(0.16, 0.035, attraction);
-            jitter = minSide * mix(0.055, 0.012, attraction);
+            x = mix(x, point.x, attraction);
+            y = mix(y, point.y, attraction);
+            angle = mix(angle, point.angle, attraction);
+            angleJitter = mix(0.16, 0.03, attraction);
+            jitter = minSide * mix(0.055, 0.01, attraction);
           } else if (i < closureCount + impliedCount) {
             const localIndex = i - closureCount;
             const guide = spec.guides[0];
@@ -785,10 +840,29 @@
             jitter = minSide * mix(0.055, 0.018, proximity);
           }
 
+          if (mode === 'scatter' && i < spec.anchorCount - offpageCount) {
+            if (scatterBudget <= 0) continue;
+            scatterBudget -= 1;
+          }
+
+          if (mode === 'scatter' && rect) {
+            const u = (x - rect.x) / rect.a;
+            const v = (y - rect.y) / rect.b;
+            const d = Math.max(Math.abs(u), Math.abs(v));
+            const clearing = mix(1.08, 1.45, smootherStep(closure));
+            if (d < clearing) {
+              const factor = (clearing + rand(0.05, 0.3)) / Math.max(d, 0.05);
+              x = mix(x, rect.x + (x - rect.x) * factor, smootherStep(closure));
+              y = mix(y, rect.y + (y - rect.y) * factor, smootherStep(closure));
+            }
+          }
+
           const selectedScale =
             mode === 'implied'
               ? impliedScalePattern[modeIndex % impliedScalePattern.length]
-              : scalePattern[i % scalePattern.length];
+              : mode === 'closure'
+                ? closureScalePattern[modeIndex % closureScalePattern.length]
+                : scalePattern[i % scalePattern.length];
           let scaleFactor = mix(1, selectedScale, scaleVariety) * overallScale;
           if (mode === 'implied') {
             scaleFactor *= mix(1, 0.58, impliedForce);
@@ -811,7 +885,7 @@
             edge || mode === 'implied'
               ? 'wall'
               : mode === 'closure'
-                ? ['circle', 'square', 'circle', 'wall'][modeIndex % 4]
+                ? ['wall', 'square', 'wall', 'circle', 'wall', 'square'][modeIndex % 6]
                 : shapePattern[i % shapePattern.length];
           anchors.push({
             x,
@@ -823,7 +897,12 @@
             edgeDepth: offpageIndex >= 0 ? mix(0.16, 0.64, offpage) : 0,
             scale: edge ? scaleFactor * mix(1.02, 1.32, offpage) : scaleFactor,
             shape,
-            fill: mode === 'implied' ? impliedColors[modeIndex % impliedColors.length] : WALL_COLORS[i % WALL_COLORS.length],
+            fill:
+              mode === 'implied'
+                ? impliedColors[modeIndex % impliedColors.length]
+                : mode === 'closure'
+                  ? closureColors[modeIndex % closureColors.length]
+                  : WALL_COLORS[i % WALL_COLORS.length],
             mode,
             guideX: activeGuide ? activeGuide.x : null,
             guideY: activeGuide ? activeGuide.y : null,
@@ -1112,8 +1191,8 @@
         const overscan = clamp(height * 0.035, 18, 42);
         const span = height + overscan * 2;
         const gaps = Array.from({ length: count - 1 }, (_, index) => {
-          const pattern = [0.76, 1.08, 1.34, 0.86, 1.58, 0.8, 1.14, 0.94];
-          return pattern[index % pattern.length] * rand(0.88, 1.12);
+          const pattern = [0.42, 1.65, 0.7, 2.3, 0.5, 1.05, 2.9, 0.62, 1.35, 0.8, 1.9, 0.55];
+          return pattern[index % pattern.length] * rand(0.8, 1.25);
         });
         const gapTotal = gaps.reduce((sum, gap) => sum + gap, 0);
         const flowPhaseA = rand(0, TAU);
@@ -1130,7 +1209,7 @@
             phaseB: flowPhaseB - i * 0.13 + rand(-0.05, 0.05),
             waveA: flowWaveA * rand(0.94, 1.06),
             waveB: flowWaveB * rand(0.92, 1.08),
-            wobble: lineGap * rand(0.08, 0.18),
+            wobble: lineGap * rand(0.06, 0.3),
             release: rand(0.995, 0.998),
             weight: lineWeight(i),
             color: LINE_COLORS[i % LINE_COLORS.length],
@@ -1174,7 +1253,7 @@
       }
 
       function lineLaneOffset(baseY, lineGap) {
-        return clamp(lineGap * 0.42, 4.5, 8);
+        return clamp(lineGap * 0.5, 6, 14);
       }
 
       function relaxAndConstrain(points, baseY, lineIndex, lineGap, activeObstacles) {
@@ -1192,7 +1271,30 @@
           constrain(points, baseY, lineIndex, lineGap, activeObstacles);
         }
         constrain(points, baseY, lineIndex, lineGap, activeObstacles);
+        chamferConstraints(points, clearance, activeObstacles);
         softenFreeSegments(points, clearance, activeObstacles);
+      }
+
+      function chamferConstraints(points, clearance, activeObstacles) {
+        if (points.length < 2) return;
+        const maxStep = (points[1].x - points[0].x) * 2.2;
+        for (let pass = 0; pass < 2; pass++) {
+          for (let i = 1; i < points.length; i++) {
+            easeToward(points, i, i - 1, maxStep, clearance, activeObstacles);
+          }
+          for (let i = points.length - 2; i >= 0; i--) {
+            easeToward(points, i, i + 1, maxStep, clearance, activeObstacles);
+          }
+        }
+      }
+
+      function easeToward(points, i, from, maxStep, clearance, activeObstacles) {
+        const delta = points[i].y - points[from].y;
+        if (Math.abs(delta) <= maxStep) return;
+        const eased = points[from].y + Math.sign(delta) * maxStep;
+        if (pointIsClear(points[i].x, eased, clearance, activeObstacles)) {
+          points[i].y = eased;
+        }
       }
 
       function softenFreeSegments(points, clearance, activeObstacles) {

@@ -5,6 +5,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "001-drift",
       "title": "drift",
       "year": 2026,
+      "date": "2026-06-16",
+      "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "A field of slowly drifting points on a low-contrast ground. Generative, runs forever."
@@ -13,6 +15,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "002-all-wall",
       "title": "all-wall",
       "year": 2026,
+      "date": "2026-06-18",
+      "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "A patterned wall of falling bricks. One color pair and one high-contrast textile tile seed each run; staggered rows scroll downward while new faux-3D bricks tumble in from above, flatten, and join the wall. Click to reshuffle."
@@ -21,6 +25,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "003-unbreakable",
       "title": "unbreakable",
       "year": 2026,
+      "date": "2026-06-19",
+      "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "Breakout in reverse. An infallible paddle favors uncapped Hokusai-colored towers. Brick impacts fill adjacent cells while solid faces preserve true ricochets, and every real impact creeps the aligned lattice upward. If the ball becomes trapped in a tight upper pocket, it stops, blinks three times, blasts an escape hole through the wall, then falls back to the paddle and becomes the building ball again. No player, no losing. Click to rebuild."
@@ -29,6 +35,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "004-hunt-prey-paint",
       "title": "hunt prey paint",
       "year": 2026,
+      "date": "2026-06-24",
+      "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "An abstract ecosystem that paints itself in watercolour and cartographic linework, then wipes the painting clean forever. Over a pale NES-bright pixel terrain, blocky prey graze, grow into spiny square emblems that age toward white, and flee hunters with their own alertness and sprint speed. Spiny prey trundle toward richer plant patches and, when they die, burst into clean eraser blasts that wipe stains, foliage, food, and husks instead of fertilizing the ground. Compact black arcade hunters run prey down, fatten, and breed only by splitting in half. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats."
@@ -37,6 +45,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "005-only-invaders",
       "title": "Only Invaders",
       "year": 2026,
+      "date": "2026-06-24",
+      "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "Space Invaders after the invaders have vanished. Four defenders hold the top, right, bottom, and left edges, trading single shots, sudden volleys, and rare charged super bullets across an empty center. Every bullet is intercepted in midair; super bullets detonate in a white-screen shock that clears the field and resets the scores."
@@ -45,6 +55,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "006-only-centipede",
       "title": "Only Centipede",
       "year": 2026,
+      "date": "2026-06-25",
+      "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "A Centipede riff with small defenders at the top and bottom, one straight bullet each, and fast, hard-edged centipedes that enter from offscreen once the field is nearly cleared. Head shots remove the head and promote the next segment; body shots split the chain. Every hit segment becomes a three-shot mushroom that dents and deforms in the centipede's color."
@@ -53,6 +65,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "007-hydra",
       "title": "hydra",
       "year": 2026,
+      "date": "2026-06-25",
+      "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "Autonomous traditional Snake on an ink-dark Prussian field. Five contenders with random starting lengths and aggression values enter from offscreen to hunt one mouse. Eating grows a snake; consecutive catches by the same snake raise its growth multiplier, larger snakes move faster and become more aggressive, and any snake may box when another snake's available space is small relative to its own length. Touching the border, itself, or another snake kills one snake. Dead snakes remain as distressed bitmap brushstrokes, dry bristles, dark chips, and pale bone fragments in Growth Rings' Hokusai palette. Click to reseed."
@@ -61,6 +75,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "008-vectrex-asteroids",
       "title": "Vectrex Asteroids",
       "year": 2026,
+      "date": "2026-06-25",
+      "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "A black-and-white Vectrex-style Asteroids variant. The ship tries to park with visible retrograde burns, predicts asteroid paths, and fires tight two- or three-shot bursts one bullet at a time until a player takes over, thrusting mainly to dodge and keeping only three shots alive at once. Bullets split asteroids into deeper generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Heavier fragments accelerate slowly, drift together under stronger gravity, bump instead of passing through, settle before they glom, and weld into rough integrated asteroid outlines that animate from their joined pieces. Any asteroid can kill the ship on contact."
@@ -69,6 +85,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "009-mutual-command",
       "title": "Mutual Command",
       "year": 2026,
+      "date": "2026-07-15",
+      "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "A two-sided Missile Command riff. A north row and south row of pixel towns and batteries launch paired attacks while their defenses try to erase incoming missiles at roughly the same rate. Each side starts at 1000 points and loses score as cities, batteries, and ground are destroyed; when a side reaches zero, the ruined row is cleared and a fresh set of towns slides in from the side."
@@ -77,6 +95,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "010-obstacles-and-how-to-avoid-them",
       "title": "Obstacles and How to Avoid Them",
       "year": 2026,
+      "date": "2026-07-15",
+      "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "A full-window drawing of borderless Hokusai-toned walls, squares, and circles composed by adjustable gestalt forces. Open side safe zones, extreme scale, and a dominant broken continuation shape the obstacles while adjustable fine lines flow through tight passages and slowly fan out again."
@@ -85,6 +105,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "011-switch-stack",
       "title": "Switch Stack",
       "year": 2026,
+      "date": "2026-07-01",
+      "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "A pure black-and-white scroll stack. Each row holds one or two boxes; as a box reaches the viewport midpoint, its binary dither has finished clearing from black to white and its block-letter state flips from ON to OFF."
@@ -93,6 +115,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "012-happiness-hunter",
       "title": "Happiness Hunter",
       "year": 2026,
+      "date": "2026-07-15",
+      "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "One yellow arcade car hunts for the fastest lane through compact gray traffic, buses, and semi trucks, signaling, speeding up, surging, or backing off to make openings, but never exits. Other gray vehicles have wider speed personalities, from aggressive squeezers to conservative gap-waiters, and try to pass too. Slow traffic packs tighter while fast traffic leaves more room. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray vehicles can take diagonal ramps offscreen and leave the highway. Every vehicle claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car scores +1 for every pass, loses 1 when most vehicles pass it, and loses 5 when a semi passes it."
@@ -101,6 +125,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "013-paddle",
       "title": "Paddle",
       "year": 2026,
+      "date": "2026-07-17",
+      "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "One-player Pong folded into a cylinder. A single paddle stands where the net used to be; the ball leaves one edge and returns from the other, so every save comes back around and the only way to be rid of the ball is to miss. The two counters tally edge crossings, left and right, and exactly one crossing happens per lap — a catch sends the ball back out the edge behind it, a miss lets it through to the far one, so the paddle decides which side a point lands on but never whether one lands. It catches eight of every ten, striking off-centre on purpose to keep the rally alive, and each miss burns a permanent bar into the centre line, which slowly becomes a histogram of where this paddle fails."
@@ -109,6 +135,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "014-only-ghosts",
       "title": "Only Ghosts",
       "year": 2026,
+      "date": "2026-07-22",
+      "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
       "description": "A two-body Pac-Man inversion on a fixed 17-by-11 course. When Pac sees a slow, floating Ghost as a threat, Pac turns and runs; its yellow silhouette compresses while a Ghost body and eyes emerge in motion. The pursuer never changes. The encounter leaves only ghosts."
@@ -117,6 +145,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "015-growth-rings",
       "title": "Growth Rings",
       "year": 2026,
+      "date": "2026-07-22",
+      "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.png",
       "description": "A trunk cross-section that grows toward 200 years one ring at a time. Latitude, solar angle, wind exposure, temperature, rainfall, and ground slope push the cambium out of symmetry; heavy rain years bloom into wider uneven rings while severity-scaled fire and pest incidents suppress 1-5 years of growth without cutting into older wood."
@@ -125,7 +155,10 @@ window.HYPERGAL_MANIFEST = {
       "slug": "016-up-mario",
       "title": "Up Mario",
       "year": 2026,
+      "date": "2026-07-24",
+      "category": "games",
       "type": "interactive",
+      "wip": true,
       "thumbnail": "thumbnail.svg",
       "description": "A one-bit vertical platformer inside an endless masonry keep. Mario climbs stone ledges through arched rooms and black stippled chambers, hits question mark boxes from below, uses iron ladders and stairs, and sometimes drops down a ladder or fireman's pole to revisit what he missed."
     },
@@ -133,6 +166,8 @@ window.HYPERGAL_MANIFEST = {
       "slug": "017-knot-work",
       "title": "Knot Work",
       "year": 2026,
+      "date": "2026-07-25",
+      "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.svg",
       "description": "An edge-to-edge field of loose Celtic interlace printed in dark brown on worn paper. Continuous rounded cords pass through a Truchet-like knot grid, alternating over and under at crossings and running beyond every side of the browser. Click or press Enter/Space to reseed."

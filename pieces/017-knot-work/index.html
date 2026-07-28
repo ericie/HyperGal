@@ -41,7 +41,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Knot Work: an edge-to-edge field of continuous dark brown Celtic knot lines on aged paper, with long traced strands and alternating over-under crossings."
+      aria-label="Knot Work: a woven panel of bold brown bands with cream pinstripes, routed in straight runs and rounded elbows with alternating over-under crossings and nested hairpin turns at the borders, after Alexander Girard."
     ></canvas>
 
     <script>
@@ -52,14 +52,24 @@
         const TAU = Math.PI * 2;
         const EDGES = ['n', 'e', 's', 'w'];
         const OPPOSITE = { n: 's', e: 'w', s: 'n', w: 'e' };
+        const INWARD = {
+          n: { x: 0, y: 1 },
+          s: { x: 0, y: -1 },
+          e: { x: -1, y: 0 },
+          w: { x: 1, y: 0 },
+        };
+        const NORMAL = {
+          top: { x: 0, y: -1 },
+          bottom: { x: 0, y: 1 },
+          left: { x: -1, y: 0 },
+          right: { x: 1, y: 0 },
+        };
+        const KAPPA = 0.5522847;
         const COLORS = {
           paper: '#e9ddc6',
           paperHot: '#f8f0df',
           paperCool: '#d4c3a5',
-          ink: '#302010',
-          inkSoft: 'rgba(48, 32, 16, 0.28)',
-          inkGhost: 'rgba(98, 54, 28, 0.14)',
-          warmLine: 'rgba(153, 80, 44, 0.15)',
+          ink: '#33260f',
           fiber: 'rgba(71, 49, 28, 0.13)',
           paleFiber: 'rgba(255, 251, 238, 0.24)',
         };
@@ -109,8 +119,33 @@
           return Math.max(min, Math.min(max, value));
         }
 
+        function clampEven(value, min, max) {
+          let v = Math.floor(value);
+          v -= v % 2;
+          return clamp(v, min, max);
+        }
+
         function rand(random, min, max) {
           return min + random() * (max - min);
+        }
+
+        function add(a, b) {
+          return { x: a.x + b.x, y: a.y + b.y };
+        }
+
+        function mul(v, k) {
+          return { x: v.x * k, y: v.y * k };
+        }
+
+        function unitVec(a, b) {
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const len = Math.hypot(dx, dy) || 1;
+          return { x: dx / len, y: dy / len };
+        }
+
+        function bez(c1, c2, p) {
+          return { op: 'C', c1x: c1.x, c1y: c1.y, c2x: c2.x, c2y: c2.y, x: p.x, y: p.y };
         }
 
         function resize() {
@@ -145,104 +180,197 @@
         }
 
         function makeScene() {
-          const random = randomFor(`${Math.round(width / 20)}x${Math.round(height / 20)}`);
+          const random = randomFor(`scene:${Math.round(width)}x${Math.round(height)}`);
           const minSide = Math.min(width, height);
-          const cell = clamp(minSide * (width < 620 ? 0.29 : 0.145), 108, 142);
-          const ribbon = clamp(cell * 0.22, 21, 29);
-          const inner = Math.max(9, ribbon * 0.45);
-          const margin = cell * 2.2;
-          const left = -margin;
-          const top = -margin;
-          const cols = Math.ceil((width + margin * 2) / cell);
-          const rows = Math.ceil((height + margin * 2) / cell);
+          const s = clamp(minSide * (width < 620 ? 0.115 : 0.072), 40, 86);
+          const lane = s * 0.85;
+          const band = s * 0.52;
+          const stripe = band * 0.3;
+          const gap = s * 0.1;
+          const cols = clampEven(Math.round((width * 0.94) / s) - 5, 6, 36);
+          const rows = clampEven(Math.round((height * 0.94) / s) - 5, 6, 36);
           const salt = Math.floor(rand(random, 0, 900));
-          const tiles = makeTiles(rows, cols, salt);
-          const warp = makeWarp(random, cell);
-          const traced = traceTiles(tiles, rows, cols, cell, left, top, salt);
-          return { cell, ribbon, inner, warp, strands: traced.strands, crossings: traced.crossings };
+          const hmirror = random() < 0.5;
+
+          const tiles = makeTiles(cols, rows, salt, hmirror);
+          suppressRings(tiles, cols, rows, salt, hmirror);
+
+          const top = symMatching(cols, random, true);
+          const bottom = hmirror ? top : symMatching(cols, random, true);
+          const left = hmirror ? symMatching(rows, random, false) : plainMatching(rows, random);
+          const right = left;
+
+          const geo = {
+            s,
+            lane,
+            band,
+            gap,
+            cols,
+            rows,
+            sides: { top, bottom, left, right },
+            crossings: [],
+          };
+
+          const loops = traceLoops(tiles, geo);
+
+          for (let row = 0; row < rows; row += 1) {
+            for (let col = 0; col < cols; col += 1) {
+              if (tiles[row][col] !== 'cross') continue;
+              const cx = col * s;
+              const cy = row * s;
+              const horizontal = (row + col) % 2 === 0;
+              const over = horizontal
+                ? [
+                    { op: 'M', x: cx - s / 2, y: cy },
+                    { op: 'L', x: cx + s / 2, y: cy },
+                  ]
+                : [
+                    { op: 'M', x: cx, y: cy - s / 2 },
+                    { op: 'L', x: cx, y: cy + s / 2 },
+                  ];
+              geo.crossings.push({ over, blankW: band + gap * 2 });
+            }
+          }
+
+          const minX = -s / 2 - left.maxLevel * lane - band;
+          const maxX = (cols - 1) * s + s / 2 + right.maxLevel * lane + band;
+          const minY = -s / 2 - top.maxLevel * lane - band;
+          const maxY = (rows - 1) * s + s / 2 + bottom.maxLevel * lane + band;
+          const outer = clamp(minSide * 0.045, 14, 54);
+          const f = Math.min(
+            1.3,
+            (width - outer * 2) / (maxX - minX),
+            (height - outer * 2) / (maxY - minY)
+          );
+
+          return {
+            s,
+            band,
+            stripe,
+            gap,
+            loops,
+            crossings: geo.crossings,
+            warp: makeWarp(random, s),
+            fit: { f, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 },
+          };
         }
 
-        function makeTiles(rows, cols, salt) {
+        function swapTile(type) {
+          if (type === 'a') return 'b';
+          if (type === 'b') return 'a';
+          return type;
+        }
+
+        function makeTiles(cols, rows, salt, hmirror) {
           const tiles = [];
+          const halfC = cols / 2;
           for (let row = 0; row < rows; row += 1) {
-            const line = [];
-            for (let col = 0; col < cols; col += 1) {
-              const n = noise(col, row, salt);
-              let type = n < 0.34 ? 'cross' : n < 0.67 ? 'a' : 'b';
-              if ((row * 3 + col * 5 + salt) % 13 === 0) type = 'cross';
-              line.push(type);
+            tiles.push([]);
+            if (hmirror && row >= rows / 2) {
+              for (let col = 0; col < cols; col += 1) {
+                tiles[row][col] = swapTile(tiles[rows - 1 - row][col]);
+              }
+              continue;
             }
-            tiles.push(line);
+            for (let col = 0; col < cols; col += 1) {
+              if (col >= halfC) {
+                tiles[row][col] = swapTile(tiles[row][cols - 1 - col]);
+                continue;
+              }
+              const coarse = noise(Math.floor(col / 3) + 37, Math.floor(row / 3) + 91, salt);
+              const crossP = 0.46 + coarse * 0.26;
+              const n = noise(col, row, salt);
+              tiles[row][col] =
+                n < crossP ? 'cross' : noise(col + 513, row + 257, salt) < 0.5 ? 'a' : 'b';
+            }
           }
           return tiles;
         }
 
-        function traceTiles(tiles, rows, cols, cell, left, top, salt) {
-          const visited = new Set();
-          const strands = [];
-          const crossings = [];
-
-          for (let row = 0; row < rows; row += 1) {
-            for (let col = 0; col < cols; col += 1) {
-              for (const edge of EDGES) {
-                const start = halfKey(row, col, edge);
-                if (visited.has(start)) continue;
-                const path = traceFrom(row, col, edge, tiles, rows, cols, cell, left, top, visited);
-                if (path.commands.length > 1) strands.push(path.commands);
-              }
-
-              if (tiles[row][col] === 'cross') {
-                const horizontalOver = (row + col + salt) % 2 === 0;
-                const h = connectorPath(row, col, 'w', 'e', tiles[row][col], cell, left, top, 0.28);
-                const v = connectorPath(row, col, 'n', 's', tiles[row][col], cell, left, top, 0.28);
-                crossings.push({
-                  under: horizontalOver ? v : h,
-                  over: horizontalOver ? h : v,
-                });
+        function suppressRings(tiles, cols, rows, salt, hmirror) {
+          for (let row = 0; row < rows - 1; row += 1) {
+            for (let col = 0; col < cols - 1; col += 1) {
+              const ring =
+                tiles[row][col] === 'a' &&
+                tiles[row][col + 1] === 'b' &&
+                tiles[row + 1][col] === 'b' &&
+                tiles[row + 1][col + 1] === 'a';
+              if (!ring) continue;
+              if (noise(col + 911, row + 477, salt) < 0.25) continue;
+              tiles[row][col] = 'cross';
+              tiles[row][cols - 1 - col] = 'cross';
+              if (hmirror) {
+                tiles[rows - 1 - row][col] = 'cross';
+                tiles[rows - 1 - row][cols - 1 - col] = 'cross';
               }
             }
           }
-
-          return { strands, crossings };
         }
 
-        function traceFrom(row, col, edge, tiles, rows, cols, cell, left, top, visited) {
-          const commands = [];
-          let current = { row, col, edge };
-          let first = true;
+        function nonCross(lo, hi, random, out) {
+          if (lo >= hi) return;
+          const count = (hi - lo + 1) / 2;
+          const pick = random() < 0.45 ? 0 : Math.floor(random() * count);
+          const j = lo + 1 + pick * 2;
+          out.push([lo, j]);
+          nonCross(lo + 1, j - 1, random, out);
+          nonCross(j + 1, hi, random, out);
+        }
 
-          for (let guard = 0; guard < rows * cols * 4; guard += 1) {
-            const id = halfKey(current.row, current.col, current.edge);
-            if (visited.has(id)) break;
-            visited.add(id);
-
-            const type = tiles[current.row]?.[current.col];
-            if (!type) break;
-            const nextEdge = pairedEdge(type, current.edge);
-            visited.add(halfKey(current.row, current.col, nextEdge));
-
-            const segment = connectorPath(current.row, current.col, current.edge, nextEdge, type, cell, left, top, 1);
-            if (first) {
-              commands.push(segment[0]);
-              first = false;
+        function finishMatching(n, pairsList, pretzelPair) {
+          pairsList.sort((p, q) => p.b - p.a - (q.b - q.a));
+          for (const p of pairsList) {
+            let inner = 0;
+            for (const q of pairsList) {
+              if (q !== p && q.a > p.a && q.b < p.b) inner = Math.max(inner, q.h);
             }
-            commands.push(segment[1]);
-
-            const neighbor = neighborHalf(current.row, current.col, nextEdge, rows, cols);
-            if (!neighbor) break;
-            current = neighbor;
+            p.h = p.cost + inner;
           }
+          const pair = new Array(n);
+          const level = new Array(n);
+          let maxLevel = 1;
+          for (const p of pairsList) {
+            pair[p.a] = p.b;
+            pair[p.b] = p.a;
+            level[p.a] = p.h;
+            level[p.b] = p.h;
+            maxLevel = Math.max(maxLevel, p.h);
+          }
+          return { pair, level, maxLevel, pretzel: pretzelPair };
+        }
 
-          return { commands };
+        function symMatching(n, random, allowPretzel) {
+          const half = n / 2;
+          let k = half % 2;
+          if (random() < 0.5) k += 2;
+          k = Math.min(k, half);
+          const pairsList = [];
+          let pretzelPair = null;
+          for (let t = 0; t < k; t += 1) {
+            pairsList.push({ a: half - 1 - t, b: half + t, cost: 1, h: 0 });
+          }
+          if (allowPretzel && k >= 1 && random() < 0.7) {
+            pairsList[0].cost = 3;
+            pretzelPair = [half - 1, half];
+          }
+          const sub = [];
+          nonCross(0, half - k - 1, random, sub);
+          for (const [a, b] of sub) {
+            pairsList.push({ a, b, cost: 1, h: 0 });
+            pairsList.push({ a: n - 1 - b, b: n - 1 - a, cost: 1, h: 0 });
+          }
+          return finishMatching(n, pairsList, pretzelPair);
+        }
+
+        function plainMatching(n, random) {
+          const sub = [];
+          nonCross(0, n - 1, random, sub);
+          const pairsList = sub.map(([a, b]) => ({ a, b, cost: 1, h: 0 }));
+          return finishMatching(n, pairsList, null);
         }
 
         function pairedEdge(type, edge) {
-          if (type === 'cross') {
-            if (edge === 'w') return 'e';
-            if (edge === 'e') return 'w';
-            if (edge === 'n') return 's';
-            return 'n';
-          }
+          if (type === 'cross') return OPPOSITE[edge];
           if (type === 'a') {
             if (edge === 'w') return 'n';
             if (edge === 'n') return 'w';
@@ -264,69 +392,223 @@
           return { row, col, edge: OPPOSITE[edge] };
         }
 
-        function connectorPath(row, col, from, to, type, cell, left, top, span) {
-          const x = left + col * cell;
-          const y = top + row * cell;
-          const p0 = edgePoint(x, y, cell, from, span, false);
-          const p3 = edgePoint(x, y, cell, to, span, true);
-          const c = { x: x + cell * 0.5, y: y + cell * 0.5 };
-          let c1;
-          let c2;
+        function edgeMid(row, col, edge, s) {
+          const cx = col * s;
+          const cy = row * s;
+          if (edge === 'n') return { x: cx, y: cy - s / 2 };
+          if (edge === 'e') return { x: cx + s / 2, y: cy };
+          if (edge === 's') return { x: cx, y: cy + s / 2 };
+          return { x: cx - s / 2, y: cy };
+        }
 
-          if (type === 'cross') {
-            const bow = cell * 0.035 * (from === 'n' || from === 's' ? 1 : -1);
-            c1 = toward(p0, p3, 0.36, bow);
-            c2 = toward(p3, p0, 0.36, -bow);
-          } else {
-            c1 = pullTowardCenter(p0, c, cell * 0.74);
-            c2 = pullTowardCenter(p3, c, cell * 0.74);
-          }
-
+        function cellCmds(type, row, col, edgeFrom, edgeTo, s) {
+          const to = edgeMid(row, col, edgeTo, s);
+          if (type === 'cross') return [{ op: 'L', x: to.x, y: to.y }];
+          const from = edgeMid(row, col, edgeFrom, s);
+          const dIn = INWARD[edgeFrom];
+          const dOut = INWARD[edgeTo];
+          const k = KAPPA * s * 0.5;
           return [
-            { op: 'M', x: p0.x, y: p0.y },
-            { op: 'C', c1x: c1.x, c1y: c1.y, c2x: c2.x, c2y: c2.y, x: p3.x, y: p3.y },
+            bez(
+              { x: from.x + dIn.x * k, y: from.y + dIn.y * k },
+              { x: to.x + dOut.x * k, y: to.y + dOut.y * k },
+              to
+            ),
           ];
         }
 
-        function edgePoint(x, y, cell, edge, span, end) {
-          const inset = (1 - span) * cell * 0.5;
-          if (edge === 'n') return { x: x + cell * 0.5, y: y + (end ? inset : 0) };
-          if (edge === 'e') return { x: x + cell - (end ? inset : 0), y: y + cell * 0.5 };
-          if (edge === 's') return { x: x + cell * 0.5, y: y + cell - (end ? inset : 0) };
-          return { x: x + (end ? inset : 0), y: y + cell * 0.5 };
+        function borderPoint(geo, side, i) {
+          const { s, cols, rows } = geo;
+          if (side === 'top') return { x: i * s, y: -s / 2 };
+          if (side === 'bottom') return { x: i * s, y: (rows - 1) * s + s / 2 };
+          if (side === 'left') return { x: -s / 2, y: i * s };
+          return { x: (cols - 1) * s + s / 2, y: i * s };
         }
 
-        function pullTowardCenter(point, center, amount) {
-          const dx = center.x - point.x;
-          const dy = center.y - point.y;
-          const len = Math.hypot(dx, dy) || 1;
-          return { x: point.x + (dx / len) * amount, y: point.y + (dy / len) * amount };
+        function arcCmds(geo, side, p1, p2, level) {
+          const N = NORMAL[side];
+          const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+          const T = unitVec(p1, p2);
+          const r = Math.min(geo.s * 0.5, dist / 2);
+          const L = level * geo.lane;
+          const k = KAPPA * r;
+          const a = add(p1, mul(N, L - r));
+          const b = add(add(p1, mul(N, L)), mul(T, r));
+          const c = add(add(p2, mul(N, L)), mul(T, -r));
+          const d = add(p2, mul(N, L - r));
+          const cmds = [{ op: 'L', x: a.x, y: a.y }, bez(add(a, mul(N, k)), add(b, mul(T, -k)), b)];
+          if (dist - r * 2 > 0.5) cmds.push({ op: 'L', x: c.x, y: c.y });
+          cmds.push(bez(add(c, mul(T, k)), add(d, mul(N, k)), d));
+          cmds.push({ op: 'L', x: p2.x, y: p2.y });
+          return cmds;
         }
 
-        function toward(a, b, t, bow) {
-          const x = a.x + (b.x - a.x) * t;
-          const y = a.y + (b.y - a.y) * t;
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const len = Math.hypot(dx, dy) || 1;
-          return { x: x + (-dy / len) * bow, y: y + (dx / len) * bow };
+        function arcSweepCmds(O, r, a0, sweep) {
+          const n = Math.max(1, Math.ceil(Math.abs(sweep) / (Math.PI / 2)));
+          const step = sweep / n;
+          const k = (4 / 3) * Math.tan(step / 4);
+          const cmds = [];
+          for (let i = 0; i < n; i += 1) {
+            const f0 = a0 + step * i;
+            const f1 = f0 + step;
+            const p0 = { x: O.x + r * Math.cos(f0), y: O.y + r * Math.sin(f0) };
+            const p1 = { x: O.x + r * Math.cos(f1), y: O.y + r * Math.sin(f1) };
+            cmds.push(
+              bez(
+                { x: p0.x - k * r * Math.sin(f0), y: p0.y + k * r * Math.cos(f0) },
+                { x: p1.x + k * r * Math.sin(f1), y: p1.y - k * r * Math.cos(f1) },
+                p1
+              )
+            );
+          }
+          return cmds;
         }
 
-        function makeWarp(random, cell) {
-          return {
-            amp: cell * rand(random, 0.04, 0.075),
-            ax: rand(random, 0.006, 0.011),
-            ay: rand(random, 0.006, 0.011),
-            bx: rand(random, 0.003, 0.007),
-            by: rand(random, 0.003, 0.007),
-            p1: rand(random, 0, TAU),
-            p2: rand(random, 0, TAU),
-            p3: rand(random, 0, TAU),
-          };
+        function tangentPoint(O, r, P, toward) {
+          const d = Math.hypot(P.x - O.x, P.y - O.y);
+          const th = Math.atan2(P.y - O.y, P.x - O.x);
+          const beta = Math.acos(clamp(r / d, -1, 1));
+          let best = null;
+          let bestDot = -Infinity;
+          for (const phi of [th + beta, th - beta]) {
+            const T = { x: O.x + r * Math.cos(phi), y: O.y + r * Math.sin(phi) };
+            const dot = (T.x - P.x) * toward.x + (T.y - P.y) * toward.y;
+            if (dot > bestDot) {
+              bestDot = dot;
+              best = { point: T, angle: phi };
+            }
+          }
+          return best;
         }
 
-        function halfKey(row, col, edge) {
+        function lineIntersect(a1, a2, b1, b2) {
+          const d1 = { x: a2.x - a1.x, y: a2.y - a1.y };
+          const d2 = { x: b2.x - b1.x, y: b2.y - b1.y };
+          const den = d1.x * d2.y - d1.y * d2.x;
+          if (Math.abs(den) < 1e-9) return { x: (a2.x + b2.x) / 2, y: (a2.y + b2.y) / 2 };
+          const t = ((b1.x - a1.x) * d2.y - (b1.y - a1.y) * d2.x) / den;
+          return { x: a1.x + d1.x * t, y: a1.y + d1.y * t };
+        }
+
+        function pretzelCmds(geo, side, A, B) {
+          const N = NORMAL[side];
+          const s = geo.s;
+          const mid = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
+          const O = add(mid, mul(N, s * 1.6));
+          const rc = s * 0.42;
+          const stub = s * 0.16;
+          const A2 = add(A, mul(N, stub));
+          const B2 = add(B, mul(N, stub));
+          const towardB = unitVec(A2, B2);
+          const tA = tangentPoint(O, rc, A2, towardB);
+          const tB = tangentPoint(O, rc, B2, mul(towardB, -1));
+          const a0 = tA.angle;
+          const a1 = tB.angle;
+          const travel = unitVec(A2, tA.point);
+          const sign =
+            travel.x * -Math.sin(a0) + travel.y * Math.cos(a0) > 0 ? 1 : -1;
+          let sweep;
+          if (sign > 0) sweep = ((a1 - a0) % TAU + TAU) % TAU;
+          else sweep = -((((a0 - a1) % TAU) + TAU) % TAU);
+          const cmds = [
+            { op: 'L', x: A2.x, y: A2.y },
+            { op: 'L', x: tA.point.x, y: tA.point.y },
+          ];
+          cmds.push(...arcSweepCmds(O, rc, a0, sweep));
+          cmds.push({ op: 'L', x: B2.x, y: B2.y });
+          cmds.push({ op: 'L', x: B.x, y: B.y });
+
+          const X = lineIntersect(A2, tA.point, B2, tB.point);
+          const u = unitVec(tB.point, B2);
+          const hl = s * 0.45;
+          geo.crossings.push({
+            over: [
+              { op: 'M', x: X.x - u.x * hl, y: X.y - u.y * hl },
+              { op: 'L', x: X.x + u.x * hl, y: X.y + u.y * hl },
+            ],
+            blankW: geo.band + geo.gap * 1.2,
+          });
+          return cmds;
+        }
+
+        function borderJump(geo, row, col, edge) {
+          let side;
+          let idx;
+          if (edge === 'n') {
+            side = 'top';
+            idx = col;
+          } else if (edge === 's') {
+            side = 'bottom';
+            idx = col;
+          } else if (edge === 'w') {
+            side = 'left';
+            idx = row;
+          } else {
+            side = 'right';
+            idx = row;
+          }
+          const m = geo.sides[side];
+          const j = m.pair[idx];
+          const p1 = borderPoint(geo, side, idx);
+          const p2 = borderPoint(geo, side, j);
+          const isPretzel = m.pretzel && (idx === m.pretzel[0] || idx === m.pretzel[1]);
+          const cmds = isPretzel
+            ? pretzelCmds(geo, side, p1, p2)
+            : arcCmds(geo, side, p1, p2, m.level[idx]);
+          let next;
+          if (side === 'top') next = { row: 0, col: j, edge: 'n' };
+          else if (side === 'bottom') next = { row: geo.rows - 1, col: j, edge: 's' };
+          else if (side === 'left') next = { row: j, col: 0, edge: 'w' };
+          else next = { row: j, col: geo.cols - 1, edge: 'e' };
+          return { cmds, next };
+        }
+
+        function hk(row, col, edge) {
           return `${row}:${col}:${edge}`;
+        }
+
+        function traceLoops(tiles, geo) {
+          const { rows, cols, s } = geo;
+          const visited = new Set();
+          const loops = [];
+
+          for (let row = 0; row < rows; row += 1) {
+            for (let col = 0; col < cols; col += 1) {
+              for (const edge of EDGES) {
+                if (visited.has(hk(row, col, edge))) continue;
+                const cmds = [];
+                let cur = { row, col, edge };
+                let first = true;
+                for (let guard = 0; guard < rows * cols * 8; guard += 1) {
+                  const id = hk(cur.row, cur.col, cur.edge);
+                  if (visited.has(id)) break;
+                  visited.add(id);
+                  const type = tiles[cur.row][cur.col];
+                  const out = pairedEdge(type, cur.edge);
+                  visited.add(hk(cur.row, cur.col, out));
+                  if (first) {
+                    const p0 = edgeMid(cur.row, cur.col, cur.edge, s);
+                    cmds.push({ op: 'M', x: p0.x, y: p0.y });
+                    first = false;
+                  }
+                  cmds.push(...cellCmds(type, cur.row, cur.col, cur.edge, out, s));
+                  const nb = neighborHalf(cur.row, cur.col, out, rows, cols);
+                  if (nb) {
+                    cur = nb;
+                    continue;
+                  }
+                  const jump = borderJump(geo, cur.row, cur.col, out);
+                  cmds.push(...jump.cmds);
+                  cur = jump.next;
+                }
+                if (cmds.length > 2) {
+                  cmds.push({ op: 'Z' });
+                  loops.push(cmds);
+                }
+              }
+            }
+          }
+          return loops;
         }
 
         function noise(col, row, salt) {
@@ -335,27 +617,54 @@
           return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
         }
 
+        function makeWarp(random, s) {
+          return {
+            amp: s * 0.018,
+            ax: rand(random, 0.003, 0.006),
+            ay: rand(random, 0.003, 0.006),
+            bx: rand(random, 0.0015, 0.004),
+            by: rand(random, 0.0015, 0.004),
+            p1: rand(random, 0, TAU),
+            p2: rand(random, 0, TAU),
+            p3: rand(random, 0, TAU),
+          };
+        }
+
         function render() {
           drawPaper();
-          for (const path of scene.strands) strokeCommands(path, scene.ribbon + 6, COLORS.inkGhost, 2, 2.5);
-          for (const path of scene.strands) strokeRibbon(path);
-          for (const crossing of scene.crossings) drawCrossing(crossing);
           drawPaperWear();
+          ctx.save();
+          ctx.translate(width / 2, height / 2);
+          ctx.scale(scene.fit.f, scene.fit.f);
+          ctx.translate(-scene.fit.cx, -scene.fit.cy);
+          for (const loop of scene.loops) strokeRibbon(loop, 'round');
+          for (const crossing of scene.crossings) drawCrossing(crossing);
+          ctx.restore();
+          drawGlaze();
+        }
+
+        function strokeRibbon(commands, cap) {
+          strokeCommands(commands, scene.band, COLORS.ink, cap);
+          strokeCommands(commands, scene.stripe, COLORS.paper, cap);
+        }
+
+        function drawCrossing(crossing) {
+          const [m, l] = crossing.over;
+          const u = unitVec(m, l);
+          const eps = 1.4 / scene.fit.f;
+          const seg = (grow) => [
+            { op: 'M', x: m.x - u.x * grow, y: m.y - u.y * grow },
+            { op: 'L', x: l.x + u.x * grow, y: l.y + u.y * grow },
+          ];
+          strokeCommands(seg(-eps), crossing.blankW, COLORS.paper, 'butt');
+          strokeCommands(seg(eps), scene.band, COLORS.ink, 'butt');
+          strokeCommands(seg(eps * 2.5), scene.stripe, COLORS.paper, 'butt');
         }
 
         function drawPaper() {
           const random = randomFor(`paper:${Math.round(width / 40)}:${Math.round(height / 40)}`);
           ctx.fillStyle = COLORS.paper;
           ctx.fillRect(0, 0, width, height);
-
-          const wash = ctx.createLinearGradient(0, 0, width, height);
-          wash.addColorStop(0, COLORS.paperHot);
-          wash.addColorStop(0.56, 'rgba(233, 221, 198, 0)');
-          wash.addColorStop(1, COLORS.paperCool);
-          ctx.globalAlpha = 0.27;
-          ctx.fillStyle = wash;
-          ctx.fillRect(0, 0, width, height);
-          ctx.globalAlpha = 1;
 
           const fibers = Math.ceil((width * height) / 2850);
           for (let i = 0; i < fibers; i += 1) {
@@ -372,16 +681,15 @@
           }
         }
 
-        function strokeRibbon(commands) {
-          strokeCommands(commands, scene.ribbon + 1.2, COLORS.inkSoft);
-          strokeCommands(commands, scene.ribbon, COLORS.ink);
-          strokeCommands(commands, scene.inner, COLORS.paper);
-          strokeCommands(commands, Math.max(1.1, scene.inner * 0.13), COLORS.warmLine);
-        }
-
-        function drawCrossing(crossing) {
-          strokeCommands(crossing.under, scene.ribbon + 1, COLORS.paper, 0, 0, 'butt');
-          strokeRibbon(crossing.over);
+        function drawGlaze() {
+          const wash = ctx.createLinearGradient(0, 0, width, height);
+          wash.addColorStop(0, COLORS.paperHot);
+          wash.addColorStop(0.56, 'rgba(233, 221, 198, 0)');
+          wash.addColorStop(1, COLORS.paperCool);
+          ctx.globalAlpha = 0.14;
+          ctx.fillStyle = wash;
+          ctx.fillRect(0, 0, width, height);
+          ctx.globalAlpha = 1;
         }
 
         function drawPaperWear() {
@@ -420,21 +728,25 @@
           ctx.globalAlpha = 1;
         }
 
-        function strokeCommands(commands, lineWidth, style, offsetX = 0, offsetY = 0, cap = 'round') {
+        function strokeCommands(commands, lineWidth, style, cap = 'round') {
           if (commands.length === 0) return;
           ctx.save();
-          ctx.translate(offsetX, offsetY);
           ctx.lineCap = cap;
           ctx.beginPath();
           for (const cmd of commands) {
             if (cmd.op === 'M') {
               const p = warpPoint(cmd.x, cmd.y);
               ctx.moveTo(p.x, p.y);
+            } else if (cmd.op === 'L') {
+              const p = warpPoint(cmd.x, cmd.y);
+              ctx.lineTo(p.x, p.y);
             } else if (cmd.op === 'C') {
               const c1 = warpPoint(cmd.c1x, cmd.c1y);
               const c2 = warpPoint(cmd.c2x, cmd.c2y);
               const p = warpPoint(cmd.x, cmd.y);
               ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, p.x, p.y);
+            } else if (cmd.op === 'Z') {
+              ctx.closePath();
             }
           }
           ctx.lineWidth = lineWidth;

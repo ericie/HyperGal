@@ -1,6 +1,8 @@
 {
   "title": "drift",
   "year": 2026,
+  "date": "2026-06-16",
+  "category": "generative",
   "type": "interactive",
   "thumbnail": "thumbnail.svg",
   "description": "A field of slowly drifting points on a low-contrast ground. Generative, runs forever."

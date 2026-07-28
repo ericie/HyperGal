@@ -1,7 +1,10 @@
 {
   "title": "Up Mario",
   "year": 2026,
+  "date": "2026-07-24",
+  "category": "games",
   "type": "interactive",
+  "wip": true,
   "thumbnail": "thumbnail.svg",
   "description": "A one-bit vertical platformer inside an endless masonry keep. Mario climbs stone ledges through arched rooms and black stippled chambers, hits question mark boxes from below, uses iron ladders and stairs, and sometimes drops down a ladder or fireman's pole to revisit what he missed."
 }

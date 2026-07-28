@@ -56,6 +56,7 @@
       const TAU = Math.PI * 2;
       const TARGET_AGE = 200;
       const SAMPLE_COUNT = 320;
+      const YOUNG_OUTLINE_POINTS = 14;
       const DEFAULT_RING_SECONDS = 0.22;
       const RING_TONES = [-0.24, -0.16, -0.08, 0, 0.1, 0.2, 0.3];
       const DAMAGE_KINDS = ['fire', 'pest'];
@@ -333,6 +334,8 @@
         const grainPhase = random() * TAU;
         const rainPhase = random() * TAU;
         const cambiumMemory = new Array(SAMPLE_COUNT).fill(0);
+        const deformationMemory = new Array(SAMPLE_COUNT).fill(0);
+        const regionalMemory = new Array(SAMPLE_COUNT).fill(0);
         let climateMemory = random() * 0.4 - 0.2;
         let rainfallMemory = random() * 0.7 - 0.35;
         let lastColorIndex = -1;
@@ -341,13 +344,13 @@
 
         for (let year = 1; year <= TARGET_AGE; year++) {
           climateMemory = climateMemory * 0.68 + (random() * 2 - 1) * 0.42;
-          rainfallMemory = rainfallMemory * 0.5 + (random() * 2 - 1) * 0.72;
+          rainfallMemory = rainfallMemory * 0.46 + (random() * 2 - 1) * 0.88;
           const slowCycle = Math.sin(year * 0.071 + forces.temperaturePhase) * 0.56;
           const fastCycle = Math.sin(year * 0.39 + forces.temperaturePhase * 1.7) * 0.18;
-          const rainCycle = Math.sin(year * 0.093 + rainPhase) * 0.52 + Math.sin(year * 0.31 + rainPhase * 0.6) * 0.22;
-          const droughtShock = random() < 0.058 ? -lerp(0.42, 1.24, random()) : 0;
-          const wetShock = random() < 0.052 ? lerp(0.34, 1.05, random()) : 0;
-          const rainfallSignal = clamp(rainCycle + rainfallMemory + droughtShock + wetShock, -1.75, 1.68);
+          const rainCycle = Math.sin(year * 0.093 + rainPhase) * 0.64 + Math.sin(year * 0.31 + rainPhase * 0.6) * 0.28;
+          const droughtShock = random() < 0.062 ? -lerp(0.48, 1.36, random()) : 0;
+          const wetShock = random() < 0.058 ? lerp(0.4, 1.2, random()) : 0;
+          const rainfallSignal = clamp(rainCycle + rainfallMemory + droughtShock + wetShock, -1.95, 1.9);
           const ageTaper = Math.exp(-year / 155);
           const temperatureSignal = clamp(
             (forces.temperatureMean - 7) / 17 + (slowCycle + fastCycle + climateMemory) * forces.temperatureVolatility,
@@ -361,28 +364,46 @@
           const wetSurge = Math.pow(clamp((rainfallSignal - 0.18) / 1.5, 0, 1), 1.18);
           const droughtDrag = Math.pow(clamp((-rainfallSignal - 0.22) / 1.55, 0, 1), 1.08);
 
+          const midAgeDip = 1 - 0.15 * Math.exp(-Math.pow((year - 62) / 44, 2));
           const baseGrowth =
-            2.22 +
-            1.62 * ageTaper +
-            Math.sin(year * 0.043 + soilPhase) * 0.28 +
-            Math.sin(year * 0.17 + grainPhase) * 0.18;
-          const annualWeatherWidth = clamp(
+            (2.22 +
+              1.62 * ageTaper +
+              Math.sin(year * 0.043 + soilPhase) * 0.28 +
+              Math.sin(year * 0.17 + grainPhase) * 0.18) *
+            midAgeDip;
+          const rawAnnualWeatherSignal =
             1 +
-              rainfallSignal * 0.42 +
-              wetSurge * 0.92 -
-              droughtDrag * 0.22 +
-              temperatureSignal * 0.12 +
-              (random() - 0.5) * (0.3 + wetSurge * 0.26),
-            0.18,
-            3.05
+            rainfallSignal * 0.54 +
+            wetSurge * 1.18 -
+            droughtDrag * 0.48 +
+            temperatureSignal * 0.16 +
+            (random() - 0.5) * (0.4 + wetSurge * 0.34);
+          const youthResponse = lerp(0.38, 1, smootherStep((year - 8) / 34));
+          const oldAgeResponse = lerp(1, 0.38, smootherStep((year - 92) / 108));
+          const weatherSensitivity = youthResponse * oldAgeResponse;
+          const annualWeatherSignal = 1 + (rawAnnualWeatherSignal - 1) * weatherSensitivity;
+          const annualWeatherWidth = clamp(
+            annualWeatherSignal >= 1
+              ? 1 + (annualWeatherSignal - 1) * 1.16
+              : 1 - (1 - annualWeatherSignal) * 1.68,
+            0.09,
+            2.6
           );
           const previous = boundaries[year - 1];
           let boundary = new Array(SAMPLE_COUNT);
           let widthTotal = 0;
           const ageIrregularity = ageIrregularityFor(year);
+          const regionalNoise = smoothLoop(
+            Array.from({ length: SAMPLE_COUNT }, () => random() * 2 - 1),
+            2,
+            0.76
+          );
 
           for (let i = 0; i < SAMPLE_COUNT; i++) {
             const a = angles[i];
+            const detailT = ageIrregularityFor(year);
+            regionalMemory[i] = clamp(regionalMemory[i] * 0.82 + regionalNoise[i] * 0.28, -0.72, 0.72);
+            deformationMemory[i] *= 0.9985;
             const sunBias = forces.sunPower * (0.16 * Math.cos(a - forces.sunAngle) + 0.035 * Math.cos(2 * (a - forces.sunAngle)));
             const windBias =
               forces.windExposure *
@@ -390,15 +411,27 @@
             const slopeBias = forces.groundPower * (0.2 * Math.cos(a - forces.slopeDown) - 0.035 * Math.cos(3 * (a - forces.slopeDown)));
             const soilBias =
               0.045 * Math.sin(a * 3 + soilPhase) +
-              0.034 * Math.sin(a * 7 - year * 0.045 + grainPhase) +
-              0.023 * Math.sin(a * 13 + year * 0.075 + soilPhase * 0.6);
+              0.034 * lerp(0.08, 1, detailT) * Math.sin(a * 7 - year * 0.045 + grainPhase) +
+              0.023 * lerp(0, 1, detailT) * Math.sin(a * 13 + year * 0.075 + soilPhase * 0.6);
             const climateBias = temperatureSignal * 0.035 * Math.sin(a * 2 + year * 0.08 + forces.temperaturePhase);
             const rainfallBias =
               rainfallSignal * (0.044 + wetSurge * 0.065) * Math.sin(a * 5 - year * 0.12 + rainPhase) +
               wetSurge * 0.052 * Math.sin(a * 9 + year * 0.19 + rainPhase * 1.7);
             const organicBias = organicGrowthBias(organicField, year, a);
             const memoryBias = cambiumMemory[i] * lerp(0.22, 1.05, ageIrregularity);
-            const stress = sunBias + windBias + slopeBias + soilBias + climateBias + rainfallBias + organicBias + memoryBias;
+            const regionalBias = regionalMemory[i] * lerp(0.22, 0.42, detailT);
+            const deformationBias = deformationMemory[i] * lerp(0.7, 1.15, detailT);
+            const stress =
+              sunBias +
+              windBias +
+              slopeBias +
+              soilBias +
+              climateBias +
+              rainfallBias +
+              organicBias +
+              memoryBias +
+              regionalBias +
+              deformationBias;
             const increment = baseGrowth * annualWeatherWidth * clamp(1 + stress, 0.28, 1.92);
             boundary[i] = previous[i] + increment;
             widthTotal += increment;
@@ -414,7 +447,15 @@
           boundary = smoothLoop(boundary, 2, lerp(0.86, 0.18, ageIrregularity));
           const activeIncidents = damageEvents.filter((event) => year >= event.year && year < event.year + event.duration);
           if (activeIncidents.length) {
-            boundary = applyDamageIncidents(boundary, previous, angles, activeIncidents, widthTotal / SAMPLE_COUNT, year, cambiumMemory);
+            boundary = applyDamageIncidents(
+              boundary,
+              previous,
+              angles,
+              activeIncidents,
+              widthTotal / SAMPLE_COUNT,
+              year,
+              deformationMemory
+            );
           }
           boundaries.push(boundary);
           const stressIndex =
@@ -508,6 +549,7 @@
 
       function organicGrowthBias(field, year, angle) {
         const t = year / TARGET_AGE;
+        const detailT = ageIrregularityFor(year);
         let bias = field.leanStrength * Math.cos(angle - field.leanAngle) * (0.45 + t * 0.95);
         bias += field.ovalStrength * Math.cos(2 * (angle - field.ovalAngle)) * (0.75 + 0.25 * Math.sin(year * 0.026));
         bias +=
@@ -516,13 +558,14 @@
           Math.sin(year * 0.037 + field.knotAngle);
         for (const wave of field.waves) {
           const envelope = 0.65 + 0.35 * Math.sin(year * 0.019 * wave.order + wave.phase * 0.3);
-          bias += wave.amplitude * envelope * Math.sin(angle * wave.order + wave.phase + year * wave.drift);
+          const detailGate = wave.order <= 2 ? 1 : smootherStep(detailT * 1.35 - (wave.order - 3) * 0.09);
+          bias += wave.amplitude * detailGate * envelope * Math.sin(angle * wave.order + wave.phase + year * wave.drift);
         }
         return clamp(bias, -0.34, 0.38);
       }
 
       function ageIrregularityFor(year) {
-        return smootherStep((year - 16) / 150);
+        return smootherStep((year - 20) / 155);
       }
 
       function makeDamageEvents(random) {
@@ -559,7 +602,7 @@
         };
       }
 
-      function applyDamageIncidents(boundary, previous, angles, events, meanWidth, year, cambiumMemory) {
+      function applyDamageIncidents(boundary, previous, angles, events, meanWidth, year, deformationMemory) {
         const out = boundary.slice();
         for (let i = 0; i < out.length; i++) {
           const a = angles[i];
@@ -596,7 +639,7 @@
             }
           }
 
-          cambiumMemory[i] = clamp(cambiumMemory[i] + memoryShift, -0.72, 0.64);
+          deformationMemory[i] = clamp(deformationMemory[i] + memoryShift * 2.35, -0.78, 0.68);
           const incidentCenter = bite > callus;
           const minAdvance = meanWidth * (incidentCenter ? 0.035 : 0.08);
           out[i] = Math.max(previous[i] + minAdvance, out[i] - bite + callus);
@@ -975,11 +1018,11 @@
         ctx.translate(cx, cy);
 
         if (activeBoundary) {
-          drawFilledBoundary(activeBoundary, radius, colorForRing(activeAge));
+          drawFilledBoundary(activeBoundary, radius, colorForRing(activeAge), ageFloat);
         }
 
         for (let year = Math.min(completeAge, TARGET_AGE); year >= 1; year--) {
-          drawFilledBoundary(model.boundaries[year], radius, colorForRing(year));
+          drawFilledBoundary(model.boundaries[year], radius, colorForRing(year), year);
         }
 
         const currentBoundary = activeBoundary || model.boundaries[Math.min(completeAge, TARGET_AGE)];
@@ -988,19 +1031,19 @@
         drawRingLines(radius, ageFloat);
         drawActiveFront(radius, activeBoundary, activeAge, partial);
         drawBarkDamage(radius, currentBoundary, ageFloat);
-        drawOuterBark(radius, currentBoundary);
+        drawOuterBark(radius, currentBoundary, ageFloat);
         ctx.restore();
       }
 
-      function drawFilledBoundary(boundary, radius, fill) {
-        pathBoundary(boundary, radius);
+      function drawFilledBoundary(boundary, radius, fill, age) {
+        pathBoundary(boundary, radius, age);
         ctx.fillStyle = fill;
         ctx.fill();
       }
 
       function drawPith(radius) {
         const pith = model.boundaries[0];
-        pathBoundary(pith, radius * 1.9);
+        pathBoundary(pith, radius * 1.9, 0);
         ctx.fillStyle = '#fff7e3';
         ctx.fill();
         ctx.strokeStyle = 'rgba(21, 32, 25, 0.54)';
@@ -1014,7 +1057,7 @@
         for (let year = 5; year <= visible; year += 5) {
           ctx.strokeStyle = year % 25 === 0 ? 'rgba(17, 20, 18, 0.62)' : 'rgba(17, 20, 18, 0.2)';
           ctx.lineWidth = year % 25 === 0 ? 1.15 : 0.55;
-          pathBoundary(model.boundaries[year], radius);
+          pathBoundary(model.boundaries[year], radius, year);
           ctx.stroke();
         }
         for (let year = 25; year <= visible; year += 25) {
@@ -1029,25 +1072,40 @@
         ctx.save();
         ctx.strokeStyle = rgbaCss(COLORS.paperRgb, frontAlpha);
         ctx.lineWidth = 1.7;
-        pathBoundary(activeBoundary, radius);
+        pathBoundary(activeBoundary, radius, activeAge - 1 + partial);
         ctx.stroke();
         ctx.strokeStyle = rgbaCss(COLORS.inkRgb, 0.42);
         ctx.lineWidth = 0.65;
-        pathBoundary(activeBoundary, radius);
+        pathBoundary(activeBoundary, radius, activeAge - 1 + partial);
         ctx.stroke();
         ctx.restore();
       }
 
-      function drawOuterBark(radius, boundary) {
+      function drawOuterBark(radius, boundary, ageFloat) {
         if (!boundary) return;
+        const age = Math.min(ageFloat, TARGET_AGE);
+        const maturity = smootherStep((age - 10) / 180);
+        const thickness = clamp(radius * lerp(0.006, 0.052, maturity), 1.2, 16);
+        const roughness = smootherStep((age - 24) / 158);
+        const barkBoundary = boundary.map((value, i) => {
+          const a = model.angles[i];
+          const coarse = 0.5 + 0.28 * Math.sin(a * 7 + model.salt * 0.013) + 0.22 * Math.sin(a * 17 - model.salt * 0.021);
+          const fine = 0.5 + 0.5 * Math.sin(a * 31 + model.salt * 0.037);
+          const outward = thickness * (0.32 + roughness * (0.34 * coarse + 0.16 * fine)) / radius;
+          return value + outward;
+        });
         ctx.save();
         ctx.strokeStyle = COLORS.ink;
-        ctx.lineWidth = clamp(radius * 0.018, 2.2, 5);
-        pathBoundary(boundary, radius * 1.003);
+        ctx.lineWidth = thickness;
+        pathBoundary(barkBoundary, radius, age);
         ctx.stroke();
-        ctx.strokeStyle = rgbaCss(COLORS.inkRgb, 0.34);
-        ctx.lineWidth = 0.8;
-        pathBoundary(boundary, radius * 0.989);
+        ctx.strokeStyle = rgbaCss(COLORS.paperRgb, lerp(0.2, 0.42, maturity));
+        ctx.lineWidth = Math.max(0.65, thickness * 0.12);
+        pathBoundary(barkBoundary, radius, age);
+        ctx.stroke();
+        ctx.strokeStyle = rgbaCss(COLORS.inkRgb, lerp(0.38, 0.72, maturity));
+        ctx.lineWidth = lerp(0.65, 1.6, maturity);
+        pathBoundary(boundary, radius * 0.997, age);
         ctx.stroke();
         ctx.restore();
       }
@@ -1134,7 +1192,7 @@
         if (!boundary || ageFloat < 8) return;
         const rayCount = 34;
         ctx.save();
-        pathBoundary(boundary, radius * 0.986);
+        pathBoundary(boundary, radius * 0.986, ageFloat);
         ctx.clip();
         ctx.strokeStyle = rgbaCss(COLORS.inkRgb, 0.12);
         ctx.lineWidth = 0.55;
@@ -1167,15 +1225,31 @@
         return out;
       }
 
-      function pathBoundary(boundary, radius) {
+      function outlinePointCount(age) {
+        const complexity = ageIrregularityFor(clamp(age, 0, TARGET_AGE));
+        return Math.round(lerp(YOUNG_OUTLINE_POINTS, SAMPLE_COUNT, Math.pow(complexity, 1.18)));
+      }
+
+      function pathBoundary(boundary, radius, age = TARGET_AGE) {
+        const pointCount = outlinePointCount(age);
+        const step = SAMPLE_COUNT / pointCount;
+        const points = new Array(pointCount);
+        for (let point = 0; point < pointCount; point++) {
+          const sampleIndex = point * step;
+          const i0 = Math.floor(sampleIndex) % SAMPLE_COUNT;
+          const i1 = (i0 + 1) % SAMPLE_COUNT;
+          const a = (point / pointCount) * TAU;
+          const r = lerp(boundary[i0], boundary[i1], sampleIndex - i0) * radius;
+          points[point] = { x: Math.cos(a) * r, y: Math.sin(a) * r };
+        }
+        const first = points[0];
+        const last = points[pointCount - 1];
         ctx.beginPath();
-        for (let i = 0; i < SAMPLE_COUNT; i++) {
-          const a = model.angles[i];
-          const r = boundary[i] * radius;
-          const x = Math.cos(a) * r;
-          const y = Math.sin(a) * r;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+        ctx.moveTo((last.x + first.x) * 0.5, (last.y + first.y) * 0.5);
+        for (let point = 0; point < pointCount; point++) {
+          const current = points[point];
+          const next = points[(point + 1) % pointCount];
+          ctx.quadraticCurveTo(current.x, current.y, (current.x + next.x) * 0.5, (current.y + next.y) * 0.5);
         }
         ctx.closePath();
       }

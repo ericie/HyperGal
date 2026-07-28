@@ -1,7 +1,10 @@
 {
   "title": "Untitled",
   "year": 2026,
+  "date": "2026-01-01",
+  "category": "generative",
   "type": "interactive",
+  "wip": false,
   "thumbnail": "thumbnail.svg",
   "description": "Short description of the piece."
 }
