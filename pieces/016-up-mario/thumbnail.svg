@@ -1,86 +1,136 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" role="img" aria-label="Up Mario castle thumbnail">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" role="img" aria-label="Up Mario thumbnail: a small round climber running along a cloud below a ladder">
   <defs>
-    <pattern id="brick" width="28" height="12" patternUnits="userSpaceOnUse">
-      <path d="M0 .5h28M14 .5v12M0 6.5h28M0 6.5v6M28 6.5v6" fill="none" stroke="#000" stroke-width=".65" opacity=".42"/>
-    </pattern>
-    <pattern id="stars" width="8" height="8" patternUnits="userSpaceOnUse">
-      <rect x="1" y="2" width="1" height="1" fill="#fff"/>
-      <rect x="6" y="6" width="1" height="1" fill="#fff"/>
-    </pattern>
+    <clipPath id="head" clipPathUnits="userSpaceOnUse">
+      <circle cx="0" cy="0" r="10"/>
+    </clipPath>
+    <g id="cloud-s">
+      <rect x="-52" y="2" width="104" height="22" rx="11"/>
+      <circle cx="-30" cy="4" r="16"/><circle cx="-2" cy="-1" r="21"/><circle cx="28" cy="4" r="16"/>
+    </g>
+    <g id="cloud-l">
+      <rect x="-76" y="2" width="152" height="22" rx="11"/>
+      <circle cx="-52" cy="4" r="17"/><circle cx="-19" cy="-3" r="23"/>
+      <circle cx="16" cy="-3" r="23"/><circle cx="50" cy="4" r="17"/>
+    </g>
   </defs>
 
-  <rect width="300" height="300" fill="#000"/>
-  <rect x="22" width="256" height="258" fill="#fff"/>
-  <rect x="22" width="256" height="258" fill="url(#brick)"/>
-  <path d="M22 0v258M278 0v258" stroke="#fff" stroke-width="2"/>
-  <path d="M27 0v258M273 0v258" stroke="#000" stroke-width="5"/>
+  <rect width="300" height="300" fill="#C7DAF1"/>
 
-  <g fill="#c9c9c9" stroke="#000" stroke-width="1.5">
-    <path d="M47 78V43a16 16 0 0 1 32 0v35z"/>
-    <path d="M218 70V33a16 16 0 0 1 32 0v37z"/>
-    <path d="M50 224v-38a17 17 0 0 1 34 0v38z"/>
+  <!-- gutter cloud banks -->
+  <g fill="#A6C3E6">
+    <circle cx="6" cy="30" r="38"/><circle cx="-2" cy="114" r="42"/>
+    <circle cx="4" cy="200" r="36"/><circle cx="-4" cy="272" r="40"/>
+    <circle cx="294" cy="12" r="36"/><circle cx="302" cy="94" r="42"/>
+    <circle cx="296" cy="176" r="38"/><circle cx="304" cy="256" r="40"/>
   </g>
-  <g stroke="#fff" stroke-width=".8" opacity=".75">
-    <path d="M55 43v35M63 29v49M71 43v35M47 57h32"/>
-    <path d="M226 33v37M234 18v52M242 33v37M218 48h32"/>
-    <path d="M58 186v38M67 169v55M76 186v38M50 202h34"/>
-  </g>
-
-  <path d="M164 172v-36q36-31 72 0v68h-72z" fill="#000"/>
-  <path d="M164 172v-36q36-31 72 0" fill="none" stroke="#000" stroke-width="2"/>
-  <path d="M164 172v32h72v-68q-36-31-72 0z" fill="url(#stars)"/>
-  <path d="M178 141q23 28 39 55" fill="none" stroke="#fff" stroke-width="1"/>
-  <g fill="none" stroke="#fff" stroke-width="1">
-    <rect x="184" y="151" width="4" height="5"/>
-    <rect x="192" y="162" width="4" height="5"/>
-    <rect x="201" y="174" width="4" height="5"/>
+  <g fill="#DEEAF8">
+    <circle cx="0" cy="70" r="34"/><circle cx="8" cy="158" r="32"/>
+    <circle cx="-2" cy="238" r="34"/>
+    <circle cx="300" cy="52" r="34"/><circle cx="292" cy="134" r="32"/>
+    <circle cx="302" cy="216" r="34"/>
   </g>
 
-  <g stroke="#000">
-    <path d="M34 238h95" stroke-width="5"/>
-    <path d="M31 235h101" stroke="#fff" stroke-width="1"/>
-    <rect x="102" y="200" width="112" height="17" fill="#fff" stroke-width="1.5"/>
-    <path d="M102 204h112M130 204v13M158 204v13M186 204v13" fill="none"/>
-    <rect x="49" y="145" width="98" height="16" fill="#fff" stroke-width="1.5"/>
-    <path d="M49 149h98M73 149v12M97 149v12M121 149v12" fill="none"/>
-    <rect x="154" y="90" width="99" height="17" fill="#fff" stroke-width="1.5"/>
-    <path d="M154 94h99M179 94v13M204 94v13M229 94v13" fill="none"/>
-    <rect x="64" y="36" width="93" height="15" fill="#fff" stroke-width="1.5"/>
-    <path d="M64 40h93M87 40v11M110 40v11M133 40v11" fill="none"/>
+  <!-- shaft, scalloped along both edges -->
+  <rect x="34" width="232" height="300" fill="#EFF5FD"/>
+  <g fill="#EFF5FD">
+    <circle cx="34" cy="8" r="19"/><circle cx="34" cy="54" r="19"/>
+    <circle cx="34" cy="100" r="19"/><circle cx="34" cy="146" r="19"/>
+    <circle cx="34" cy="192" r="19"/><circle cx="34" cy="238" r="19"/>
+    <circle cx="266" cy="30" r="19"/><circle cx="266" cy="76" r="19"/>
+    <circle cx="266" cy="122" r="19"/><circle cx="266" cy="168" r="19"/>
+    <circle cx="266" cy="214" r="19"/>
   </g>
 
-  <g fill="none" stroke="#000">
-    <path d="M121 145l33-38" stroke-width="2.5"/>
-    <path d="M121 137h8v-9h8v-9h8v-9h9" stroke-width="1.5"/>
-    <path d="M112 200v-39M124 200v-39" stroke-width="3"/>
-    <path d="M112 170h12M112 181h12M112 192h12" stroke-width="1.5"/>
-    <path d="M214 90v-42M226 90v-42" stroke-width="3"/>
-    <path d="M214 58h12M214 69h12M214 80h12" stroke-width="1.5"/>
+  <!-- haze, farthest layer -->
+  <g fill="#E7F0FB">
+    <use href="#cloud-s" x="104" y="58"/>
+    <use href="#cloud-s" x="196" y="150"/>
+    <use href="#cloud-s" x="86" y="216"/>
   </g>
 
-  <g font-family="Geneva, sans-serif" font-size="16" font-weight="900" text-anchor="middle">
-    <rect x="74" y="108" width="24" height="24" fill="#000" stroke="#000" stroke-width="1.5"/>
-    <rect x="196" y="165" width="24" height="24" fill="#000" stroke="#fff" stroke-width="1.5"/>
-    <text x="86" y="126" fill="#fff">?</text>
-    <text x="208" y="183" fill="#fff">?</text>
+  <!-- upper cloud -->
+  <g>
+    <g fill="#1D3D6D" opacity=".08"><use href="#cloud-s" x="202" y="82"/></g>
+    <g fill="#FFFFFF"><use href="#cloud-s" x="199" y="72"/></g>
+    <path d="M147 91h104v3a11 11 0 0 1-11 11h-82a11 11 0 0 1-11-11z" fill="#C7DAF1"/>
+    <path d="M153 91a16 16 0 0 0 31 1zM181 91a21 21 0 0 0 32 0zM212 91a16 16 0 0 0 28 2z" fill="#C7DAF1"/>
   </g>
 
-  <g transform="translate(126 143)" fill="#000" stroke="#000" stroke-linecap="square">
-    <ellipse cx="0" cy="3" rx="12" ry="2.5" opacity=".35" stroke="none"/>
-    <path d="M-7-21h15l-2 13H-6z"/>
-    <path d="M-5-8l-7 9M5-8l8 9M-7-18l-11 5M7-18l10-6" fill="none" stroke-width="3"/>
-    <ellipse cx="0" cy="-29" rx="8" ry="9" fill="#fff" stroke-width="1.5"/>
-    <path d="M3-31h3v3M1-25h8" fill="none" stroke-width="2"/>
-    <path d="M-10-36l15-3 6 5h4v3h-25z"/>
-    <path d="M-3-19v8M4-19v8" stroke="#fff" stroke-width="2"/>
+  <!-- ladder down from the upper cloud -->
+  <g stroke="#A6C3E6" stroke-width="6" stroke-linecap="round">
+    <path d="M203 100v78M221 100v78"/>
+  </g>
+  <g stroke="#7BA1D0" stroke-width="5" stroke-linecap="round">
+    <path d="M205 116h14M205 136h14M205 156h14"/>
   </g>
 
-  <rect y="258" width="300" height="42" fill="#fff" stroke="#000" stroke-width="3"/>
-  <path d="M106 258v42M190 258v42" stroke="#000" stroke-width="2"/>
-  <text x="9" y="278" font-family="Georgia, serif" font-size="16" font-weight="900">UP MARIO</text>
-  <text x="11" y="290" font-family="Geneva, sans-serif" font-size="7" font-weight="700">THE ENDLESS KEEP</text>
-  <text x="115" y="272" font-family="Geneva, sans-serif" font-size="7" font-weight="700">HEIGHT</text>
-  <text x="115" y="289" font-family="Geneva, sans-serif" font-size="13" font-weight="900">0317 M</text>
-  <text x="200" y="272" font-family="Geneva, sans-serif" font-size="7" font-weight="700">BOXES</text>
-  <text x="200" y="289" font-family="Geneva, sans-serif" font-size="13" font-weight="900">? 12</text>
+  <!-- question box -->
+  <g>
+    <rect x="58" y="92" width="32" height="32" rx="10" fill="#1D3D6D" opacity=".1"/>
+    <rect x="56" y="88" width="32" height="32" rx="10" fill="#2E5FA1"/>
+    <rect x="61" y="93" width="22" height="6" rx="3" fill="#4B77B5"/>
+    <text x="72" y="112" font-family="Geneva, sans-serif" font-size="20" font-weight="900" fill="#fff" text-anchor="middle">?</text>
+  </g>
+
+  <!-- main cloud -->
+  <g>
+    <g fill="#1D3D6D" opacity=".08"><use href="#cloud-l" x="139" y="190"/></g>
+    <g fill="#FFFFFF"><use href="#cloud-l" x="136" y="179"/></g>
+    <path d="M60 198h152v3a11 11 0 0 1-11 11H71a11 11 0 0 1-11-11z" fill="#C7DAF1"/>
+    <path d="M67 198a17 17 0 0 0 31 1zM100 198a23 23 0 0 0 32 0zM135 198a23 23 0 0 0 32 0zM170 198a17 17 0 0 0 29 2z" fill="#C7DAF1"/>
+  </g>
+
+  <!-- the climber, mid-stride -->
+  <g transform="translate(112,179) scale(1.5)">
+    <ellipse cx="0" cy="2" rx="14" ry="4" fill="#1D3D6D" opacity=".1"/>
+
+    <!-- back arm and leg, one tone lighter -->
+    <path d="M-3.5-18-9-9l-2.5 8" fill="none" stroke="#7BA1D0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <ellipse cx="-10.5" cy="-.5" rx="5" ry="3" fill="#7BA1D0"/>
+    <path d="M-6-28l-7 4-4.5 6.5" fill="none" stroke="#7BA1D0" stroke-width="5.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="-17.5" cy="-17.5" r="3.6" fill="#7BA1D0"/>
+
+    <!-- torso -->
+    <rect x="-9.5" y="-30" width="19" height="18" rx="8" fill="#2E5FA1"/>
+    <rect x="-9.5" y="-24" width="19" height="12" rx="7" fill="#1D3D6D"/>
+    <path d="M-4.5-29v7M4.5-29v7" stroke="#1D3D6D" stroke-width="2.8" stroke-linecap="round"/>
+    <circle cx="0" cy="-20.5" r="2" fill="#7BA1D0"/>
+
+    <!-- front arm and leg -->
+    <path d="M3.5-18 8.5-11l1.5-8" fill="none" stroke="#4B77B5" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <ellipse cx="11" cy="-8" rx="5.4" ry="3.2" fill="#1D3D6D"/>
+    <path d="M6-28l7 4 2.5 6" fill="none" stroke="#4B77B5" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="15.5" cy="-18" r="3.8" fill="#4B77B5"/>
+
+    <!-- head -->
+    <g transform="translate(0,-38)">
+      <circle cx="0" cy="0" r="10" fill="#fff"/>
+      <g clip-path="url(#head)">
+        <rect x="-12" y="-19" width="24" height="15" fill="#2E5FA1"/>
+      </g>
+      <rect x="-4.5" y="-5.6" width="16" height="4.8" rx="2.4" fill="#2E5FA1"/>
+      <circle cx="0" cy="-10.5" r="2.8" fill="#7BA1D0"/>
+      <ellipse cx="-.2" cy="2.6" rx="2.2" ry="2.9" fill="#1D3D6D"/>
+      <ellipse cx="4.2" cy="2.6" rx="2.2" ry="2.9" fill="#1D3D6D"/>
+      <circle cx=".6" cy="1.4" r=".9" fill="#fff"/>
+      <circle cx="5" cy="1.4" r=".9" fill="#fff"/>
+      <ellipse cx="-5.4" cy="6.4" rx="2.3" ry="1.5" fill="#DFA9AE"/>
+      <ellipse cx="9.4" cy="6.4" rx="2.3" ry="1.5" fill="#DFA9AE"/>
+      <path d="M-.1 6.4a2.2 2.2 0 0 0 4.4 0" fill="none" stroke="#1D3D6D" stroke-width="1.5" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <!-- sparkles -->
+  <g fill="#C7DAF1">
+    <path d="M56 48c1 4.2 2 5.2 6 6-4 1-5 2-6 6-1-4-2-5-6-6 4-.8 5-1.8 6-6z"/>
+    <path d="M246 146c.8 3.4 1.6 4.2 4.8 4.8-3.2.8-4 1.6-4.8 4.8-.8-3.2-1.6-4-4.8-4.8 3.2-.6 4-1.4 4.8-4.8z"/>
+    <path d="M50 236c1 4.2 2 5.2 6 6-4 1-5 2-6 6-1-4-2-5-6-6 4-.8 5-1.8 6-6z"/>
+    <path d="M158 40c.8 3.4 1.6 4.2 4.8 4.8-3.2.8-4 1.6-4.8 4.8-.8-3.2-1.6-4-4.8-4.8 3.2-.6 4-1.4 4.8-4.8z"/>
+  </g>
+
+  <!-- title plate -->
+  <rect y="258" width="300" height="42" fill="#fff"/>
+  <rect y="258" width="300" height="2" fill="#C7DAF1"/>
+  <text x="16" y="283" font-family="Geneva, sans-serif" font-size="19" font-weight="900" fill="#2E5FA1">UP MARIO</text>
+  <text x="284" y="283" font-family="Geneva, sans-serif" font-size="11" font-weight="700" fill="#7BA1D0" text-anchor="end">THE ENDLESS SKY</text>
 </svg>

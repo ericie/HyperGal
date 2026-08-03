@@ -7,10 +7,10 @@
     <style>
       :root {
         color-scheme: light;
-        --bg: #ffffff;
+        --bg: #EFF5FD;
         --ink: #2E5FA1;
-        --muted: #6a8fc4;
-        --hot: #2E5FA1;
+        --muted: #7BA1D0;
+        --hot: #4B77B5;
         --hud-height: 58px;
       }
 
@@ -55,7 +55,7 @@
         pointer-events: none;
         color: #2E5FA1;
         background: #ffffff;
-        border-top: 3px solid #2E5FA1;
+        border-top: 2px solid #C7DAF1;
         font-size: 11px;
         line-height: 1.05;
         z-index: 2;
@@ -65,7 +65,7 @@
         display: grid;
         align-content: center;
         padding: 5px clamp(10px, 2.4vw, 18px) 6px;
-        border-right: 3px solid #2E5FA1;
+        border-right: 2px solid #C7DAF1;
       }
 
       .hud__title strong {
@@ -78,7 +78,7 @@
 
       .hud__title span {
         margin-top: 4px;
-        color: #6a8fc4;
+        color: #7BA1D0;
         font-size: 9px;
         font-weight: 700;
         letter-spacing: 0.06em;
@@ -97,7 +97,7 @@
         align-content: center;
         gap: 4px;
         padding: 4px clamp(8px, 2vw, 16px);
-        border-right: 1px solid #2E5FA1;
+        border-right: 1px solid #DEEAF8;
         font-size: 9px;
         font-weight: 800;
         overflow: hidden;
@@ -119,8 +119,10 @@
 
       .hud__meter {
         width: 100%;
-        height: 5px;
-        border: 1px solid #2E5FA1;
+        height: 6px;
+        border-radius: 3px;
+        background: #DEEAF8;
+        overflow: hidden;
       }
 
       .hud__meter::before {
@@ -128,7 +130,8 @@
         display: block;
         width: 68%;
         height: 100%;
-        background: #2E5FA1;
+        border-radius: 3px;
+        background: #7BA1D0;
       }
 
       .hud span {
@@ -146,7 +149,8 @@
         margin: 0;
         padding: 5px 7px;
         color: #fff;
-        background: #2E5FA1;
+        background: #1D3D6D;
+        border-radius: 6px;
         font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         pointer-events: none;
         white-space: pre;
@@ -192,7 +196,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Up Mario: a safety-sign pictogram figure climbs an endless sky of flat clouds, question boxes, and ladders."
+      aria-label="Up Mario: a small round climber in a cap runs, jumps and hauls himself up an endless sky of soft clouds, question boxes and ladders, drawn flat in a single blue."
     ></canvas>
     <div class="hud" aria-hidden="true">
       <div class="hud__title">
@@ -255,51 +259,32 @@
           pole: 330,
         };
 
-        /* -- SAFETY-SIGN PALETTE -- */
-        const BLUE = '#2E5FA1';
-        const BLUE_LIGHT = '#4A7FC4';
-        const BLUE_PALE = '#B8D0EA';
-        const BLUE_FAINT = 'rgba(46, 95, 161, 0.08)';
-        const WHITE = '#ffffff';
-        const GRAY_LIGHT = '#E8EDF4';
+        /* -- SOFT MONOTONE RAMP --
+           One hue, eight steps. Flat fills only: depth comes from tone,
+           never from gradients. `blush` is the single warm whisper, used
+           at cheek scale only -- set it to C.pale for a pure monotone. */
+        const C = {
+          white: '#FFFFFF',
+          sky: '#EFF5FD',
+          haze: '#E7F0FB',
+          skyDeep: '#DEEAF8',
+          mist: '#C7DAF1',
+          pale: '#A6C3E6',
+          mid: '#7BA1D0',
+          deep: '#4B77B5',
+          ink: '#2E5FA1',
+          night: '#1D3D6D',
+          blush: '#DFA9AE',
+        };
 
+        const SHADOW = 'rgba(29, 61, 109, 0.10)';
+        const SHADOW_SOFT = 'rgba(29, 61, 109, 0.06)';
+
+        /* Dust tints, kept as names so the simulation calls read clearly. */
         const COLORS = {
-          paper: WHITE,
-          paperDim: GRAY_LIGHT,
-          ink: BLUE,
-          softInk: 'rgba(46, 95, 161, 0.55)',
-          faint: 'rgba(46, 95, 161, 0.12)',
-          lighter: BLUE_FAINT,
-          white: WHITE,
-          shadow: 'rgba(46, 95, 161, 0.18)',
-          skyTop: WHITE,
-          skyBottom: WHITE,
-          shaft: WHITE,
-          shaftEdge: BLUE,
-          grid: 'rgba(46, 95, 161, 0.08)',
-          brick: WHITE,
-          brickDark: BLUE,
-          brickLight: WHITE,
-          girder: WHITE,
-          girderDark: BLUE,
-          girderLight: WHITE,
-          rail: BLUE,
-          railDark: BLUE,
-          coin: BLUE,
-          coinHot: WHITE,
-          spring: WHITE,
-          springDark: BLUE,
-          barrel: BLUE,
-          barrelDark: BLUE,
-          barrelBand: WHITE,
-          heroRed: WHITE,
-          heroRedDark: BLUE,
-          skin: WHITE,
-          skinDark: BLUE,
-          denim: WHITE,
-          denimDark: BLUE,
-          boot: BLUE,
-          smoke: 'rgba(46, 95, 161, 0.35)',
+          ink: C.ink,
+          coin: C.mid,
+          smoke: C.pale,
         };
 
         let width = 1;
@@ -467,6 +452,11 @@
             revisitPlatformId: null,
             revisitCooldownUntil: 0,
             noRouteSince: 0,
+            stride: 0,
+            climbT: 0,
+            nextBlinkAt: 1.8,
+            blinkEndsAt: 0,
+            blinkCount: 0,
           };
           lastProgressAt = 0;
           lastProgressHeight = 0;
@@ -529,7 +519,9 @@
 
         function updateHero(dt) {
           hero.previousY = hero.y;
+          updateBlink();
           if (hero.onLink) {
+            hero.climbT += dt;
             updateLinkTravel(dt);
             return;
           }
@@ -562,8 +554,20 @@
           hero.x += hero.vx * dt;
           hero.vy += GRAVITY * dt;
           hero.y += hero.vy * dt;
+          if (hero.grounded) hero.stride += Math.abs(hero.vx) * dt;
           keepHeroInShaft();
           collidePlatforms();
+        }
+
+        /* Eye blinks run on their own little clock so the face never feels
+           frozen while he is standing still. Timed off a hash rather than the
+           world rng, so blinking cannot desync a seeded run. */
+        function updateBlink() {
+          if (simTime >= hero.nextBlinkAt) {
+            hero.blinkCount = (hero.blinkCount || 0) + 1;
+            hero.blinkEndsAt = simTime + 0.11;
+            hero.nextBlinkAt = simTime + 1.5 + hash01(hero.blinkCount * 7919) * 3.6;
+          }
         }
 
         function planAutopilot() {
@@ -1562,7 +1566,10 @@
         }
 
         /* ====================================================
-           RENDER -- flat ISO safety-sign style
+           RENDER -- flat kawaii illustration, one hue, eight tones
+           No gradients anywhere: every shape is a flat fill, and depth is
+           made by stacking tones from the ramp. Rounded joints, rounded
+           caps, no hairlines.
            ==================================================== */
 
         function render() {
@@ -1573,35 +1580,222 @@
           drawBarrels();
           drawParticles();
           drawHero();
-          drawEdgeTrim();
+          drawFrame();
         }
+
+        /* -- SHAPE HELPERS -- */
+
+        /* Hand-rolled so the piece does not depend on ctx.roundRect. */
+        function roundRectPath(x, y, w, h, r) {
+          const rr = Math.max(0, Math.min(r, Math.min(w, h) * 0.5));
+          ctx.moveTo(x + rr, y);
+          ctx.lineTo(x + w - rr, y);
+          ctx.arcTo(x + w, y, x + w, y + rr, rr);
+          ctx.lineTo(x + w, y + h - rr);
+          ctx.arcTo(x + w, y + h, x + w - rr, y + h, rr);
+          ctx.lineTo(x + rr, y + h);
+          ctx.arcTo(x, y + h, x, y + h - rr, rr);
+          ctx.lineTo(x, y + rr);
+          ctx.arcTo(x, y, x + rr, y, rr);
+          ctx.closePath();
+        }
+
+        function fillRound(x, y, w, h, r, color) {
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          roundRectPath(x, y, w, h, r);
+          ctx.fill();
+        }
+
+        function fillCircle(x, y, r, color) {
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, TAU);
+          ctx.fill();
+        }
+
+        function fillOval(x, y, rx, ry, color) {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.scale(1, ry / rx);
+          fillCircle(0, 0, rx, color);
+          ctx.restore();
+        }
+
+        /* A limb: two rounded segments through a soft joint. */
+        function limb(ax, ay, bx, by, bend, thickness, color) {
+          const mx = (ax + bx) * 0.5;
+          const my = (ay + by) * 0.5;
+          const dx = bx - ax;
+          const dy = by - ay;
+          const len = Math.hypot(dx, dy) || 1;
+          const jx = mx + (-dy / len) * bend;
+          const jy = my + (dx / len) * bend;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = thickness;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(jx, jy);
+          ctx.lineTo(bx, by);
+          ctx.stroke();
+        }
+
+        function capsule(ax, ay, bx, by, thickness, color) {
+          ctx.strokeStyle = color;
+          ctx.lineWidth = thickness;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(bx, by);
+          ctx.stroke();
+        }
+
+        function sparkle(x, y, r, color) {
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.moveTo(x, y - r);
+          ctx.quadraticCurveTo(x + r * 0.18, y - r * 0.18, x + r, y);
+          ctx.quadraticCurveTo(x + r * 0.18, y + r * 0.18, x, y + r);
+          ctx.quadraticCurveTo(x - r * 0.18, y + r * 0.18, x - r, y);
+          ctx.quadraticCurveTo(x - r * 0.18, y - r * 0.18, x, y - r);
+          ctx.fill();
+        }
+
+        /* Stable per-index noise for scenery that must not consume the
+           world rng (that stream belongs to the seeded level). */
+        function hash01(n) {
+          let x = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
+          x ^= x >>> 13;
+          x = Math.imul(x, 0xc2b2ae35);
+          x ^= x >>> 16;
+          return (x >>> 0) / 4294967296;
+        }
+
+        /* -- BACKGROUND -- */
 
         function drawBackground() {
-          ctx.fillStyle = WHITE;
+          const playHeight = height - hudHeight();
+          const shaftPad = Math.max(12, Math.min(28, width * 0.035));
+          const left = worldLeft - shaftPad;
+          const right = worldLeft + worldWidth + shaftPad;
+
+          ctx.fillStyle = C.mist;
           ctx.fillRect(0, 0, width, height);
 
-          const playHeight = height - (width <= 520 ? 64 : 58);
-          const shaftPad = Math.max(10, Math.min(24, width * 0.03));
+          drawGutters(left, right, playHeight);
 
-          /* Play area -- very faint blue tint */
-          ctx.fillStyle = '#F4F7FB';
-          ctx.fillRect(worldLeft - shaftPad, 0, worldWidth + shaftPad * 2, playHeight);
+          ctx.fillStyle = C.sky;
+          ctx.fillRect(left, 0, right - left, playHeight);
 
-          /* Side columns -- solid safety blue */
-          ctx.fillStyle = BLUE;
-          ctx.fillRect(0, 0, Math.max(0, worldLeft - shaftPad), playHeight);
-          ctx.fillRect(worldLeft + worldWidth + shaftPad, 0, width, playHeight);
-
-          /* Thin vertical rules at shaft edges */
-          ctx.fillStyle = BLUE;
-          ctx.fillRect(worldLeft - shaftPad, 0, 3, playHeight);
-          ctx.fillRect(worldLeft + worldWidth + shaftPad - 3, 0, 3, playHeight);
+          drawScallops(left, right, playHeight);
+          drawFarScenery(left, right, playHeight);
         }
 
-        function drawEdgeTrim() {
-          const playHeight = height - (width <= 520 ? 64 : 58);
-          ctx.fillStyle = BLUE;
-          ctx.fillRect(worldLeft - 24, 0, worldWidth + 48, 3);
+        /* Two parallax layers of soft shapes so the shaft has air in it. */
+        function drawFarScenery(left, right, playHeight) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(left, 0, right - left, playHeight);
+          ctx.clip();
+
+          const inner = right - left;
+
+          /* Far clouds, slowest layer. */
+          const drift = cameraY * 0.22;
+          const band = 300;
+          const first = Math.floor((drift - height) / band);
+          const last = Math.ceil((drift + height) / band);
+          for (let i = first; i <= last; i += 1) {
+            const rx = hash01(i * 3 + 11);
+            const ry = hash01(i * 5 + 29);
+            const rs = hash01(i * 7 + 53);
+            const cx = left + inner * (0.12 + rx * 0.76);
+            const cy = height - hudHeight() - (i * band + ry * band - drift);
+            if (cy < -140 || cy > playHeight + 140) continue;
+            const w = inner * (0.3 + rs * 0.32);
+            cloudPath(cx, cy, w, 0.8);
+            ctx.fillStyle = C.haze;
+            ctx.fill();
+          }
+
+          /* Sparkles, mid layer. */
+          const drift2 = cameraY * 0.44;
+          const sBand = 128;
+          const sFirst = Math.floor((drift2 - height) / sBand);
+          const sLast = Math.ceil((drift2 + height) / sBand);
+          for (let i = sFirst; i <= sLast; i += 1) {
+            const rx = hash01(i * 13 + 101);
+            const ry = hash01(i * 17 + 211);
+            const rr = hash01(i * 19 + 307);
+            if (rr < 0.34) continue;
+            const cx = left + inner * (0.06 + rx * 0.88);
+            const cy = height - hudHeight() - (i * sBand + ry * sBand - drift2);
+            if (cy < -20 || cy > playHeight + 20) continue;
+            sparkle(cx, cy, 3 + rr * 3.5, C.mist);
+          }
+
+          ctx.restore();
+        }
+
+        /* Side walls read as a soft cloud bank rather than a printed margin. */
+        function drawGutters(left, right, playHeight) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, 0, Math.max(0, left), playHeight);
+          ctx.rect(right, 0, Math.max(0, width - right), playHeight);
+          ctx.clip();
+
+          const band = 64;
+          const drift = cameraY * 0.6;
+          const first = Math.floor((drift - height) / band);
+          const last = Math.ceil((drift + height) / band);
+          for (let i = first; i <= last; i += 1) {
+            const y = height - hudHeight() - (i * band - drift);
+            if (y < -100 || y > playHeight + 100) continue;
+            const r = 30 + hash01(i * 23 + 5) * 22;
+            /* Two tones, heavily overlapped, so it reads as a bank of cloud
+               rather than a column of dots. */
+            ctx.fillStyle = hash01(i * 41 + 17) > 0.5 ? C.skyDeep : C.pale;
+            ctx.beginPath();
+            ctx.arc(left - 24 - hash01(i * 29 + 3) * 30, y, r, 0, TAU);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(right + 24 + hash01(i * 37 + 13) * 30, y + band * 0.5, r, 0, TAU);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        /* Bites of sky taken out of the gutter, so the shaft edge is soft. */
+        function drawScallops(left, right, playHeight) {
+          const scallop = 46;
+          const offset = mod(cameraY * 0.5, scallop);
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, 0, width, playHeight);
+          ctx.clip();
+          ctx.fillStyle = C.sky;
+          for (let y = -scallop + offset; y < playHeight + scallop; y += scallop) {
+            ctx.beginPath();
+            ctx.arc(left, y, scallop * 0.42, 0, TAU);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(right, y + scallop * 0.5, scallop * 0.42, 0, TAU);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        function drawFrame() {
+          const playHeight = height - hudHeight();
+          ctx.fillStyle = C.pale;
+          ctx.fillRect(0, playHeight - 2, width, 2);
+        }
+
+        function hudHeight() {
+          return width <= 520 ? 64 : 58;
         }
 
         /* -- CLOUD PLATFORMS -- */
@@ -1609,100 +1803,114 @@
         function drawPlatforms() {
           for (const platform of platforms) {
             const sy = screenY(platform.y);
-            if (sy < -70 || sy > height + 70) continue;
+            if (sy < -90 || sy > height + 90) continue;
             const sx = worldLeft + platformLeft(platform);
             const pulse = Math.max(0, 1 - (simTime - platform.pulseUntil + 0.24) / 0.24);
             drawCloudPlatform(platform, sx, sy, pulse);
             if (platform.spring) drawSpring(sx + platform.w * 0.5, sy - 2);
-            if (platform.id === targetPlatformId && !manualActive()) drawTargetTick(sx + platform.w * 0.5, sy - 24);
+            if (platform.id === targetPlatformId && !manualActive()) drawTargetTick(sx + platform.w * 0.5, sy - 34);
           }
         }
 
         function drawCloudPlatform(platform, sx, sy, pulse) {
           const w = platform.w;
           const cx = sx + w * 0.5;
+          const seed = platform.id | 0;
+          const drowsy = hash01(seed * 31 + 7) > 0.82 && w > 150;
+          const body = pulse > 0 ? C.mist : C.white;
 
+          cloudPath(cx + 3, sy + 11, w * 0.97, 0.94);
+          ctx.fillStyle = SHADOW;
+          ctx.fill();
+
+          cloudPath(cx, sy, w, 1);
           ctx.save();
-
-          /* Shadow */
-          ctx.fillStyle = 'rgba(46, 95, 161, 0.10)';
-          ctx.beginPath();
-          drawCloudPath(cx + 4, sy + 10, w * 0.96, 0.85);
-          ctx.fill();
-
-          /* Cloud body */
-          ctx.fillStyle = pulse > 0 ? BLUE_PALE : WHITE;
-          ctx.strokeStyle = BLUE;
-          ctx.lineWidth = 2.5;
-          ctx.beginPath();
-          drawCloudPath(cx, sy, w, 1);
-          ctx.fill();
-          ctx.stroke();
-
+          ctx.clip();
+          ctx.fillStyle = body;
+          ctx.fillRect(cx - w, sy - 60, w * 3, 200);
+          ctx.fillStyle = pulse > 0 ? C.pale : C.mist;
+          ctx.fillRect(cx - w, sy + 19, w * 3, 120);
           ctx.restore();
+
+          if (drowsy) drawCloudFace(cx, sy + 16, seed);
         }
 
-        function drawCloudPath(cx, baseY, w, scale) {
+        /* A fat cloud built as a union of circles over a rounded slab. The
+           crests sit just above `topY`, which is the surface he stands on,
+           so he settles into the fluff instead of hovering over it. */
+        function cloudPath(cx, topY, w, scale) {
           const hw = w * 0.5;
-          const bumps = Math.max(3, Math.round(w / 46));
-          const bumpR = (w / bumps) * 0.42 * scale;
-          const bigR = bumpR * 1.45;
+          const inset = 19 * scale;
+          const span = Math.max(1, w - inset * 2);
+          const bumps = clamp(Math.round(w / 38), 3, 9);
+          const spacing = span / Math.max(1, bumps - 1);
+          const base = clamp(spacing * 0.78, 11 * scale, 25 * scale);
 
-          /* Flat base line */
-          ctx.moveTo(cx - hw + 6, baseY);
-          ctx.lineTo(cx + hw - 6, baseY);
-
-          /* Right end cap */
-          ctx.arc(cx + hw - bumpR * 0.8, baseY - bumpR * 0.6, bumpR * 0.7, Math.PI * 0.35, -Math.PI * 0.5, true);
-
-          /* Top bumps */
-          const topY = baseY - bumpR * 1.1;
-          const startX = cx + hw * 0.55;
-          const endX = cx - hw * 0.55;
-          const step = (startX - endX) / (bumps - 1);
-
-          for (let i = 0; i < bumps; i++) {
-            const bx = startX - step * i;
-            const r = i === Math.floor(bumps / 2) ? bigR : bumpR;
-            const by = topY - (i === Math.floor(bumps / 2) ? bumpR * 0.35 : 0);
-            ctx.arc(bx, by, r, -Math.PI * 0.25, -Math.PI * 0.75, true);
+          ctx.beginPath();
+          roundRectPath(cx - hw, topY + 2 * scale, w, 22 * scale, 11 * scale);
+          for (let i = 0; i < bumps; i += 1) {
+            const t = bumps === 1 ? 0.5 : i / (bumps - 1);
+            /* Fullest through the middle, so the crown reads as a crown. */
+            const hump = Math.sin(Math.PI * (0.16 + 0.68 * t));
+            const r = base * (0.62 + 0.38 * hump);
+            const bx = cx - hw + inset + t * span;
+            /* Crests hover just above the surface he stands on, so he
+               settles into the fluff instead of hovering over it. */
+            const by = topY - (1.5 + hump * 6.5) * scale + r;
+            ctx.moveTo(bx + r, by);
+            ctx.arc(bx, by, r, 0, TAU);
           }
+        }
 
-          /* Left end cap */
-          ctx.arc(cx - hw + bumpR * 0.8, baseY - bumpR * 0.6, bumpR * 0.7, -Math.PI * 0.5, Math.PI * 0.65, true);
-
-          ctx.closePath();
+        /* A few of the bigger clouds are asleep. */
+        function drawCloudFace(cx, cy, seed) {
+          const gap = 13;
+          const drift = Math.sin(simTime * 1.4 + seed) * 0.7;
+          ctx.strokeStyle = C.pale;
+          ctx.lineWidth = 2.6;
+          ctx.lineCap = 'round';
+          for (const side of [-1, 1]) {
+            ctx.beginPath();
+            ctx.arc(cx + side * gap, cy + drift, 5, Math.PI * 0.15, Math.PI * 0.85);
+            ctx.stroke();
+          }
+          fillOval(cx, cy + 9.5 + drift, 2, 1.6, C.pale);
+          fillOval(cx - gap * 1.9, cy + 5 + drift, 3.4, 2.2, C.mist);
+          fillOval(cx + gap * 1.9, cy + 5 + drift, 3.4, 2.2, C.mist);
         }
 
         function drawSpring(cx, sy) {
-          ctx.strokeStyle = BLUE;
-          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = C.mid;
+          ctx.lineWidth = 3;
+          ctx.lineCap = 'round';
           ctx.beginPath();
           for (let i = 0; i <= 5; i += 1) {
-            const x = cx + (i % 2 === 0 ? -10 : 10);
-            const y = sy - 4 - i * 4;
+            const x = cx + (i % 2 === 0 ? -8 : 8);
+            const y = sy - 6 - i * 4;
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
           }
           ctx.stroke();
-          ctx.strokeRect(Math.round(cx - 14) + 0.5, Math.round(sy - 3) + 0.5, 28, 5);
-          ctx.strokeRect(Math.round(cx - 12) + 0.5, Math.round(sy - 27) + 0.5, 24, 5);
+          fillRound(cx - 15, sy - 8, 30, 7, 3.5, C.deep);
+          fillRound(cx - 13, sy - 31, 26, 7, 3.5, C.deep);
         }
 
         function drawTargetTick(cx, sy) {
-          const bob = Math.sin(simTime * 8) * 2;
+          const bob = Math.sin(simTime * 5) * 2.5;
           ctx.save();
-          ctx.fillStyle = BLUE;
+          ctx.globalAlpha = 0.75;
+          ctx.fillStyle = C.pale;
           ctx.beginPath();
-          ctx.moveTo(cx, sy + bob);
-          ctx.lineTo(cx - 7, sy - 9 + bob);
-          ctx.lineTo(cx + 7, sy - 9 + bob);
+          ctx.moveTo(cx, sy + 9 + bob);
+          ctx.lineTo(cx - 7, sy + bob);
+          ctx.lineTo(cx + 7, sy + bob);
           ctx.closePath();
           ctx.fill();
+          fillRound(cx - 3, sy - 9 + bob, 6, 9, 3, C.pale);
           ctx.restore();
         }
 
-        /* -- LINKS (ladders/stairs/poles) -- clean flat lines -- */
+        /* -- LINKS -- */
 
         function drawLinks() {
           for (const link of links) {
@@ -1711,92 +1919,120 @@
             if (Math.max(y1, y2) < -60 || Math.min(y1, y2) > height + 60) continue;
             const x1 = worldLeft + link.x1;
             const x2 = worldLeft + link.x2;
-            if (link.kind === 'stairs') drawStairs(x1, y1, x2, y2, link.id === targetLinkId);
-            else if (link.kind === 'pole') drawPole(x1, y1, x2, y2, link.id === targetLinkId);
-            else drawLadder(x1, y1, x2, y2, link.id === targetLinkId);
+            const active = link.id === targetLinkId;
+            if (link.kind === 'stairs') drawStairs(x1, y1, x2, y2, active);
+            else if (link.kind === 'pole') drawPole(x1, y1, x2, y2, active);
+            else drawLadder(x1, y1, x2, y2, active);
           }
+        }
+
+        function linkTones(active) {
+          return active ? { rail: C.mid, step: C.deep } : { rail: C.pale, step: C.mid };
         }
 
         function drawLadder(x1, y1, x2, y2, active) {
-          const x = Math.round((x1 + x2) * 0.5);
-          ctx.strokeStyle = BLUE;
-          ctx.lineWidth = active ? 3.5 : 2.5;
-          ctx.beginPath();
-          ctx.moveTo(x - 8, y1);
-          ctx.lineTo(x - 8, y2);
-          ctx.moveTo(x + 8, y1);
-          ctx.lineTo(x + 8, y2);
-          ctx.stroke();
-          ctx.lineWidth = active ? 2.5 : 2;
+          const x = (x1 + x2) * 0.5;
+          const tone = linkTones(active);
           const top = Math.min(y1, y2);
           const bottom = Math.max(y1, y2);
-          for (let y = top + 13; y < bottom - 8; y += 15) {
-            ctx.beginPath();
-            ctx.moveTo(x - 8, Math.round(y) + 0.5);
-            ctx.lineTo(x + 8, Math.round(y) + 0.5);
-            ctx.stroke();
+          capsule(x - 9, top + 6, x - 9, bottom - 2, 5.5, tone.rail);
+          capsule(x + 9, top + 6, x + 9, bottom - 2, 5.5, tone.rail);
+          for (let y = top + 18; y < bottom - 6; y += 17) {
+            capsule(x - 7, y, x + 7, y, 4.5, tone.step);
           }
         }
 
+        /* Treads fanned across a stringer. The link itself is often almost
+           vertical, so the drawing takes a horizontal liberty -- otherwise a
+           staircase is indistinguishable from a ladder. */
         function drawStairs(x1, y1, x2, y2, active) {
-          ctx.strokeStyle = BLUE;
-          ctx.lineWidth = active ? 3 : 2;
-          const steps = Math.max(4, Math.floor(Math.abs(y2 - y1) / 15));
-          const dx = (x2 - x1) / steps;
-          const dy = (y2 - y1) / steps;
-          ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          for (let i = 1; i <= steps; i += 1) {
-            const nextX = x1 + dx * i;
-            const nextY = y1 + dy * i;
-            ctx.lineTo(nextX, y1 + dy * (i - 1));
-            ctx.lineTo(nextX, nextY);
+          const tone = linkTones(active);
+          const top = Math.min(y1, y2);
+          const bottom = Math.max(y1, y2);
+          const steps = Math.max(3, Math.round((bottom - top) / 22));
+          const dir = x2 >= x1 ? 1 : -1;
+          const spread = 13;
+          const fan = (t) => lerp(x1, x2, t) + dir * lerp(-spread, spread, t);
+
+          capsule(fan(0) - dir * 9, y1 + 4, fan(1) + dir * 9, y2 - 4, 7, tone.rail);
+          for (let i = 0; i <= steps; i += 1) {
+            const t = i / steps;
+            fillRound(fan(t) - 12, lerp(y1, y2, t) - 3.5, 24, 7, 3.5, tone.step);
           }
-          ctx.stroke();
         }
 
         function drawPole(x1, y1, x2, y2, active) {
-          const x = Math.round((x1 + x2) * 0.5);
-          ctx.strokeStyle = BLUE;
-          ctx.lineWidth = active ? 4 : 3;
-          ctx.beginPath();
-          ctx.moveTo(x, y1);
-          ctx.lineTo(x, y2);
-          ctx.stroke();
-          ctx.fillStyle = BLUE;
-          ctx.beginPath();
-          ctx.arc(x, y2 - 2, 5, 0, TAU);
-          ctx.fill();
+          const x = (x1 + x2) * 0.5;
+          const tone = linkTones(active);
+          const top = Math.min(y1, y2);
+          const bottom = Math.max(y1, y2);
+          capsule(x, top + 8, x, bottom - 2, 7, tone.rail);
+          fillCircle(x, top + 7, 8, tone.step);
+          fillCircle(x, top + 7, 3, C.white);
+          fillRound(x - 9, bottom - 6, 18, 7, 3.5, tone.step);
         }
 
-        /* -- QUESTION BOXES -- flat safety style -- */
+        /* -- QUESTION BOXES -- */
 
         function drawQuestionBoxes() {
           for (const box of boxes) {
             const sy = screenY(box.y + box.size);
-            if (sy < -44 || sy > height + 44) continue;
+            if (sy < -48 || sy > height + 48) continue;
             const sx = worldLeft + box.x - box.size * 0.5;
-            const lift = box.hit ? Math.max(0, 1 - (simTime - box.hitAt) / 0.18) * 8 : 0;
+            const age = simTime - box.hitAt;
+            const lift = box.hit ? Math.max(0, 1 - age / 0.2) * 9 : Math.sin(simTime * 2.4 + box.x * 0.05) * 1.4;
+            const s = box.size;
+            const targeted = box.id === targetBoxId && !box.hit;
+
             ctx.save();
-            ctx.translate(Math.round(sx) + 0.5, Math.round(sy - lift) + 0.5);
+            ctx.translate(sx + s * 0.5, sy - lift + s * 0.5);
+            if (targeted) ctx.scale(1 + Math.sin(simTime * 6) * 0.04, 1 + Math.sin(simTime * 6) * 0.04);
+            ctx.translate(-s * 0.5, -s * 0.5);
 
-            ctx.fillStyle = box.hit ? GRAY_LIGHT : BLUE;
-            ctx.strokeStyle = BLUE;
-            ctx.lineWidth = box.id === targetBoxId ? 3 : 2;
-            ctx.fillRect(0, 0, box.size, box.size);
-            ctx.strokeRect(0, 0, box.size, box.size);
+            fillRound(1.5, 4, s, s, 8, SHADOW);
 
-            ctx.font = '900 17px Geneva, system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillStyle = box.hit ? BLUE : WHITE;
-            ctx.fillText(box.hit ? '-' : '?', box.size * 0.5, box.size * 0.52);
+            if (box.hit) {
+              fillRound(0, 0, s, s, 8, C.pale);
+              /* Opened: a contented little face. */
+              ctx.strokeStyle = C.white;
+              ctx.lineWidth = 2.4;
+              ctx.lineCap = 'round';
+              for (const side of [-1, 1]) {
+                ctx.beginPath();
+                ctx.arc(s * 0.5 + side * 5.5, s * 0.46, 3.4, Math.PI * 1.1, Math.PI * 1.9);
+                ctx.stroke();
+              }
+              ctx.beginPath();
+              ctx.arc(s * 0.5, s * 0.6, 2.6, Math.PI * 0.15, Math.PI * 0.85);
+              ctx.stroke();
+            } else {
+              fillRound(0, 0, s, s, 8, C.ink);
+              fillRound(4, 4, s - 8, 5, 2.5, C.deep);
+              ctx.fillStyle = C.white;
+              ctx.font = '900 17px Geneva, "Lucida Grande", system-ui, sans-serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('?', s * 0.5, s * 0.58);
+            }
 
             ctx.restore();
+
+            /* Burst of sparkles on the frame the box opens. */
+            if (box.hit && age < 0.45) {
+              const t = age / 0.45;
+              ctx.save();
+              ctx.globalAlpha = 1 - t;
+              for (let i = 0; i < 5; i += 1) {
+                const a = (i / 5) * TAU - 0.4;
+                const d = 14 + t * 22;
+                sparkle(sx + s * 0.5 + Math.cos(a) * d, sy - lift + s * 0.5 + Math.sin(a) * d, 4 * (1 - t) + 1.5, C.pale);
+              }
+              ctx.restore();
+            }
           }
         }
 
-        /* -- BARRELS -- flat blue discs -- */
+        /* -- BARRELS -- little grumps that patrol a cloud -- */
 
         function drawBarrels() {
           for (const barrel of barrels) {
@@ -1804,21 +2040,33 @@
             if (!platform) continue;
             const bx = worldLeft + platformLeft(platform) + barrel.offset;
             const by = screenY(platform.y + barrel.radius + 2);
-            if (by < -42 || by > height + 42) continue;
+            if (by < -46 || by > height + 46) continue;
+            const r = barrel.radius;
+            const hop = Math.abs(Math.sin(barrel.roll * 1.4));
+            const squash = 1 + hop * 0.08;
+
             ctx.save();
-            ctx.translate(Math.round(bx), Math.round(by));
-            ctx.fillStyle = BLUE;
+            ctx.translate(bx, by);
+            fillOval(1, r * 0.95, r * 0.85, r * 0.28, SHADOW);
+            ctx.scale(1 / squash, squash);
+            ctx.rotate(Math.sin(barrel.roll) * 0.16);
+
+            fillCircle(0, 0, r, C.deep);
+            fillOval(0, r * 0.42, r * 0.72, r * 0.4, C.ink);
+
+            const face = barrel.dir;
+            fillOval(-r * 0.34 + face * 1.5, -r * 0.16, r * 0.19, r * 0.26, C.white);
+            fillOval(r * 0.34 + face * 1.5, -r * 0.16, r * 0.19, r * 0.26, C.white);
+            fillCircle(-r * 0.34 + face * 2.6, -r * 0.12, r * 0.1, C.night);
+            fillCircle(r * 0.34 + face * 2.6, -r * 0.12, r * 0.1, C.night);
+
+            ctx.strokeStyle = C.night;
+            ctx.lineWidth = 1.8;
+            ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.arc(0, 0, barrel.radius, 0, TAU);
-            ctx.fill();
-            ctx.strokeStyle = WHITE;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(-barrel.radius * 0.5, -barrel.radius * 0.5);
-            ctx.lineTo(barrel.radius * 0.5, barrel.radius * 0.5);
-            ctx.moveTo(barrel.radius * 0.5, -barrel.radius * 0.5);
-            ctx.lineTo(-barrel.radius * 0.5, barrel.radius * 0.5);
+            ctx.arc(face * 1.5, r * 0.44, r * 0.22, Math.PI * 1.15, Math.PI * 1.85);
             ctx.stroke();
+
             ctx.restore();
           }
         }
@@ -1828,103 +2076,303 @@
         function drawParticles() {
           for (const particle of particles) {
             const age = particle.age / particle.life;
-            const alpha = 1 - age;
             const sx = worldLeft + particle.x;
             const sy = screenY(particle.y);
-            ctx.globalAlpha = alpha * 0.6;
-            ctx.fillStyle = BLUE;
-            const size = Math.max(1, Math.round(particle.r * 0.55));
-            ctx.fillRect(Math.round(sx), Math.round(sy), size, size);
+            ctx.globalAlpha = (1 - age) * 0.85;
+            fillCircle(sx, sy, Math.max(1, particle.r * (1 - age * 0.5)), particle.color || C.pale);
           }
           ctx.globalAlpha = 1;
         }
 
-        /* -- HERO -- ISO safety-sign pictogram person -- */
+        /* ====================================================
+           HERO -- a small round climber who actually moves
+           Built on a skeleton so arms and legs swing, reach, tuck and splay
+           instead of holding one pose. Tones step down the ramp from back
+           limb to boot, which is what keeps a flat figure readable.
+           ==================================================== */
+
+        const FOOT_Y = -1;
+        const HIP_Y = -18;
+        const SHOULDER_Y = -29;
+        const HEAD_Y = -38;
+        const HEAD_R = 10;
+
+        /* Stepped back-to-front so no two touching shapes share a tone. */
+        const SKIN = {
+          back: C.mid,
+          shirt: C.ink,
+          arm: C.deep,
+          bib: C.night,
+          leg: C.deep,
+          boot: C.night,
+          cap: C.ink,
+        };
 
         function drawHero() {
           const sx = worldLeft + hero.x;
           const sy = screenY(hero.y);
-          const blink = hero.blinkUntil > simTime && Math.floor(simTime * 24) % 2 === 0;
+          const link = hero.onLink ? linkById(hero.onLink.linkId) : null;
+          const hurt = hero.stumbleUntil > simTime;
+
+          /* Contact shadow, tighter once he leaves the ground. */
+          if (hero.grounded) fillOval(sx, sy + 2, 14, 4, SHADOW);
+          else fillOval(sx, sy + 2, 9, 2.5, SHADOW_SOFT);
 
           ctx.save();
-          ctx.translate(Math.round(sx), Math.round(sy));
-          ctx.scale(hero.facing, 1);
+          ctx.translate(sx, sy);
 
-          const climb = hero.onLink ? Math.sin(simTime * 9) * 4 : 0;
-          const jumpPose = hero.grounded ? 0 : clamp(hero.vy / JUMP_SPEED, -0.65, 1);
-          const run =
-            Math.sin(simTime * 16) *
-            (hero.grounded ? clamp(Math.abs(hero.vx) / RUN_SPEED, 0, 1) : 0.25);
+          /* Landing squash and takeoff stretch, pivoted on the feet. */
+          const land = Math.max(0, 1 - (simTime - hero.landedAt) / 0.2);
+          const air = hero.grounded || link ? 0 : clamp(hero.vy / JUMP_SPEED, -0.9, 1);
+          ctx.scale(1 + 0.18 * land - Math.max(0, air) * 0.05, 1 - 0.2 * land + Math.max(0, air) * 0.06);
 
-          /* Blue circle background (safety sign style) */
-          ctx.fillStyle = blink ? BLUE_LIGHT : BLUE;
-          ctx.beginPath();
-          ctx.arc(0, -22, 24, 0, TAU);
-          ctx.fill();
+          if (hurt) ctx.rotate(Math.sin(simTime * 40) * 0.08);
 
-          /* White pictogram figure */
-          ctx.strokeStyle = WHITE;
-          ctx.fillStyle = WHITE;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
+          if (link && link.kind === 'pole') drawHeroSlide();
+          else if (link) drawHeroClimb();
+          else {
+            ctx.scale(hero.facing, 1);
+            drawHeroRun(air);
+          }
 
-          /* Head */
-          ctx.beginPath();
-          ctx.arc(0, -36, 6, 0, TAU);
-          ctx.fill();
+          ctx.restore();
 
-          /* Body */
-          ctx.lineWidth = 3.5;
-          ctx.beginPath();
-          ctx.moveTo(0, -30);
-          ctx.lineTo(0, -14);
-          ctx.stroke();
+          if (hero.rescuedUntil > simTime) drawRescueSparkles(sx, sy);
+        }
 
-          /* Arms */
-          const leftArmEnd = hero.onLink ? -8 + climb * 0.5 : -10;
-          const rightArmEnd = hero.onLink ? 8 - climb * 0.5 : jumpPose > 0.3 ? 4 : 10;
-          const leftArmY = -25 + (hero.onLink ? climb : jumpPose * -5);
-          const rightArmY = -23 - (hero.onLink ? climb : jumpPose * -3);
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(0, -26);
-          ctx.lineTo(leftArmEnd, leftArmY);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(0, -26);
-          ctx.lineTo(rightArmEnd, rightArmY);
-          ctx.stroke();
+        /* Side view: run cycle on the ground, tuck rising, splay falling. */
+        function drawHeroRun(air) {
+          const grounded = hero.grounded;
+          const gait = grounded ? clamp(Math.abs(hero.vx) / RUN_SPEED, 0, 1) : 0;
+          const phase = hero.stride / 22;
+          const breathe = Math.sin(simTime * 2.3) * (grounded ? 1 - gait : 0);
 
-          /* Legs */
-          const leftFoot = run * 5 - jumpPose * 3;
-          const rightFoot = -run * 5 + jumpPose * 2;
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(0, -14);
-          ctx.lineTo(-6 + leftFoot, -2);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(0, -14);
-          ctx.lineTo(6 + rightFoot, -2);
-          ctx.stroke();
+          /* Bob up as each leg passes under the body. */
+          const bob = grounded ? -Math.abs(Math.sin(phase)) * 2.6 * gait + breathe * 0.6 : 0;
+          const lean = grounded ? clamp(hero.vx / RUN_SPEED, -1, 1) * hero.facing * 1.4 : air * 1.6;
 
-          /* Feet */
-          ctx.lineWidth = 2.5;
-          ctx.beginPath();
-          ctx.moveTo(-9 + leftFoot, -2);
-          ctx.lineTo(-3 + leftFoot, -2);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(3 + rightFoot, -2);
-          ctx.lineTo(9 + rightFoot, -2);
-          ctx.stroke();
+          ctx.save();
+          ctx.translate(0, bob);
+
+          const hipX = lean * 0.5;
+          const shoulderX = lean * 2;
+
+          /* Foot targets: a flat half-loop on the ground, tucked in the air. */
+          let footA;
+          let footB;
+          if (grounded) {
+            const swing = 9.5 * gait;
+            const lift = 7 * gait;
+            footA = [Math.cos(phase) * swing + 1, FOOT_Y - Math.max(0, Math.sin(phase)) * lift];
+            footB = [Math.cos(phase + Math.PI) * swing + 1, FOOT_Y - Math.max(0, Math.sin(phase + Math.PI)) * lift];
+          } else if (air > 0.1) {
+            footA = [-4, FOOT_Y - 5 - air * 6];
+            footB = [7, FOOT_Y - 2 - air * 4];
+          } else {
+            const fall = clamp(-air, 0, 1);
+            footA = [-7 - fall * 4, FOOT_Y - fall * 1];
+            footB = [8 + fall * 4, FOOT_Y - 1];
+          }
+
+          /* Hands counter-swing against the legs. */
+          let handA;
+          let handB;
+          if (grounded) {
+            /* Hands stay outboard of the torso through the whole swing, or
+               they read as a button stitched to his front. */
+            const swing = 6.5 * gait;
+            const droop = SHOULDER_Y + 12 + breathe * 0.9;
+            handA = [-11 - Math.cos(phase) * swing, droop - Math.abs(Math.sin(phase)) * 3.5 * gait];
+            handB = [11.5 - Math.cos(phase + Math.PI) * swing, droop - Math.abs(Math.sin(phase + Math.PI)) * 3.5 * gait];
+          } else if (air > 0.1) {
+            handA = [-11, SHOULDER_Y - 5 - air * 9];
+            handB = [12, SHOULDER_Y - 8 - air * 9];
+          } else {
+            const fall = clamp(-air, 0, 1);
+            handA = [-14 - fall * 2, SHOULDER_Y - 1 - fall * 7];
+            handB = [14 + fall * 2, SHOULDER_Y - 3 - fall * 8];
+          }
+
+          /* Back limbs a tone lighter, so the pose reads in depth. */
+          limb(hipX - 3.5, HIP_Y, footA[0], footA[1], -3, 8, SKIN.back);
+          fillOval(footA[0] + 1, footA[1] + 0.5, 5, 3, SKIN.back);
+          limb(shoulderX - 6, SHOULDER_Y + 1, handA[0], handA[1], 1.5, 5.8, SKIN.back);
+          fillCircle(handA[0], handA[1], 3.6, SKIN.back);
+
+          drawTorso(hipX, shoulderX);
+
+          limb(hipX + 3.5, HIP_Y, footB[0], footB[1], -3, 8.5, SKIN.leg);
+          fillOval(footB[0] + 1.2, footB[1] + 0.5, 5.4, 3.2, SKIN.boot);
+          limb(shoulderX + 6, SHOULDER_Y + 1, handB[0], handB[1], -1.5, 6, SKIN.arm);
+          fillCircle(handB[0], handB[1], 3.8, SKIN.arm);
+
+          drawHead(shoulderX, air, gait, false);
+          ctx.restore();
+        }
+
+        /* Front view: hand over hand up a ladder or a stair. */
+        function drawHeroClimb() {
+          const c = hero.climbT * 7;
+          const s = Math.sin(c);
+          ctx.save();
+          ctx.translate(0, -Math.abs(s) * 1.4);
+
+          const handAY = SHOULDER_Y - 14 - s * 7;
+          const handBY = SHOULDER_Y - 14 + s * 7;
+          const footAY = FOOT_Y - Math.max(0, -s) * 7;
+          const footBY = FOOT_Y - Math.max(0, s) * 7;
+
+          limb(-4, HIP_Y, -6.5, footAY, 3, 8, SKIN.back);
+          fillOval(-6.5, footAY + 0.5, 5, 3, SKIN.back);
+          limb(4, HIP_Y, 6.5, footBY, -3, 8.5, SKIN.leg);
+          fillOval(6.5, footBY + 0.5, 5.4, 3.2, SKIN.boot);
+
+          drawTorso(0, 0);
+          drawHead(0, 0, 0, true);
+
+          /* Arms last and wide of the head, or the head hides the reach. */
+          limb(-6.5, SHOULDER_Y + 2, -15, handAY, -4, 7, SKIN.arm);
+          fillCircle(-15, handAY, 4, SKIN.arm);
+          limb(6.5, SHOULDER_Y + 2, 15, handBY, 4, 7, SKIN.arm);
+          fillCircle(15, handBY, 4, SKIN.arm);
 
           ctx.restore();
         }
 
+        /* Front view: both hands on the pole, legs wrapped, going down fast. */
+        function drawHeroSlide() {
+          const wob = Math.sin(simTime * 12) * 1.5;
+          ctx.save();
+          ctx.translate(wob * 0.4, 0);
+
+          limb(-4, HIP_Y, -8, FOOT_Y - 3, 4.5, 8, SKIN.back);
+          fillOval(-8, FOOT_Y - 2.5, 5, 3, SKIN.back);
+          limb(4, HIP_Y, 8, FOOT_Y - 3, -4.5, 8.5, SKIN.leg);
+          fillOval(8, FOOT_Y - 2.5, 5.4, 3.2, SKIN.boot);
+
+          drawTorso(0, 0);
+          drawHead(wob * 0.6, 0.6, 0, true);
+
+          /* Both hands on the pole, above the head, drawn over it. */
+          limb(-6, SHOULDER_Y + 2, -3.5, SHOULDER_Y - 23, -5, 7, SKIN.arm);
+          fillCircle(-3.5, SHOULDER_Y - 23, 4, SKIN.arm);
+          limb(6, SHOULDER_Y + 2, 3.5, SHOULDER_Y - 31, 5, 7, SKIN.arm);
+          fillCircle(3.5, SHOULDER_Y - 31, 4, SKIN.arm);
+
+          ctx.restore();
+        }
+
+        function drawTorso(hipX, shoulderX) {
+          const h = HIP_Y - SHOULDER_Y;
+          ctx.save();
+          ctx.translate(hipX, 0);
+          ctx.rotate((shoulderX - hipX) * 0.012);
+
+          /* Shirt, then dungarees over the lower two thirds. */
+          fillRound(-9.5, SHOULDER_Y - 1, 19, h + 7, 8, SKIN.shirt);
+          fillRound(-9.5, SHOULDER_Y + 5, 19, h + 1, 7, SKIN.bib);
+          capsule(-4.5, SHOULDER_Y, -4.5, SHOULDER_Y + 7, 2.8, SKIN.bib);
+          capsule(4.5, SHOULDER_Y, 4.5, SHOULDER_Y + 7, 2.8, SKIN.bib);
+          fillCircle(0, SHOULDER_Y + 8.5, 2, C.mid);
+
+          ctx.restore();
+        }
+
+        function drawHead(offsetX, air, gait, frontOn) {
+          const nod = gait > 0 ? Math.sin(hero.stride / 11) * 0.7 : Math.sin(simTime * 2.3) * 0.5;
+          ctx.save();
+          ctx.translate(offsetX * 0.55, HEAD_Y + nod);
+
+          /* Face */
+          fillCircle(0, 0, HEAD_R, C.white);
+          /* Far ear, one tone back so it sits behind the face. */
+          if (!frontOn) fillCircle(-HEAD_R + 1, 1.5, 2.8, C.mist);
+
+          /* Cap: clipped to the head so the silhouette stays clean, plus a
+             brim that points the way he is going. */
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(0, 0, HEAD_R, 0, TAU);
+          ctx.clip();
+          ctx.fillStyle = SKIN.cap;
+          ctx.fillRect(-HEAD_R - 2, -HEAD_R - 8, HEAD_R * 2 + 4, HEAD_R + 4);
+          ctx.restore();
+          if (frontOn) fillRound(-10.5, -5.4, 21, 4.6, 2.3, SKIN.cap);
+          else fillRound(-4.5, -5.6, 16, 4.8, 2.4, SKIN.cap);
+          fillCircle(0, -HEAD_R - 0.5, 2.8, C.mid);
+
+          drawFace(frontOn ? 0 : 2, air, frontOn);
+          ctx.restore();
+        }
+
+        function drawFace(look, air, frontOn) {
+          const blinking = simTime < hero.blinkEndsAt;
+          const hurt = hero.stumbleUntil > simTime;
+          const gap = frontOn ? 4.6 : 4.2;
+          const eyeY = 2.6;
+
+          if (hurt) {
+            /* Dazed: two little crosses. */
+            ctx.strokeStyle = C.night;
+            ctx.lineWidth = 1.7;
+            ctx.lineCap = 'round';
+            for (const side of [-1, 1]) {
+              const x = look + side * gap;
+              ctx.beginPath();
+              ctx.moveTo(x - 2.2, eyeY - 2.2);
+              ctx.lineTo(x + 2.2, eyeY + 2.2);
+              ctx.moveTo(x + 2.2, eyeY - 2.2);
+              ctx.lineTo(x - 2.2, eyeY + 2.2);
+              ctx.stroke();
+            }
+          } else if (blinking) {
+            ctx.strokeStyle = C.night;
+            ctx.lineWidth = 1.8;
+            ctx.lineCap = 'round';
+            for (const side of [-1, 1]) {
+              ctx.beginPath();
+              ctx.arc(look + side * gap, eyeY - 1, 2.4, Math.PI * 0.15, Math.PI * 0.85);
+              ctx.stroke();
+            }
+          } else {
+            for (const side of [-1, 1]) {
+              const x = look + side * gap;
+              fillOval(x, eyeY, 2.2, 2.9, C.night);
+              fillCircle(x + 0.8, eyeY - 1.2, 0.9, C.white);
+            }
+          }
+
+          /* Cheeks: the one warm note in the whole piece. */
+          fillOval(look - gap - 3.2, eyeY + 3.8, 2.3, 1.5, C.blush);
+          fillOval(look + gap + 3.2, eyeY + 3.8, 2.3, 1.5, C.blush);
+
+          /* Mouth: an open O in the air, a small smile on the ground. */
+          if (air > 0.25) {
+            fillOval(look, eyeY + 5.4, 1.8, 2.2, C.night);
+          } else {
+            ctx.strokeStyle = C.night;
+            ctx.lineWidth = 1.5;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.arc(look, eyeY + 4, 2.2, Math.PI * 0.12, Math.PI * 0.88);
+            ctx.stroke();
+          }
+        }
+
+        function drawRescueSparkles(sx, sy) {
+          const t = clamp((hero.rescuedUntil - simTime) / 0.6, 0, 1);
+          ctx.save();
+          ctx.globalAlpha = t;
+          for (let i = 0; i < 6; i += 1) {
+            const a = (i / 6) * TAU + simTime * 2;
+            const d = 22 + (1 - t) * 20;
+            sparkle(sx + Math.cos(a) * d, sy - 22 + Math.sin(a) * d, 3 + t * 3, C.mid);
+          }
+          ctx.restore();
+        }
+
         function screenY(worldY) {
-          const hudHeight = width <= 520 ? 64 : 58;
-          return height - hudHeight - (worldY - cameraY);
+          return height - hudHeight() - (worldY - cameraY);
         }
 
         /* -- INPUT (unchanged) -- */

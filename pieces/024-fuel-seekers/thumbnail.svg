@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-labelledby="title description">
+  <title id="title">Fuel Seekers</title>
+  <desc id="description">Amber-filled bubbles crossing a dark marbled resource field between ten small fuel stations.</desc>
+  <rect width="800" height="800" fill="#1f201e"/>
+  <g transform="translate(0 100)">
+  <path d="M-30 506C75 447 116 480 192 423c80-60 44-129 142-151 97-22 122 39 212-28 91-68 89-132 198-158 42-10 74-8 106 4" fill="none" stroke="#37342b" stroke-width="72" opacity=".52"/>
+  <path d="M-34 498C76 440 119 474 190 418c76-60 43-126 141-150 99-24 127 39 216-30 87-67 87-124 197-153 44-12 77-9 108 2" fill="none" stroke="#4a4434" stroke-width="18" opacity=".42"/>
+  <path d="M28 64c117 44 151 121 269 98 103-20 114-94 215-92 99 2 135 76 248 47" fill="none" stroke="#343229" stroke-width="54" opacity=".56"/>
+  <path d="M37 60c107 41 149 114 257 94 108-20 119-93 220-89 96 4 137 75 246 45" fill="none" stroke="#484231" stroke-width="13" opacity=".38"/>
+  <path d="M75 635c69-112 176-86 232-176 59-95 8-157 81-219 77-65 153-19 213-112 29-45 26-83 21-130" fill="none" stroke="#302f29" stroke-width="37" opacity=".72"/>
+
+  <defs>
+    <g id="station">
+      <circle r="25" fill="none" stroke="#d58b4b" stroke-opacity=".24"/>
+      <rect x="-9" y="-14" width="18" height="29" fill="#dc9552"/>
+      <rect x="-6" y="-9" width="12" height="7" fill="#242520"/>
+      <rect x="-12" y="14" width="24" height="4" fill="#11120f"/>
+      <rect x="-7" y="-18" width="14" height="4" fill="#11120f"/>
+    </g>
+    <g id="bubble-low">
+      <circle r="9" fill="#643719" fill-opacity=".72" stroke="#dce2d8" stroke-opacity=".7" stroke-width="2"/>
+      <path d="M-7 2h14v7H-7z" fill="#d88746" fill-opacity=".72"/>
+      <path d="M-4-5a6 6 0 0 1 3-2" fill="none" stroke="#fffbe9" stroke-opacity=".75"/>
+    </g>
+    <g id="bubble-high">
+      <circle r="11" fill="#a95c2d" fill-opacity=".74" stroke="#eef1e8" stroke-opacity=".76" stroke-width="2"/>
+      <path d="M-5-7a8 8 0 0 1 4-2" fill="none" stroke="#fffbe9" stroke-opacity=".82"/>
+    </g>
+    <g id="bubble-empty">
+      <circle r="7" fill="#e4ebe1" fill-opacity=".06" stroke="#cbd6ca" stroke-opacity=".62" stroke-width="1.5"/>
+      <path d="M-5 4h10v3H-5z" fill="#bd6d38" fill-opacity=".62"/>
+    </g>
+  </defs>
+
+  <g>
+    <use href="#station" transform="translate(102 115)"/>
+    <use href="#station" transform="translate(282 133)"/>
+    <use href="#station" transform="translate(505 105)"/>
+    <use href="#station" transform="translate(692 165)"/>
+    <use href="#station" transform="translate(177 292)"/>
+    <use href="#station" transform="translate(390 261)"/>
+    <use href="#station" transform="translate(622 330)"/>
+    <use href="#station" transform="translate(92 489)"/>
+    <use href="#station" transform="translate(363 494)"/>
+    <use href="#station" transform="translate(704 483)"/>
+  </g>
+
+  <g>
+    <use href="#bubble-high" transform="translate(129 107) scale(.8)"/>
+    <use href="#bubble-low" transform="translate(69 79) scale(.65)"/>
+    <use href="#bubble-empty" transform="translate(174 73)"/>
+    <use href="#bubble-high" transform="translate(236 104) scale(.7)"/>
+    <use href="#bubble-empty" transform="translate(328 166) scale(.72)"/>
+    <use href="#bubble-low" transform="translate(407 98) scale(.82)"/>
+    <use href="#bubble-empty" transform="translate(557 142) scale(.8)"/>
+    <use href="#bubble-high" transform="translate(635 122) scale(.72)"/>
+    <use href="#bubble-low" transform="translate(733 96) scale(.65)"/>
+    <use href="#bubble-empty" transform="translate(773 211) scale(.75)"/>
+    <use href="#bubble-low" transform="translate(111 212) scale(.82)"/>
+    <use href="#bubble-empty" transform="translate(209 242) scale(.7)"/>
+    <use href="#bubble-high" transform="translate(278 227) scale(.68)"/>
+    <use href="#bubble-low" transform="translate(349 310) scale(.74)"/>
+    <use href="#bubble-empty" transform="translate(451 220) scale(.9)"/>
+    <use href="#bubble-low" transform="translate(529 279) scale(.72)"/>
+    <use href="#bubble-high" transform="translate(650 304) scale(.66)"/>
+    <use href="#bubble-empty" transform="translate(721 257) scale(.72)"/>
+    <use href="#bubble-empty" transform="translate(56 347) scale(.84)"/>
+    <use href="#bubble-high" transform="translate(132 375) scale(.74)"/>
+    <use href="#bubble-low" transform="translate(244 339) scale(.66)"/>
+    <use href="#bubble-empty" transform="translate(318 393) scale(.82)"/>
+    <use href="#bubble-high" transform="translate(422 361) scale(.82)"/>
+    <use href="#bubble-low" transform="translate(502 405) scale(.72)"/>
+    <use href="#bubble-empty" transform="translate(586 388) scale(.68)"/>
+    <use href="#bubble-high" transform="translate(757 382) scale(.72)"/>
+    <use href="#bubble-low" transform="translate(46 528) scale(.68)"/>
+    <use href="#bubble-high" transform="translate(134 476) scale(.7)"/>
+    <use href="#bubble-empty" transform="translate(214 524) scale(.82)"/>
+    <use href="#bubble-low" transform="translate(310 461) scale(.75)"/>
+    <use href="#bubble-high" transform="translate(401 505) scale(.67)"/>
+    <use href="#bubble-empty" transform="translate(474 473) scale(.72)"/>
+    <use href="#bubble-low" transform="translate(551 522) scale(.65)"/>
+    <use href="#bubble-high" transform="translate(639 463) scale(.72)"/>
+    <use href="#bubble-empty" transform="translate(756 534) scale(.82)"/>
+  </g>
+  </g>
+</svg>
