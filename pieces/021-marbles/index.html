@@ -1,0 +1,1136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="Four bookmatched marble tiles rendered as a photographic procedural surface."
+    />
+    <title>Marbles · HyperGal</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --panel: #e8e6df;
+        --panel-ink: #171918;
+        --panel-muted: #5f625e;
+        --panel-rule: #a6a69f;
+        --focus: #005fcc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #272723;
+      }
+
+      body {
+        min-width: 320px;
+        font-family:
+          "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #272723;
+      }
+
+      canvas:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: -7px;
+      }
+
+      .marble-panel {
+        position: fixed;
+        z-index: 10;
+        top: max(16px, env(safe-area-inset-top));
+        left: max(16px, env(safe-area-inset-left));
+        width: min(292px, calc(100vw - 32px));
+        border: 1px solid var(--panel-ink);
+        border-radius: 2px;
+        background: var(--panel);
+        box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.64);
+        color: var(--panel-ink);
+        font-size: 12px;
+        line-height: 1.2;
+        user-select: none;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 45px;
+        padding: 7px 8px 7px 11px;
+        border-bottom: 1px solid var(--panel-ink);
+        cursor: grab;
+        touch-action: none;
+      }
+
+      .panel-heading {
+        min-width: 0;
+      }
+
+      .panel-heading h1 {
+        margin: 0;
+        overflow: hidden;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        line-height: 1.05;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .panel-heading p {
+        margin: 3px 0 0;
+        overflow: hidden;
+        color: var(--panel-muted);
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 9px;
+        letter-spacing: 0.025em;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .panel-actions {
+        display: flex;
+        flex: 0 0 auto;
+        gap: 4px;
+      }
+
+      .panel-button {
+        display: grid;
+        width: 29px;
+        height: 29px;
+        padding: 0;
+        place-items: center;
+        border: 1px solid var(--panel-ink);
+        border-radius: 1px;
+        background: transparent;
+        color: var(--panel-ink);
+        font: 700 17px/1 Arial, sans-serif;
+        cursor: pointer;
+      }
+
+      .panel-button[data-action="reseed"] {
+        background: var(--panel-ink);
+        color: var(--panel);
+        font-size: 18px;
+      }
+
+      .panel-button:hover {
+        background: #fff;
+        color: #000;
+      }
+
+      .panel-button:focus-visible,
+      input:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      .marble-panel.is-dragging .panel-header {
+        cursor: grabbing;
+      }
+
+      .marble-panel.is-collapsed {
+        width: 176px;
+      }
+
+      .marble-panel.is-collapsed .panel-header {
+        border-bottom: 0;
+      }
+
+      .marble-panel.is-collapsed .panel-controls,
+      .marble-panel.is-collapsed .panel-note,
+      .marble-panel.is-collapsed .panel-heading p {
+        display: none;
+      }
+
+      .panel-controls {
+        padding: 9px 10px 8px;
+      }
+
+      .palette-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 144px;
+        align-items: center;
+        gap: 8px;
+        min-height: 37px;
+        border-bottom: 1px solid var(--panel-rule);
+      }
+
+      .palette-row label {
+        font-weight: 650;
+      }
+
+      .palette-row select {
+        width: 100%;
+        height: 26px;
+        padding: 2px 24px 2px 6px;
+        border: 1px solid var(--panel-ink);
+        border-radius: 1px;
+        background: var(--panel);
+        color: var(--panel-ink);
+        font: 10px/1.1 "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+        cursor: pointer;
+      }
+
+      .color-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 42px 58px;
+        align-items: center;
+        gap: 8px;
+        min-height: 37px;
+        border-bottom: 1px solid var(--panel-rule);
+      }
+
+      .color-row label {
+        font-weight: 650;
+      }
+
+      .color-row input[type="color"] {
+        width: 42px;
+        height: 24px;
+        padding: 2px;
+        border: 1px solid var(--panel-ink);
+        border-radius: 1px;
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .color-row input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+
+      .color-row input[type="color"]::-webkit-color-swatch {
+        border: 0;
+      }
+
+      .color-value,
+      .control-value {
+        color: var(--panel-muted);
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+      }
+
+      .range-row {
+        --progress: 50%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 58px;
+        align-items: center;
+        column-gap: 8px;
+        min-height: 39px;
+      }
+
+      .range-row label {
+        font-weight: 650;
+      }
+
+      .range-row input[type="range"] {
+        grid-column: 1 / 3;
+        width: 100%;
+        height: 10px;
+        margin: -5px 0 0;
+        padding: 0;
+        appearance: none;
+        background: transparent;
+        cursor: ew-resize;
+      }
+
+      .range-row input[type="range"]::-webkit-slider-runnable-track {
+        height: 2px;
+        background: linear-gradient(
+          to right,
+          var(--panel-ink) 0 var(--progress),
+          var(--panel-rule) var(--progress) 100%
+        );
+      }
+
+      .range-row input[type="range"]::-webkit-slider-thumb {
+        width: 10px;
+        height: 14px;
+        margin-top: -6px;
+        border: 1px solid var(--panel-ink);
+        border-radius: 0;
+        appearance: none;
+        background: var(--panel);
+      }
+
+      .range-row input[type="range"]::-moz-range-track {
+        height: 2px;
+        border: 0;
+        background: var(--panel-rule);
+      }
+
+      .range-row input[type="range"]::-moz-range-progress {
+        height: 2px;
+        background: var(--panel-ink);
+      }
+
+      .range-row input[type="range"]::-moz-range-thumb {
+        width: 9px;
+        height: 13px;
+        border: 1px solid var(--panel-ink);
+        border-radius: 0;
+        background: var(--panel);
+      }
+
+      .panel-note {
+        margin: 0;
+        padding: 8px 10px 9px;
+        border-top: 1px solid var(--panel-ink);
+        color: var(--panel-muted);
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 9px;
+        line-height: 1.35;
+      }
+
+      .webgl-error {
+        position: fixed;
+        inset: 0;
+        display: none;
+        place-items: center;
+        padding: 24px;
+        background: #272723;
+        color: #f3f0e8;
+        font-size: 16px;
+        text-align: center;
+      }
+
+      .has-webgl-error .webgl-error {
+        display: grid;
+      }
+
+      .has-webgl-error .marble-panel,
+      .has-webgl-error canvas {
+        display: none;
+      }
+
+      .no-panel .marble-panel {
+        display: none;
+      }
+
+      .status {
+        position: fixed;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      @media (max-width: 520px) {
+        .marble-panel {
+          top: max(10px, env(safe-area-inset-top));
+          left: max(10px, env(safe-area-inset-left));
+          width: min(258px, calc(100vw - 20px));
+        }
+
+        .panel-header {
+          min-height: 41px;
+          padding-block: 5px;
+        }
+
+        .panel-controls {
+          padding-top: 6px;
+          padding-bottom: 5px;
+        }
+
+        .color-row,
+        .range-row {
+          min-height: 35px;
+        }
+
+        .panel-note {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .panel-button,
+        input {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="stage"
+      tabindex="0"
+      role="img"
+      aria-label="Marbles: four photographic procedural marble tiles mirrored across their horizontal and vertical joints while their turbulence flows in a seamless five-second cycle."
+    ></canvas>
+
+    <aside class="marble-panel" aria-label="Marble controls">
+      <div class="panel-header">
+        <div class="panel-heading">
+          <h1>Marbles</h1>
+          <p id="slab-number">BOOKMATCH / SLAB 0000</p>
+        </div>
+        <div class="panel-actions">
+          <button
+            class="panel-button"
+            id="collapse-panel"
+            data-action="collapse"
+            type="button"
+            aria-controls="marble-controls"
+            aria-expanded="true"
+            aria-label="Collapse marble controls"
+            title="Collapse controls"
+          >−</button>
+          <button
+            class="panel-button"
+            id="reseed"
+            data-action="reseed"
+            type="button"
+            aria-label="Cut a new slab"
+            title="Cut a new slab"
+          >↻</button>
+        </div>
+      </div>
+
+      <div class="panel-controls" id="marble-controls">
+        <div class="color-row">
+          <label for="base-color">Stone</label>
+          <input id="base-color" type="color" value="#696a61" />
+          <output class="color-value" for="base-color">#696A61</output>
+        </div>
+
+        <div class="color-row">
+          <label for="vein-color">Vein</label>
+          <input id="vein-color" type="color" value="#e7e1d4" />
+          <output class="color-value" for="vein-color">#E7E1D4</output>
+        </div>
+
+        <div class="palette-row">
+          <label for="palette">Palette</label>
+          <select id="palette">
+            <option value="0">Rose / orange</option>
+            <option value="1">Red / tangerine</option>
+            <option value="2">Blush / moss</option>
+            <option value="3">Black / cream</option>
+            <option value="4">Olive / ivory</option>
+            <option value="5">Emerald / ice</option>
+            <option value="6">Teal / mustard</option>
+            <option value="7">Cobalt / cyan</option>
+            <option value="custom">Custom colors</option>
+          </select>
+        </div>
+
+        <div class="range-row">
+          <label for="scale">Vein scale</label>
+          <output class="control-value" for="scale">4.2×</output>
+          <input id="scale" type="range" min="18" max="82" value="42" />
+        </div>
+
+        <div class="range-row">
+          <label for="flow">Flow</label>
+          <output class="control-value" for="flow">38°</output>
+          <input id="flow" type="range" min="0" max="180" value="38" />
+        </div>
+
+        <div class="range-row">
+          <label for="turbulence">Turbulence</label>
+          <output class="control-value" for="turbulence" aria-live="off">68%</output>
+          <input id="turbulence" type="range" min="0" max="100" value="68" />
+        </div>
+
+        <div class="range-row">
+          <label for="vein-width">Vein width</label>
+          <output class="control-value" for="vein-width">36%</output>
+          <input id="vein-width" type="range" min="5" max="90" value="36" />
+        </div>
+
+        <div class="range-row">
+          <label for="grain">Mineral grain</label>
+          <output class="control-value" for="grain">46%</output>
+          <input id="grain" type="range" min="0" max="100" value="46" />
+        </div>
+
+        <div class="range-row">
+          <label for="polish">Polish</label>
+          <output class="control-value" for="polish">74%</output>
+          <input id="polish" type="range" min="0" max="100" value="74" />
+        </div>
+
+        <div class="range-row">
+          <label for="relief">Relief</label>
+          <output class="control-value" for="relief">44%</output>
+          <input id="relief" type="range" min="0" max="100" value="44" />
+        </div>
+      </div>
+
+      <p class="panel-note">DRAG HEADER · R NEW SLAB · 5S TURBULENCE LOOP</p>
+    </aside>
+
+    <p class="webgl-error">
+      This piece needs WebGL to render its photographic stone surface.
+    </p>
+    <p id="status" class="status" aria-live="polite"></p>
+
+    <script>
+      (() => {
+        const canvas = document.getElementById('stage');
+        const panel = document.querySelector('.marble-panel');
+        const panelHeader = panel.querySelector('.panel-header');
+        const collapseButton = document.getElementById('collapse-panel');
+        const reseedButton = document.getElementById('reseed');
+        const slabNumber = document.getElementById('slab-number');
+        const status = document.getElementById('status');
+        const pageParams = new URLSearchParams(location.search);
+        const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+        const LOOP_DURATION = 5000;
+
+        if (pageParams.get('panel') === '0') {
+          document.body.classList.add('no-panel');
+        }
+
+        const PALETTES = [
+          { name: 'rose and orange', colors: ['#d82e5b', '#f29a22'] },
+          { name: 'red and tangerine', colors: ['#d83224', '#ef642f'] },
+          { name: 'blush and moss', colors: ['#dda0b6', '#476b32'] },
+          { name: 'black and cream', colors: ['#1c1b1a', '#f1eadc'] },
+          { name: 'olive and ivory', colors: ['#a4a53d', '#eee7cb'] },
+          { name: 'emerald and ice', colors: ['#15945a', '#b9dadd'] },
+          { name: 'teal and mustard', colors: ['#287c79', '#d2c45c'] },
+          { name: 'cobalt and cyan', colors: ['#294b98', '#00a9d2'] }
+        ];
+
+        const paletteSelect = document.getElementById('palette');
+        const controls = {
+          baseColor: document.getElementById('base-color'),
+          veinColor: document.getElementById('vein-color'),
+          scale: document.getElementById('scale'),
+          flow: document.getElementById('flow'),
+          turbulence: document.getElementById('turbulence'),
+          veinWidth: document.getElementById('vein-width'),
+          grain: document.getElementById('grain'),
+          polish: document.getElementById('polish'),
+          relief: document.getElementById('relief')
+        };
+
+        const gl = canvas.getContext('webgl', {
+          alpha: false,
+          antialias: false,
+          depth: false,
+          powerPreference: 'high-performance',
+          preserveDrawingBuffer: true
+        });
+
+        if (!gl || !gl.getExtension('OES_standard_derivatives')) {
+          document.body.classList.add('has-webgl-error');
+          return;
+        }
+
+        const vertexSource = `
+          attribute vec2 a_position;
+          varying vec2 v_uv;
+
+          void main() {
+            v_uv = a_position * 0.5 + 0.5;
+            gl_Position = vec4(a_position, 0.0, 1.0);
+          }
+        `;
+
+        const fragmentSource = `
+          #extension GL_OES_standard_derivatives : enable
+          precision highp float;
+
+          varying vec2 v_uv;
+          uniform vec2 u_resolution;
+          uniform vec3 u_stone;
+          uniform vec3 u_vein;
+          uniform float u_seed;
+          uniform float u_scale;
+          uniform float u_flow;
+          uniform float u_phase;
+          uniform float u_turbulence;
+          uniform float u_veinWidth;
+          uniform float u_grain;
+          uniform float u_polish;
+          uniform float u_relief;
+
+          float hash21(vec2 p) {
+            p = fract(p * vec2(123.34, 456.21));
+            p += dot(p, p + 45.32 + u_seed * 0.013);
+            return fract(p.x * p.y);
+          }
+
+          float noise2(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            vec2 u = f * f * (3.0 - 2.0 * f);
+            float a = hash21(i);
+            float b = hash21(i + vec2(1.0, 0.0));
+            float c = hash21(i + vec2(0.0, 1.0));
+            float d = hash21(i + vec2(1.0, 1.0));
+            return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+          }
+
+          float fbm(vec2 p) {
+            float value = 0.0;
+            float amplitude = 0.52;
+            mat2 turn = mat2(0.80, 0.60, -0.60, 0.80);
+            for (int i = 0; i < 5; i++) {
+              value += amplitude * noise2(p);
+              p = turn * p * 2.03 + vec2(13.17, 7.91);
+              amplitude *= 0.49;
+            }
+            return value;
+          }
+
+          vec3 saturateColor(vec3 color, float amount) {
+            float luma = dot(color, vec3(0.299, 0.587, 0.114));
+            return mix(vec3(luma), color, amount);
+          }
+
+          void main() {
+            vec2 source = 1.0 - abs(v_uv * 2.0 - 1.0);
+            float tileAspect = u_resolution.x / max(1.0, u_resolution.y);
+            vec2 p = (source - 0.5) * vec2(tileAspect, 1.0);
+
+            float cs = cos(u_flow);
+            float sn = sin(u_flow);
+            p = mat2(cs, -sn, sn, cs) * p * u_scale;
+
+            vec2 seedOffset = vec2(
+              sin(u_seed * 0.019) * 18.0,
+              cos(u_seed * 0.023) * 18.0
+            );
+            vec2 loopOffset =
+              vec2(cos(u_phase), sin(u_phase)) *
+              u_turbulence *
+              (0.28 + u_turbulence * 0.72);
+            vec2 q = vec2(
+              fbm(p * 0.62 + seedOffset + loopOffset),
+              fbm(
+                p * 0.62 +
+                seedOffset +
+                vec2(5.2, 1.3) -
+                loopOffset.yx
+              )
+            );
+            vec2 r = vec2(
+              fbm(
+                p +
+                q * (0.75 + u_turbulence * 2.4) +
+                seedOffset * 0.3 +
+                loopOffset.yx * 0.7
+              ),
+              fbm(
+                p +
+                q.yx * (0.65 + u_turbulence * 2.1) +
+                vec2(8.3, 2.8) -
+                loopOffset * 0.62
+              )
+            );
+
+            float folds = fbm(
+              p * 0.82 + r * (1.25 + u_turbulence * 3.1) + q * 0.8
+            );
+            float current =
+              folds * 1.82 +
+              r.x * 0.84 +
+              q.y * 0.31 +
+              p.y * 0.055;
+
+            float mainDistance = abs(sin(current * 7.15));
+            float width = mix(0.045, 0.48, u_veinWidth);
+            float mainVein = 1.0 - smoothstep(width, width + 0.19, mainDistance);
+            float mainHalo = 1.0 - smoothstep(width, width + 0.46, mainDistance);
+
+            float secondaryField =
+              fbm(p * 1.72 + r.yx * 2.6 + seedOffset * 0.21) * 1.5 +
+              folds * 0.8;
+            float secondaryDistance = abs(sin(secondaryField * 10.8 + 1.7));
+            float hairline = 1.0 - smoothstep(
+              0.035,
+              0.105 + u_veinWidth * 0.05,
+              secondaryDistance
+            );
+            hairline *= smoothstep(0.22, 0.78, folds);
+
+            float cloud = fbm(p * 0.34 + r * 0.7 + 17.0);
+            float fineCloud = fbm(p * 2.65 + q * 2.1 + seedOffset * 0.13);
+            float crystal = noise2(p * 11.0 + q * 4.0 + seedOffset);
+            float veinMask = clamp(mainVein + hairline * 0.08, 0.0, 1.0);
+            float haloMask = clamp(mainHalo * 0.54, 0.0, 1.0);
+
+            vec3 stone = u_stone;
+            stone *= mix(0.76, 1.18, cloud);
+            stone *= mix(0.91, 1.09, fineCloud);
+            stone = mix(stone, saturateColor(stone, 0.72), 0.28);
+            stone += (crystal - 0.5) * 0.055 * u_grain;
+            stone = mix(
+              stone,
+              u_vein,
+              smoothstep(0.77, 0.97, fineCloud) * 0.075
+            );
+
+            vec3 veinColor = u_vein * mix(0.79, 1.08, cloud);
+            vec3 color = mix(stone, mix(stone, veinColor, 0.45), haloMask);
+            color = mix(color, veinColor, veinMask);
+            float fissure = hairline * (1.0 - mainVein * 0.9);
+            color = mix(color, u_stone * 0.47, fissure * 0.66);
+
+            float heightField =
+              folds * 0.26 +
+              mainHalo * 0.16 +
+              mainVein * 0.35 +
+              hairline * 0.11 +
+              crystal * 0.035 * u_grain;
+            vec2 gradient = vec2(
+              dFdx(heightField),
+              dFdy(heightField)
+            ) * min(u_resolution.x, u_resolution.y) * 0.032 * u_relief;
+            vec3 normal = normalize(vec3(-gradient.x, -gradient.y, 1.0));
+            vec3 light = normalize(vec3(-0.42, -0.58, 0.72));
+            float diffuse = dot(normal, light) * 0.5 + 0.5;
+            color *= mix(0.83, 1.13, diffuse);
+
+            vec3 view = vec3(0.0, 0.0, 1.0);
+            vec3 halfVector = normalize(light + view);
+            float specular = pow(
+              max(dot(normal, halfVector), 0.0),
+              mix(18.0, 104.0, u_polish)
+            );
+            color += specular * mix(0.025, 0.30, u_polish);
+
+            float screenGrain = hash21(gl_FragCoord.xy + u_seed * 3.7) - 0.5;
+            float filmGrain =
+              noise2(gl_FragCoord.xy * 0.31 + u_seed * 0.17) - 0.5;
+            float mineral = step(
+              mix(0.9986, 0.991, u_grain),
+              hash21(floor(gl_FragCoord.xy * 0.55) + u_seed)
+            );
+            color += screenGrain * 0.052 * u_grain;
+            color += filmGrain * 0.022 * u_grain;
+            color += mineral * mix(vec3(-0.065), vec3(0.11), crystal) * u_grain;
+
+            vec2 screenEdge = min(v_uv, 1.0 - v_uv);
+            float edgeDistance = min(screenEdge.x, screenEdge.y);
+            float edgeShade = smoothstep(0.0, 0.012, edgeDistance);
+            color *= mix(0.88, 1.0, edgeShade);
+
+            float glareAxis = v_uv.x * 0.82 + v_uv.y * 0.34;
+            float surfaceGlare = exp(-pow((glareAxis - 0.91) * 5.8, 2.0));
+            color += surfaceGlare * 0.028 * u_polish;
+            float vignette = smoothstep(1.12, 0.22, length(v_uv - 0.5));
+            color *= mix(0.94, 1.015, vignette);
+            gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+          }
+        `;
+
+        const program = createProgram(vertexSource, fragmentSource);
+        if (!program) {
+          document.body.classList.add('has-webgl-error');
+          return;
+        }
+
+        const positions = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positions);
+        gl.bufferData(
+          gl.ARRAY_BUFFER,
+          new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+          gl.STATIC_DRAW
+        );
+
+        gl.useProgram(program);
+        const positionLocation = gl.getAttribLocation(program, 'a_position');
+        gl.enableVertexAttribArray(positionLocation);
+        gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+        const uniforms = {
+          resolution: gl.getUniformLocation(program, 'u_resolution'),
+          stone: gl.getUniformLocation(program, 'u_stone'),
+          vein: gl.getUniformLocation(program, 'u_vein'),
+          seed: gl.getUniformLocation(program, 'u_seed'),
+          scale: gl.getUniformLocation(program, 'u_scale'),
+          flow: gl.getUniformLocation(program, 'u_flow'),
+          phase: gl.getUniformLocation(program, 'u_phase'),
+          turbulence: gl.getUniformLocation(program, 'u_turbulence'),
+          veinWidth: gl.getUniformLocation(program, 'u_veinWidth'),
+          grain: gl.getUniformLocation(program, 'u_grain'),
+          polish: gl.getUniformLocation(program, 'u_polish'),
+          relief: gl.getUniformLocation(program, 'u_relief')
+        };
+
+        let seed = seedFromLocation();
+        let panelDrag = null;
+        let renderFrame = 0;
+        let animationStartedAt = performance.now();
+        let hiddenAt = 0;
+        let lastReadoutAt = 0;
+
+        applySeedSettings();
+        bindControls();
+        bindPanel();
+        resize();
+        updatePanel();
+        scheduleRender();
+
+        addEventListener('resize', resize, { passive: true });
+        addEventListener('keydown', onKeyDown);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        if (typeof reducedMotion.addEventListener === 'function') {
+          reducedMotion.addEventListener('change', onMotionPreference);
+        } else {
+          reducedMotion.addListener(onMotionPreference);
+        }
+        reseedButton.addEventListener('click', reseed);
+
+        function createProgram(vertex, fragment) {
+          const vertexShader = compileShader(gl.VERTEX_SHADER, vertex);
+          const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragment);
+          if (!vertexShader || !fragmentShader) return null;
+
+          const nextProgram = gl.createProgram();
+          gl.attachShader(nextProgram, vertexShader);
+          gl.attachShader(nextProgram, fragmentShader);
+          gl.linkProgram(nextProgram);
+
+          if (!gl.getProgramParameter(nextProgram, gl.LINK_STATUS)) {
+            console.error(gl.getProgramInfoLog(nextProgram));
+            return null;
+          }
+          return nextProgram;
+        }
+
+        function compileShader(type, source) {
+          const shader = gl.createShader(type);
+          gl.shaderSource(shader, source);
+          gl.compileShader(shader);
+          if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(shader));
+            return null;
+          }
+          return shader;
+        }
+
+        function seedFromLocation() {
+          const value = pageParams.get('seed');
+          return value ? hashString(value) : Math.floor(Math.random() * 0x7fffffff);
+        }
+
+        function hashString(value) {
+          let hash = 2166136261;
+          for (let i = 0; i < value.length; i += 1) {
+            hash ^= value.charCodeAt(i);
+            hash = Math.imul(hash, 16777619);
+          }
+          return hash >>> 0;
+        }
+
+        function resize() {
+          const dpr = reducedMotion.matches
+            ? Math.min(2, devicePixelRatio || 1)
+            : Math.min(1.25, devicePixelRatio || 1);
+          const width = Math.max(1, Math.round(innerWidth * dpr));
+          const height = Math.max(1, Math.round(innerHeight * dpr));
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+            canvas.style.width = `${innerWidth}px`;
+            canvas.style.height = `${innerHeight}px`;
+          }
+          clampPanel();
+          scheduleRender();
+        }
+
+        function scheduleRender() {
+          if (!renderFrame) renderFrame = requestAnimationFrame(render);
+        }
+
+        function render(time) {
+          renderFrame = 0;
+          const isAnimated = !reducedMotion.matches;
+          const elapsed = ((time - animationStartedAt) % LOOP_DURATION + LOOP_DURATION) % LOOP_DURATION;
+          const phase = isAnimated ? (elapsed / LOOP_DURATION) * Math.PI * 2 : 0;
+          const loopValue = 0.5 - 0.5 * Math.cos(phase);
+          const turbulenceLimit = Number(controls.turbulence.value) / 100;
+          const turbulence = isAnimated
+            ? turbulenceLimit * (0.42 + loopValue * 0.58)
+            : turbulenceLimit;
+
+          gl.viewport(0, 0, canvas.width, canvas.height);
+          gl.useProgram(program);
+          gl.uniform2f(uniforms.resolution, canvas.width, canvas.height);
+
+          const stone = hexToRgb(controls.baseColor.value);
+          const vein = hexToRgb(controls.veinColor.value);
+          gl.uniform3f(uniforms.stone, stone[0], stone[1], stone[2]);
+          gl.uniform3f(uniforms.vein, vein[0], vein[1], vein[2]);
+          gl.uniform1f(uniforms.seed, seed % 100000);
+          gl.uniform1f(uniforms.scale, map(Number(controls.scale.value), 18, 82, 1.8, 8.2));
+          gl.uniform1f(uniforms.flow, Number(controls.flow.value) * Math.PI / 180);
+          gl.uniform1f(uniforms.phase, phase);
+          gl.uniform1f(uniforms.turbulence, turbulence);
+          gl.uniform1f(uniforms.veinWidth, Number(controls.veinWidth.value) / 100);
+          gl.uniform1f(uniforms.grain, Number(controls.grain.value) / 100);
+          gl.uniform1f(uniforms.polish, Number(controls.polish.value) / 100);
+          gl.uniform1f(uniforms.relief, Number(controls.relief.value) / 100);
+          gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+          if (!isAnimated || time - lastReadoutAt >= 80) {
+            updateTurbulenceReadout(turbulence);
+            lastReadoutAt = time;
+          }
+          if (isAnimated && !document.hidden) {
+            renderFrame = requestAnimationFrame(render);
+          }
+        }
+
+        function bindControls() {
+          Object.values(controls).forEach((control) => {
+            control.addEventListener('input', () => {
+              if (control === controls.baseColor || control === controls.veinColor) {
+                paletteSelect.value = 'custom';
+              }
+              updatePanel();
+              scheduleRender();
+            });
+          });
+
+          paletteSelect.addEventListener('change', () => {
+            if (paletteSelect.value === 'custom') return;
+            applyPalette(Number(paletteSelect.value));
+            updatePanel();
+            scheduleRender();
+          });
+        }
+
+        function applyPalette(index) {
+          const palette = PALETTES[index];
+          if (!palette) return;
+          paletteSelect.value = String(index);
+          controls.baseColor.value = palette.colors[0];
+          controls.veinColor.value = palette.colors[1];
+          canvas.setAttribute(
+            'aria-label',
+            `Marbles: four ${palette.name} photographic procedural marble tiles ` +
+              `mirrored across their horizontal and vertical joints while their ` +
+              `turbulence flows in a seamless five-second cycle.`
+          );
+        }
+
+        function applySeedSettings() {
+          const random = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+          applyPalette(Math.floor(random() * PALETTES.length));
+          setRandomControl(controls.scale, 18, 82, random);
+          setRandomControl(controls.flow, 0, 180, random);
+          setRandomControl(controls.turbulence, 40, 95, random);
+          setRandomControl(controls.veinWidth, 8, 80, random);
+          setRandomControl(controls.grain, 10, 90, random);
+          setRandomControl(controls.polish, 30, 95, random);
+          setRandomControl(controls.relief, 15, 80, random);
+        }
+
+        function setRandomControl(control, min, max, random) {
+          control.value = String(Math.floor(random() * (max - min + 1)) + min);
+        }
+
+        function mulberry32(value) {
+          return () => {
+            let t = (value += 0x6d2b79f5);
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        function updatePanel() {
+          updateColorOutput(controls.baseColor);
+          updateColorOutput(controls.veinColor);
+          updateRange(controls.scale, `${(Number(controls.scale.value) / 10).toFixed(1)}×`);
+          updateRange(controls.flow, `${controls.flow.value}°`);
+          updateRange(controls.turbulence, `${controls.turbulence.value}%`);
+          updateRange(controls.veinWidth, `${controls.veinWidth.value}%`);
+          updateRange(controls.grain, `${controls.grain.value}%`);
+          updateRange(controls.polish, `${controls.polish.value}%`);
+          updateRange(controls.relief, `${controls.relief.value}%`);
+          slabNumber.textContent = `BOOKMATCH / SLAB ${String(seed % 10000).padStart(4, '0')}`;
+        }
+
+        function updateTurbulenceReadout(value) {
+          const output = controls.turbulence.closest('.range-row').querySelector('output');
+          const text = `${Math.round(value * 100)}%`;
+          output.value = text;
+          output.textContent = text;
+        }
+
+        function updateColorOutput(input) {
+          const output = input.parentElement.querySelector('output');
+          output.value = input.value.toUpperCase();
+          output.textContent = input.value.toUpperCase();
+        }
+
+        function updateRange(input, text) {
+          const row = input.closest('.range-row');
+          const min = Number(input.min);
+          const max = Number(input.max);
+          const progress = ((Number(input.value) - min) / (max - min)) * 100;
+          row.style.setProperty('--progress', `${progress}%`);
+          const output = row.querySelector('output');
+          output.value = text;
+          output.textContent = text;
+        }
+
+        function bindPanel() {
+          collapseButton.addEventListener('click', () => {
+            const collapsed = panel.classList.toggle('is-collapsed');
+            collapseButton.textContent = collapsed ? '+' : '−';
+            collapseButton.setAttribute('aria-expanded', String(!collapsed));
+            collapseButton.setAttribute(
+              'aria-label',
+              collapsed ? 'Expand marble controls' : 'Collapse marble controls'
+            );
+            collapseButton.title = collapsed ? 'Expand controls' : 'Collapse controls';
+            clampPanel();
+          });
+
+          panelHeader.addEventListener('pointerdown', (event) => {
+            if (event.target.closest('button')) return;
+            const rect = panel.getBoundingClientRect();
+            panelDrag = {
+              pointerId: event.pointerId,
+              offsetX: event.clientX - rect.left,
+              offsetY: event.clientY - rect.top
+            };
+            panel.classList.add('is-dragging');
+            panelHeader.setPointerCapture(event.pointerId);
+            event.preventDefault();
+          });
+
+          panelHeader.addEventListener('pointermove', (event) => {
+            if (!panelDrag || event.pointerId !== panelDrag.pointerId) return;
+            movePanel(
+              event.clientX - panelDrag.offsetX,
+              event.clientY - panelDrag.offsetY
+            );
+          });
+
+          panelHeader.addEventListener('pointerup', endPanelDrag);
+          panelHeader.addEventListener('pointercancel', endPanelDrag);
+        }
+
+        function endPanelDrag(event) {
+          if (!panelDrag || event.pointerId !== panelDrag.pointerId) return;
+          panel.classList.remove('is-dragging');
+          if (panelHeader.hasPointerCapture(event.pointerId)) {
+            panelHeader.releasePointerCapture(event.pointerId);
+          }
+          panelDrag = null;
+        }
+
+        function movePanel(left, top) {
+          const rect = panel.getBoundingClientRect();
+          const margin = 8;
+          const maxLeft = Math.max(margin, innerWidth - rect.width - margin);
+          const maxTop = Math.max(margin, innerHeight - rect.height - margin);
+          panel.style.left = `${Math.round(clamp(left, margin, maxLeft))}px`;
+          panel.style.top = `${Math.round(clamp(top, margin, maxTop))}px`;
+        }
+
+        function clampPanel() {
+          if (!panel.style.left && !panel.style.top) return;
+          const rect = panel.getBoundingClientRect();
+          movePanel(rect.left, rect.top);
+        }
+
+        function reseed() {
+          const value = Math.floor(Math.random() * 0x7fffffff).toString(36);
+          seed = hashString(value);
+          applySeedSettings();
+          try {
+            const url = new URL(location.href);
+            url.searchParams.set('seed', value);
+            history.replaceState(null, '', url);
+          } catch (error) {
+            // The artwork still reseeds when history is unavailable on file://.
+          }
+          updatePanel();
+          scheduleRender();
+          status.textContent =
+            `New marble slab ${String(seed % 10000).padStart(4, '0')} with randomized settings`;
+        }
+
+        function onKeyDown(event) {
+          if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+          if (event.key.toLowerCase() === 'r' && !isEditable(event.target)) {
+            event.preventDefault();
+            reseed();
+          }
+        }
+
+        function onVisibilityChange() {
+          if (document.hidden) {
+            hiddenAt = performance.now();
+            return;
+          }
+          if (hiddenAt) {
+            animationStartedAt += performance.now() - hiddenAt;
+            hiddenAt = 0;
+          }
+          scheduleRender();
+        }
+
+        function onMotionPreference() {
+          animationStartedAt = performance.now();
+          lastReadoutAt = 0;
+          resize();
+          scheduleRender();
+        }
+
+        function isEditable(element) {
+          return Boolean(
+            element &&
+            (element.matches('input, textarea, select') || element.isContentEditable)
+          );
+        }
+
+        function hexToRgb(hex) {
+          const value = Number.parseInt(hex.slice(1), 16);
+          return [
+            ((value >> 16) & 255) / 255,
+            ((value >> 8) & 255) / 255,
+            (value & 255) / 255
+          ];
+        }
+
+        function map(value, inMin, inMax, outMin, outMax) {
+          return outMin + ((value - inMin) / (inMax - inMin)) * (outMax - outMin);
+        }
+
+        function clamp(value, min, max) {
+          return Math.max(min, Math.min(max, value));
+        }
+      })();
+    </script>
+  </body>
+</html>

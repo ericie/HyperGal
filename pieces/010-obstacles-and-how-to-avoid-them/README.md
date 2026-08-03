@@ -17,14 +17,21 @@ independent aspect ratios that range from compact bars to long, thin spans.
 Squares and circles interrupt their directional rhythm. Open safe zones protect
 the left and right edges, redirecting off-page continuation through the top and
 bottom. Generous shape-to-shape clearance keeps the composition open.
+Proximity reserves part of the composition for contact groups: at higher
+strengths, shapes in the same group touch or overlap into clear stacks, while
+unrelated shapes retain the full minimum clearance. This avoids accidental
+sliver corridors between merely-near forms.
 Irregularly spaced, fine field lines share long wave phases and flow through
 continuous cubic curves around rounded influence envelopes rather than tracing
 each silhouette's angles. They compress into dense bundles in tight passages,
 retain that displacement downstream, and slowly fan back out when space returns.
 Small colored drawing heads travel each path from left to right, revealing the
 line in their wake at a steady physical speed, including through large vertical
-detours. Starts are staggered, and completed lines remain in the composition.
-Reduced motion displays the complete static field.
+detours. Every line runs on an independent draw, linger, fade, and rest cadence,
+so paths continually reappear across the field like rain rather than arriving in
+one batch. Each line also has its own obstacle-recognition distance, steering
+response, turn radius, lane clearance, route choice, and recovery rate. Reduced
+motion displays the complete static field.
 
 Click, tap, Space, or Enter to reseed the arrangement. Add `?seed=<value>` to
 the URL for a repeatable starting composition.

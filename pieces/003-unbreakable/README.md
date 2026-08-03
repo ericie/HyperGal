@@ -12,8 +12,8 @@ cell and reverses only the horizontal motion. A climbing ball keeps climbing; a
 returning ball keeps falling instead of cutting through the tower.
 
 The wall therefore grows *downward* toward the paddle and *inward* through its
-own passages. Each real brick impact creeps the shared lattice upward, carrying
-old bricks off the top. The opening wall already fills roughly the top
+own passages. Each newly completed brick creeps the shared lattice upward,
+carrying old bricks off the top. The opening wall already fills roughly the top
 two-fifths of the screen, which shortens the ball's return cycle. It is never
 finished and never breached. Unbreakable.
 
@@ -41,21 +41,22 @@ its character away:
   starved column. Taller towers create the side faces that turn the upper wall
   into a reverse-Breakout pinball corridor. Tower depth has no imposed maximum.
 
-Every brick impact advances the shared lattice upward by one column's fraction
-of a brick. No timer or invisible boundary moves the wall, and tower depth has
-no placement limit.
+Every newly completed cell advances the shared lattice upward by one column's
+fraction of a brick. A bounce that cannot add a genuinely empty cell does not
+move the grid. No timer or invisible boundary moves the wall, and tower depth
+has no placement limit.
 
-The bomb is not a power-up or a random event. It is a recovery rule for the rare
-case where the ball becomes trapped in the upper brickwork and cannot fall back
-down. Repeated brick impacts must remain confined to roughly two and a half rows
-for more than two seconds before it arms. Ordinary corridor runs make vertical
-progress and never qualify. A trapped ball stops, blinks three times, and blows
-an elliptical hole through nearby occupied cells. The spent bomb then falls
-through the wall without colliding; the paddle catches it and relaunches it as
-the normal building ball.
+The bomb is not a power-up or a random event. It is a recovery rule for a ball
+that keeps building without making it back to the paddle. Each bounce that
+successfully completes a new cell adds one to that trip's counter. Reaching the
+paddle resets the counter; reaching ten turns the ball into a bomb. A trapped
+ball stops, stays pinned to its pocket while it blinks three times, and blows an
+elliptical hole through nearby occupied cells. The spent bomb then falls through
+the wall without colliding; the paddle catches it and relaunches it as the normal
+building ball.
 
 Add `?debug` to the URL for a live overlay of ball, brick, front, underside-hit,
-side-hit, top-hit, bomb, and pending-deposit stats.
+side-hit, top-hit, completed-cell, current-trip, bomb, and pending-deposit stats.
 
 ## Color
 

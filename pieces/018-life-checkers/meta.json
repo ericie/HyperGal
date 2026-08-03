@@ -1,0 +1,10 @@
+{
+  "title": "Life Checkers",
+  "year": 2026,
+  "date": "2026-07-30",
+  "category": "generative",
+  "type": "generative",
+  "wip": true,
+  "thumbnail": "thumbnail.svg",
+  "description": "Conway's Game of Life played across a shifting four-color checkerboard. At reset, the dead checkerboard changes from top to bottom before the new live cells fade in through ten quick batches."
+}

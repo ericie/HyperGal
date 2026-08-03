@@ -29,7 +29,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "Breakout in reverse. An infallible paddle favors uncapped Hokusai-colored towers. Brick impacts fill adjacent cells while solid faces preserve true ricochets, and every real impact creeps the aligned lattice upward. If the ball becomes trapped in a tight upper pocket, it stops, blinks three times, blasts an escape hole through the wall, then falls back to the paddle and becomes the building ball again. No player, no losing. Click to rebuild."
+      "description": "Breakout in reverse. An infallible paddle favors uncapped Hokusai-colored towers. Brick impacts fill adjacent cells while solid faces preserve true ricochets, and only a newly completed cell creeps the aligned lattice upward. Ten cell-making bounces without a paddle return turn the ball into a bomb that blasts an escape hole, falls back to the paddle, and becomes the building ball again. No player, no losing. Click to rebuild."
     },
     {
       "slug": "004-hunt-prey-paint",
@@ -171,6 +171,59 @@ window.HYPERGAL_MANIFEST = {
       "type": "generative",
       "thumbnail": "thumbnail.svg",
       "description": "An edge-to-edge field of loose Celtic interlace printed in dark brown on worn paper. Continuous rounded cords pass through a Truchet-like knot grid, alternating over and under at crossings and running beyond every side of the browser. Click or press Enter/Space to reseed."
+    },
+    {
+      "slug": "018-life-checkers",
+      "title": "Life Checkers",
+      "year": 2026,
+      "date": "2026-07-30",
+      "category": "generative",
+      "type": "generative",
+      "wip": true,
+      "thumbnail": "thumbnail.svg",
+      "description": "Conway's Game of Life played across a shifting four-color checkerboard. At reset, the dead checkerboard changes from top to bottom before the new live cells fade in through ten quick batches."
+    },
+    {
+      "slug": "019-city-of-signs",
+      "title": "City of Signs",
+      "year": 2026,
+      "date": "2026-07-30",
+      "category": "generative",
+      "type": "illustration",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "A precise black-and-white geometric city reconstructed from circles, rectangles, polygons, and filled arcs. Seven joined towers carry flags, circular domes, arches, rosettes, diamonds, and a dense center gate above a continuous ornamental belt and shared arcade."
+    },
+    {
+      "slug": "020-soft-collapse",
+      "title": "Soft Collapse",
+      "year": 2026,
+      "date": "2026-07-30",
+      "category": "generative",
+      "type": "generative",
+      "wip": true,
+      "thumbnail": "thumbnail.svg",
+      "description": "A field of black-and-white geometric cells where individual motifs slide through fixed cropped frames in four cardinal directions. Click to move a block; press Space to pause and R to recompose."
+    },
+    {
+      "slug": "021-marbles",
+      "title": "Marbles",
+      "year": 2026,
+      "date": "2026-07-31",
+      "category": "generative",
+      "type": "generative",
+      "thumbnail": "thumbnail.jpg",
+      "description": "Four bookmatched marble tiles cut from one procedural slab. Each seed selects a Life Checkers palette and randomized marble settings for a photographic surface whose turbulence flows through a seamless five-second loop."
+    },
+    {
+      "slug": "022-hyper-lichen",
+      "title": "Hyper-Lichen",
+      "year": 2026,
+      "date": "2026-08-01",
+      "category": "generative",
+      "type": "generative",
+      "thumbnail": "thumbnail.svg",
+      "description": "Crustose lichen colonies continuously recolonize an entire dark stone surface in full-coverage radial waves of mint, sage, cream, and pale pink. Each completed layer immediately gives way to the next."
     }
   ]
 };

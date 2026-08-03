@@ -8,9 +8,9 @@
       :root {
         color-scheme: light;
         --bg: #ffffff;
-        --ink: #2E5FA1;
-        --muted: #6a8fc4;
-        --hot: #2E5FA1;
+        --ink: #000000;
+        --muted: #4a4a4a;
+        --hot: #000000;
         --hud-height: 58px;
       }
 
@@ -36,7 +36,7 @@
         height: 100%;
         background: var(--bg);
         cursor: pointer;
-        image-rendering: auto;
+        image-rendering: pixelated;
         touch-action: none;
       }
 
@@ -53,9 +53,9 @@
         grid-template-columns: minmax(132px, 0.9fr) minmax(0, 2.1fr);
         align-items: stretch;
         pointer-events: none;
-        color: #2E5FA1;
-        background: #ffffff;
-        border-top: 3px solid #2E5FA1;
+        color: #000;
+        background: #fff;
+        border-top: 3px solid #000;
         font-size: 11px;
         line-height: 1.05;
         z-index: 2;
@@ -65,23 +65,21 @@
         display: grid;
         align-content: center;
         padding: 5px clamp(10px, 2.4vw, 18px) 6px;
-        border-right: 3px solid #2E5FA1;
+        border-right: 3px solid #000;
       }
 
       .hud__title strong {
-        font-family: Geneva, "Lucida Grande", ui-sans-serif, system-ui, sans-serif;
+        font-family: Georgia, "Times New Roman", serif;
         font-size: clamp(17px, 2.3vw, 25px);
         line-height: 0.9;
         font-weight: 900;
-        letter-spacing: 0.04em;
       }
 
       .hud__title span {
         margin-top: 4px;
-        color: #6a8fc4;
+        color: #222;
         font-size: 9px;
         font-weight: 700;
-        letter-spacing: 0.06em;
       }
 
       .hud__stats {
@@ -97,7 +95,7 @@
         align-content: center;
         gap: 4px;
         padding: 4px clamp(8px, 2vw, 16px);
-        border-right: 1px solid #2E5FA1;
+        border-right: 1px solid #000;
         font-size: 9px;
         font-weight: 800;
         overflow: hidden;
@@ -120,7 +118,7 @@
       .hud__meter {
         width: 100%;
         height: 5px;
-        border: 1px solid #2E5FA1;
+        border: 1px solid #000;
       }
 
       .hud__meter::before {
@@ -128,7 +126,7 @@
         display: block;
         width: 68%;
         height: 100%;
-        background: #2E5FA1;
+        background: #000;
       }
 
       .hud span {
@@ -146,7 +144,7 @@
         margin: 0;
         padding: 5px 7px;
         color: #fff;
-        background: #2E5FA1;
+        background: #000;
         font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         pointer-events: none;
         white-space: pre;
@@ -192,12 +190,12 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Up Mario: a safety-sign pictogram figure climbs an endless sky of flat clouds, question boxes, and ladders."
+      aria-label="Up Mario: a black-and-white castle platform hero climbs an endless masonry keep of stone ledges, iron ladders, stairs, poles, and question mark boxes."
     ></canvas>
     <div class="hud" aria-hidden="true">
       <div class="hud__title">
         <strong>UP MARIO</strong>
-        <span>THE ENDLESS SKY</span>
+        <span>THE ENDLESS KEEP</span>
       </div>
       <div class="hud__stats">
         <span class="hud__stat">
@@ -254,52 +252,43 @@
           stairs: 148,
           pole: 330,
         };
-
-        /* -- SAFETY-SIGN PALETTE -- */
-        const BLUE = '#2E5FA1';
-        const BLUE_LIGHT = '#4A7FC4';
-        const BLUE_PALE = '#B8D0EA';
-        const BLUE_FAINT = 'rgba(46, 95, 161, 0.08)';
-        const WHITE = '#ffffff';
-        const GRAY_LIGHT = '#E8EDF4';
-
         const COLORS = {
-          paper: WHITE,
-          paperDim: GRAY_LIGHT,
-          ink: BLUE,
-          softInk: 'rgba(46, 95, 161, 0.55)',
-          faint: 'rgba(46, 95, 161, 0.12)',
-          lighter: BLUE_FAINT,
-          white: WHITE,
-          shadow: 'rgba(46, 95, 161, 0.18)',
-          skyTop: WHITE,
-          skyBottom: WHITE,
-          shaft: WHITE,
-          shaftEdge: BLUE,
-          grid: 'rgba(46, 95, 161, 0.08)',
-          brick: WHITE,
-          brickDark: BLUE,
-          brickLight: WHITE,
-          girder: WHITE,
-          girderDark: BLUE,
-          girderLight: WHITE,
-          rail: BLUE,
-          railDark: BLUE,
-          coin: BLUE,
-          coinHot: WHITE,
-          spring: WHITE,
-          springDark: BLUE,
-          barrel: BLUE,
-          barrelDark: BLUE,
-          barrelBand: WHITE,
-          heroRed: WHITE,
-          heroRedDark: BLUE,
-          skin: WHITE,
-          skinDark: BLUE,
-          denim: WHITE,
-          denimDark: BLUE,
-          boot: BLUE,
-          smoke: 'rgba(46, 95, 161, 0.35)',
+          paper: '#ffffff',
+          paperDim: '#d8d8d8',
+          ink: '#000000',
+          softInk: 'rgba(0, 0, 0, 0.55)',
+          faint: 'rgba(0, 0, 0, 0.16)',
+          lighter: 'rgba(0, 0, 0, 0.08)',
+          white: '#ffffff',
+          shadow: 'rgba(0, 0, 0, 0.34)',
+          skyTop: '#ffffff',
+          skyBottom: '#ffffff',
+          shaft: '#ffffff',
+          shaftEdge: '#000000',
+          grid: 'rgba(0, 0, 0, 0.16)',
+          brick: '#ffffff',
+          brickDark: '#000000',
+          brickLight: '#ffffff',
+          girder: '#ffffff',
+          girderDark: '#000000',
+          girderLight: '#ffffff',
+          rail: '#000000',
+          railDark: '#000000',
+          coin: '#000000',
+          coinHot: '#ffffff',
+          spring: '#ffffff',
+          springDark: '#000000',
+          barrel: '#ffffff',
+          barrelDark: '#000000',
+          barrelBand: '#000000',
+          heroRed: '#ffffff',
+          heroRedDark: '#000000',
+          skin: '#ffffff',
+          skinDark: '#000000',
+          denim: '#ffffff',
+          denimDark: '#000000',
+          boot: '#000000',
+          smoke: 'rgba(0, 0, 0, 0.5)',
         };
 
         let width = 1;
@@ -488,7 +477,7 @@
           canvas.style.width = `${width}px`;
           canvas.style.height = `${height}px`;
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingEnabled = false;
           worldWidth = Math.round(clamp(width * (width < 560 ? 0.94 : 0.74), 300, 820));
           worldLeft = Math.round((width - worldWidth) / 2);
         }
@@ -1561,50 +1550,191 @@
           }
         }
 
-        /* ====================================================
-           RENDER -- flat ISO safety-sign style
-           ==================================================== */
-
         function render() {
           drawBackground();
+          drawBackScaffold();
           drawLinks();
           drawPlatforms();
           drawQuestionBoxes();
           drawBarrels();
           drawParticles();
           drawHero();
-          drawEdgeTrim();
+          drawForegroundMask();
         }
 
         function drawBackground() {
-          ctx.fillStyle = WHITE;
+          ctx.fillStyle = COLORS.paper;
           ctx.fillRect(0, 0, width, height);
 
           const playHeight = height - (width <= 520 ? 64 : 58);
           const shaftPad = Math.max(10, Math.min(24, width * 0.03));
-
-          /* Play area -- very faint blue tint */
-          ctx.fillStyle = '#F4F7FB';
+          ctx.fillStyle = COLORS.white;
           ctx.fillRect(worldLeft - shaftPad, 0, worldWidth + shaftPad * 2, playHeight);
+          drawBrickField(
+            worldLeft - shaftPad,
+            -16,
+            worldWidth + shaftPad * 2,
+            playHeight + 32,
+            cameraY * 0.18,
+            0.19,
+          );
 
-          /* Side columns -- solid safety blue */
-          ctx.fillStyle = BLUE;
+          ctx.fillStyle = COLORS.ink;
           ctx.fillRect(0, 0, Math.max(0, worldLeft - shaftPad), playHeight);
           ctx.fillRect(worldLeft + worldWidth + shaftPad, 0, width, playHeight);
 
-          /* Thin vertical rules at shaft edges */
-          ctx.fillStyle = BLUE;
-          ctx.fillRect(worldLeft - shaftPad, 0, 3, playHeight);
-          ctx.fillRect(worldLeft + worldWidth + shaftPad - 3, 0, 3, playHeight);
+          drawEdgeMasonry(worldLeft - shaftPad, playHeight, -1);
+          drawEdgeMasonry(worldLeft + worldWidth + shaftPad, playHeight, 1);
         }
 
-        function drawEdgeTrim() {
+        function drawBackScaffold() {
           const playHeight = height - (width <= 520 ? 64 : 58);
-          ctx.fillStyle = BLUE;
-          ctx.fillRect(worldLeft - 24, 0, worldWidth + 48, 3);
+          const spacing = 268;
+          const scroll = mod(cameraY * 0.28, spacing);
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(worldLeft + 3, 0, worldWidth - 6, playHeight);
+          ctx.clip();
+          for (let y = -scroll - 70; y < playHeight + spacing; y += spacing) {
+            const roomIndex = Math.floor((cameraY * 0.28 + y) / spacing);
+            if (mod(roomIndex, 2) === 1) {
+              const chamberW = worldWidth * (worldWidth < 390 ? 0.48 : 0.42);
+              const chamberX =
+                worldLeft + (mod(roomIndex, 2) === 0 ? worldWidth * 0.08 : worldWidth - chamberW - worldWidth * 0.08);
+              drawDarkChamber(chamberX, y + 13, chamberW, 143, roomIndex);
+            }
+            const archCount = worldWidth < 390 ? 2 : 3;
+            const bay = worldWidth / archCount;
+            for (let i = 0; i < archCount; i += 1) {
+              const narrow = (roomIndex + i) % 3 === 0;
+              const archW = Math.min(narrow ? 46 : 58, bay * 0.5);
+              const archH = narrow ? 86 : 108;
+              const cx = worldLeft + bay * (i + 0.5);
+              drawCastleArch(cx, y + 36 + ((roomIndex + i) % 2) * 11, archW, archH, roomIndex + i);
+            }
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+            for (let x = worldLeft + 4; x < worldLeft + worldWidth - 8; x += 32) {
+              ctx.fillRect(Math.round(x), Math.round(y + 164), 22, 2);
+            }
+          }
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.38)';
+          ctx.lineWidth = 1;
+          for (let x = worldLeft + worldWidth * 0.25; x < worldLeft + worldWidth; x += worldWidth * 0.25) {
+            ctx.beginPath();
+            ctx.moveTo(Math.round(x) + 0.5, -20);
+            ctx.lineTo(Math.round(x) + 0.5, playHeight + 20);
+            ctx.stroke();
+          }
+          ctx.restore();
         }
 
-        /* -- CLOUD PLATFORMS -- */
+        function drawBrickField(x, y, w, h, scroll, alpha) {
+          const courseH = 12;
+          const brickW = 28;
+          const offsetY = mod(scroll, courseH);
+          ctx.save();
+          ctx.strokeStyle = `rgba(0, 0, 0, ${alpha})`;
+          ctx.lineWidth = 1;
+          for (let rowY = y - offsetY, row = 0; rowY < y + h; rowY += courseH, row += 1) {
+            ctx.beginPath();
+            ctx.moveTo(x, Math.round(rowY) + 0.5);
+            ctx.lineTo(x + w, Math.round(rowY) + 0.5);
+            for (let jointX = x + (row % 2 ? brickW * 0.5 : brickW); jointX < x + w; jointX += brickW) {
+              ctx.moveTo(Math.round(jointX) + 0.5, Math.round(rowY) + 0.5);
+              ctx.lineTo(Math.round(jointX) + 0.5, Math.round(rowY + courseH) + 0.5);
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        function drawCastleArch(cx, top, w, h, index) {
+          const radius = w * 0.5;
+          const bottom = top + h;
+          ctx.save();
+          ctx.fillStyle = index % 4 === 0 ? 'rgba(0, 0, 0, 0.28)' : 'rgba(0, 0, 0, 0.18)';
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.48)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(cx - radius, bottom);
+          ctx.lineTo(cx - radius, top + radius);
+          ctx.arc(cx, top + radius, radius, Math.PI, 0);
+          ctx.lineTo(cx + radius, bottom);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.72)';
+          ctx.lineWidth = 1;
+          const bars = index % 3 === 0 ? 2 : 3;
+          for (let i = 1; i <= bars; i += 1) {
+            const x = cx - radius + (w * i) / (bars + 1);
+            ctx.beginPath();
+            ctx.moveTo(Math.round(x) + 0.5, top + radius * 0.76);
+            ctx.lineTo(Math.round(x) + 0.5, bottom - 4);
+            ctx.stroke();
+          }
+          ctx.beginPath();
+          ctx.moveTo(cx - radius + 4, top + radius + 11);
+          ctx.lineTo(cx + radius - 4, top + radius + 11);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        function drawDarkChamber(x, top, w, h, index) {
+          const radius = Math.min(34, w * 0.18);
+          ctx.save();
+          ctx.fillStyle = COLORS.ink;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x, top + h);
+          ctx.lineTo(x, top + radius);
+          ctx.quadraticCurveTo(x + w * 0.5, top - radius * 0.55, x + w, top + radius);
+          ctx.lineTo(x + w, top + h);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = COLORS.white;
+          ctx.globalAlpha = 0.48;
+          for (let py = top + radius + 7, row = 0; py < top + h - 6; py += 8, row += 1) {
+            for (let px = x + 7 + (row % 2) * 4; px < x + w - 5; px += 12) {
+              if (mod(Math.round(px + py) + index, 3) !== 0) continue;
+              ctx.fillRect(Math.round(px), Math.round(py), 1, 1);
+            }
+          }
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = COLORS.white;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x + w * 0.25, top + 12);
+          ctx.quadraticCurveTo(x + w * 0.57, top + h * 0.42, x + w * 0.7, top + h - 10);
+          ctx.stroke();
+          for (let i = 1; i < 7; i += 1) {
+            const t = i / 7;
+            const px = lerp(x + w * 0.25, x + w * 0.7, t);
+            const py = lerp(top + 12, top + h - 10, t);
+            ctx.strokeRect(Math.round(px) - 2, Math.round(py) - 2, 4, 5);
+          }
+          ctx.restore();
+        }
+
+        function drawEdgeMasonry(edgeX, playHeight, side) {
+          const widthPx = Math.max(8, Math.min(17, worldLeft * 0.22));
+          const x = side < 0 ? edgeX - widthPx : edgeX;
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(Math.round(x), 0, Math.ceil(widthPx), playHeight);
+          ctx.strokeStyle = COLORS.white;
+          ctx.lineWidth = 1;
+          const offset = mod(cameraY * 0.24, 24);
+          for (let y = -offset; y < playHeight + 24; y += 24) {
+            ctx.beginPath();
+            ctx.moveTo(x, Math.round(y) + 0.5);
+            ctx.lineTo(x + widthPx, Math.round(y) + 0.5);
+            ctx.stroke();
+          }
+        }
 
         function drawPlatforms() {
           for (const platform of platforms) {
@@ -1612,71 +1742,113 @@
             if (sy < -70 || sy > height + 70) continue;
             const sx = worldLeft + platformLeft(platform);
             const pulse = Math.max(0, 1 - (simTime - platform.pulseUntil + 0.24) / 0.24);
-            drawCloudPlatform(platform, sx, sy, pulse);
+            if (platform.type === 'girder') drawGirderPlatform(platform, sx, sy, pulse);
+            else if (platform.type === 'open') drawOpenPlatform(platform, sx, sy, pulse);
+            else drawBrickPlatform(platform, sx, sy, pulse);
             if (platform.spring) drawSpring(sx + platform.w * 0.5, sy - 2);
             if (platform.id === targetPlatformId && !manualActive()) drawTargetTick(sx + platform.w * 0.5, sy - 24);
           }
         }
 
-        function drawCloudPlatform(platform, sx, sy, pulse) {
-          const w = platform.w;
-          const cx = sx + w * 0.5;
+        function drawBrickPlatform(platform, sx, sy, pulse) {
+          const h = platform.h;
+          drawPlatformShadow(sx, sy, platform.w);
+          ctx.fillStyle = pulse > 0 ? COLORS.paperDim : COLORS.white;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 1.5;
+          ctx.fillRect(Math.round(sx), Math.round(sy), Math.round(platform.w), h + 3);
+          ctx.strokeRect(Math.round(sx) + 0.5, Math.round(sy) + 0.5, Math.round(platform.w), h + 3);
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(Math.round(sx - 2), Math.round(sy - 3), Math.round(platform.w + 4), 5);
+          ctx.fillStyle = COLORS.white;
+          ctx.fillRect(Math.round(sx + 3), Math.round(sy - 2), Math.max(0, Math.round(platform.w - 6)), 1);
 
-          ctx.save();
-
-          /* Shadow */
-          ctx.fillStyle = 'rgba(46, 95, 161, 0.10)';
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 1;
           ctx.beginPath();
-          drawCloudPath(cx + 4, sy + 10, w * 0.96, 0.85);
-          ctx.fill();
-
-          /* Cloud body */
-          ctx.fillStyle = pulse > 0 ? BLUE_PALE : WHITE;
-          ctx.strokeStyle = BLUE;
-          ctx.lineWidth = 2.5;
-          ctx.beginPath();
-          drawCloudPath(cx, sy, w, 1);
-          ctx.fill();
+          ctx.moveTo(Math.round(sx), Math.round(sy + 10) + 0.5);
+          ctx.lineTo(Math.round(sx + platform.w), Math.round(sy + 10) + 0.5);
           ctx.stroke();
-
-          ctx.restore();
+          const brickW = 30;
+          for (let x = sx + brickW; x < sx + platform.w - 3; x += brickW) {
+            ctx.beginPath();
+            ctx.moveTo(Math.round(x) + 0.5, Math.round(sy + 2));
+            ctx.lineTo(Math.round(x) + 0.5, Math.round(sy + 10));
+            ctx.stroke();
+          }
+          for (let x = sx + brickW * 0.5; x < sx + platform.w - 3; x += brickW) {
+            ctx.beginPath();
+            ctx.moveTo(Math.round(x) + 0.5, Math.round(sy + 11));
+            ctx.lineTo(Math.round(x) + 0.5, Math.round(sy + h + 3));
+            ctx.stroke();
+          }
+          ctx.fillStyle = COLORS.ink;
+          for (let x = sx + 7 + (platform.id % 4); x < sx + platform.w - 4; x += 19) {
+            ctx.fillRect(Math.round(x), Math.round(sy + h - 1 + ((x / 19) % 2)), 2, 1);
+          }
         }
 
-        function drawCloudPath(cx, baseY, w, scale) {
-          const hw = w * 0.5;
-          const bumps = Math.max(3, Math.round(w / 46));
-          const bumpR = (w / bumps) * 0.42 * scale;
-          const bigR = bumpR * 1.45;
-
-          /* Flat base line */
-          ctx.moveTo(cx - hw + 6, baseY);
-          ctx.lineTo(cx + hw - 6, baseY);
-
-          /* Right end cap */
-          ctx.arc(cx + hw - bumpR * 0.8, baseY - bumpR * 0.6, bumpR * 0.7, Math.PI * 0.35, -Math.PI * 0.5, true);
-
-          /* Top bumps */
-          const topY = baseY - bumpR * 1.1;
-          const startX = cx + hw * 0.55;
-          const endX = cx - hw * 0.55;
-          const step = (startX - endX) / (bumps - 1);
-
-          for (let i = 0; i < bumps; i++) {
-            const bx = startX - step * i;
-            const r = i === Math.floor(bumps / 2) ? bigR : bumpR;
-            const by = topY - (i === Math.floor(bumps / 2) ? bumpR * 0.35 : 0);
-            ctx.arc(bx, by, r, -Math.PI * 0.25, -Math.PI * 0.75, true);
+        function drawGirderPlatform(platform, sx, sy, pulse) {
+          const h = platform.h;
+          drawPlatformShadow(sx, sy, platform.w);
+          ctx.fillStyle = pulse > 0 ? COLORS.paperDim : COLORS.white;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 1.5;
+          ctx.fillRect(Math.round(sx), Math.round(sy), Math.round(platform.w), h);
+          ctx.strokeRect(Math.round(sx) + 0.5, Math.round(sy) + 0.5, Math.round(platform.w), h);
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(Math.round(sx - 2), Math.round(sy - 3), Math.round(platform.w + 4), 5);
+          ctx.fillRect(Math.round(sx), Math.round(sy + h - 3), Math.round(platform.w), 4);
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 1;
+          for (let x = sx + 3; x < sx + platform.w - 21; x += 28) {
+            ctx.beginPath();
+            ctx.moveTo(Math.round(x), Math.round(sy + 3));
+            ctx.lineTo(Math.round(x + 24), Math.round(sy + h - 4));
+            ctx.moveTo(Math.round(x + 24), Math.round(sy + 3));
+            ctx.lineTo(Math.round(x), Math.round(sy + h - 4));
+            ctx.stroke();
           }
+          ctx.fillStyle = COLORS.white;
+          for (let x = sx + 8; x < sx + platform.w - 5; x += 24) {
+            ctx.fillRect(Math.round(x), Math.round(sy - 2), 2, 1);
+          }
+        }
 
-          /* Left end cap */
-          ctx.arc(cx - hw + bumpR * 0.8, baseY - bumpR * 0.6, bumpR * 0.7, -Math.PI * 0.5, Math.PI * 0.65, true);
+        function drawOpenPlatform(platform, sx, sy, pulse) {
+          drawPlatformShadow(sx, sy, platform.w);
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(Math.round(sx), Math.round(sy) - 1.5);
+          ctx.lineTo(Math.round(sx + platform.w), Math.round(sy) - 1.5);
+          ctx.stroke();
+          ctx.lineWidth = 1.1;
+          for (let x = sx + 14; x < sx + platform.w; x += 28) {
+            ctx.beginPath();
+            ctx.moveTo(Math.round(x), Math.round(sy + 1));
+            ctx.lineTo(Math.round(x - 9), Math.round(sy + platform.h + 4));
+            ctx.lineTo(Math.round(x + 5), Math.round(sy + platform.h + 4));
+            ctx.stroke();
+          }
+          if (pulse > 0) {
+            ctx.fillStyle = COLORS.ink;
+            ctx.globalAlpha = pulse * 0.22;
+            ctx.fillRect(Math.round(sx), Math.round(sy - 5), Math.round(platform.w), 7);
+            ctx.globalAlpha = 1;
+          }
+        }
 
-          ctx.closePath();
+        function drawPlatformShadow(sx, sy, w) {
+          ctx.fillStyle = COLORS.ink;
+          ctx.globalAlpha = 0.26;
+          ctx.fillRect(Math.round(sx + 5), Math.round(sy + 8), Math.round(w), 12);
+          ctx.globalAlpha = 1;
         }
 
         function drawSpring(cx, sy) {
-          ctx.strokeStyle = BLUE;
-          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 2;
           ctx.beginPath();
           for (let i = 0; i <= 5; i += 1) {
             const x = cx + (i % 2 === 0 ? -10 : 10);
@@ -1692,17 +1864,20 @@
         function drawTargetTick(cx, sy) {
           const bob = Math.sin(simTime * 8) * 2;
           ctx.save();
-          ctx.fillStyle = BLUE;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.fillStyle = COLORS.ink;
+          ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(cx, sy + bob);
-          ctx.lineTo(cx - 7, sy - 9 + bob);
-          ctx.lineTo(cx + 7, sy - 9 + bob);
+          ctx.lineTo(cx - 8, sy - 10 + bob);
+          ctx.lineTo(cx + 8, sy - 10 + bob);
           ctx.closePath();
           ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = COLORS.white;
+          ctx.fillRect(Math.round(cx) - 1, Math.round(sy - 7 + bob), 2, 3);
           ctx.restore();
         }
-
-        /* -- LINKS (ladders/stairs/poles) -- clean flat lines -- */
 
         function drawLinks() {
           for (const link of links) {
@@ -1719,28 +1894,37 @@
 
         function drawLadder(x1, y1, x2, y2, active) {
           const x = Math.round((x1 + x2) * 0.5);
-          ctx.strokeStyle = BLUE;
-          ctx.lineWidth = active ? 3.5 : 2.5;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = active ? 4.5 : 3;
           ctx.beginPath();
-          ctx.moveTo(x - 8, y1);
-          ctx.lineTo(x - 8, y2);
-          ctx.moveTo(x + 8, y1);
-          ctx.lineTo(x + 8, y2);
+          ctx.moveTo(x - 9, y1);
+          ctx.lineTo(x - 9, y2);
+          ctx.moveTo(x + 9, y1);
+          ctx.lineTo(x + 9, y2);
           ctx.stroke();
-          ctx.lineWidth = active ? 2.5 : 2;
+          ctx.strokeStyle = COLORS.white;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x - 9.5, y1);
+          ctx.lineTo(x - 9.5, y2);
+          ctx.moveTo(x + 8.5, y1);
+          ctx.lineTo(x + 8.5, y2);
+          ctx.stroke();
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = active ? 2 : 1.4;
           const top = Math.min(y1, y2);
           const bottom = Math.max(y1, y2);
           for (let y = top + 13; y < bottom - 8; y += 15) {
             ctx.beginPath();
-            ctx.moveTo(x - 8, Math.round(y) + 0.5);
-            ctx.lineTo(x + 8, Math.round(y) + 0.5);
+            ctx.moveTo(x - 9, Math.round(y) + 0.5);
+            ctx.lineTo(x + 9, Math.round(y) + 0.5);
             ctx.stroke();
           }
         }
 
         function drawStairs(x1, y1, x2, y2, active) {
-          ctx.strokeStyle = BLUE;
-          ctx.lineWidth = active ? 3 : 2;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = active ? 3.5 : 2.2;
           const steps = Math.max(4, Math.floor(Math.abs(y2 - y1) / 15));
           const dx = (x2 - x1) / steps;
           const dy = (y2 - y1) / steps;
@@ -1753,23 +1937,50 @@
             ctx.lineTo(nextX, nextY);
           }
           ctx.stroke();
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1 + 7);
+          ctx.lineTo(x2, y2 + 7);
+          ctx.stroke();
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1 - 14);
+          ctx.lineTo(x2, y2 - 14);
+          ctx.stroke();
+          for (let i = 0; i <= steps; i += 2) {
+            const x = x1 + dx * i;
+            const y = y1 + dy * i;
+            ctx.beginPath();
+            ctx.moveTo(x, y - 14);
+            ctx.lineTo(x, y + 5);
+            ctx.stroke();
+          }
         }
 
         function drawPole(x1, y1, x2, y2, active) {
           const x = Math.round((x1 + x2) * 0.5);
-          ctx.strokeStyle = BLUE;
-          ctx.lineWidth = active ? 4 : 3;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = active ? 5 : 3.4;
           ctx.beginPath();
           ctx.moveTo(x, y1);
           ctx.lineTo(x, y2);
           ctx.stroke();
-          ctx.fillStyle = BLUE;
+          ctx.strokeStyle = COLORS.white;
+          ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.arc(x, y2 - 2, 5, 0, TAU);
-          ctx.fill();
+          ctx.moveTo(x - 0.5, y1 + 4);
+          ctx.lineTo(x - 0.5, y2 - 4);
+          ctx.stroke();
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(x, y2 - 10, 7, 0, TAU);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(x, y2);
+          ctx.quadraticCurveTo(x + 17, y2, x + 17, y2 + 14);
+          ctx.stroke();
         }
-
-        /* -- QUESTION BOXES -- flat safety style -- */
 
         function drawQuestionBoxes() {
           for (const box of boxes) {
@@ -1779,24 +1990,46 @@
             const lift = box.hit ? Math.max(0, 1 - (simTime - box.hitAt) / 0.18) * 8 : 0;
             ctx.save();
             ctx.translate(Math.round(sx) + 0.5, Math.round(sy - lift) + 0.5);
-
-            ctx.fillStyle = box.hit ? GRAY_LIGHT : BLUE;
-            ctx.strokeStyle = BLUE;
-            ctx.lineWidth = box.id === targetBoxId ? 3 : 2;
+            ctx.fillStyle = box.hit ? COLORS.white : COLORS.ink;
+            ctx.strokeStyle = COLORS.ink;
+            ctx.lineWidth = box.id === targetBoxId ? 3 : 1.8;
             ctx.fillRect(0, 0, box.size, box.size);
             ctx.strokeRect(0, 0, box.size, box.size);
-
-            ctx.font = '900 17px Geneva, system-ui, sans-serif';
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = box.hit ? COLORS.ink : COLORS.white;
+            ctx.strokeRect(3, 3, box.size - 6, box.size - 6);
+            ctx.beginPath();
+            ctx.moveTo(1, 7);
+            ctx.lineTo(5, 7);
+            ctx.moveTo(box.size - 1, 7);
+            ctx.lineTo(box.size - 5, 7);
+            ctx.moveTo(1, box.size - 7);
+            ctx.lineTo(5, box.size - 7);
+            ctx.moveTo(box.size - 1, box.size - 7);
+            ctx.lineTo(box.size - 5, box.size - 7);
+            ctx.stroke();
+            ctx.font = '900 18px Geneva, system-ui, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillStyle = box.hit ? BLUE : WHITE;
+            ctx.fillStyle = box.hit ? COLORS.ink : COLORS.white;
             ctx.fillText(box.hit ? '-' : '?', box.size * 0.5, box.size * 0.52);
-
+            if (box.id === targetBoxId) {
+              ctx.strokeStyle = COLORS.ink;
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(2, box.size + 6);
+              ctx.lineTo(box.size - 2, box.size + 6);
+              ctx.stroke();
+            } else if (box.failedAt && simTime - box.failedAt < 0.35) {
+              ctx.strokeStyle = COLORS.softInk;
+              ctx.beginPath();
+              ctx.moveTo(6, box.size + 5);
+              ctx.lineTo(box.size - 6, box.size + 5);
+              ctx.stroke();
+            }
             ctx.restore();
           }
         }
-
-        /* -- BARRELS -- flat blue discs -- */
 
         function drawBarrels() {
           for (const barrel of barrels) {
@@ -1807,23 +2040,25 @@
             if (by < -42 || by > height + 42) continue;
             ctx.save();
             ctx.translate(Math.round(bx), Math.round(by));
-            ctx.fillStyle = BLUE;
+            ctx.rotate(barrel.roll);
+            ctx.fillStyle = COLORS.ink;
+            ctx.strokeStyle = COLORS.ink;
+            ctx.lineWidth = 1.8;
             ctx.beginPath();
-            ctx.arc(0, 0, barrel.radius, 0, TAU);
+            ctx.ellipse(0, 0, barrel.radius + 1, barrel.radius, 0, 0, TAU);
             ctx.fill();
-            ctx.strokeStyle = WHITE;
-            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.strokeStyle = COLORS.white;
+            ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(-barrel.radius * 0.5, -barrel.radius * 0.5);
-            ctx.lineTo(barrel.radius * 0.5, barrel.radius * 0.5);
-            ctx.moveTo(barrel.radius * 0.5, -barrel.radius * 0.5);
-            ctx.lineTo(-barrel.radius * 0.5, barrel.radius * 0.5);
+            ctx.moveTo(-barrel.radius + 1, -3);
+            ctx.lineTo(barrel.radius - 1, 3);
+            ctx.moveTo(-barrel.radius + 1, 4);
+            ctx.lineTo(barrel.radius - 1, -4);
             ctx.stroke();
             ctx.restore();
           }
         }
-
-        /* -- PARTICLES -- */
 
         function drawParticles() {
           for (const particle of particles) {
@@ -1831,103 +2066,126 @@
             const alpha = 1 - age;
             const sx = worldLeft + particle.x;
             const sy = screenY(particle.y);
-            ctx.globalAlpha = alpha * 0.6;
-            ctx.fillStyle = BLUE;
+            ctx.globalAlpha = alpha * 0.72;
+            ctx.fillStyle = particle.color;
             const size = Math.max(1, Math.round(particle.r * 0.55));
             ctx.fillRect(Math.round(sx), Math.round(sy), size, size);
           }
           ctx.globalAlpha = 1;
         }
 
-        /* -- HERO -- ISO safety-sign pictogram person -- */
-
         function drawHero() {
           const sx = worldLeft + hero.x;
           const sy = screenY(hero.y);
           const blink = hero.blinkUntil > simTime && Math.floor(simTime * 24) % 2 === 0;
-
           ctx.save();
           ctx.translate(Math.round(sx), Math.round(sy));
           ctx.scale(hero.facing, 1);
+          ctx.lineCap = 'square';
+          ctx.lineJoin = 'miter';
+
+          ctx.fillStyle = COLORS.shadow;
+          ctx.beginPath();
+          ctx.ellipse(1, 4, 16, 3, 0, 0, TAU);
+          ctx.fill();
 
           const climb = hero.onLink ? Math.sin(simTime * 9) * 4 : 0;
           const jumpPose = hero.grounded ? 0 : clamp(hero.vy / JUMP_SPEED, -0.65, 1);
           const run =
             Math.sin(simTime * 16) *
             (hero.grounded ? clamp(Math.abs(hero.vx) / RUN_SPEED, 0, 1) : 0.25);
+          ctx.strokeStyle = COLORS.ink;
+          ctx.fillStyle = COLORS.ink;
+          ctx.lineWidth = 4;
 
-          /* Blue circle background (safety sign style) */
-          ctx.fillStyle = blink ? BLUE_LIGHT : BLUE;
+          const leftFoot = run * 4.5 - jumpPose * 3;
+          const rightFoot = -run * 4.5 + jumpPose * 2;
           ctx.beginPath();
-          ctx.arc(0, -22, 24, 0, TAU);
-          ctx.fill();
-
-          /* White pictogram figure */
-          ctx.strokeStyle = WHITE;
-          ctx.fillStyle = WHITE;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-
-          /* Head */
-          ctx.beginPath();
-          ctx.arc(0, -36, 6, 0, TAU);
-          ctx.fill();
-
-          /* Body */
-          ctx.lineWidth = 3.5;
-          ctx.beginPath();
-          ctx.moveTo(0, -30);
-          ctx.lineTo(0, -14);
+          ctx.moveTo(-6, -9);
+          ctx.lineTo(-10 + leftFoot, 0);
+          ctx.moveTo(6, -9);
+          ctx.lineTo(12 + rightFoot, 0);
           ctx.stroke();
-
-          /* Arms */
-          const leftArmEnd = hero.onLink ? -8 + climb * 0.5 : -10;
-          const rightArmEnd = hero.onLink ? 8 - climb * 0.5 : jumpPose > 0.3 ? 4 : 10;
-          const leftArmY = -25 + (hero.onLink ? climb : jumpPose * -5);
-          const rightArmY = -23 - (hero.onLink ? climb : jumpPose * -3);
           ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.moveTo(0, -26);
-          ctx.lineTo(leftArmEnd, leftArmY);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(0, -26);
-          ctx.lineTo(rightArmEnd, rightArmY);
+          ctx.moveTo(-14 + leftFoot, 0);
+          ctx.lineTo(-7 + leftFoot, 0);
+          ctx.moveTo(8 + rightFoot, 0);
+          ctx.lineTo(16 + rightFoot, 0);
           ctx.stroke();
 
-          /* Legs */
-          const leftFoot = run * 5 - jumpPose * 3;
-          const rightFoot = -run * 5 + jumpPose * 2;
-          ctx.lineWidth = 3;
+          ctx.fillStyle = COLORS.ink;
           ctx.beginPath();
-          ctx.moveTo(0, -14);
-          ctx.lineTo(-6 + leftFoot, -2);
-          ctx.stroke();
+          ctx.moveTo(-12, -26);
+          ctx.lineTo(11, -26);
+          ctx.lineTo(9, -8);
+          ctx.lineTo(-10, -8);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = COLORS.white;
+          ctx.fillRect(-5, -24, 3, 12);
+          ctx.fillRect(4, -24, 3, 12);
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(-3, -14, 8, 3);
+
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 4;
           ctx.beginPath();
-          ctx.moveTo(0, -14);
-          ctx.lineTo(6 + rightFoot, -2);
+          ctx.moveTo(-10, -23);
+          ctx.lineTo(-18, -17 + (hero.onLink ? climb : jumpPose * -6));
+          ctx.moveTo(10, -23);
+          ctx.lineTo(18, -16 - (hero.onLink ? climb : jumpPose * -4));
           ctx.stroke();
 
-          /* Feet */
-          ctx.lineWidth = 2.5;
+          ctx.fillStyle = blink ? COLORS.ink : COLORS.white;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.moveTo(-9 + leftFoot, -2);
-          ctx.lineTo(-3 + leftFoot, -2);
+          ctx.ellipse(0, -35, 11, 11.5, 0, 0, TAU);
+          ctx.fill();
           ctx.stroke();
+
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(5, -38, 3, 3);
+          ctx.fillRect(1, -31, 9, 3);
+          ctx.fillRect(8, -34, 5, 4);
+
+          ctx.fillStyle = COLORS.ink;
           ctx.beginPath();
-          ctx.moveTo(3 + rightFoot, -2);
-          ctx.lineTo(9 + rightFoot, -2);
-          ctx.stroke();
+          ctx.moveTo(-13, -43);
+          ctx.lineTo(8, -47);
+          ctx.lineTo(13, -42);
+          ctx.lineTo(17, -40);
+          ctx.lineTo(-13, -40);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillRect(-15, -41, 31, 3);
+          ctx.fillStyle = COLORS.white;
+          ctx.fillRect(-6, -43, 10, 1);
 
           ctx.restore();
+        }
+
+        function drawForegroundMask() {
+          const playHeight = height - (width <= 520 ? 64 : 58);
+          const trim = Math.max(3, Math.min(8, worldLeft * 0.12));
+          ctx.fillStyle = COLORS.ink;
+          ctx.fillRect(worldLeft - trim, 0, trim, playHeight);
+          ctx.fillRect(worldLeft + worldWidth, 0, trim, playHeight);
+          ctx.fillRect(worldLeft - trim, 0, worldWidth + trim * 2, 3);
+          ctx.fillStyle = COLORS.white;
+          const offset = mod(cameraY * 0.31, 34);
+          for (let y = -offset; y < playHeight; y += 34) {
+            ctx.fillRect(Math.round(worldLeft - trim), Math.round(y), trim, 1);
+            ctx.fillRect(Math.round(worldLeft + worldWidth), Math.round(y + 17), trim, 1);
+          }
         }
 
         function screenY(worldY) {
           const hudHeight = width <= 520 ? 64 : 58;
           return height - hudHeight - (worldY - cameraY);
         }
-
-        /* -- INPUT (unchanged) -- */
 
         function onKeyDown(event) {
           if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') {

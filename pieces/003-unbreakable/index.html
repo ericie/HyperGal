@@ -37,16 +37,16 @@
       // the paddle. A side hit fills one cell of the corridor, reverses the
       // horizontal motion, and lets the ball keep climbing. The wall therefore
       // grows DOWNWARD and INWARD, so the whole world is scrolled upward one
-      // small step per real brick impact. It is never finished or breached.
+      // small step per newly completed brick. It is never finished or breached.
       //
       // The wall lives on one shared integer lattice. Bricks retain a column and
       // row rather than an independently drifting screen position, while one
       // global offset scrolls every row together. The paddle favors narrow,
       // persistent towers, producing corridors where the ball can ricochet
       // upward while filling empty cells instead of knocking bricks out.
-      // If repeated impacts prove it is trapped in one shallow upper pocket,
-      // the ball blinks three times, clears an elliptical hole, and drops
-      // harmlessly through the wall before the paddle turns it back into a ball.
+      // If it completes ten new cells before returning to the paddle, the ball
+      // blinks three times, clears an elliptical hole, and drops harmlessly
+      // through the wall before the paddle turns it back into a ball.
 
       const canvas = document.getElementById('stage');
       const ctx = canvas.getContext('2d', { alpha: false });
@@ -62,14 +62,11 @@
       const FLOOR_MARGIN = 46;    // px — gap from bottom edge to paddle line
       const SETPOINT_FRAC = 0.42; // begin with a substantial wall and a shorter return cycle
       const REPAIR_MARGIN_ROWS = 2; // repair columns that thin above this point
-      const SCROLL_FOLLOW = 4.5;  // how quickly the shared lattice eases after an impact
+      const SCROLL_FOLLOW = 4.5;  // how quickly the shared lattice eases after a new cell
       const SCROLL_MAX_SPEED = 120; // px/s — prevents the moving lattice tunneling through the ball
       const BALL_COUNT = 1;       // a single paddle, shadowing a single ball
       const COLLISION_EPS = 0.05; // px — keeps a resolved ball outside the brick it hit
-      const STUCK_WINDOW_MS = 3200; // a sustained, tight collision pocket arms the bomb
-      const STUCK_MIN_SPAN_MS = 2200;
-      const STUCK_IMPACTS = 10;
-      const STUCK_VERTICAL_RANGE = BRICK_H * 2.5;
+      const BOMB_CELL_BOUNCES = 10; // ten cell-making bounces without a paddle return
       const BOMB_ARM_MS = 1500;   // six half-beats: blink, blink, blink
       const BOMB_FALL_SPEED = 480;
       const BLAST_COL_RADIUS = 3.6;
@@ -89,7 +86,7 @@
       let repairLineY = 0;
 
       let gridY = 0;       // screen-y of lattice row 0; shared by every column
-      let gridTargetY = 0; // brick impacts advance this upward by one mean step
+      let gridTargetY = 0; // completed cells advance this upward by one mean step
       let front = [];      // front[c] = integer row below the deepest brick in column c
       let bricks = [];     // {c, row, color} — row never leaves the shared lattice
       let brickMap = new Map();
@@ -98,7 +95,7 @@
       let focus = null;    // temporary { mode, from, to, center, remaining }
       let focusCooldown = 0;
       let depositColorBag = [];
-      let impactStats = { underside: 0, side: 0, top: 0, bombs: 0 };
+      let impactStats = { underside: 0, side: 0, top: 0, cells: 0, bombs: 0 };
       let explosions = [];
       let debris = [];
       let raf = 0;
@@ -168,12 +165,11 @@
         focus = null;
         focusCooldown = randInt(2, 4);
         depositColorBag = [];
-        impactStats = { underside: 0, side: 0, top: 0, bombs: 0 };
+        impactStats = { underside: 0, side: 0, top: 0, cells: 0, bombs: 0 };
         explosions = [];
         debris = [];
         const n = BALL_COUNT;
         balls = [];
-        const resetAt = performance.now();
         for (let i = 0; i < n; i++) {
           const color = nextDepositColor();
           const x = rand(colW, W - colW);
@@ -183,8 +179,7 @@
             y: rand(setpointY + BRICK_H * 3, paddleY - BRICK_H),
             vx, vy, color,
             mode: 'ball',
-            impactHistory: [],
-            lastImpactAt: resetAt,
+            newCellBounces: 0,
             trail: [],
             paddle: { x, w: colW + PADDLE_PAD * 2 },
           });
@@ -253,13 +248,14 @@
         return c >= 0 && c < numCols && !hasBrick(c, row);
       }
 
-      function recordImpact(c) {
+      function recordCellCreation(c) {
         gridTargetY -= BRICK_H / numCols;
+        impactStats.cells++;
         noteDeposit(c);
       }
 
       function maintainBrickCeiling() {
-        // Keep one complete, occupied row straddling the top edge. As impact-
+        // Keep one complete, occupied row straddling the top edge. As cell-
         // driven creep advances the lattice, this replaces the old row with
         // real bricks—never an invisible collision plane.
         const ceilingRow = Math.floor(-gridY / BRICK_H);
@@ -284,7 +280,7 @@
         if (!canPlaceLiveBrick(c, row)) return false;
         const key = brickKey(c, row);
         if (pendingDeposits.some((deposit) => deposit.key === key)) return false;
-        pendingDeposits.push({ c, row, color: ball.color, key });
+        pendingDeposits.push({ c, row, color: ball.color, key, ball });
         ball.color = nextDepositColor();
         return true;
       }
@@ -299,38 +295,19 @@
         if (ball.mode !== 'ball') return;
         ball.mode = 'arming';
         ball.bombStarted = lastT;
+        // The wall keeps easing upward while the fuse burns. Pin the bomb to
+        // the pocket that trapped it rather than leaving it behind on screen.
+        ball.bombWallY = ball.y - gridY;
         ball.vx = 0;
         ball.vy = 0;
         ball.flash = 1;
         ball.trail.length = 0;
       }
 
-      function noteBallImpact(ball) {
+      function noteNewCellBounce(ball) {
         if (ball.mode !== 'ball') return;
-        const now = lastT;
-        // One geometric contact can be reinforced by the ceiling containment
-        // pass in the same frame; it still counts as one impact.
-        if (ball.impactHistory.length && now - ball.lastImpactAt < 20) return;
-        ball.lastImpactAt = now;
-        ball.impactHistory.push({ t: now, y: ball.y });
-        while (ball.impactHistory.length && now - ball.impactHistory[0].t > STUCK_WINDOW_MS) {
-          ball.impactHistory.shift();
-        }
-        if (ball.impactHistory.length < STUCK_IMPACTS) return;
-
-        const first = ball.impactHistory[0];
-        if (now - first.t < STUCK_MIN_SPAN_MS) return;
-        let low = Infinity;
-        let high = -Infinity;
-        for (const hit of ball.impactHistory) {
-          low = Math.min(low, hit.y);
-          high = Math.max(high, hit.y);
-        }
-
-        // A healthy corridor run makes clear vertical progress. Only a ball
-        // ricocheting in a shallow pocket high above the paddle becomes a bomb.
-        const highInWall = ball.y < paddleY - BRICK_H * 5;
-        if (highInWall && high - low <= STUCK_VERTICAL_RANGE) armBomb(ball);
+        ball.newCellBounces++;
+        if (ball.newCellBounces >= BOMB_CELL_BOUNCES) armBomb(ball);
       }
 
       function spawnBlastDebris(brick, centerX, centerY) {
@@ -379,7 +356,7 @@
         ball.mode = 'fallingBomb';
         ball.vx = 0;
         ball.vy = BOMB_FALL_SPEED;
-        ball.impactHistory.length = 0;
+        ball.newCellBounces = 0;
         ball.trail.length = 0;
         // Re-establish the real top row immediately if the blast reached it.
         maintainBrickCeiling();
@@ -388,8 +365,8 @@
       function restoreBall(ball) {
         ball.mode = 'ball';
         ball.color = nextDepositColor();
-        ball.impactHistory.length = 0;
-        ball.lastImpactAt = lastT;
+        ball.newCellBounces = 0;
+        delete ball.bombWallY;
         ball.flash = 1;
         aimAtColumn(ball, chooseTargetColumn());
       }
@@ -398,7 +375,13 @@
         for (let i = pendingDeposits.length - 1; i >= 0; i--) {
           const deposit = pendingDeposits[i];
           if (balls.some((ball) => circleTouchesCell(ball, deposit.c, deposit.row))) continue;
-          if (canPlaceLiveBrick(deposit.c, deposit.row)) addBrick(deposit.c, deposit.row, deposit.color);
+          if (canPlaceLiveBrick(deposit.c, deposit.row)
+            && addBrick(deposit.c, deposit.row, deposit.color)) {
+            // Scrolling and bomb progress happen only after a reserved cell
+            // actually becomes a brick.
+            recordCellCreation(deposit.c);
+            noteNewCellBounce(deposit.ball);
+          }
           pendingDeposits.splice(i, 1);
         }
       }
@@ -642,10 +625,8 @@
           ball.vx = impact.normalX * Math.abs(ball.vx);
           ball.vy = verticalVelocity; // side faces never change climb / fall direction
           queueDeposit(ball, brick.c + impact.normalX, brick.row);
-          recordImpact(brick.c);
           impactStats.side++;
           ball.flash = 1;
-          noteBallImpact(ball);
           return;
         }
 
@@ -655,10 +636,8 @@
           ball.y = bottom + BALL_R + COLLISION_EPS;
           ball.vy = Math.abs(ball.vy);
           queueDeposit(ball, brick.c, targetRow);
-          recordImpact(brick.c);
           impactStats.underside++;
           ball.flash = 1;
-          noteBallImpact(ball);
           return;
         }
 
@@ -666,10 +645,8 @@
           ball.x = hitX;
           ball.y = top - BALL_R - COLLISION_EPS;
           ball.vy = -Math.abs(ball.vy);
-          recordImpact(brick.c);
           impactStats.top++;
           ball.flash = 1;
-          noteBallImpact(ball);
         }
       }
 
@@ -683,10 +660,8 @@
         ball.y = bottom + BALL_R + COLLISION_EPS;
         ball.vy = Math.abs(ball.vy);
         queueDeposit(ball, brick.c, brick.row + 1);
-        recordImpact(brick.c);
         impactStats.underside++;
         ball.flash = 1;
-        noteBallImpact(ball);
       }
 
       let lastT = 0;
@@ -696,8 +671,8 @@
         const dt = Math.max(0, Math.min(1 / 30, (now - lastT) / 1000));
         lastT = now;
 
-        // --- global scroll: each real brick impact advances the one shared
-        //     lattice by 1 / numCols of a brick, keeping the mean front steady.
+        // --- global scroll: each completed cell advances the one shared lattice
+        //     by 1 / numCols of a brick, keeping the mean front steady.
         //     No column can ever drift off-grid because no brick owns a y-value. -
         const easedScroll = (gridTargetY - gridY) * Math.min(1, dt * SCROLL_FOLLOW);
         gridY += clamp(easedScroll, -SCROLL_MAX_SPEED * dt, SCROLL_MAX_SPEED * dt);
@@ -713,6 +688,7 @@
         const minX = BALL_R, maxX = W - BALL_R;
         for (const ball of balls) {
           if (ball.mode === 'arming') {
+            ball.y = gridY + ball.bombWallY;
             if (now - ball.bombStarted >= BOMB_ARM_MS) detonateBomb(ball);
           } else {
             const previousX = ball.x;
@@ -739,12 +715,11 @@
               if (ball.mode === 'ball') containBelowBrickCeiling(ball);
 
               // Paddle line: it never misses. Reaching it also proves the ball
-              // escaped the upper wall, so any old stuck evidence is discarded.
+              // completed a return trip, so its cell-bounce count starts over.
               if (ball.y + BALL_R >= paddleY) {
                 ball.y = paddleY - BALL_R;
                 if (ball.vy > 0) {
-                  ball.impactHistory.length = 0;
-                  ball.lastImpactAt = now;
+                  ball.newCellBounces = 0;
                   aimAtColumn(ball, chooseTargetColumn());
                 }
               }
@@ -979,7 +954,7 @@
           `bricks=${bricks.length} front lo=${lo.toFixed(0)} hi=${hi.toFixed(0)} setpoint=${setpointY.toFixed(0)}`,
           `repairLine=${repairLineY.toFixed(0)} paddleY=${paddleY.toFixed(0)} (tower depth uncapped)`,
           `grid=${gridY.toFixed(2)} target=${gridTargetY.toFixed(2)} focus=${focus ? `${focus.mode} ${focus.remaining}` : `repair ${focusCooldown}`}`,
-          `impacts underside=${impactStats.underside} side=${impactStats.side} top=${impactStats.top} bombs=${impactStats.bombs} pending=${pendingDeposits.length}`,
+          `impacts underside=${impactStats.underside} side=${impactStats.side} top=${impactStats.top} cells=${impactStats.cells} trip=${balls[0]?.newCellBounces || 0}/${BOMB_CELL_BOUNCES} bombs=${impactStats.bombs} pending=${pendingDeposits.length}`,
         ];
         lines.forEach((s, i) => ctx.fillText(s, 12, 24 + i * 18));
       }

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-labelledby="title desc">
+  <title id="title">Soft Collapse</title>
+  <desc id="desc">A dense black and white field of triangles, diamonds, square rings, and chevrons.</desc>
+  <rect width="600" height="600" fill="#f7f7f4"/>
+  <g fill="#11110f">
+    <path d="M0 0h100L50 50 0 100zm100 0h100v100L150 50z"/>
+    <path d="M200 0h100l-50 50 50 50H200l50-50z"/>
+    <path d="M325 25h50v50h-50zM300 0h100v100H300zm25 25v50h50V25z" fill-rule="evenodd"/>
+    <path d="M400 0h100l-50 50 50 50H400l50-50zM500 0h100l-50 50-50 50z"/>
+
+    <path d="M0 100h100v100H0zm22 22v56h56v-56z" fill-rule="evenodd"/>
+    <path d="M100 100h100l-50 50 50 50H100l50-50z"/>
+    <path d="M200 100l50 50-50 50zm100 0v100l-50-50z"/>
+    <path d="M300 100h100l-50 50-50 50zm100 0h100v100l-50-50z"/>
+    <path d="M500 100h100v100H500zm20 20v60h60v-60z" fill-rule="evenodd"/>
+
+    <path d="M0 200l50 50-50 50zm100 0v100l-50-50z"/>
+    <path d="M100 200h100v26h-58v22h44v26h-44v26h-42z"/>
+    <path d="M200 200h100l-50 50 50 50H200l50-50z"/>
+    <path d="M300 200h100v100H300zm22 22v56h56v-56z" fill-rule="evenodd"/>
+    <path d="M400 200l50 50-50 50zm100 0v100l-50-50z"/>
+    <path d="M500 200h100l-50 50 50 50H500l50-50z"/>
+
+    <path d="M0 300h100l-50 50 50 50H0l50-50z"/>
+    <path d="M100 300h100v100H100zm24 24v52h52v-52z" fill-rule="evenodd"/>
+    <path d="M200 300l50 50-50 50zm100 0v100l-50-50z"/>
+    <path d="M300 300h100l-50 50 50 50H300l50-50z"/>
+    <path d="M400 300h100v26h-58v22h44v26h-44v26h-42z"/>
+    <path d="M500 300l50 50-50 50zm100 0v100l-50-50z"/>
+
+    <path d="M0 400h100v100H0zm22 22v56h56v-56z" fill-rule="evenodd"/>
+    <path d="M100 400l50 50-50 50zm100 0v100l-50-50z"/>
+    <path d="M200 400h100l-50 50-50 50zm100 0h100l-50 50 50 50H300l50-50z"/>
+    <path d="M400 400h100v100H400zm22 22v56h56v-56z" fill-rule="evenodd"/>
+    <path d="M500 400h100l-50 50 50 50H500l50-50z"/>
+
+    <path d="M0 500h100l-50 50 50 50H0l50-50z"/>
+    <path d="M100 500h100l-50 50-50 50zm100 0h100v100l-50-50z"/>
+    <path d="M300 500h100v100H300zm24 24v52h52v-52z" fill-rule="evenodd"/>
+    <path d="M400 500h100l-50 50 50 50H400l50-50z"/>
+    <path d="M500 500h100l-50 50-50 50z"/>
+  </g>
+</svg>

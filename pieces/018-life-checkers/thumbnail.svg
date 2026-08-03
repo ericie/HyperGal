@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-labelledby="title desc">
+  <title id="title">Life Checkers</title>
+  <desc id="desc">A black and cream checkerboard interrupted by a lively cobalt and cyan Game of Life pattern, one combination from eight woven palettes.</desc>
+  <defs>
+    <pattern id="dead" width="100" height="100" patternUnits="userSpaceOnUse">
+      <rect width="50" height="50" fill="#1c1b1a"/>
+      <rect x="50" width="50" height="50" fill="#f1eadc"/>
+      <rect y="50" width="50" height="50" fill="#f1eadc"/>
+      <rect x="50" y="50" width="50" height="50" fill="#1c1b1a"/>
+    </pattern>
+  </defs>
+  <rect width="800" height="800" fill="url(#dead)"/>
+  <g>
+    <rect x="250" y="100" width="50" height="50" fill="#00a9d2"/>
+    <rect x="300" y="150" width="50" height="50" fill="#00a9d2"/>
+    <rect x="200" y="200" width="50" height="50" fill="#294b98"/>
+    <rect x="250" y="200" width="50" height="50" fill="#00a9d2"/>
+    <rect x="300" y="200" width="50" height="50" fill="#294b98"/>
+    <rect x="500" y="250" width="50" height="50" fill="#00a9d2"/>
+    <rect x="550" y="250" width="50" height="50" fill="#294b98"/>
+    <rect x="450" y="300" width="50" height="50" fill="#00a9d2"/>
+    <rect x="500" y="300" width="50" height="50" fill="#294b98"/>
+    <rect x="350" y="350" width="50" height="50" fill="#00a9d2"/>
+    <rect x="400" y="350" width="50" height="50" fill="#294b98"/>
+    <rect x="450" y="350" width="50" height="50" fill="#00a9d2"/>
+    <rect x="500" y="350" width="50" height="50" fill="#294b98"/>
+    <rect x="550" y="350" width="50" height="50" fill="#00a9d2"/>
+    <rect x="300" y="400" width="50" height="50" fill="#00a9d2"/>
+    <rect x="350" y="400" width="50" height="50" fill="#294b98"/>
+    <rect x="400" y="450" width="50" height="50" fill="#00a9d2"/>
+    <rect x="450" y="450" width="50" height="50" fill="#294b98"/>
+    <rect x="500" y="450" width="50" height="50" fill="#00a9d2"/>
+    <rect x="250" y="550" width="50" height="50" fill="#294b98"/>
+    <rect x="300" y="550" width="50" height="50" fill="#00a9d2"/>
+    <rect x="350" y="550" width="50" height="50" fill="#294b98"/>
+    <rect x="300" y="600" width="50" height="50" fill="#294b98"/>
+    <rect x="350" y="650" width="50" height="50" fill="#294b98"/>
+  </g>
+</svg>

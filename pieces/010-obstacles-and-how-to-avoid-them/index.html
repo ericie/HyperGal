@@ -171,6 +171,11 @@
       .gestalt-control[data-lines] {
         --tone: var(--prussian);
         min-height: 39px;
+      }
+
+      .gestalt-control[data-line-angle] {
+        --tone: var(--prussian);
+        min-height: 39px;
         padding-bottom: 4px;
         border-bottom: 1px solid rgba(0, 21, 34, 0.3);
       }
@@ -203,7 +208,8 @@
         text-align: center;
       }
 
-      [data-lines] .count-mark {
+      [data-lines] .count-mark,
+      [data-line-angle] .count-mark {
         color: var(--prussian);
       }
 
@@ -314,7 +320,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Obstacles and How to Avoid Them: small drawing heads animate fluid field lines around borderless Hokusai-toned walls, squares, and circles."
+      aria-label="Obstacles and How to Avoid Them: repeating drawing heads leave fluid, fading field lines around borderless Hokusai-toned walls, squares, and circles."
     ></canvas>
 
     <aside class="gestalt-panel" aria-label="Gestalt controls">
@@ -349,6 +355,13 @@
           <span class="gestalt-name">Lines</span>
           <output class="gestalt-value">32</output>
           <input class="gestalt-strength" type="range" min="8" max="64" step="1" value="32" aria-label="Line count" />
+        </div>
+
+        <div class="gestalt-control" data-line-angle>
+          <span class="count-mark" aria-hidden="true">&#8736;</span>
+          <span class="gestalt-name">Angle</span>
+          <output class="gestalt-value">90&deg;</output>
+          <input class="gestalt-strength" type="range" min="0" max="360" step="1" value="90" aria-label="Line angle" />
         </div>
 
         <div class="gestalt-control" data-gestalt="scale">
@@ -429,16 +442,16 @@
         COLORS.wheat,
       ];
       const LINE_COLORS = [
-        'rgba(0, 21, 34, 0.88)',
-        'rgba(0, 75, 135, 0.7)',
-        'rgba(168, 0, 44, 0.6)',
-        'rgba(0, 21, 34, 0.78)',
-        'rgba(222, 184, 135, 0.86)',
-        'rgba(0, 75, 135, 0.58)',
-        'rgba(168, 0, 44, 0.54)',
-        'rgba(255, 215, 123, 0.94)',
-        'rgba(0, 21, 34, 0.84)',
-        'rgba(222, 184, 135, 0.72)',
+        'rgba(0, 21, 34, 0.5)',
+        'rgba(0, 75, 135, 0.4)',
+        'rgba(168, 0, 44, 0.34)',
+        'rgba(0, 21, 34, 0.44)',
+        'rgba(222, 184, 135, 0.48)',
+        'rgba(0, 75, 135, 0.33)',
+        'rgba(168, 0, 44, 0.3)',
+        'rgba(255, 215, 123, 0.52)',
+        'rgba(0, 21, 34, 0.47)',
+        'rgba(222, 184, 135, 0.4)',
       ];
       const GESTALTS = {
         scale: { enabled: true, strength: 0.38 },
@@ -449,7 +462,7 @@
         offpage: { enabled: true, strength: 0.66 },
       };
       const COUNT_SETTING = { strength: 0.42 };
-      const LINE_SETTING = { count: 32 };
+      const LINE_SETTING = { count: 32, angle: 90 };
 
       let width = 1;
       let height = 1;
@@ -463,7 +476,6 @@
       let compositionFrame = 0;
       let lineAnimationFrame = 0;
       let lineAnimationStartedAt = 0;
-      let lineAnimationDuration = 1;
       let lastAnimationRender = 0;
       let prefersReducedMotion = reducedMotionQuery ? reducedMotionQuery.matches : false;
       let panelDrag = null;
@@ -548,11 +560,121 @@
       function compose() {
         random = mulberry32((seed ^ Math.round(width * 17) ^ Math.round(height * 31)) >>> 0);
         obstacles = makeObstacles();
-        lineTemplates = makeLineTemplates();
-        lines = makeLines();
+        composeLines();
         updateCountOutput();
         updateLineOutput();
         restartLineAnimation();
+      }
+
+      function lineFrame() {
+        const theta = (LINE_SETTING.angle * Math.PI) / 180;
+        const dx = Math.sin(theta);
+        const dy = -Math.cos(theta);
+        return {
+          dx,
+          dy,
+          w: Math.abs(width * dx) + Math.abs(height * dy),
+          h: Math.abs(width * dy) + Math.abs(height * dx),
+          phi: Math.atan2(dy, dx),
+        };
+      }
+
+      function composeLines() {
+        const frame = lineFrame();
+        const cx = width / 2;
+        const cy = height / 2;
+        const fcx = frame.w / 2;
+        const fcy = frame.h / 2;
+        const routing = obstacles.map((obstacle) => {
+          const relX = obstacle.x - cx;
+          const relY = obstacle.y - cy;
+          const u = relX * frame.dx + relY * frame.dy + fcx;
+          const v = relX * -frame.dy + relY * frame.dx + fcy;
+          return {
+            ...obstacle,
+            x: u,
+            y: v,
+            baseX: u,
+            baseY: v,
+            rotation: obstacle.rotation - frame.phi,
+          };
+        });
+        const toScreen = (point) => ({
+          x: cx + (point.x - fcx) * frame.dx - (point.y - fcy) * frame.dy,
+          y: cy + (point.x - fcx) * frame.dy + (point.y - fcy) * frame.dx,
+        });
+        const realWidth = width;
+        const realHeight = height;
+        width = frame.w;
+        height = frame.h;
+        try {
+          lineTemplates = makeLineTemplates();
+          assignRoutingGroups(routing, lineSpacing());
+          lines = makeLines(routing, toScreen);
+        } finally {
+          width = realWidth;
+          height = realHeight;
+        }
+      }
+
+      function assignRoutingGroups(routing, lineGap) {
+        const parent = routing.map((_, index) => index);
+        const clearance = clamp(lineGap * 0.42, 5, 8);
+        const widestLane = clamp(lineGap * 0.5 * 1.28, 5, 17);
+        const mergeGap = clearance * 2 + widestLane * 1.5;
+
+        const find = (index) => {
+          let root = index;
+          while (parent[root] !== root) root = parent[root];
+          while (parent[index] !== index) {
+            const next = parent[index];
+            parent[index] = root;
+            index = next;
+          }
+          return root;
+        };
+        const join = (a, b) => {
+          const rootA = find(a);
+          const rootB = find(b);
+          if (rootA !== rootB) parent[rootB] = rootA;
+        };
+
+        for (let i = 0; i < routing.length; i++) {
+          for (let j = i + 1; j < routing.length; j++) {
+            const a = routing[i];
+            const b = routing[j];
+            const sameStack = a.stackId && a.stackId === b.stackId;
+            const surfaceGap =
+              segmentDistance(centerSegment(a), centerSegment(b)) -
+              obstacleCollisionRadius(a) -
+              obstacleCollisionRadius(b);
+            if (sameStack || surfaceGap < mergeGap) join(i, j);
+          }
+        }
+
+        const groups = new Map();
+        for (let i = 0; i < routing.length; i++) {
+          const root = find(i);
+          const obstacle = routing[i];
+          const bounds = wallHalfBounds(obstacle);
+          const group = groups.get(root) || {
+            minY: Infinity,
+            maxY: -Infinity,
+            ids: [],
+          };
+          group.minY = Math.min(group.minY, obstacle.y - bounds.y);
+          group.maxY = Math.max(group.maxY, obstacle.y + bounds.y);
+          group.ids.push(obstacle.id);
+          groups.set(root, group);
+        }
+
+        for (let i = 0; i < routing.length; i++) {
+          const group = groups.get(find(i));
+          routing[i].routeGroupY = (group.minY + group.maxY) * 0.5;
+          routing[i].routeGroupTop = group.minY;
+          routing[i].routeGroupBottom = group.maxY;
+          routing[i].routeGroupKey = hashText(group.ids.sort((a, b) => a - b).join(','));
+        }
       }
 
       function makeObstacles() {
@@ -577,6 +699,17 @@
 
           for (let attempt = 0; attempt < 120; attempt++) {
             const jitter = attempt < 72 ? anchor.jitter : anchor.jitter * 1.65;
+            const stackMembers =
+              anchor.stackId && anchor.stackIndex > 0
+                ? placed.filter((item) => item.stackId === anchor.stackId)
+                : [];
+            const stackParent =
+              stackMembers.length > 0
+                ? stackMembers[
+                    (anchor.stackIndex - 1 + attempt) % stackMembers.length
+                  ]
+                : null;
+            if (anchor.stackId && anchor.stackIndex > 0 && !stackParent) continue;
             const trial = {
               ...obstacle,
               x: anchor.x + rand(-jitter, jitter),
@@ -586,7 +719,12 @@
               guideX: anchor.guideX,
               guideY: anchor.guideY,
               guideAngle: anchor.guideAngle,
+              stackId: anchor.stackId,
+              stackIndex: anchor.stackIndex,
             };
+            if (stackParent) {
+              positionStackContact(trial, stackParent, anchor, attempt);
+            }
 
             const bounds = wallHalfBounds(trial, clearance);
             if (anchor.edge) {
@@ -597,8 +735,16 @@
               const minY = verticalBoundary + bounds.y;
               const maxY = height - verticalBoundary - bounds.y;
               if (maxX <= minX || maxY <= minY) continue;
-              trial.x = clamp(trial.x, minX, maxX);
-              trial.y = clamp(trial.y, minY, maxY);
+              const clampedX = clamp(trial.x, minX, maxX);
+              const clampedY = clamp(trial.y, minY, maxY);
+              if (
+                stackParent &&
+                Math.hypot(clampedX - trial.x, clampedY - trial.y) > 0.5
+              ) {
+                continue;
+              }
+              trial.x = clampedX;
+              trial.y = clampedY;
             }
 
             trial.baseX = trial.x;
@@ -623,6 +769,9 @@
 
       function anchorPriority(anchor) {
         if (anchor.edge) return 4;
+        if (anchor.mode === 'proximity') {
+          return 3.72 + anchor.proximityStrength * 0.18 - anchor.stackIndex * 0.015;
+        }
         if (anchor.mode === 'closure') return 3.2;
         if (anchor.mode === 'implied') return 3;
         if (anchor.shape === 'square') return 2.3;
@@ -668,6 +817,7 @@
           return {
             x: center.x + Math.cos(theta) * width * rand(0.13, 0.25),
             y: center.y + Math.sin(theta) * height * rand(0.12, 0.23),
+            angle: theta + Math.PI / 2 + rand(-0.28, 0.28),
           };
         });
         const closure = {
@@ -699,6 +849,30 @@
           ? mix(0.2, 3.6, Math.pow(GESTALTS.scale.strength, 1.65))
           : 1;
         const impliedForce = smootherStep(implied);
+        const proximityForce = smootherStep(proximity);
+        const contactStrength = smootherStep(
+          clamp((proximity - 0.38) / 0.62, 0, 1)
+        );
+        const proximityCount =
+          proximity > 0
+            ? Math.round(
+                clamp(
+                  spec.count * mix(0.1, 0.52, proximityForce),
+                  2,
+                  Math.max(2, spec.count - 3)
+                )
+              )
+            : 0;
+        const proximityStackCount =
+          contactStrength > 0
+            ? Math.round(
+                clamp(
+                  mix(1, 3, proximityForce),
+                  1,
+                  Math.max(1, Math.floor(proximityCount / 2))
+                )
+              )
+            : 0;
         const closureCoverage = mix(0.62, 0.86, closure);
         const closureSpacing =
           spec.base * 1.6 * clamp(Math.pow(overallScale, 0.72), 0.45, 1.6);
@@ -743,6 +917,7 @@
         const offpageCount =
           offpage > 0 ? Math.round(clamp(spec.count * mix(0.06, 0.17, offpage), 1, 4)) : 0;
         const scalePattern = [0.1, 1.16, 0.25, 3.4, 0.5, 8.8, 1.7, 0.14, 6.2, 0.36, 2.6, 0.18];
+        const proximityScalePattern = [0.42, 1.2, 0.72, 2.2, 0.32, 1.55, 0.58, 1.8, 0.9];
         const impliedScalePattern = [0.12, 0.3, 0.72, 0.16, 1.15, 0.4, 0.88, 0.14, 0.58, 0.22];
         const closureScalePattern = [0.74, 0.62, 0.8, 0.68, 0.88, 0.7];
         const impliedColors = [COLORS.prussian, COLORS.prussian, COLORS.ink, COLORS.prussian, COLORS.tyrian];
@@ -765,10 +940,46 @@
           let mode = 'scatter';
           let modeIndex = i;
           let activeGuide = null;
+          let stackId = null;
+          let stackIndex = 0;
+          let stackAngle = 0;
 
-          if (i < closureCount) {
-            mode = 'closure';
+          if (i < proximityCount) {
+            mode = 'proximity';
             modeIndex = i;
+            const stackGroup =
+              proximityStackCount > 0
+                ? modeIndex % proximityStackCount
+                : modeIndex % spec.clusters.length;
+            const cluster = spec.clusters[stackGroup % spec.clusters.length];
+            stackIndex =
+              proximityStackCount > 0
+                ? Math.floor(modeIndex / proximityStackCount)
+                : 0;
+            stackId =
+              proximityStackCount > 0
+                ? `proximity-${stackGroup}`
+                : null;
+            stackAngle = cluster.angle;
+            const theta = rand(0, TAU);
+            const radius =
+              Math.sqrt(random()) *
+              minSide *
+              mix(0.3, 0.025, proximityForce);
+            const targetX = cluster.x + Math.cos(theta) * radius * rand(0.8, 1.35);
+            const targetY = cluster.y + Math.sin(theta) * radius * rand(0.72, 1.12);
+            x = mix(x, targetX, proximityForce);
+            y = mix(y, targetY, proximityForce);
+            angle = mix(
+              angle,
+              cluster.angle + pick([0, Math.PI / 2, -Math.PI / 2]),
+              proximityForce * 0.52
+            );
+            angleJitter = mix(0.18, 0.055, proximityForce);
+            jitter = minSide * mix(0.06, 0.012, proximityForce);
+          } else if (i < proximityCount + closureCount) {
+            mode = 'closure';
+            modeIndex = i - proximityCount;
             const gapLength = (1 - closureCoverage) * rect.perimeter;
             const edgeMids = [
               rect.a,
@@ -791,8 +1002,8 @@
             angle = mix(angle, point.angle, attraction);
             angleJitter = mix(0.16, 0.03, attraction);
             jitter = minSide * mix(0.055, 0.01, attraction);
-          } else if (i < closureCount + impliedCount) {
-            const localIndex = i - closureCount;
+          } else if (i < proximityCount + closureCount + impliedCount) {
+            const localIndex = i - proximityCount - closureCount;
             const guide = spec.guides[0];
             const guideIndex = localIndex;
             const guideSlots = impliedCount;
@@ -826,18 +1037,6 @@
             angle = mix(angle, targetAngle, attraction);
             angleJitter = mix(0.16, 0.012, attraction);
             jitter = minSide * mix(0.07, 0.007, attraction);
-          } else if (proximity > 0 && i < spec.count) {
-            mode = 'proximity';
-            modeIndex = i - closureCount - impliedCount;
-            const cluster = spec.clusters[(i - closureCount - impliedCount) % spec.clusters.length];
-            const theta = rand(0, TAU);
-            const radius = Math.sqrt(random()) * minSide * mix(0.28, 0.055, proximity);
-            const targetX = cluster.x + Math.cos(theta) * radius * rand(0.8, 1.5);
-            const targetY = cluster.y + Math.sin(theta) * radius * rand(0.7, 1.15);
-            const attraction = smootherStep(proximity);
-            x = mix(x, targetX, attraction);
-            y = mix(y, targetY, attraction);
-            jitter = minSide * mix(0.055, 0.018, proximity);
           }
 
           if (mode === 'scatter' && i < spec.anchorCount - offpageCount) {
@@ -862,6 +1061,8 @@
               ? impliedScalePattern[modeIndex % impliedScalePattern.length]
               : mode === 'closure'
                 ? closureScalePattern[modeIndex % closureScalePattern.length]
+                : mode === 'proximity'
+                  ? proximityScalePattern[modeIndex % proximityScalePattern.length]
                 : scalePattern[i % scalePattern.length];
           let scaleFactor = mix(1, selectedScale, scaleVariety) * overallScale;
           if (mode === 'implied') {
@@ -907,6 +1108,11 @@
             guideX: activeGuide ? activeGuide.x : null,
             guideY: activeGuide ? activeGuide.y : null,
             guideAngle: activeGuide ? activeGuide.angle : null,
+            stackId,
+            stackIndex,
+            stackAngle,
+            contactStrength,
+            proximityStrength: proximityForce,
           });
         }
 
@@ -927,9 +1133,51 @@
         return true;
       }
 
+      function positionStackContact(trial, parent, anchor, attempt) {
+        const directionPattern = [0, 0.58, -0.66, 1.02, -1.08, 0.28, -0.34];
+        const direction =
+          anchor.stackAngle +
+          directionPattern[(anchor.stackIndex - 1) % directionPattern.length] +
+          rand(-0.2, 0.2) +
+          (attempt % 5) * 0.11;
+        const parentReach = obstacleSupportRadius(parent, direction);
+        const trialReach = obstacleSupportRadius(trial, direction + Math.PI);
+        const contactDepth =
+          Math.min(obstacleContactThickness(parent), obstacleContactThickness(trial)) *
+          mix(0.08, 0.42, anchor.contactStrength) *
+          rand(0.78, 1.18);
+        const centerDistance = Math.max(
+          0,
+          parentReach + trialReach - contactDepth
+        );
+        trial.x = parent.x + Math.cos(direction) * centerDistance;
+        trial.y = parent.y + Math.sin(direction) * centerDistance;
+      }
+
+      function obstacleSupportRadius(obstacle, direction) {
+        if (obstacle.type === 'circle') return obstacle.radius;
+        const local = direction - obstacle.rotation;
+        return (
+          Math.abs(Math.cos(local)) * obstacle.width * 0.5 +
+          Math.abs(Math.sin(local)) * obstacle.height * 0.5
+        );
+      }
+
+      function obstacleContactThickness(obstacle) {
+        return obstacle.type === 'circle'
+          ? obstacle.radius * 2
+          : Math.min(obstacle.width, obstacle.height);
+      }
+
       function overlapsPlaced(candidate, placed, corridor) {
         const a = centerSegment(candidate);
         for (const existing of placed) {
+          if (
+            candidate.stackId &&
+            existing.stackId === candidate.stackId
+          ) {
+            continue;
+          }
           const b = centerSegment(existing);
           const minDistance =
             obstacleCollisionRadius(candidate) + obstacleCollisionRadius(existing) + corridor;
@@ -1096,21 +1344,22 @@
         };
       }
 
-      function makeLines() {
+      function makeLines(routingObstacles, toScreen) {
         const lineGap = lineSpacing();
         const xStep = clamp(width / 360, 3, 4.2);
         const stroke = clamp(Math.min(width, height) / 760, 0.72, 1.55);
         const clearance = clamp(lineGap * 0.42, 5, 8);
         const approach = clamp(lineGap * 2.1, 32, 72);
-        prepareObstacleCaches(clearance, approach);
+        prepareObstacleCaches(routingObstacles, clearance, approach);
         const made = [];
 
         for (let i = 0; i < lineTemplates.length; i++) {
           const template = lineTemplates[i];
+          template.routeSides = new Map();
           const baseY = template.baseY;
           const points = [];
           let displacement = 0;
-          const activeObstacles = obstacles;
+          const activeObstacles = routingObstacles;
 
           for (let x = -8; x <= width + 8; x += xStep) {
             const naturalY =
@@ -1124,18 +1373,31 @@
             for (let o = 0; o < activeObstacles.length; o++) {
               const obstacle = activeObstacles[o];
               const exact = shapeIntervalAtX(obstacle, x, clearance);
-              const soft = fluidIntervalAtX(obstacle, x);
+              const soft = fluidIntervalAtX(obstacle, x, template);
               if (!soft) continue;
 
-              const lane = lineLaneOffset(baseY, lineGap);
-              const softLane = lane * 0.32;
-              const side = sideForRoute(baseY, i, obstacle, soft, lineGap, softLane);
+              const lane = lineLaneOffset(baseY, lineGap, template);
+              const softLane =
+                lane * mix(0.22, 0.5, (template.steering - 0.62) / 0.86);
+              const side = sideForRoute(
+                baseY,
+                template,
+                obstacle,
+                soft,
+                lineGap,
+                softLane,
+                y
+              );
               const softTarget = side < 0 ? soft.top - softLane : soft.bottom + softLane;
               const insideSoft = y > soft.top && y < soft.bottom;
 
               if (insideSoft) {
                 const depth = side < 0 ? (y - soft.top) / soft.height : (soft.bottom - y) / soft.height;
-                const strength = mix(0.09, 0.48, smootherStep(depth));
+                const strength = clamp(
+                  mix(0.055, 0.52, smootherStep(depth)) * template.steering,
+                  0.035,
+                  0.72
+                );
                 const correction = (softTarget - y) * strength;
                 if (Math.abs(correction) > 0.01) constrained = true;
                 y += correction;
@@ -1154,7 +1416,11 @@
             if (hardConstrained) {
               displacement = y - naturalY;
             } else if (constrained) {
-              displacement = mix(displacement, y - naturalY, 0.56);
+              displacement = mix(
+                displacement,
+                y - naturalY,
+                template.deflectionMemory
+              );
               y = naturalY + displacement;
             } else {
               displacement *= template.release;
@@ -1164,9 +1430,24 @@
             points.push({ x, y });
           }
 
-          relaxAndConstrain(points, baseY, i, lineGap, activeObstacles);
-          const curves = makeLineCurves(points);
+          relaxAndConstrain(points, baseY, template, lineGap, activeObstacles);
+          const curves = makeLineCurves(points, activeObstacles, clearance);
+          for (const point of points) {
+            const mapped = toScreen(point);
+            point.x = mapped.x;
+            point.y = mapped.y;
+          }
+          for (const curve of curves) {
+            mapCurveToScreen(curve, toScreen);
+          }
           const pathLength = curves.totalLength;
+          const drawDuration =
+            template.drawDuration * (pathLength / Math.max(1, width));
+          const cycleDuration =
+            drawDuration +
+            template.holdDuration +
+            template.fadeDuration +
+            template.restDuration;
           made.push({
             baseY,
             index: i,
@@ -1176,9 +1457,12 @@
             stroke: stroke * template.weight,
             color: template.color,
             spriteColor: WALL_COLORS[i % WALL_COLORS.length],
-            drawDelay: template.drawDelay,
-            drawDuration:
-              template.drawDuration * (pathLength / Math.max(1, width)),
+            drawDuration,
+            holdDuration: template.holdDuration,
+            fadeDuration: template.fadeDuration,
+            restDuration: template.restDuration,
+            cycleDuration,
+            cycleOffset: template.cyclePhase * cycleDuration,
           });
         }
 
@@ -1203,20 +1487,33 @@
         let baseY = -overscan;
 
         for (let i = 0; i < count; i++) {
+          const turnTightness = rand(0.62, 1.5);
           templates.push({
+            index: i,
             baseY,
             phaseA: flowPhaseA + i * 0.085 + rand(-0.035, 0.035),
             phaseB: flowPhaseB - i * 0.13 + rand(-0.05, 0.05),
             waveA: flowWaveA * rand(0.94, 1.06),
             waveB: flowWaveB * rand(0.92, 1.08),
             wobble: lineGap * rand(0.06, 0.3),
-            release: rand(0.995, 0.998),
+            recognition: rand(0.62, 1.62),
+            steering: rand(0.62, 1.48),
+            turnTightness,
+            deflectionMemory: rand(0.38, 0.76),
+            release: mix(0.984, 0.9994, Math.pow(random(), 0.4)),
+            laneScale: rand(0.78, 1.28),
+            routeSalt: rand(-1000, 1000),
+            relaxPasses: Math.round(mix(8, 4, (turnTightness - 0.62) / 0.88)),
+            freeSoftenPasses: Math.round(
+              mix(10, 4, (turnTightness - 0.62) / 0.88)
+            ),
             weight: lineWeight(i),
             color: LINE_COLORS[i % LINE_COLORS.length],
-            drawDelay:
-              (i / Math.max(1, count - 1)) * mix(2.6, 4.4, count / 64) +
-              rand(0, 0.32),
-            drawDuration: rand(6.2, 9.2),
+            drawDuration: rand(5.8, 9.4),
+            holdDuration: rand(0.35, 1.45),
+            fadeDuration: rand(2.8, 6.2),
+            restDuration: rand(0.45, 2.4),
+            cyclePhase: random(),
           });
           if (i < gaps.length) baseY += (gaps[i] / gapTotal) * span;
         }
@@ -1234,32 +1531,73 @@
         return pattern[index % pattern.length] * rand(0.92, 1.08);
       }
 
-      function sideForLine(baseY, lineIndex, obstacle) {
-        const dy = baseY - (obstacle.baseY || obstacle.y);
+      function sideForLine(baseY, template, obstacle) {
+        const routeY = Number.isFinite(obstacle.routeGroupY)
+          ? obstacle.routeGroupY
+          : obstacle.baseY || obstacle.y;
+        const routeKey = Number.isFinite(obstacle.routeGroupKey)
+          ? obstacle.routeGroupKey
+          : obstacle.id;
+        const dy = baseY - routeY;
         if (Math.abs(dy) > 3) return dy < 0 ? -1 : 1;
-        const h = Math.sin((seed + 1) * 12.9898 + lineIndex * 78.233 + obstacle.id * 37.719);
+        const h = Math.sin(
+          (seed + 1) * 12.9898 +
+          template.index * 78.233 +
+          template.routeSalt * 19.193 +
+          routeKey * 37.719
+        );
         return h < 0 ? -1 : 1;
       }
 
-      function sideForRoute(baseY, lineIndex, obstacle, interval, lineGap, padding = 0) {
+      function hashText(value) {
+        let hash = 2166136261;
+        for (let i = 0; i < value.length; i++) {
+          hash ^= value.charCodeAt(i);
+          hash = Math.imul(hash, 16777619);
+        }
+        return hash >>> 0;
+      }
+
+      function sideForRoute(
+        baseY,
+        template,
+        obstacle,
+        interval,
+        lineGap,
+        padding = 0,
+        currentY = baseY
+      ) {
         const minY = -lineGap * 2.2;
         const maxY = height + lineGap * 2.2;
         const top = interval.top - padding;
         const bottom = interval.bottom + padding;
-        let side = sideForLine(baseY, lineIndex, obstacle);
-        if (side < 0 && top < minY && bottom <= maxY) side = 1;
-        if (side > 0 && bottom > maxY && top >= minY) side = -1;
+        const routeTop = Number.isFinite(obstacle.routeGroupTop)
+          ? obstacle.routeGroupTop - padding
+          : top;
+        const routeBottom = Number.isFinite(obstacle.routeGroupBottom)
+          ? obstacle.routeGroupBottom + padding
+          : bottom;
+        const routeKey = Number.isFinite(obstacle.routeGroupKey)
+          ? obstacle.routeGroupKey
+          : obstacle.id;
+        if (template.routeSides.has(routeKey)) {
+          return template.routeSides.get(routeKey);
+        }
+        let side = sideForLine(currentY, template, obstacle);
+        if (side < 0 && routeTop < minY && routeBottom <= maxY) side = 1;
+        if (side > 0 && routeBottom > maxY && routeTop >= minY) side = -1;
+        template.routeSides.set(routeKey, side);
         return side;
       }
 
-      function lineLaneOffset(baseY, lineGap) {
-        return clamp(lineGap * 0.5, 6, 14);
+      function lineLaneOffset(baseY, lineGap, template) {
+        return clamp(lineGap * 0.5 * template.laneScale, 5, 17);
       }
 
-      function relaxAndConstrain(points, baseY, lineIndex, lineGap, activeObstacles) {
+      function relaxAndConstrain(points, baseY, template, lineGap, activeObstacles) {
         const scratch = points.map((p) => p.y);
         const clearance = clamp(lineGap * 0.42, 5, 8);
-        for (let pass = 0; pass < 6; pass++) {
+        for (let pass = 0; pass < template.relaxPasses; pass++) {
           for (let i = 3; i < points.length - 3; i++) {
             scratch[i] =
               points[i].y * 0.34 +
@@ -1268,16 +1606,26 @@
               (points[i - 3].y + points[i + 3].y) * 0.03;
           }
           for (let i = 3; i < points.length - 3; i++) points[i].y = scratch[i];
-          constrain(points, baseY, lineIndex, lineGap, activeObstacles);
+          constrain(points, baseY, template, lineGap, activeObstacles);
         }
-        constrain(points, baseY, lineIndex, lineGap, activeObstacles);
-        chamferConstraints(points, clearance, activeObstacles);
-        softenFreeSegments(points, clearance, activeObstacles);
+        constrain(points, baseY, template, lineGap, activeObstacles);
+        chamferConstraints(points, clearance, activeObstacles, template);
+        softenFreeSegments(points, clearance, activeObstacles, template);
+        secureLineSegments(
+          points,
+          baseY,
+          template,
+          lineGap,
+          activeObstacles
+        );
+        constrain(points, baseY, template, lineGap, activeObstacles);
       }
 
-      function chamferConstraints(points, clearance, activeObstacles) {
+      function chamferConstraints(points, clearance, activeObstacles, template) {
         if (points.length < 2) return;
-        const maxStep = (points[1].x - points[0].x) * 2.2;
+        const maxStep =
+          (points[1].x - points[0].x) *
+          mix(1.3, 3.8, (template.turnTightness - 0.62) / 0.88);
         for (let pass = 0; pass < 2; pass++) {
           for (let i = 1; i < points.length; i++) {
             easeToward(points, i, i - 1, maxStep, clearance, activeObstacles);
@@ -1297,9 +1645,9 @@
         }
       }
 
-      function softenFreeSegments(points, clearance, activeObstacles) {
+      function softenFreeSegments(points, clearance, activeObstacles, template) {
         const scratch = points.map((point) => point.y);
-        for (let pass = 0; pass < 7; pass++) {
+        for (let pass = 0; pass < template.freeSoftenPasses; pass++) {
           for (let i = 4; i < points.length - 4; i++) {
             const desired =
               points[i].y * 0.2 +
@@ -1323,21 +1671,83 @@
         return true;
       }
 
-      function constrain(points, baseY, lineIndex, lineGap, activeObstacles) {
+      function constrain(points, baseY, template, lineGap, activeObstacles) {
         const minY = -lineGap * 2.2;
         const maxY = height + lineGap * 2.2;
         const clearance = clamp(lineGap * 0.42, 5, 8);
-        const lane = lineLaneOffset(baseY, lineGap);
+        const lane = lineLaneOffset(baseY, lineGap, template);
 
         for (const p of points) {
           for (const obstacle of activeObstacles) {
             const interval = shapeIntervalAtX(obstacle, p.x, clearance);
             if (!interval) continue;
-            const side = sideForRoute(baseY, lineIndex, obstacle, interval, lineGap, lane);
+            const side = sideForRoute(
+              baseY,
+              template,
+              obstacle,
+              interval,
+              lineGap,
+              lane,
+              p.y
+            );
             const target = side < 0 ? interval.top - lane : interval.bottom + lane;
             if ((side < 0 && p.y > target) || (side > 0 && p.y < target)) p.y = target;
           }
           p.y = clamp(p.y, minY, maxY);
+        }
+      }
+
+      function secureLineSegments(
+        points,
+        baseY,
+        template,
+        lineGap,
+        activeObstacles
+      ) {
+        const clearance = clamp(lineGap * 0.42, 5, 8);
+        const lane = lineLaneOffset(baseY, lineGap, template);
+        const minY = -lineGap * 2.2;
+        const maxY = height + lineGap * 2.2;
+
+        for (let pass = 0; pass < 3; pass++) {
+          for (let i = 0; i < points.length - 1; i++) {
+            const from = points[i];
+            const to = points[i + 1];
+
+            for (let sample = 1; sample <= 3; sample++) {
+              const t = sample / 4;
+              const x = mix(from.x, to.x, t);
+              const y = mix(from.y, to.y, t);
+
+              for (const obstacle of activeObstacles) {
+                const interval = shapeIntervalAtX(obstacle, x, clearance);
+                if (!interval || y <= interval.top || y >= interval.bottom) {
+                  continue;
+                }
+                const side = sideForRoute(
+                  baseY,
+                  template,
+                  obstacle,
+                  interval,
+                  lineGap,
+                  lane,
+                  y
+                );
+                const target =
+                  side < 0 ? interval.top - lane : interval.bottom + lane;
+                if (side < 0) {
+                  from.y = Math.min(from.y, target);
+                  to.y = Math.min(to.y, target);
+                } else {
+                  from.y = Math.max(from.y, target);
+                  to.y = Math.max(to.y, target);
+                }
+              }
+            }
+
+            from.y = clamp(from.y, minY, maxY);
+            to.y = clamp(to.y, minY, maxY);
+          }
         }
       }
 
@@ -1423,14 +1833,15 @@
         }));
       }
 
-      function prepareObstacleCaches(clearance, approach) {
+      function prepareObstacleCaches(list, clearance, approach) {
         const softMargin = clearance + approach;
-        for (const obstacle of obstacles) {
+        for (const obstacle of list) {
           const bounds = wallHalfBounds(obstacle, clearance);
           obstacle._exactMargin = clearance;
           obstacle._softMargin = softMargin;
-          obstacle._fluidRadiusX = bounds.x + approach * 3.4;
-          obstacle._fluidRadiusY = bounds.y + approach * 1.2;
+          obstacle._fluidBoundsX = bounds.x;
+          obstacle._fluidBoundsY = bounds.y;
+          obstacle._fluidApproach = approach;
           obstacle._exactGeometry =
             obstacle.type === 'circle' ? null : makeGeometryCache(obstacleVertices(obstacle, clearance));
           obstacle._softGeometry =
@@ -1438,10 +1849,17 @@
         }
       }
 
-      function fluidIntervalAtX(obstacle, x) {
-        const normalizedX = (x - obstacle.x) / obstacle._fluidRadiusX;
+      function fluidIntervalAtX(obstacle, x, template) {
+        const radiusX =
+          obstacle._fluidBoundsX +
+          obstacle._fluidApproach * 3.4 * template.recognition;
+        const radiusY =
+          obstacle._fluidBoundsY +
+          obstacle._fluidApproach *
+            mix(0.82, 1.62, (template.steering - 0.62) / 0.86);
+        const normalizedX = (x - obstacle.x) / radiusX;
         if (Math.abs(normalizedX) >= 1) return null;
-        const span = obstacle._fluidRadiusY * Math.sqrt(1 - normalizedX * normalizedX);
+        const span = radiusY * Math.sqrt(1 - normalizedX * normalizedX);
         return makeInterval(obstacle.y - span, obstacle.y + span);
       }
 
@@ -1470,26 +1888,52 @@
 
       function drawLines(time) {
         const elapsed = Math.max(0, (time - lineAnimationStartedAt) / 1000);
-        const animationTime = prefersReducedMotion ? lineAnimationDuration : elapsed;
 
         ctx.save();
         for (const line of lines) {
-          const progress = prefersReducedMotion
-            ? 1
-            : clamp((animationTime - line.drawDelay) / line.drawDuration, 0, 1);
-          if (progress <= 0) continue;
+          let progress = 1;
+          let alpha = 1;
+          let isDrawing = false;
+
+          if (!prefersReducedMotion) {
+            const cycleTime =
+              (elapsed + line.cycleOffset) % line.cycleDuration;
+            const drawEnd = line.drawDuration;
+            const holdEnd = drawEnd + line.holdDuration;
+            const fadeEnd = holdEnd + line.fadeDuration;
+
+            if (cycleTime < drawEnd) {
+              progress = cycleTime / drawEnd;
+              alpha = smootherStep(clamp(cycleTime / 0.24, 0, 1));
+              isDrawing = true;
+            } else if (cycleTime < holdEnd) {
+              progress = 1;
+            } else if (cycleTime < fadeEnd) {
+              progress = 1;
+              alpha =
+                1 -
+                smootherStep(
+                  (cycleTime - holdEnd) / Math.max(0.001, line.fadeDuration)
+                );
+            } else {
+              continue;
+            }
+          }
+
+          if (progress <= 0 || alpha <= 0.001) continue;
 
           ctx.beginPath();
+          ctx.globalAlpha = alpha;
           ctx.lineWidth = line.stroke;
           ctx.strokeStyle = line.color;
           const head = drawSmoothLine(line, progress);
           ctx.stroke();
-          if (head && progress < 1) drawLineSprite(line, head);
+          if (head && isDrawing) drawLineSprite(line, head);
         }
         ctx.restore();
       }
 
-      function makeLineCurves(points) {
+      function makeLineCurves(points, activeObstacles = null, clearance = 0) {
         const curves = [];
         let totalLength = 0;
         for (let i = 0; i < points.length - 1; i++) {
@@ -1509,6 +1953,12 @@
             startLength: totalLength,
             lengthLut: [{ t: 0, length: 0 }],
           };
+          if (
+            activeObstacles &&
+            !curveIsClear(curve, activeObstacles, clearance)
+          ) {
+            repairCurve(curve, activeObstacles, clearance);
+          }
           let curveLength = 0;
           let previousX = curve.startX;
           let previousY = curve.startY;
@@ -1529,6 +1979,74 @@
         }
         curves.totalLength = totalLength;
         return curves;
+      }
+
+      function curveIsClear(curve, activeObstacles, clearance) {
+        for (let sample = 1; sample < 12; sample++) {
+          const point = cubicPoint(curve, sample / 12);
+          if (!pointIsClear(point.x, point.y, clearance, activeObstacles)) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      function repairCurve(curve, activeObstacles, clearance) {
+        curve.control1X = mix(curve.startX, curve.endX, 1 / 3);
+        curve.control2X = mix(curve.startX, curve.endX, 2 / 3);
+
+        for (let pass = 0; pass < 4; pass++) {
+          let adjusted = false;
+          for (let sample = 1; sample < 12; sample++) {
+            const point = cubicPoint(curve, sample / 12);
+            for (const obstacle of activeObstacles) {
+              const interval = shapeIntervalAtX(obstacle, point.x, clearance);
+              if (
+                !interval ||
+                point.y <= interval.top ||
+                point.y >= interval.bottom
+              ) {
+                continue;
+              }
+
+              const routeAbove =
+                (curve.startY + curve.endY) * 0.5 <= interval.center;
+              const target = routeAbove
+                ? interval.top - 2
+                : interval.bottom + 2;
+              if (routeAbove) {
+                curve.control1Y = Math.min(curve.control1Y, target);
+                curve.control2Y = Math.min(curve.control2Y, target);
+              } else {
+                curve.control1Y = Math.max(curve.control1Y, target);
+                curve.control2Y = Math.max(curve.control2Y, target);
+              }
+              adjusted = true;
+            }
+          }
+          if (!adjusted || curveIsClear(curve, activeObstacles, clearance)) break;
+        }
+      }
+
+      function mapCurveToScreen(curve, toScreen) {
+        const start = toScreen({ x: curve.startX, y: curve.startY });
+        const control1 = toScreen({
+          x: curve.control1X,
+          y: curve.control1Y,
+        });
+        const control2 = toScreen({
+          x: curve.control2X,
+          y: curve.control2Y,
+        });
+        const end = toScreen({ x: curve.endX, y: curve.endY });
+        curve.startX = start.x;
+        curve.startY = start.y;
+        curve.control1X = control1.x;
+        curve.control1Y = control1.y;
+        curve.control2X = control2.x;
+        curve.control2Y = control2.y;
+        curve.endX = end.x;
+        curve.endY = end.y;
       }
 
       function cubicPoint(curve, t) {
@@ -1713,6 +2231,27 @@
         updateLineControl(control, control.querySelector('.gestalt-strength'));
       }
 
+      function bindLineAngleControl() {
+        const control = document.querySelector('[data-line-angle]');
+        const slider = control.querySelector('.gestalt-strength');
+        slider.value = LINE_SETTING.angle;
+        updateLineAngleControl(control, slider);
+
+        slider.addEventListener('input', () => {
+          LINE_SETTING.angle = Number(slider.value);
+          updateLineAngleControl(control, slider);
+          scheduleCompose();
+        });
+      }
+
+      function updateLineAngleControl(control, slider) {
+        control.style.setProperty('--strength', `${(LINE_SETTING.angle / 360) * 100}%`);
+        const output = control.querySelector('.gestalt-value');
+        output.value = `${LINE_SETTING.angle}°`;
+        output.textContent = output.value;
+        slider.setAttribute('aria-valuetext', `${LINE_SETTING.angle} degrees`);
+      }
+
       function bindGestaltControls() {
         document.querySelectorAll('[data-gestalt]').forEach((control) => {
           const name = control.dataset.gestalt;
@@ -1762,10 +2301,6 @@
         lineAnimationFrame = 0;
         lastAnimationRender = 0;
         lineAnimationStartedAt = performance.now();
-        lineAnimationDuration = Math.max(
-          1,
-          ...lines.map((line) => line.drawDelay + line.drawDuration)
-        );
 
         if (prefersReducedMotion) {
           render(lineAnimationStartedAt);
@@ -1783,12 +2318,7 @@
         }
         lastAnimationRender = time;
         render(time);
-        const elapsed = (time - lineAnimationStartedAt) / 1000;
-        if (elapsed < lineAnimationDuration) {
-          lineAnimationFrame = requestAnimationFrame(animateLineField);
-        } else {
-          lineAnimationFrame = 0;
-        }
+        lineAnimationFrame = requestAnimationFrame(animateLineField);
       }
 
       function reseed() {
@@ -1889,6 +2419,7 @@
 
       bindCountControl();
       bindLineControl();
+      bindLineAngleControl();
       bindGestaltControls();
       bindCompositionPanel();
       resize();

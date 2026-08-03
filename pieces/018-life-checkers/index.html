@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Conway's Game of Life played across two seeded color pairs drawn from eight woven checkerboard palettes."
+    />
+    <title>Life Checkers · HyperGal</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --canvas-background: #d82e5b;
+      }
+
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--canvas-background);
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        cursor: crosshair;
+        touch-action: none;
+      }
+
+      .status {
+        position: fixed;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="stage"
+      tabindex="0"
+      role="img"
+      aria-label="Life Checkers: Conway's Game of Life on a checkerboard. Dead and live cells use two different color pairs selected from eight woven palettes. Click or drag to draw. Space pauses, N steps, R scatters a new field and palette combination, and C clears."
+    ></canvas>
+    <p id="status" class="status" aria-live="polite"></p>
+
+    <script>
+      (() => {
+        const canvas = document.getElementById('stage');
+        const status = document.getElementById('status');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const params = new URLSearchParams(location.search);
+        let pendingStasisTest = params.get('test') === 'stasis';
+        let pendingOpeningPulsar = !params.has('seed') && !pendingStasisTest;
+
+        const PALETTES = [
+          { name: 'rose and orange', colors: ['#d82e5b', '#f29a22'] },
+          { name: 'red and tangerine', colors: ['#d83224', '#ef642f'] },
+          { name: 'blush and moss', colors: ['#dda0b6', '#476b32'] },
+          { name: 'black and cream', colors: ['#1c1b1a', '#f1eadc'] },
+          { name: 'olive and ivory', colors: ['#a4a53d', '#eee7cb'] },
+          { name: 'emerald and ice', colors: ['#15945a', '#b9dadd'] },
+          { name: 'teal and mustard', colors: ['#287c79', '#d2c45c'] },
+          { name: 'cobalt and cyan', colors: ['#294b98', '#00a9d2'] },
+        ];
+        const STEP_MS = 65;
+        const FADE_IN_MS = 110;
+        const FADE_OUT_MS = 90;
+        const INTRO_BATCH_MS = 45;
+        const INTRO_BATCHES = 10;
+        const INTRO_CELL_FADE_MS = 90;
+        const STATE_HISTORY_LIMIT = 512;
+        const MIN_PLAY_BEFORE_RESET_MS = 900;
+        const WIPE_MS = 520;
+        const MIN_CELL = 14;
+        const TARGET_CELLS = 34;
+        const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        let width = 1;
+        let height = 1;
+        let dpr = 1;
+        let cellSize = 20;
+        let cols = 1;
+        let rows = 1;
+        let cells = new Uint8Array(1);
+        let next = new Uint8Array(1);
+        let levels = new Float32Array(1);
+        let colors = [...PALETTES[0].colors, ...PALETTES[1].colors];
+        let deadPalette = PALETTES[0];
+        let livePalette = PALETTES[1];
+        let paused = reducedMotion;
+        let drawing = false;
+        let paintValue = 1;
+        let lastPainted = -1;
+        let lastTime = 0;
+        let accumulator = 0;
+        let seed = params.get('seed') || randomSeed();
+        let introPhase = 'reveal';
+        let introStartedAt = null;
+        let introOrder = [];
+        let playStartedAt = 0;
+        let seenStates = new Set();
+        let stateHistory = [];
+        let transition = null;
+
+        resize(true);
+        requestAnimationFrame(frame);
+
+        addEventListener('resize', () => resize(false), { passive: true });
+        canvas.addEventListener('pointerdown', startDrawing);
+        canvas.addEventListener('pointermove', draw);
+        canvas.addEventListener('pointerup', stopDrawing);
+        canvas.addEventListener('pointercancel', stopDrawing);
+        canvas.addEventListener('keydown', onKeyDown);
+
+        function randomSeed() {
+          return Math.floor(Math.random() * 0xffffffff).toString(36);
+        }
+
+        function xmur3(str) {
+          let h = 1779033703 ^ str.length;
+          for (let i = 0; i < str.length; i += 1) {
+            h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+            h = (h << 13) | (h >>> 19);
+          }
+          return () => {
+            h = Math.imul(h ^ (h >>> 16), 2246822507);
+            h = Math.imul(h ^ (h >>> 13), 3266489909);
+            return (h ^= h >>> 16) >>> 0;
+          };
+        }
+
+        function mulberry32(a) {
+          return () => {
+            let t = (a += 0x6d2b79f5);
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        function resize(firstRun) {
+          if (!firstRun) transition = null;
+          const oldCells = cells;
+          const oldLevels = levels;
+          const oldCols = cols;
+          const oldRows = rows;
+
+          width = Math.max(1, innerWidth);
+          height = Math.max(1, innerHeight);
+          dpr = Math.min(2, devicePixelRatio || 1);
+          cellSize = Math.max(MIN_CELL, Math.ceil(Math.min(width, height) / TARGET_CELLS));
+          cols = Math.ceil(width / cellSize);
+          rows = Math.ceil(height / cellSize);
+
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.imageSmoothingEnabled = false;
+
+          cells = new Uint8Array(cols * rows);
+          next = new Uint8Array(cols * rows);
+          levels = new Float32Array(cols * rows);
+
+          if (firstRun) {
+            scatter(true);
+          } else {
+            const copyCols = Math.min(cols, oldCols);
+            const copyRows = Math.min(rows, oldRows);
+            const oldX = Math.floor((oldCols - copyCols) / 2);
+            const oldY = Math.floor((oldRows - copyRows) / 2);
+            const newX = Math.floor((cols - copyCols) / 2);
+            const newY = Math.floor((rows - copyRows) / 2);
+            for (let y = 0; y < copyRows; y += 1) {
+              for (let x = 0; x < copyCols; x += 1) {
+                cells[(y + newY) * cols + x + newX] =
+                  oldCells[(y + oldY) * oldCols + x + oldX];
+                levels[(y + newY) * cols + x + newX] =
+                  oldLevels[(y + oldY) * oldCols + x + oldX];
+              }
+            }
+            if (introPhase !== 'play') beginIntro();
+            resetStateHistory();
+          }
+          render();
+        }
+
+        function scatter(withIntro = false, excludedPalettes = []) {
+          const random = mulberry32(xmur3(seed)());
+          const paletteRandom = mulberry32(xmur3(`${seed}:palette`)());
+          choosePalettes(paletteRandom, excludedPalettes);
+          cells.fill(0);
+
+          if (pendingStasisTest) {
+            const centerX = Math.floor(cols / 2);
+            const centerY = Math.floor(rows / 2);
+            cells[(centerY - 1) * cols + centerX - 1] = 1;
+            cells[(centerY - 1) * cols + centerX] = 1;
+            cells[centerY * cols + centerX - 1] = 1;
+            cells[centerY * cols + centerX] = 1;
+            pendingStasisTest = false;
+          } else if (pendingOpeningPulsar) {
+            placePulsar();
+            pendingOpeningPulsar = false;
+          } else {
+            for (let i = 0; i < cells.length; i += 1) {
+              cells[i] = random() < 0.34 ? 1 : 0;
+            }
+          }
+          resetStateHistory();
+
+          if (withIntro) {
+            beginIntro();
+          } else {
+            levels.fill(0);
+          }
+          render();
+        }
+
+        function placePulsar() {
+          const centerX = Math.floor(cols / 2);
+          const centerY = Math.floor(rows / 2);
+          const arms = [-4, -3, -2, 2, 3, 4];
+          const rails = [-6, -1, 1, 6];
+
+          for (const rail of rails) {
+            for (const arm of arms) {
+              const horizontal = (centerY + rail) * cols + centerX + arm;
+              const vertical = (centerY + arm) * cols + centerX + rail;
+              if (horizontal >= 0 && horizontal < cells.length) cells[horizontal] = 1;
+              if (vertical >= 0 && vertical < cells.length) cells[vertical] = 1;
+            }
+          }
+        }
+
+        function beginIntro() {
+          introOrder = [];
+          for (let i = 0; i < cells.length; i += 1) {
+            if (cells[i]) introOrder.push(i);
+          }
+
+          const random = mulberry32(xmur3(`${seed}:intro`)());
+          for (let i = introOrder.length - 1; i > 0; i -= 1) {
+            const j = Math.floor(random() * (i + 1));
+            [introOrder[i], introOrder[j]] = [introOrder[j], introOrder[i]];
+          }
+
+          levels.fill(0);
+          introStartedAt = null;
+          introPhase = reducedMotion ? 'play' : 'reveal';
+
+          if (reducedMotion) {
+            for (const index of introOrder) levels[index] = 1;
+          }
+        }
+
+        function updateIntro(time) {
+          if (introPhase === 'play') return;
+          if (introStartedAt === null) introStartedAt = time;
+
+          const elapsed = time - introStartedAt;
+          if (introPhase === 'reveal') {
+            for (let i = 0; i < introOrder.length; i += 1) {
+              const batch = Math.min(
+                INTRO_BATCHES - 1,
+                Math.floor((i * INTRO_BATCHES) / introOrder.length),
+              );
+              const fadeElapsed = elapsed - batch * INTRO_BATCH_MS;
+              levels[introOrder[i]] = Math.max(
+                0,
+                Math.min(1, fadeElapsed / INTRO_CELL_FADE_MS),
+              );
+            }
+
+            const revealEnd =
+              (INTRO_BATCHES - 1) * INTRO_BATCH_MS + INTRO_CELL_FADE_MS;
+            if (elapsed >= revealEnd) {
+              introPhase = 'play';
+              playStartedAt = time;
+              accumulator = 0;
+              status.textContent = 'Game started.';
+            }
+          }
+        }
+
+        function choosePalettes(random, excludedPalettes = []) {
+          const excludedColors = new Set(
+            excludedPalettes.flatMap((palette) => palette.colors),
+          );
+          const available = PALETTES.filter((palette) =>
+            palette.colors.every((color) => !excludedColors.has(color)),
+          );
+          const deadIndex = Math.floor(random() * available.length);
+          let liveIndex = Math.floor(random() * (available.length - 1));
+          if (liveIndex >= deadIndex) liveIndex += 1;
+
+          deadPalette = available[deadIndex];
+          livePalette = available[liveIndex];
+          colors = [...deadPalette.colors, ...livePalette.colors];
+
+          document.documentElement.style.setProperty('--canvas-background', colors[0]);
+          canvas.setAttribute(
+            'aria-label',
+            `Life Checkers: Conway's Game of Life on a checkerboard. ` +
+              `Dead cells alternate ${deadPalette.name}; live cells alternate ${livePalette.name}. ` +
+              `Click or drag to draw. Space pauses, N steps, R scatters a new field and palette combination, and C clears.`,
+          );
+        }
+
+        function stateKey() {
+          let key = '';
+          for (let i = 0; i < cells.length; i += 16) {
+            let packed = 0;
+            for (let bit = 0; bit < 16 && i + bit < cells.length; bit += 1) {
+              packed |= cells[i + bit] << bit;
+            }
+            key += String.fromCharCode(packed);
+          }
+          return key;
+        }
+
+        function resetStateHistory() {
+          seenStates.clear();
+          stateHistory = [];
+          rememberState(stateKey());
+        }
+
+        function rememberState(key) {
+          seenStates.add(key);
+          stateHistory.push(key);
+          if (stateHistory.length > STATE_HISTORY_LIMIT) {
+            seenStates.delete(stateHistory.shift());
+          }
+        }
+
+        function step() {
+          let changed = false;
+          for (let y = 0; y < rows; y += 1) {
+            for (let x = 0; x < cols; x += 1) {
+              let neighbors = 0;
+              for (let dy = -1; dy <= 1; dy += 1) {
+                for (let dx = -1; dx <= 1; dx += 1) {
+                  if (dx === 0 && dy === 0) continue;
+                  const nx = (x + dx + cols) % cols;
+                  const ny = (y + dy + rows) % rows;
+                  neighbors += cells[ny * cols + nx];
+                }
+              }
+              const index = y * cols + x;
+              next[index] = neighbors === 3 || (cells[index] && neighbors === 2) ? 1 : 0;
+              if (next[index] !== cells[index]) changed = true;
+            }
+          }
+          [cells, next] = [next, cells];
+          const key = stateKey();
+          const repeated = seenStates.has(key);
+          rememberState(key);
+          return changed && !repeated;
+        }
+
+        function render(elapsed = 0) {
+          const fadeIn = reducedMotion ? 1 : elapsed / FADE_IN_MS;
+          const fadeOut = reducedMotion ? 1 : elapsed / FADE_OUT_MS;
+          const wipeRow = transition
+            ? Math.floor(transition.progress * (rows + 1))
+            : rows;
+
+          for (let y = 0; y < rows; y += 1) {
+            for (let x = 0; x < cols; x += 1) {
+              const index = y * cols + x;
+              if (transition) {
+                const backgroundColors =
+                  y < wipeRow ? colors : transition.oldColors;
+                drawCell(x, y, 0, backgroundColors);
+                continue;
+              }
+
+              const alive = cells[index];
+              const parity = (x + y) & 1;
+              let level = levels[index];
+
+              if (introPhase === 'play') {
+                if (alive) {
+                  level = Math.min(1, level + fadeIn);
+                } else {
+                  level = Math.max(0, level - fadeOut);
+                }
+                levels[index] = level;
+              }
+
+              drawCell(x, y, level, colors);
+            }
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        function drawCell(x, y, level, paletteColors) {
+          const parity = (x + y) & 1;
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = paletteColors[parity];
+          ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+
+          if (level > 0) {
+            ctx.globalAlpha = level;
+            ctx.fillStyle = paletteColors[2 + parity];
+            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          }
+        }
+
+        function frame(time) {
+          if (!lastTime) lastTime = time;
+          const elapsed = Math.min(250, time - lastTime);
+          lastTime = time;
+
+          if (transition) {
+            updateTransition(time);
+            accumulator = 0;
+          } else if (introPhase !== 'play') {
+            updateIntro(time);
+            accumulator = 0;
+          } else if (!paused && !drawing) {
+            accumulator += elapsed;
+            while (accumulator >= STEP_MS) {
+              if (!step()) {
+                if (time - playStartedAt >= MIN_PLAY_BEFORE_RESET_MS) {
+                  resetAfterStasis();
+                  break;
+                }
+              }
+              accumulator -= STEP_MS;
+            }
+          } else {
+            accumulator = 0;
+          }
+          render(Math.min(50, elapsed));
+          requestAnimationFrame(frame);
+        }
+
+        function resetAfterStasis() {
+          const outgoingPalettes = [deadPalette, livePalette];
+          transition = {
+            oldColors: colors.slice(),
+            progress: 0,
+            startedAt: null,
+          };
+
+          seed = randomSeed();
+          history.replaceState(null, '', `${location.pathname}?seed=${encodeURIComponent(seed)}`);
+          scatter(false, outgoingPalettes);
+          levels.fill(0);
+          introPhase = 'background';
+          accumulator = 0;
+          status.textContent = 'Field reached stasis. Changing the background.';
+        }
+
+        function updateTransition(time) {
+          if (!transition) return;
+          if (transition.startedAt === null) transition.startedAt = time;
+
+          const elapsed = time - transition.startedAt;
+          transition.progress = reducedMotion ? 1 : Math.min(1, elapsed / WIPE_MS);
+
+          if (transition.progress >= 1) {
+            transition = null;
+            resetStateHistory();
+            beginIntro();
+            status.textContent = 'Background changed. Adding the new live cells.';
+          }
+        }
+
+        function cellAt(event) {
+          const rect = canvas.getBoundingClientRect();
+          const x = Math.floor((event.clientX - rect.left) / cellSize);
+          const y = Math.floor((event.clientY - rect.top) / cellSize);
+          if (x < 0 || x >= cols || y < 0 || y >= rows) return -1;
+          return y * cols + x;
+        }
+
+        function startDrawing(event) {
+          finishTransition();
+          finishIntro();
+          canvas.focus({ preventScroll: true });
+          canvas.setPointerCapture(event.pointerId);
+          drawing = true;
+          const index = cellAt(event);
+          if (index < 0) return;
+          paintValue = cells[index] ? 0 : 1;
+          lastPainted = -1;
+          paint(index);
+        }
+
+        function draw(event) {
+          if (!drawing) return;
+          paint(cellAt(event));
+        }
+
+        function paint(index) {
+          if (index < 0 || index === lastPainted) return;
+          cells[index] = paintValue;
+          resetStateHistory();
+          lastPainted = index;
+          render();
+        }
+
+        function stopDrawing() {
+          drawing = false;
+          lastPainted = -1;
+        }
+
+        function finishIntro() {
+          if (introPhase === 'play') return;
+          for (const index of introOrder) levels[index] = 1;
+          introPhase = 'play';
+          playStartedAt = performance.now();
+          accumulator = 0;
+        }
+
+        function finishTransition() {
+          if (!transition) return;
+          transition = null;
+          resetStateHistory();
+          accumulator = 0;
+          beginIntro();
+        }
+
+        function onKeyDown(event) {
+          const key = event.key.toLowerCase();
+          finishTransition();
+          finishIntro();
+          if (key === ' ') {
+            event.preventDefault();
+            paused = !paused;
+            status.textContent = paused ? 'Paused.' : 'Playing.';
+          } else if (key === 'n') {
+            paused = true;
+            step();
+            render();
+            status.textContent = 'Advanced one generation.';
+          } else if (key === 'r') {
+            seed = randomSeed();
+            history.replaceState(null, '', `${location.pathname}?seed=${encodeURIComponent(seed)}`);
+            scatter(false);
+            status.textContent =
+              `New field scattered. Dead cells use ${deadPalette.name}; ` +
+              `live cells use ${livePalette.name}.`;
+          } else if (key === 'c') {
+            cells.fill(0);
+            resetStateHistory();
+            paused = true;
+            render();
+            status.textContent = 'Field cleared.';
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>
