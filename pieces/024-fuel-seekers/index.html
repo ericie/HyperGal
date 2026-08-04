@@ -67,7 +67,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Fuel Seekers: sixty translucent bubbles travel among ten small gas stations placed over a low-contrast marbled oil field. Their amber fuel drains as they move. At an empty station they stop and refill; if they run dry first, they pop and a replacement enters from beyond the edge. Press R to reseed the field."
+      aria-label="Fuel Seekers: sixty large abstract bubbles travel among ten five-sided stations placed over a low-contrast marbled oil field. Filling a bubble erases the vein beneath its station. Empty stations burst and new stations emerge over untouched resources. Bubbles that run dry also pop, and replacements enter from beyond the edge. Press R to reseed the field."
     ></canvas>
     <p id="status" class="status" aria-live="polite"></p>
 
@@ -97,8 +97,13 @@
         let stations = [];
         let bubbles = [];
         let pops = [];
+        let stationPops = [];
+        let depletedPatches = [];
+        let pendingStations = [];
+        let resourceCandidates = [];
         let lastFrameAt = 0;
         let nextBubbleId = 1;
+        let nextStationId = 1;
         let popCount = 0;
         let raf = 0;
         let noiseOffsetX = 0;
@@ -177,10 +182,15 @@
         function buildScene() {
           random = mulberry32(seed ^ 0x6c8e9cf5);
           buildFieldTexture();
-          placeStations();
+          depletedPatches = [];
+          pendingStations = [];
+          stationPops = [];
+          stations = [];
           bubbles = [];
           pops = [];
           nextBubbleId = 1;
+          nextStationId = 1;
+          placeStations();
 
           for (let i = 0; i < BUBBLE_COUNT; i += 1) {
             bubbles.push(createBubble(true, i));
@@ -293,7 +303,7 @@
         }
 
         function placeStations() {
-          const candidates = [];
+          resourceCandidates = [];
           const marginX = Math.min(0.11, 62 / Math.max(1, width));
           const marginY = Math.min(0.11, 62 / Math.max(1, height));
           const stationRandom = mulberry32(seed ^ 0x27d4eb2d);
@@ -302,54 +312,94 @@
             const nx = marginX + stationRandom() * (1 - marginX * 2);
             const ny = marginY + stationRandom() * (1 - marginY * 2);
             const sample = fieldAt(nx, ny);
-            candidates.push({
+            resourceCandidates.push({
               nx,
               ny,
               value: sample.resource + stationRandom() * 0.018
             });
           }
 
-          candidates.sort((a, b) => b.value - a.value);
+          resourceCandidates.sort((a, b) => b.value - a.value);
           const selected = [];
-          let separation = Math.min(width, height) * 0.19;
+          while (selected.length < STATION_COUNT) {
+            const point = pickResourcePoint(selected, false);
+            if (!point) break;
+            selected.push(point);
+          }
+          stations = selected.map((point) => createStation(point, false));
+        }
 
-          while (selected.length < STATION_COUNT && separation > 22) {
-            for (const candidate of candidates) {
-              if (selected.includes(candidate)) continue;
+        function pickResourcePoint(extraPoints = [], respectDepletion = true) {
+          const occupied = stations.concat(extraPoints);
+          const baseSeparation = Math.min(width, height) * 0.16;
+          const relaxations = [1, 0.8, 0.62, 0.46, 0.32];
+
+          for (const relaxation of relaxations) {
+            for (const candidate of resourceCandidates) {
               const x = candidate.nx * width;
               const y = candidate.ny * height;
-              const clear = selected.every((other) =>
-                Math.hypot(x - other.nx * width, y - other.ny * height) >= separation
-              );
-              if (clear) selected.push(candidate);
-              if (selected.length === STATION_COUNT) break;
+              const awayFromStations = occupied.every((other) => {
+                const otherX = other.x ?? other.nx * width;
+                const otherY = other.y ?? other.ny * height;
+                return Math.hypot(x - otherX, y - otherY) >= baseSeparation * relaxation;
+              });
+              if (!awayFromStations) continue;
+
+              if (respectDepletion) {
+                const untouched = depletedPatches.every((patch) =>
+                  Math.hypot(x - patch.x, y - patch.y) >=
+                    patch.radius * (0.72 + relaxation * 0.35)
+                );
+                if (!untouched) continue;
+              }
+              return candidate;
             }
-            separation *= 0.82;
           }
+          return null;
+        }
 
-          while (selected.length < STATION_COUNT) {
-            const fallback = candidates.find((candidate) => !selected.includes(candidate));
-            if (!fallback) break;
-            selected.push(fallback);
-          }
-
-          const stationSize = clamp(Math.min(width, height) * 0.022, 10, 17);
-          stations = selected.map((point, index) => ({
-            id: index,
+        function createStation(point, entering) {
+          const size = clamp(Math.min(width, height) * 0.03, 15, 24);
+          const capacity = 3.6 + point.value * 2.8 + random() * 1.2;
+          return {
+            id: nextStationId++,
             x: point.nx * width,
             y: point.ny * height,
             nx: point.nx,
             ny: point.ny,
             resource: point.value,
-            size: stationSize,
-            side: stationRandom() < 0.5 ? -1 : 1,
+            size,
+            side: random() < 0.5 ? -1 : 1,
             occupant: null,
-            phase: stationRandom() * TAU
-          }));
+            phase: random() * TAU,
+            capacity,
+            remaining: capacity,
+            flowAngle: fieldTangent(point.nx, point.ny),
+            eraseColor: fieldBaseColor(point.nx, point.ny),
+            birth: entering ? 0 : 1
+          };
+        }
+
+        function fieldTangent(nx, ny) {
+          const epsilon = 0.004;
+          const left = fieldAt(clamp(nx - epsilon, 0, 1), ny).resource;
+          const right = fieldAt(clamp(nx + epsilon, 0, 1), ny).resource;
+          const above = fieldAt(nx, clamp(ny - epsilon, 0, 1)).resource;
+          const below = fieldAt(nx, clamp(ny + epsilon, 0, 1)).resource;
+          return Math.atan2(right - left, above - below);
+        }
+
+        function fieldBaseColor(nx, ny) {
+          const cloud = fieldAt(nx, ny).cloud - 0.5;
+          return [
+            clampByte(FIELD_BASE[0] + cloud * 8),
+            clampByte(FIELD_BASE[1] + cloud * 7.2),
+            clampByte(FIELD_BASE[2] + cloud * 6.2)
+          ];
         }
 
         function createBubble(initial, index = 0) {
-          const radius = 3.4 + Math.pow(random(), 1.45) * 5.8;
+          const radius = 9 + Math.pow(random(), 1.3) * 12;
           const speedBase = clamp(Math.min(width, height) * 0.058, 25, 52);
           const bubble = {
             id: nextBubbleId++,
@@ -407,7 +457,10 @@
 
         function chooseTarget(bubble, avoidCurrent) {
           const available = stations.filter((station) =>
-            !station.occupant && (!avoidCurrent || station !== bubble.station)
+            !station.occupant &&
+            station.remaining > 0 &&
+            station.birth >= 0.68 &&
+            (!avoidCurrent || station !== bubble.station)
           );
           if (!available.length) {
             bubble.target = null;
@@ -447,6 +500,8 @@
         }
 
         function update(dt) {
+          updateStations(dt);
+
           for (let i = 0; i < bubbles.length; i += 1) {
             const bubble = bubbles[i];
             bubble.age += dt;
@@ -467,6 +522,25 @@
             pops[i].age += dt;
             if (pops[i].age >= pops[i].duration) pops.splice(i, 1);
           }
+
+          for (let i = stationPops.length - 1; i >= 0; i -= 1) {
+            stationPops[i].age += dt;
+            if (stationPops[i].age >= stationPops[i].duration) stationPops.splice(i, 1);
+          }
+        }
+
+        function updateStations(dt) {
+          for (const station of stations) {
+            station.birth = Math.min(1, station.birth + dt * 0.72);
+          }
+
+          for (let i = pendingStations.length - 1; i >= 0; i -= 1) {
+            pendingStations[i] -= dt;
+            if (pendingStations[i] > 0) continue;
+            const point = pickResourcePoint([], true) || pickResourcePoint([], false);
+            if (point) stations.push(createStation(point, true));
+            pendingStations.splice(i, 1);
+          }
         }
 
         function updateFillingBubble(bubble, dt) {
@@ -485,7 +559,15 @@
           bubble.y += (targetY - bubble.y) * settle;
           bubble.vx = 0;
           bubble.vy = 0;
-          bubble.fuel = Math.min(1, bubble.fuel + bubble.fillRate * dt);
+          const requested = Math.min(1 - bubble.fuel, bubble.fillRate * dt);
+          const transferred = Math.min(requested, station.remaining);
+          bubble.fuel = Math.min(1, bubble.fuel + transferred);
+          station.remaining = Math.max(0, station.remaining - transferred);
+
+          if (station.remaining <= 0.0001) {
+            retireStation(station, bubble);
+            return;
+          }
 
           if (bubble.fuel >= 1) {
             station.occupant = null;
@@ -498,8 +580,59 @@
           }
         }
 
+        function retireStation(station, interruptedBubble) {
+          const depletion = 1 - station.remaining / station.capacity;
+          const patch = {
+            x: station.x,
+            y: station.y,
+            radius: station.size * (3.6 + depletion * 2.7),
+            angle: station.flowAngle,
+            color: station.eraseColor,
+            phase: station.phase
+          };
+          depletedPatches.push(patch);
+          paintPermanentDepletion(patch);
+
+          stationPops.push({
+            x: station.x,
+            y: station.y,
+            age: 0,
+            duration: 1.05,
+            radius: station.size,
+            side: station.side,
+            phase: station.phase
+          });
+
+          stations = stations.filter((candidate) => candidate !== station);
+          for (const bubble of bubbles) {
+            if (bubble.target === station) {
+              bubble.target = null;
+              bubble.retargetIn = 0;
+            }
+            if (bubble.station === station && bubble !== interruptedBubble) {
+              bubble.station = null;
+            }
+          }
+
+          if (interruptedBubble) {
+            interruptedBubble.state = 'travel';
+            interruptedBubble.station = station;
+            interruptedBubble.target = null;
+            interruptedBubble.vx = station.side * interruptedBubble.speed * 0.34;
+            interruptedBubble.vy = -interruptedBubble.speed * 0.16;
+            interruptedBubble.retargetIn = 0;
+          }
+
+          pendingStations.push(0.65 + random() * 0.85);
+          status.textContent = 'A station exhausted its vein and moved to a new deposit.';
+        }
+
         function updateTravelingBubble(bubble, dt) {
           bubble.retargetIn -= dt;
+          if (bubble.target && !stations.includes(bubble.target)) {
+            bubble.target = null;
+            bubble.retargetIn = 0;
+          }
           if (!bubble.target || bubble.retargetIn <= 0) {
             chooseTarget(bubble, bubble.station !== null);
           }
@@ -560,6 +693,11 @@
         }
 
         function dockBubble(bubble, station) {
+          if (!stations.includes(station) || station.remaining <= 0) {
+            bubble.target = null;
+            bubble.retargetIn = 0;
+            return;
+          }
           station.occupant = bubble;
           bubble.state = 'filling';
           bubble.station = station;
@@ -597,7 +735,11 @@
           ctx.drawImage(fieldCanvas, 0, 0, width, height);
           drawFieldGlaze();
 
+          for (const station of stations) {
+            drawDepletionPatch(station, 1 - station.remaining / station.capacity);
+          }
           for (const station of stations) drawStation(station);
+          for (const pop of stationPops) drawStationPop(pop);
           for (const pop of pops) drawPop(pop);
           for (const bubble of bubbles) drawBubble(bubble);
           ctx.restore();
@@ -612,60 +754,113 @@
           ctx.fillRect(0, 0, width, height);
         }
 
+        function paintPermanentDepletion(patch) {
+          fieldCtx.save();
+          fieldCtx.setTransform(
+            fieldCanvas.width / width,
+            0,
+            0,
+            fieldCanvas.height / height,
+            0,
+            0
+          );
+          drawDepletionPatch(patch, 1, fieldCtx);
+          fieldCtx.restore();
+        }
+
+        function drawDepletionPatch(patch, amount, target = ctx) {
+          if (amount <= 0.002) return;
+          const color = patch.color || patch.eraseColor;
+          const angle = patch.angle ?? patch.flowAngle;
+          const baseRadius = patch.radius ?? patch.size * (1.3 + amount * 5);
+          const strength = Math.pow(amount, 0.62);
+
+          target.save();
+          target.translate(patch.x, patch.y);
+          target.rotate(angle);
+          target.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+
+          const layers = [
+            { scale: 1.12, thickness: 0.34, alpha: 0.18 },
+            { scale: 0.92, thickness: 0.29, alpha: 0.42 },
+            { scale: 0.72, thickness: 0.24, alpha: 0.82 }
+          ];
+          for (const layer of layers) {
+            target.globalAlpha = strength * layer.alpha;
+            target.beginPath();
+            target.ellipse(
+              0,
+              0,
+              baseRadius * layer.scale,
+              Math.max(2, baseRadius * layer.thickness),
+              Math.sin(patch.phase) * 0.08,
+              0,
+              TAU
+            );
+            target.fill();
+          }
+
+          target.globalAlpha = strength * 0.54;
+          target.beginPath();
+          target.ellipse(
+            -baseRadius * 0.48,
+            baseRadius * 0.08 * Math.sin(patch.phase * 1.7),
+            baseRadius * 0.55,
+            baseRadius * 0.2,
+            0,
+            0,
+            TAU
+          );
+          target.fill();
+          target.restore();
+        }
+
         function drawStation(station) {
           const { x, y, size: s } = station;
           const occupied = Boolean(station.occupant);
-          const pulse = 0.5 + 0.5 * Math.sin(station.phase + performance.now() * 0.0017);
+          const reserve = clamp(station.remaining / station.capacity, 0, 1);
+          const born = 1 - Math.pow(1 - station.birth, 3);
 
           ctx.save();
-          ctx.translate(Math.round(x) + 0.5, Math.round(y) + 0.5);
+          ctx.translate(x, y);
+          ctx.scale(born, born);
 
-          ctx.strokeStyle = occupied
-            ? 'rgba(240, 170, 87, 0.26)'
-            : `rgba(240, 170, 87, ${0.17 + pulse * 0.1})`;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.arc(0, 0, s * (occupied ? 1.35 : 1.45 + pulse * 0.18), 0, TAU);
-          ctx.stroke();
-
-          ctx.fillStyle = 'rgba(9, 10, 9, 0.56)';
-          ctx.beginPath();
-          ctx.ellipse(0, s * 0.62, s * 0.72, s * 0.23, 0, 0, TAU);
+          ctx.save();
+          ctx.translate(-station.side * s * 0.08, s * 0.18);
+          traceStationShape(s * 1.05, station.side);
+          ctx.fillStyle = 'rgba(5, 6, 5, 0.44)';
           ctx.fill();
+          ctx.restore();
 
-          ctx.fillStyle = occupied ? '#d78845' : '#e2a05c';
-          ctx.fillRect(-s * 0.39, -s * 0.58, s * 0.78, s * 1.18);
-          ctx.fillStyle = '#20221f';
-          ctx.fillRect(-s * 0.25, -s * 0.4, s * 0.5, s * 0.32);
-          ctx.fillStyle = occupied ? '#f3bc75' : '#697067';
-          ctx.fillRect(-s * 0.17, -s * 0.32, s * 0.34, s * 0.13);
-
-          ctx.strokeStyle = '#d78845';
-          ctx.lineWidth = Math.max(1, s * 0.1);
-          ctx.beginPath();
-          ctx.moveTo(station.side * s * 0.39, -s * 0.25);
-          ctx.quadraticCurveTo(
-            station.side * s * 0.84,
-            -s * 0.34,
-            station.side * s * 0.72,
-            s * 0.32
-          );
+          traceStationShape(s, station.side);
+          ctx.fillStyle = `rgba(224, 147, 76, ${0.34 + reserve * 0.66})`;
+          ctx.fill();
+          ctx.strokeStyle = occupied
+            ? 'rgba(255, 222, 171, 0.92)'
+            : 'rgba(244, 178, 104, 0.78)';
+          ctx.lineWidth = Math.max(1, s * 0.085);
           ctx.stroke();
-
-          ctx.fillStyle = '#111310';
-          ctx.fillRect(-s * 0.56, s * 0.55, s * 1.12, s * 0.18);
-          ctx.fillRect(-s * 0.31, -s * 0.73, s * 0.62, s * 0.15);
 
           if (occupied) {
             const bubble = station.occupant;
-            ctx.strokeStyle = 'rgba(242, 178, 101, 0.48)';
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(244, 183, 111, 0.38)';
+            ctx.lineWidth = Math.max(1, s * 0.06);
             ctx.beginPath();
-            ctx.moveTo(station.side * s * 0.65, s * 0.2);
+            ctx.moveTo(station.side * s * 0.92, 0);
             ctx.lineTo(bubble.x - x, bubble.y - y);
             ctx.stroke();
           }
           ctx.restore();
+        }
+
+        function traceStationShape(size, side) {
+          ctx.beginPath();
+          ctx.moveTo(-side * size * 0.58, -size * 0.62);
+          ctx.lineTo(side * size * 0.22, -size * 0.62);
+          ctx.lineTo(side * size, 0);
+          ctx.lineTo(side * size * 0.22, size * 0.62);
+          ctx.lineTo(-side * size * 0.58, size * 0.62);
+          ctx.closePath();
         }
 
         function drawBubble(bubble) {
@@ -676,54 +871,96 @@
 
           ctx.save();
           ctx.translate(bubble.x, bubble.y);
+          ctx.rotate(Math.atan2(bubble.vy, bubble.vx) * 0.08);
 
-          ctx.beginPath();
-          ctx.arc(0, 0, r, 0, TAU);
-          ctx.clip();
-
-          const body = ctx.createRadialGradient(-r * 0.35, -r * 0.42, 0, 0, 0, r);
-          body.addColorStop(0, 'rgba(237, 242, 228, 0.13)');
-          body.addColorStop(0.72, 'rgba(156, 170, 157, 0.035)');
-          body.addColorStop(1, 'rgba(7, 8, 7, 0.19)');
-          ctx.fillStyle = body;
-          ctx.fillRect(-r, -r, r * 2, r * 2);
-
-          const fuelTop = r - fuel * r * 2;
-          const fuelGradient = ctx.createLinearGradient(0, fuelTop, 0, r);
-          fuelGradient.addColorStop(0, filling ? 'rgba(246, 183, 99, 0.69)' : 'rgba(225, 145, 68, 0.62)');
-          fuelGradient.addColorStop(1, 'rgba(91, 47, 21, 0.78)');
-          ctx.fillStyle = fuelGradient;
-          ctx.fillRect(-r, fuelTop, r * 2, r * 2);
-          ctx.strokeStyle = 'rgba(255, 211, 142, 0.44)';
-          ctx.lineWidth = Math.max(0.55, r * 0.09);
-          ctx.beginPath();
-          ctx.ellipse(
-            0,
-            fuelTop,
-            r * 0.9,
-            Math.max(0.45, r * 0.12),
-            Math.sin(bubble.age * 1.7 + bubble.phase) * 0.08,
-            0,
-            TAU
-          );
+          traceBubbleShape(bubble, r * 1.06, 1.8);
+          ctx.fillStyle = 'rgba(205, 220, 205, 0.035)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(188, 205, 190, 0.2)';
+          ctx.lineWidth = Math.max(0.7, r * 0.055);
           ctx.stroke();
-          ctx.restore();
 
-          ctx.save();
-          ctx.translate(bubble.x, bubble.y);
+          traceBubbleShape(bubble, r, 0);
+          ctx.fillStyle = filling
+            ? 'rgba(231, 224, 197, 0.1)'
+            : 'rgba(215, 228, 215, 0.055)';
+          ctx.fill();
           ctx.strokeStyle = filling
-            ? 'rgba(255, 226, 177, 0.88)'
-            : 'rgba(210, 222, 210, 0.66)';
-          ctx.lineWidth = Math.max(0.8, r * 0.14);
-          ctx.beginPath();
-          ctx.arc(0, 0, r, 0, TAU);
+            ? 'rgba(255, 224, 174, 0.82)'
+            : 'rgba(211, 224, 211, 0.58)';
+          ctx.lineWidth = Math.max(1, r * 0.085);
           ctx.stroke();
 
-          ctx.strokeStyle = 'rgba(255, 255, 244, 0.78)';
-          ctx.lineWidth = Math.max(0.55, r * 0.1);
+          if (fuel > 0.002) {
+            const coreRadius = r * Math.sqrt(fuel) * 0.67;
+            traceBubbleShape(bubble, coreRadius, 3.6);
+            ctx.fillStyle = filling
+              ? 'rgba(234, 151, 73, 0.72)'
+              : 'rgba(201, 111, 50, 0.62)';
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        function traceBubbleShape(bubble, radius, phaseOffset) {
+          const points = [];
+          const count = 9;
+          for (let i = 0; i < count; i += 1) {
+            const angle = (i / count) * TAU;
+            const pulse =
+              Math.sin(bubble.phase + phaseOffset + i * 2.17 + bubble.age * 0.52) * 0.075 +
+              Math.sin(bubble.phase * 1.7 - i * 1.31 + bubble.age * 0.24) * 0.045;
+            const stretch = 1 + Math.cos(angle) * 0.055;
+            points.push([
+              Math.cos(angle) * radius * (1 + pulse) * stretch,
+              Math.sin(angle) * radius * (1 + pulse) / stretch
+            ]);
+          }
+
+          const last = points[points.length - 1];
+          const first = points[0];
           ctx.beginPath();
-          ctx.arc(-r * 0.08, -r * 0.1, r * 0.62, Math.PI * 1.04, Math.PI * 1.46);
+          ctx.moveTo((last[0] + first[0]) * 0.5, (last[1] + first[1]) * 0.5);
+          for (let i = 0; i < points.length; i += 1) {
+            const point = points[i];
+            const next = points[(i + 1) % points.length];
+            ctx.quadraticCurveTo(
+              point[0],
+              point[1],
+              (point[0] + next[0]) * 0.5,
+              (point[1] + next[1]) * 0.5
+            );
+          }
+          ctx.closePath();
+        }
+
+        function drawStationPop(pop) {
+          const progress = clamp(pop.age / pop.duration, 0, 1);
+          const ease = 1 - Math.pow(1 - progress, 4);
+          ctx.save();
+          ctx.translate(pop.x, pop.y);
+          ctx.globalAlpha = 1 - progress;
+
+          traceStationShape(pop.radius * (1 + ease * 2.2), pop.side);
+          ctx.strokeStyle = 'rgba(242, 168, 91, 0.74)';
+          ctx.lineWidth = Math.max(1, pop.radius * 0.07 * (1 - progress));
           ctx.stroke();
+
+          for (let i = 0; i < 5; i += 1) {
+            const angle = pop.phase + (i / 5) * TAU;
+            const distance = pop.radius * (0.7 + ease * 3.6);
+            ctx.save();
+            ctx.translate(Math.cos(angle) * distance, Math.sin(angle) * distance);
+            ctx.rotate(angle + ease * 1.4);
+            ctx.fillStyle = i % 2 ? '#d17a3d' : '#eca55d';
+            ctx.beginPath();
+            ctx.moveTo(pop.radius * 0.2, 0);
+            ctx.lineTo(-pop.radius * 0.13, pop.radius * 0.11);
+            ctx.lineTo(-pop.radius * 0.13, -pop.radius * 0.11);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+          }
           ctx.restore();
         }
 

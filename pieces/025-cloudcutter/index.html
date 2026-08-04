@@ -32,43 +32,39 @@
       const FIELD_T = .4;          // field threshold: the visible cloud edge
       const VIS = Math.sqrt(1 - Math.sqrt(.4));  // visible radius / kernel radius
       const BITE_S = 2.6;          // how hard one shot subtracts from the field
-      const BULLET_SPEED = 640;
-      const BULLET_LIFE = 1.15;
-      const MAX_BULLETS = 8;
-      const FIRE_CD = .07;
-      const SHIP_ACCEL = 330;
-      const SHIP_TURN = 5.1;
-      const SHIP_MAX_SPEED = 430;
-      const AIR_DRAG = .15;
-      const AUTO_TURN_GAIN = 2.4;
-      const AUTO_TURN_DEAD = .012;
-      const SHIP_R = 12;
+      const BITE_R = 6.4;          // one round takes a small chunk, nothing more
+      const BULLET_SPEED = 680;
+      const BULLET_RANGE = 330;    // the guns only reach a little way ahead
+      const MAX_BULLETS = 26;
+      const FIRE_CD = .045;        // held down, not squeezed
+      const SHIP_ACCEL = 300;
+      const SHIP_TURN = 3.4;
+      const AIR_DRAG = 1.6;        // open sky: cruises near 190
+      const CLOUD_DRAG = 6.4;      // buried in a body: down to a crawl
+      const SHIP_R = 8;
+      const REAM_CD = .1;          // the hull widens what the guns opened
       const MAX_SCALE = 1.7;
-      const MAX_CLOUDS = 16;
-      const MIN_KEEP_AREA = 620;   // below this a lone cloud has been shot away
-      const MIN_COMP_AREA = 1500;  // below this a severed piece is only vapor
-      const RUN_IN = 300;          // how far back the ship starts its attack run
-      const TRAIL_MAX = 56;
+      const MIN_KEEP_AREA = 900;   // below this a lone cloud has been shot away
+      const MIN_COMP_AREA = 2600;  // below this a severed piece is only vapor
+      const TRAIL_MAX = 64;
       const MAX_WISPS = 240;
 
       let W = 0, H = 0, dpr = 1;
       let last = 0, raf = 0, now = 0, serial = 0;
       let clouds, bullets, wisps, streaks;
-      let ship, auto, score, cuts, passes, playerControl, spawnCd, cloudTarget;
+      let ship, cam, score, cuts, bored, playerControl, spawnCd, cloudTarget;
+      let liveR = 0, killR = 0;
       const keys = new Set();
 
       const rand = (a, b) => a + Math.random() * (b - a);
       const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
-      const wrap = (v, max) => { v %= max; return v < 0 ? v + max : v; };
+
       const normAngle = (a) => {
         a = (a + Math.PI) % TAU;
         if (a < 0) a += TAU;
         return a - Math.PI;
       };
-      const clampMag = (x, y, max) => {
-        const m = Math.hypot(x, y);
-        return m > max ? { x: x / m * max, y: y / m * max } : { x, y };
-      };
+
 
       function resize() {
         cancelAnimationFrame(raf);
@@ -87,42 +83,39 @@
         clouds = [];
         bullets = [];
         wisps = [];
-        streaks = makeStreaks();
         serial = 0;
         score = 0;
         cuts = 0;
-        passes = 0;
+        bored = 0;
         now = 0;
         spawnCd = 0;
         playerControl = false;
-        cloudTarget = clamp(Math.round(W / 210), 5, 10);
+        // The sky is unbounded. Weather is kept stocked inside a ring around
+        // the camera and forgotten once it falls well outside one.
+        // The ring scales with the viewport, so the quota below stocks the
+        // same amount of visible sky on a phone as on a wall.
+        const viewR = Math.hypot(W, H) * .5;
+        liveR = viewR * 1.55;
+        killR = viewR * 2.4;
+        cloudTarget = clamp(Math.round(7.2 * Math.PI * liveR * liveR / (W * H)), 12, 40);
         ship = {
-          x: W * .3,
-          y: H / 2,
-          vx: 0,
-          vy: 0,
+          x: 0, y: 0,
+          vx: 150, vy: 0,
           a: 0,
           roll: 0,
           turn: 0,
           thrusting: false,
           fireCd: 0,
-          snag: 0,
-          tearCd: 0,
+          reamCd: 0,
+          wander: rand(0, 40),
+          inside: false,
+          insideFor: 0,
+          load: 0,
+          buried: 0,
           trail: [],
         };
-        auto = {
-          mode: 'seek',
-          t: 0,
-          targetId: null,
-          start: { x: 0, y: 0 },
-          aim: { x: 0, y: 0 },
-          standoff: 220,
-          run: { x: 0, y: 0 },
-          lastExit: { x: 0, y: 0 },
-          bankDir: 1,
-          bankFor: 1.2,
-          spent: 0,
-        };
+        cam = { x: 0, y: 0 };
+        streaks = makeStreaks();
         seedClouds();
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, W, H);
@@ -130,29 +123,37 @@
         raf = requestAnimationFrame(frame);
       }
 
+      // Drawn in screen space and dragged by a fraction of the pan, so the
+      // haze behind the weather reads as further off than the weather is.
       function makeStreaks() {
-        const n = clamp(Math.round(W * H / 26000), 18, 70);
+        const n = clamp(Math.round(W * H / 24000), 20, 80);
         return Array.from({ length: n }, () => ({
-          x: rand(0, W),
-          y: rand(0, H),
-          len: rand(9, 46),
-          v: rand(26, 130),
-          a: rand(.04, .13),
+          x: rand(-40, W + 40),
+          y: rand(-40, H + 40),
+          len: rand(10, 52),
+          v: rand(14, 70),
+          depth: rand(.22, .55),
+          a: rand(.04, .12),
         }));
       }
 
       function sizeScale() {
-        return clamp(Math.min(W, H) / 760, .68, 1.35);
+        return clamp(Math.min(W, H) / 900, .55, 1.3);
       }
 
       function seedClouds() {
         for (let i = 0; i < cloudTarget; i++) {
-          const size = rand(44, 88) * sizeScale();
-          const cloud = makeCloud(rand(size, W - size), rand(size * .9, H - size * .9), size);
-          if (Math.hypot(cloud.x - ship.x, cloud.y - ship.y) < 190) cloud.x = wrap(cloud.x + W * .45, W);
+          const a = rand(0, TAU);
+          const d = Math.sqrt(Math.random()) * liveR;
+          const cloud = newCloud(cam.x + Math.cos(a) * d, cam.y + Math.sin(a) * d);
+          if (Math.hypot(cloud.x - ship.x, cloud.y - ship.y) < cloud.radius + 200) continue;
           clouds.push(cloud);
           buildCloudGeometry(cloud);
         }
+      }
+
+      function newCloud(x, y) {
+        return makeCloud(x, y, rand(105, 215) * sizeScale());
       }
 
       // ---------- cloud bodies ----------
@@ -162,7 +163,7 @@
           id: ++serial,
           x, y,
           size,
-          vx: -rand(15, 38) * (70 / (40 + size)),
+          vx: -rand(9, 30) * (120 / (80 + size)),
           scale: 1,
           growTo: 1,
           growRate: 0,
@@ -175,7 +176,7 @@
           radius: size,
           phase: rand(0, TAU),
           bob: rand(0, TAU),
-          healRate: rand(.05, .16),
+          healRate: rand(.018, .06),
           cutCd: 0,
           flash: 0,
           dirty: true,
@@ -260,11 +261,19 @@
         const bites = cloud.bites;
         for (let i = 0; i < bites.length; i++) {
           const b = bites[i];
-          const dx = lx - b.x, dy = ly - b.y;
+          let dx = lx - b.x, dy = ly - b.y;
+          const ex = b.x2 - b.x, ey = b.y2 - b.y;
+          const len2 = ex * ex + ey * ey;
+          if (len2 > 0) {
+            let t = (dx * ex + dy * ey) / len2;
+            t = t < 0 ? 0 : t > 1 ? 1 : t;
+            dx -= ex * t;
+            dy -= ey * t;
+          }
           const r2 = b.r * b.r, d2 = dx * dx + dy * dy;
           if (d2 < r2) {
-            const t = 1 - d2 / r2;
-            v -= b.s * t * t;
+            const t2 = 1 - d2 / r2;
+            v -= b.s * t2 * t2;
           }
         }
         return v;
@@ -273,27 +282,6 @@
       function fieldWorld(cloud, wx, wy) {
         return fieldLocal(cloud, (wx - cloud.x) / cloud.scale, (wy - cloud.y) / cloud.scale);
       }
-
-      // The body as if it had never been shot — used to tell a carved path from
-      // a shot that simply sailed past the cloud.
-      function solidWorld(cloud, wx, wy) {
-        return solidLocal(cloud, (wx - cloud.x) / cloud.scale, (wy - cloud.y) / cloud.scale);
-      }
-
-      function solidLocal(cloud, lx, ly) {
-        let v = 0;
-        for (const p of cloud.puffs) {
-          const dx = lx - p.x, dy = ly - p.y;
-          const r2 = p.r * p.r, d2 = dx * dx + dy * dy;
-          if (d2 < r2) {
-            const t = 1 - d2 / r2;
-            const k = t * t;
-            if (k > v) v = k;
-          }
-        }
-        return v;
-      }
-
 
       function cloudToWorld(cloud, p) {
         return { x: cloud.x + p.x * cloud.scale, y: cloud.y + p.y * cloud.scale };
@@ -486,7 +474,7 @@
           if (solids[0].area < MIN_KEEP_AREA) return { empty: true, solids: [] };
         } else {
           const total = solids.reduce((s, l) => s + l.area, 0);
-          const floor = Math.max(MIN_COMP_AREA, total * .16);
+          const floor = Math.max(MIN_COMP_AREA, total * .09);
           keep = solids.filter((l, i) => i === 0 || l.area >= floor);
           drop = solids.filter((l, i) => i !== 0 && l.area < floor);
         }
@@ -530,11 +518,19 @@
               }
             }
             for (const b of cloud.bites) {
-              const dx = x - b.x, dy = y - b.y;
+              let dx = x - b.x, dy = y - b.y;
+              const ex = b.x2 - b.x, ey = b.y2 - b.y;
+              const len2 = ex * ex + ey * ey;
+              if (len2 > 0) {
+                let t = (dx * ex + dy * ey) / len2;
+                t = t < 0 ? 0 : t > 1 ? 1 : t;
+                dx -= ex * t;
+                dy -= ey * t;
+              }
               const r2 = b.r * b.r, d2 = dx * dx + dy * dy;
               if (d2 < r2) {
-                const t = 1 - d2 / r2;
-                v -= b.s * t * t;
+                const t2 = 1 - d2 / r2;
+                v -= b.s * t2 * t2;
               }
             }
             if (v > FIELD_T * 1.2) {
@@ -555,7 +551,7 @@
         const c = polyCentroid(comp.pts);
         let r = 0;
         for (const p of comp.pts) r = Math.max(r, Math.hypot(p.x - c.x, p.y - c.y));
-        cloud.bites.push({ x: c.x, y: c.y, r: r * 1.12 + 2, s: 2.6, heal: 0 });
+        cloud.bites.push({ x: c.x, y: c.y, x2: c.x, y2: c.y, len: 0, r: r * 1.12 + 2, s: 2.6, heal: 0 });
         const w = cloudToWorld(cloud, c);
         for (let i = 0; i < 6; i++) {
           puffWisp(w.x + rand(-r, r) * cloud.scale, w.y + rand(-r, r) * cloud.scale, r * .5 * cloud.scale, cloud.vx);
@@ -572,8 +568,12 @@
           const kid = makeCloud(cloud.x + c.x * cloud.scale, cloud.y + c.y * cloud.scale, cloud.size);
           kid.puffs = puffs.map((p) => ({ x: p.x - c.x, y: p.y - c.y, vr: p.vr, r: p.r }));
           kid.bites = cloud.bites
-            .filter((b) => pointInPolygon(b, comp.pts) || nearestVertexDist(b, comp.pts) < b.r * 1.15)
-            .map((b) => ({ x: b.x - c.x, y: b.y - c.y, r: b.r, s: b.s, heal: b.heal && cloud.healRate * 2.1 }));
+            .filter((b) => pointInPolygon(b, comp.pts) || pointInPolygon({ x: b.x2, y: b.y2 }, comp.pts)
+              || nearestVertexDist(b, comp.pts) < b.r * 1.15)
+            .map((b) => ({
+              x: b.x - c.x, y: b.y - c.y, x2: b.x2 - c.x, y2: b.y2 - c.y,
+              len: b.len, r: b.r, s: b.s, heal: b.heal && cloud.healRate * 2.1,
+            }));
           kid.scale = cloud.scale;
           kid.healRate = cloud.healRate;
           kid.vx = cloud.vx + rand(-4, 4);
@@ -583,16 +583,17 @@
           kid.cutCd = rand(5, 9);
           kid.flash = 1;
           const push = Math.hypot(c.x, c.y) || 1;
-          kid.driftX = c.x / push * 9;
-          kid.driftY = c.y / push * 13;
+          kid.driftX = c.x / push * 14;
+          kid.driftY = c.y / push * 18;
           updateBounds(kid);
           kids.push(kid);
         }
         if (kids.length < 2) return [];
+        // The halves are shouldered apart once, here — after that they only
+        // pan, like everything else in the sky.
         for (const kid of kids) {
-          kid.x += kid.driftX * .6;
-          kid.y += kid.driftY * .6;
-          kid.vyPush = kid.driftY * .5;
+          kid.x += kid.driftX;
+          kid.y += kid.driftY;
           delete kid.driftX;
           delete kid.driftY;
         }
@@ -614,21 +615,35 @@
         }
       }
 
+      // A bore is one channel, not a rosary of holes. A round landing just past
+      // the end of a cut already made lengthens that cut instead of adding
+      // another, which is both what the ship is physically doing and the only
+      // way a whole tunnel fits in a list short enough to evaluate.
       function biteCloud(cloud, wx, wy, rWorld) {
         const s = cloud.scale;
-        cloud.bites.push({
-          x: (wx - cloud.x) / s,
-          y: (wy - cloud.y) / s,
-          r: rWorld / s,
-          s: BITE_S,
-          heal: cloud.healRate,
-        });
-        if (cloud.bites.length > 64) cloud.bites.shift();
+        const lx = (wx - cloud.x) / s, ly = (wy - cloud.y) / s;
+        const r = rWorld / s;
+        const bites = cloud.bites;
+        for (let i = bites.length - 1, n = 0; i >= 0 && n < 6; i--, n++) {
+          const b = bites[i];
+          if (b.len > 90 || Math.abs(b.r - r) > r * .35) continue;
+          const d = Math.hypot(lx - b.x2, ly - b.y2);
+          if (d > r * 1.4) continue;
+          b.x2 = lx;
+          b.y2 = ly;
+          b.len += d;
+          if (r > b.r) b.r = r;
+          cloud.dirty = true;
+          cloud.nextBuild = 0;
+          return;
+        }
+        bites.push({ x: lx, y: ly, x2: lx, y2: ly, len: 0, r, s: BITE_S, heal: cloud.healRate });
+        if (bites.length > 130) bites.shift();
         cloud.dirty = true;
         cloud.nextBuild = 0;
-        for (let i = 0; i < 3; i++) {
-          puffWisp(wx + rand(-6, 6), wy + rand(-6, 6), rand(3, 7), cloud.vx);
-        }
+        // Rounds land many times a second; only some of them show as vapor,
+        // or the cut disappears behind its own smoke.
+        if (Math.random() < .3) puffWisp(wx + rand(-5, 5), wy + rand(-5, 5), rand(3.5, 7), cloud.vx);
       }
 
       // ---------- per-frame cloud upkeep ----------
@@ -636,13 +651,7 @@
       function updateClouds(dt) {
         for (let i = clouds.length - 1; i >= 0; i--) {
           const cloud = clouds[i];
-          cloud.x += cloud.vx * dt;
-          cloud.y += Math.sin(now * .25 + cloud.bob) * 4.5 * dt;
-          if (cloud.vyPush) {
-            cloud.y += cloud.vyPush * dt;
-            cloud.vyPush *= 1 - 1.1 * dt;
-            if (Math.abs(cloud.vyPush) < .3) cloud.vyPush = 0;
-          }
+          cloud.x += cloud.vx * dt;   // weather only ever pans, never rises
           if (cloud.cutCd > 0) cloud.cutCd -= dt;
           if (cloud.flash > 0) cloud.flash = Math.max(0, cloud.flash - dt * 1.6);
 
@@ -665,43 +674,43 @@
             }
           }
 
-          if (cloud.x + cloud.radius * cloud.scale < -30) clouds.splice(i, 1);
+          const ext = cloud.radius * cloud.scale;
+          if (Math.hypot(cloud.x - cam.x, cloud.y - cam.y) > killR + ext) clouds.splice(i, 1);
         }
 
-        // Keep the window itself full. Counting every cloud would count the
-        // ones still out beyond the right edge, and the sky would run thin
-        // for the half minute they take to drift in.
-        let inFrame = 0;
-        for (const cloud of clouds) {
-          const ext = cloud.radius * cloud.scale;
-          if (cloud.x - ext < W && cloud.x + ext * .6 > 0) inFrame++;
-        }
         spawnCd -= dt;
-        if (inFrame < cloudTarget && clouds.length < cloudTarget + 3 && spawnCd <= 0) {
-          const size = rand(44, 88) * sizeScale();
-          const cloud = makeCloud(0, spawnY(size), size);
-          cloud.x = W + cloud.radius * 1.05 + rand(6, 70);
+        if (spawnCd > 0) return;
+        let live = 0;
+        for (const cloud of clouds) {
+          if (Math.hypot(cloud.x - cam.x, cloud.y - cam.y) < liveR) live++;
+        }
+        if (live >= cloudTarget) { spawnCd = .35; return; }
+        spawnCloud();
+        spawnCd = rand(.1, .3);
+      }
+
+      // New weather comes in just outside the live ring, leaning toward
+      // wherever the ship is heading so the sky ahead is never thin.
+      function spawnCloud() {
+        const lead = Math.atan2(ship.vy, ship.vx);
+        for (let tries = 0; tries < 14; tries++) {
+          const a = tries < 9 ? lead + rand(-1.2, 1.2) : rand(0, TAU);
+          const d = liveR * rand(.86, 1);
+          const cloud = newCloud(cam.x + Math.cos(a) * d, cam.y + Math.sin(a) * d);
+          let clear = true;
+          for (const other of clouds) {
+            const gap = (cloud.radius + other.radius * other.scale) * .62;
+            if (Math.hypot(cloud.x - other.x, cloud.y - other.y) < gap) { clear = false; break; }
+          }
+          if (!clear) continue;
           clouds.push(cloud);
           buildCloudGeometry(cloud);
-          spawnCd = rand(.8, 2.2);
+          return;
         }
       }
 
-      // Come in through the widest gap left by whatever is still arriving, so
-      // the weather stays spread across the whole window instead of clumping.
-      function spawnY(size) {
-        let best = H / 2, bestGap = -1;
-        for (let i = 0; i < 6; i++) {
-          const y = rand(size * .8, H - size * .8);
-          let gap = Infinity;
-          for (const cloud of clouds) {
-            if (cloud.x < W * .5) continue;
-            gap = Math.min(gap, Math.abs(cloud.y - y));
-          }
-          if (gap > bestGap) { bestGap = gap; best = y; }
-        }
-        return best;
-      }
+
+
 
       function budCloud(cloud) {
         if (cloud.puffs.length >= 20 || cloud.radius > cloud.size * 1.9) return;
@@ -737,7 +746,7 @@
             cloud.nextBuild = 0;
             continue;
           }
-          if (res.solids.length >= 2 && clouds.length < MAX_CLOUDS) {
+          if (res.solids.length >= 2 && clouds.length < cloudTarget + 10) {
             const kids = splitCloud(cloud, res.solids);
             if (kids.length >= 2) {
               (removed || (removed = new Set())).add(cloud);
@@ -771,68 +780,134 @@
         updateShip(dt);
         updateBullets(dt);
         collideBullets();
+        const px = cam.x, py = cam.y;
+        updateCamera(dt);
         updateClouds(dt);
         processCloudGeometry();
         updateWisps(dt);
-        updateStreaks(dt);
+        updateStreaks(dt, cam.x - px, cam.y - py);
       }
 
       function updateShip(dt) {
         ship.thrusting = false;
         ship.turn = 0;
+
+        // What matters is not whether the ship is standing in cloud — down its
+        // own bore it never is — but whether its bow is up against uncut body.
+        const load = bowLoad();
+        const surround = inTheCut();
+        ship.load = load;
+        trackBurial(surround, dt);
         if (playerControl) playerControls(dt);
-        else autoControls(dt);
+        else pilot(dt, surround);
+        ream(dt);
 
-        const drag = Math.max(0, 1 - AIR_DRAG * dt);
-        ship.vx *= drag;
-        ship.vy *= drag;
-        const sp = Math.hypot(ship.vx, ship.vy);
-        if (sp > SHIP_MAX_SPEED) {
-          ship.vx = ship.vx / sp * SHIP_MAX_SPEED;
-          ship.vy = ship.vy / sp * SHIP_MAX_SPEED;
-        }
-
+        // Open sky is cheap; a face of cloud is thick going. The ship makes
+        // headway at whatever rate its guns have opened the way in front of it.
+        const k = Math.max(0, 1 - (AIR_DRAG + CLOUD_DRAG * load) * dt);
+        ship.vx *= k;
+        ship.vy *= k;
         ship.x += ship.vx * dt;
         ship.y += ship.vy * dt;
-        // The weather streams through a window rather than a torus, so the ship
-        // works inside the frame and pushes off the edges of it.
-        const m = 16;
-        if (ship.x < m) { ship.x = m; ship.vx = Math.abs(ship.vx) * .4; }
-        else if (ship.x > W - m) { ship.x = W - m; ship.vx = -Math.abs(ship.vx) * .4; }
-        if (ship.y < m) { ship.y = m; ship.vy = Math.abs(ship.vy) * .4; }
-        else if (ship.y > H - m) { ship.y = H - m; ship.vy = -Math.abs(ship.vy) * .4; }
 
-        ship.roll += (ship.turn - ship.roll) * Math.min(1, dt * 6);
+        ship.roll += (ship.turn - ship.roll) * Math.min(1, dt * 5);
         ship.trail.push({ x: ship.x, y: ship.y });
         if (ship.trail.length > TRAIL_MAX) ship.trail.shift();
-
         ship.fireCd -= dt;
-        ship.tearCd -= dt;
-        ship.snag = Math.max(0, ship.snag - dt * 1.8);
-        buffet(dt);
       }
 
-      // Cloud contact does not kill: it drags, shoves the ship back out along the
-      // density gradient, and tears vapor off the cloud as it goes.
-      function buffet(dt) {
-        const cloud = cloudAt(ship.x, ship.y);
-        if (!cloud) return;
-        const s = cloud.scale;
-        const lx = (ship.x - cloud.x) / s, ly = (ship.y - cloud.y) / s;
-        const h = 3;
-        const gx = fieldLocal(cloud, lx + h, ly) - fieldLocal(cloud, lx - h, ly);
-        const gy = fieldLocal(cloud, lx, ly + h) - fieldLocal(cloud, lx, ly - h);
-        const gm = Math.hypot(gx, gy) || 1;
-        ship.vx -= gx / gm * 260 * dt;
-        ship.vy -= gy / gm * 260 * dt;
-        const slow = Math.max(0, 1 - 2.4 * dt);
-        ship.vx *= slow;
-        ship.vy *= slow;
-        ship.snag = 1;
-        if (ship.tearCd <= 0) {
-          ship.tearCd = .16;
-          biteCloud(cloud, ship.x, ship.y, SHIP_R * .6);
+      // Cloud on most sides means the ship is inside a body, working its way
+      // along a bore it opened — the only thing "inside a cloud" can mean for
+      // a ship that clears its own path.
+      function inTheCut() {
+        let n = 0;
+        for (let i = 0; i < 6; i++) {
+          const a = i / 6 * TAU + .4;
+          if (cloudAt(ship.x + Math.cos(a) * 46, ship.y + Math.sin(a) * 46)) n++;
         }
+        return n >= 3;
+      }
+
+      // How much uncut body the bow is pressed against, 0 to 1.
+      function bowLoad() {
+        const ca = Math.cos(ship.a), sa = Math.sin(ship.a);
+        let n = 0;
+        for (let d = 9; d <= 33; d += 8) {
+          if (cloudAt(ship.x + ca * d, ship.y + sa * d)) n++;
+        }
+        return n / 4;
+      }
+
+      function trackBurial(surround, dt) {
+        ship.buried = surround
+          ? Math.min(1, ship.buried + dt * 3.2)
+          : Math.max(0, ship.buried - dt * 2.6);
+        if (surround) {
+          ship.insideFor += dt;
+          ship.inside = true;
+          return;
+        }
+        if (!ship.inside) return;
+        // Out the far side of something it had to bore through.
+        if (ship.insideFor > .7) { bored++; score += 140; }
+        ship.inside = false;
+        ship.insideFor = 0;
+      }
+
+      // The guns open a pilot hole; the hull reams it out to its own width, so
+      // the ship can never wedge itself in a bore too narrow to fly.
+      function ream(dt) {
+        ship.reamCd -= dt;
+        if (ship.reamCd > 0) return;
+        let cut = false;
+        for (const cloud of clouds) {
+          const ext = cloud.radius * cloud.scale;
+          if (Math.abs(ship.x - cloud.x) > ext || Math.abs(ship.y - cloud.y) > ext) continue;
+          if (fieldWorld(cloud, ship.x, ship.y) <= FIELD_T) continue;
+          biteCloud(cloud, ship.x, ship.y, SHIP_R * 1.2);
+          cut = true;
+        }
+        if (cut) ship.reamCd = REAM_CD;
+      }
+
+      // There is no target and no plan. The ship holds a slowly wandering
+      // course, leans toward the thicker sky, and keeps the guns going whenever
+      // anything is close enough ahead to open up — an icebreaker, not a hunter.
+      function pilot(dt, cloud) {
+        ship.wander += dt;
+        const drift = Math.sin(ship.wander * .23) * .6 + Math.sin(ship.wander * .57 + 1.9) * .3;
+        let want = ship.a + drift * dt * 1.7;
+        if (!cloud) {
+          let best = -Infinity;
+          for (let i = -2; i <= 2; i++) {
+            const a = ship.a + i * .3 + drift * .1;
+            const s = skyAhead(a) - Math.abs(i) * .07;
+            if (s > best) { best = s; want = a; }
+          }
+        }
+        // A drill does not turn sharply while it is in the cut.
+        turnToward(want, dt, cloud ? .08 : 1);
+        thrust(dt);
+        if (workAhead()) autoFire();
+      }
+
+      // How much weather lies along a heading, nearer counting for more.
+      function skyAhead(a) {
+        const ca = Math.cos(a), sa = Math.sin(a);
+        let v = 0;
+        for (let d = 180; d <= 900; d += 180) {
+          v += densityAt(ship.x + ca * d, ship.y + sa * d) * (1 - d / 1200);
+        }
+        return v;
+      }
+
+      // Anything within reach of the guns worth spending rounds on.
+      function workAhead() {
+        const ca = Math.cos(ship.a), sa = Math.sin(ship.a);
+        for (let d = 20; d <= BULLET_RANGE; d += 24) {
+          if (cloudAt(ship.x + ca * d, ship.y + sa * d)) return true;
+        }
+        return false;
       }
 
       function playerControls(dt) {
@@ -846,43 +921,35 @@
         ship.vx += Math.cos(ship.a) * SHIP_ACCEL * dt;
         ship.vy += Math.sin(ship.a) * SHIP_ACCEL * dt;
         ship.thrusting = true;
-        if (Math.random() < 14 * dt) {
-          puffWisp(ship.x - Math.cos(ship.a) * 16, ship.y - Math.sin(ship.a) * 16, rand(2, 4.5), -ship.vx * .1);
+        if (Math.random() < 10 * dt) {
+          puffWisp(ship.x - Math.cos(ship.a) * 12, ship.y - Math.sin(ship.a) * 12, rand(2.5, 5), 0);
         }
       }
 
-      function turnToward(want, dt) {
+      function turnToward(want, dt, rate = 1) {
         const err = normAngle(want - ship.a);
-        if (Math.abs(err) > AUTO_TURN_DEAD) {
-          const step = clamp(err * AUTO_TURN_GAIN, -SHIP_TURN, SHIP_TURN) * dt;
-          ship.a += Math.abs(step) > Math.abs(err) ? err : step;
-          ship.turn = step < 0 ? -1 : 1;
-        }
+        const step = clamp(err * 2.4, -SHIP_TURN * rate, SHIP_TURN * rate) * dt;
+        ship.a += Math.abs(step) > Math.abs(err) ? err : step;
+        ship.turn = step < 0 ? -1 : step > 0 ? 1 : 0;
         return err;
-      }
-
-      function burnToward(dvx, dvy, dt, gate = .5) {
-        const mag = Math.hypot(dvx, dvy);
-        if (mag < 6) return false;
-        const err = turnToward(Math.atan2(dvy, dvx), dt);
-        if (Math.abs(err) < gate && mag > 18) {
-          thrust(dt);
-          return true;
-        }
-        return false;
       }
 
       function fire(angle = ship.a) {
         if (ship.fireCd > 0 || bullets.length >= MAX_BULLETS) return;
         ship.fireCd = FIRE_CD;
-        const x = ship.x + Math.cos(angle) * 18;
-        const y = ship.y + Math.sin(angle) * 18;
+        const x = ship.x + Math.cos(angle) * 12;
+        const y = ship.y + Math.sin(angle) * 12;
         bullets.push({
           x, y, px: x, py: y,
-          vx: Math.cos(angle) * BULLET_SPEED + ship.vx * .35,
-          vy: Math.sin(angle) * BULLET_SPEED + ship.vy * .35,
-          age: 0,
+          vx: Math.cos(angle) * BULLET_SPEED + ship.vx,
+          vy: Math.sin(angle) * BULLET_SPEED + ship.vy,
+          gone: 0,
         });
+      }
+
+      // Sweep the muzzle a hair so the bore comes out wide enough to fly.
+      function autoFire() {
+        fire(ship.a + Math.sin(now * 11) * .08);
       }
 
       function updateBullets(dt) {
@@ -892,288 +959,56 @@
           b.py = b.y;
           b.x += b.vx * dt;
           b.y += b.vy * dt;
-          b.age += dt;
-          if (b.age > BULLET_LIFE || b.x < -20 || b.x > W + 20 || b.y < -20 || b.y > H + 20) {
-            bullets.splice(i, 1);
-          }
+          b.gone += Math.hypot(b.x - b.px, b.y - b.py);
+          if (b.gone > BULLET_RANGE) bullets.splice(i, 1);
         }
       }
 
+      // Weather crowds and overlaps, so a round bites every body it is standing
+      // in, not just the first one found. Carving only the front cloud would
+      // leave the one behind it whole and no bore would ever go clean through.
       function collideBullets() {
         for (let i = bullets.length - 1; i >= 0; i--) {
           const b = bullets[i];
-          let hit = null;
-          for (const cloud of clouds) {
-            const ext = cloud.radius * cloud.scale + 8;
-            if (Math.min(b.x, b.px) - cloud.x > ext || cloud.x - Math.max(b.x, b.px) > ext) continue;
-            if (Math.min(b.y, b.py) - cloud.y > ext || cloud.y - Math.max(b.y, b.py) > ext) continue;
-            for (let s = 1; s <= 3; s++) {
-              const t = s / 3;
-              const x = b.px + (b.x - b.px) * t;
-              const y = b.py + (b.y - b.py) * t;
-              if (fieldWorld(cloud, x, y) > FIELD_T) {
-                hit = { cloud, x, y };
-                break;
-              }
+          let struck = false;
+          for (let s = 1; s <= 3 && !struck; s++) {
+            const t = s / 3;
+            const x = b.px + (b.x - b.px) * t;
+            const y = b.py + (b.y - b.py) * t;
+            const r = BITE_R * rand(.85, 1.2);
+            for (const cloud of clouds) {
+              const ext = cloud.radius * cloud.scale + 8;
+              if (Math.abs(x - cloud.x) > ext || Math.abs(y - cloud.y) > ext) continue;
+              if (fieldWorld(cloud, x, y) <= FIELD_T) continue;
+              biteCloud(cloud, x, y, r);
+              struck = true;
             }
-            if (hit) break;
           }
-          if (hit) {
-            biteCloud(hit.cloud, hit.x, hit.y, rand(12.5, 16.5));
+          if (struck) {
             bullets.splice(i, 1);
-            score += 5;
+            score += 3;
           }
         }
       }
 
-      // ---------- autopilot ----------
+      // ---------- camera ----------
 
-      function autoControls(dt) {
-        auto.t += dt;
-        auto.spent += dt;
-        const target = auto.targetId ? clouds.find((c) => c.id === auto.targetId) : null;
-        // One cloud only gets so much of the pilot's afternoon.
-        if (target && auto.spent > 34) {
-          target.cutCd = 10;
-          toBank(false);
-          return;
-        }
-        // The target coming apart under the guns is the cut landing: fly the gap.
-        if (!target && auto.mode === 'runin') {
-          if (auto.t > .4) startRun(auto.lastExit);
-          else toSeek();
-          return;
-        }
-        switch (auto.mode) {
-          case 'seek': seekMode(dt); break;
-          case 'setup': setupMode(dt, target); break;
-          case 'runin': runinMode(dt, target); break;
-          case 'run': runMode(dt); break;
-          default: bankMode(dt); break;
-        }
-      }
-
-      function seekMode(dt) {
-        const target = pickTarget();
-        if (target) {
-          planCut(target);
-          auto.targetId = target.id;
-          auto.mode = 'setup';
-          auto.t = 0;
-          auto.spent = 0;
-          return;
-        }
-        const dvx = (W * .35 - ship.x) * 1.2 - ship.vx;
-        const dvy = (H * .5 - ship.y) * 1.2 - ship.vy;
-        burnToward(dvx, dvy, dt);
-      }
-
-      function pickTarget() {
-        let best = null, bestScore = -Infinity;
-        for (const cloud of clouds) {
-          if (cloud.cutCd > 0) continue;
-          const ext = cloud.radius * cloud.scale;
-          if (ext < 42) continue;
-          if (cloud.x + ext > W - 20 || cloud.x - ext < 40) continue;
-          const d = Math.hypot(cloud.x - ship.x, cloud.y - ship.y);
-          const s = ext * 2.4 - d * .5;
-          if (s > bestScore) { bestScore = s; best = cloud; }
-        }
-        return best;
-      }
-
-      // Pick the line to cut along: mostly with or against the weather so drift
-      // stays down the barrel, and always one whose run-in lane fits the frame.
-      function planCut(target) {
-        let best = 0, bestScore = -Infinity;
-        for (let i = 0; i < 12; i++) {
-          const dir = i / 12 * TAU + rand(-.13, .13);
-          const cx = Math.cos(dir), cy = Math.sin(dir);
-          const reach = solidReach(target, 0, 0, -cx, -cy) + RUN_IN;
-          const sx = target.x - cx * reach * target.scale;
-          const sy = target.y - cy * reach * target.scale;
-          const inside = sx > 50 && sx < W - 50 && sy > 50 && sy < H - 50;
-          const s = (inside ? 260 : 0) + Math.abs(cx) * 70 + rand(0, 50)
-            - Math.hypot(sx - ship.x, sy - ship.y) * .14;
-          if (s > bestScore) { bestScore = s; best = dir; }
-        }
-        const dir = best;
-        const cx = Math.cos(dir), cy = Math.sin(dir);
-        const px = -cy, py = cx;
-        const off = rand(-.12, .12) * target.radius;
-        const ox = px * off, oy = py * off;
-        // Measure the real chord along this line — an average radius would put
-        // the aim points inside a wide cumulus.
-        const near = solidReach(target, ox, oy, -cx, -cy);
-        // The aim point rides with the cloud, and it sits at the cloud's own
-        // middle: wherever the ship drifts to, the line it fires along still
-        // runs through the body's centre, so a finished slot halves the cloud.
-        auto.aim = { x: ox, y: oy };
-        auto.start = { x: ox - cx * (near + RUN_IN), y: oy - cy * (near + RUN_IN) };
-        auto.standoff = near + 170;
-      }
-
-      // How far the intact body reaches from the cut line's midpoint, outermost
-      // crossing first, so a lumpy silhouette is measured where it matters.
-      function solidReach(cloud, ox, oy, ux, uy) {
-        const maxD = cloud.radius + 6;
-        for (let d = maxD; d > 4; d -= 5) {
-          if (solidLocal(cloud, ox + ux * d, oy + uy * d) > FIELD_T) return d;
-        }
-        return 8;
-      }
-
-      // Swing wide and get back from the cloud, far enough to have a run.
-      function setupMode(dt, target) {
-        if (!target) { toSeek(); return; }
-        const st = cloudToWorld(target, auto.start);
-        const dx = clamp(st.x, 46, W - 46) - ship.x;
-        const dy = clamp(st.y, 46, H - 46) - ship.y;
+      // Rides a little ahead of the ship so the sky about to be cut is already
+      // on screen, on a leash short enough that the ship never leaves the frame.
+      function updateCamera(dt) {
+        const k = Math.min(1, dt * 2.4);
+        cam.x += (ship.x + ship.vx * .5 - cam.x) * k;
+        cam.y += (ship.y + ship.vy * .5 - cam.y) * k;
+        const leash = Math.min(W, H) * .28;
+        const dx = ship.x - cam.x, dy = ship.y - cam.y;
         const d = Math.hypot(dx, dy);
-        const want = clampMag(dx * 2.4, dy * 2.4, Math.min(340, 40 + d * 2));
-        burnToward(want.x + target.vx - ship.vx, want.y - ship.vy, dt);
-        const back = Math.hypot(ship.x - target.x, ship.y - target.y) > auto.standoff * target.scale;
-        if ((d < 120 || auto.t > 4.5) && back) {
-          auto.mode = 'runin';
-          auto.t = 0;
-          return;
-        }
-        if (auto.t > 9) { target.cutCd = 6; toSeek(); }
-      }
-
-      // The attack run: line up on the aim point and hold the trigger down, so
-      // every shot lands where the last one stopped and the slot drives deeper.
-      // Sideways drift is the enemy — it fans the burst across the whole face —
-      // so the run is flown in the cloud's frame and the drift is burned off
-      // before the guns are allowed to speak.
-      function runinMode(dt, target) {
-        if (!target) { toSeek(); return; }
-        const ex = cloudToWorld(target, auto.aim);
-        auto.lastExit = ex;
-        const raw = Math.hypot(ex.x - ship.x, ex.y - ship.y) || 1;
-        // Lead the drift: over the shot's flight the whole cloud slides left.
-        const tof = raw / BULLET_SPEED;
-        // Sweep the muzzle a little so the shots open a slot, not a needle.
-        const sweep = Math.sin(now * 3.1) * 5;
-        const dx = ex.x + target.vx * tof - ship.x, dy = ex.y - ship.y;
-        const len = Math.hypot(dx, dy) || 1;
-        const adx = dx - dy / len * sweep, ady = dy + dx / len * sweep;
-        const alen = Math.hypot(adx, ady) || 1;
-        const ux = adx / alen, uy = ady / alen;
-
-        const rvx = ship.vx - target.vx, rvy = ship.vy;
-        const closing = rvx * ux + rvy * uy;
-        const latx = rvx - ux * closing, laty = rvy - uy * closing;
-        const range = Math.hypot(target.x - ship.x, target.y - ship.y);
-        const surf = range - target.radius * target.scale;
-        // Crab into the drift while there is still room to fix it, then stop
-        // correcting and point straight down the slot for the firing pass.
-        const damp = clamp((surf - 25) / 150, 0, 1) * 2.6;
-        // A moving ship hands its rounds a sideways kick; lay off by exactly
-        // enough to cancel it, so the burst goes where the nose is pointed.
-        const bias = Math.asin(clamp((ship.vy * ux - ship.vx * uy) * .35 / BULLET_SPEED, -.6, .6));
-        const fireDir = Math.atan2(uy, ux) + bias;
-        const err = turnToward(Math.atan2(uy * 180 - laty * damp, ux * 180 - latx * damp) + bias, dt);
-
-        if (Math.abs(err) < .45 && closing < 130) thrust(dt);
-        // Only shoot when the round will actually land in the slot.
-        if (Math.abs(normAngle(fireDir - ship.a)) * range < 9) autoFire();
-        // The way through has to be open past the far side, not just to the middle.
-        const past = (target.radius + 34) * target.scale;
-        const through = { x: ex.x + ux * past, y: ex.y + uy * past };
-        if (channelClear(target, ship, through)) { startRun(through); return; }
-        // Pull off when the nose is about to bury itself in solid weather.
-        const nx = ship.x + Math.cos(ship.a) * 34, ny = ship.y + Math.sin(ship.a) * 34;
-        if (fieldWorld(target, nx, ny) > FIELD_T || auto.t > 9) toBank(true);
-      }
-
-      // Open along its whole length, and it really did go through the body —
-      // not around a shoulder. A path that misses the middle is not a way
-      // through, it is just weather the ship happened to slip past.
-      function channelClear(cloud, from, to) {
-        const dx = to.x - from.x, dy = to.y - from.y;
-        const len = Math.hypot(dx, dy) || 1;
-        const px = -dy / len, py = dx / len;
-        if (Math.abs((cloud.x - from.x) * px + (cloud.y - from.y) * py) > cloud.radius * cloud.scale * .45) {
-          return false;
-        }
-        const steps = 28;
-        let crossed = 0;
-        for (let i = 0; i <= steps; i++) {
-          const t = i / steps;
-          const x = from.x + dx * t, y = from.y + dy * t;
-          if (solidWorld(cloud, x, y) > FIELD_T) crossed++;
-          for (let s = -1; s <= 1; s++) {
-            if (fieldWorld(cloud, x + px * s * 6, y + py * s * 6) > FIELD_T * .92) return false;
-          }
-        }
-        return crossed >= steps * .12;
-      }
-
-      function startRun(ex) {
-        const dx = ex.x - ship.x, dy = ex.y - ship.y;
-        const len = Math.hypot(dx, dy) || 1;
-        auto.run = { x: ex.x + dx / len * 90, y: ex.y + dy / len * 90 };
-        auto.mode = 'run';
-        auto.t = 0;
-      }
-
-      function runMode(dt) {
-        const dx = auto.run.x - ship.x, dy = auto.run.y - ship.y;
-        const d = Math.hypot(dx, dy);
-        if (d < 30 || auto.t > 4.4) {
-          passes++;
-          score += 150;
-          toBank(false);
-          return;
-        }
-        let want = Math.atan2(dy, dx);
-        const px = -Math.sin(want), py = Math.cos(want);
-        const ax = ship.x + Math.cos(want) * 48, ay = ship.y + Math.sin(want) * 48;
-        const dl = densityAt(ax - px * 17, ay - py * 17);
-        const dr = densityAt(ax + px * 17, ay + py * 17);
-        want += clamp((dl - dr) * .8, -.45, .45);
-        turnToward(want, dt);
-        thrust(dt);
-        if (auto.t > .1) autoFire();
-      }
-
-      // Break off, haul the nose around, and either line up the same slot again
-      // or go looking for a different cloud.
-      function bankMode(dt) {
-        ship.a += auto.bankDir * SHIP_TURN * .58 * dt;
-        ship.turn = auto.bankDir;
-        if (auto.t < auto.bankFor * .62) thrust(dt);
-        if (auto.t < auto.bankFor) return;
-        const target = auto.targetId ? clouds.find((c) => c.id === auto.targetId) : null;
-        if (target && auto.spent < 30) {
-          auto.mode = 'setup';
-          auto.t = 0;
-        } else {
-          if (target) target.cutCd = 5;
-          toSeek();
+        if (d > leash) {
+          cam.x += dx * (1 - leash / d);
+          cam.y += dy * (1 - leash / d);
         }
       }
 
-      function toSeek() {
-        auto.mode = 'seek';
-        auto.targetId = null;
-        auto.t = 0;
-      }
 
-      function toBank(keepTarget) {
-        auto.mode = 'bank';
-        if (!keepTarget) auto.targetId = null;
-        auto.t = 0;
-        const home = normAngle(Math.atan2(H / 2 - ship.y, W / 2 - ship.x) - ship.a);
-        auto.bankDir = Math.abs(home) > 1.9 ? (Math.random() < .5 ? -1 : 1) : (home < 0 ? -1 : 1);
-        auto.bankFor = rand(.9, 1.7);
-      }
-
-      function autoFire() {
-        if (ship.fireCd > 0 || bullets.length >= MAX_BULLETS) return;
-        fire();
-      }
 
       // ---------- vapor ----------
 
@@ -1202,15 +1037,14 @@
         }
       }
 
-      function updateStreaks(dt) {
+      function updateStreaks(dt, camDx, camDy) {
         for (const s of streaks) {
-          s.x -= s.v * dt;
-          if (s.x + s.len < 0) {
-            s.x = W + rand(0, 90);
-            s.y = rand(0, H);
-            s.len = rand(9, 46);
-            s.v = rand(26, 130);
-          }
+          s.x -= s.v * dt + camDx * s.depth;
+          s.y -= camDy * s.depth;
+          if (s.x + s.len < -60) { s.x = W + 50; s.y = rand(-40, H + 40); }
+          else if (s.x > W + 80) { s.x = -s.len - 50; s.y = rand(-40, H + 40); }
+          if (s.y < -60) s.y = H + 50;
+          else if (s.y > H + 60) s.y = -50;
         }
       }
 
@@ -1220,11 +1054,19 @@
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, W, H);
         drawStreaks();
+        ctx.save();
+        ctx.translate(W / 2 - cam.x, H / 2 - cam.y);
         drawTrail();
-        for (const cloud of clouds) drawCloud(cloud);
+        for (const cloud of clouds) {
+          const ext = cloud.radius * cloud.scale + 30;
+          if (Math.abs(cloud.x - cam.x) > W / 2 + ext) continue;
+          if (Math.abs(cloud.y - cam.y) > H / 2 + ext) continue;
+          drawCloud(cloud);
+        }
         drawWisps();
         drawBullets();
         drawShip();
+        ctx.restore();
         drawHud();
       }
 
@@ -1289,21 +1131,18 @@
 
       function drawShip() {
         const rs = Math.cos(ship.roll * .95);
-        const bank = ship.roll * 3.6;
+        const bank = ship.roll * 2.6;
         const cx = ship.x, cy = ship.y;
-        {
-          const nose = pointFrom(cx, cy, ship.a, 18, 0);
-          const left = pointFrom(cx, cy, ship.a, -11, -10.5 * rs);
-          const notch = pointFrom(cx, cy, ship.a, -6, bank);
-          const right = pointFrom(cx, cy, ship.a, -11, 10.5 * rs);
-          strokePath([nose, left, notch, right], true, 1.35, ship.snag > 0 ? .6 : .95);
-          strokePath([pointFrom(cx, cy, ship.a, 8, 0), pointFrom(cx, cy, ship.a, -1, bank * .6)], false, .9, .5);
-          if (ship.thrusting) {
-            const f1 = pointFrom(cx, cy, ship.a, -10, -4.5 * rs);
-            const f2 = pointFrom(cx, cy, ship.a, -22 - Math.sin(now * 64) * 5, bank * .4);
-            const f3 = pointFrom(cx, cy, ship.a, -10, 4.5 * rs);
-            strokePath([f1, f2, f3], false, 1, .64);
-          }
+        const nose = pointFrom(cx, cy, ship.a, 13, 0);
+        const left = pointFrom(cx, cy, ship.a, -8, -7.5 * rs);
+        const notch = pointFrom(cx, cy, ship.a, -4.5, bank);
+        const right = pointFrom(cx, cy, ship.a, -8, 7.5 * rs);
+        strokePath([nose, left, notch, right], true, 1.25, ship.buried > .3 ? .66 : .95);
+        if (ship.thrusting) {
+          const f1 = pointFrom(cx, cy, ship.a, -7, -3.2 * rs);
+          const f2 = pointFrom(cx, cy, ship.a, -15 - Math.sin(now * 64) * 4, bank * .4);
+          const f3 = pointFrom(cx, cy, ship.a, -7, 3.2 * rs);
+          strokePath([f1, f2, f3], false, .9, .6);
         }
       }
 
@@ -1319,18 +1158,14 @@
         ctx.fillStyle = `${LINE}.82)`;
         ctx.fillText(String(score).padStart(6, '0'), 18, 18);
         ctx.fillStyle = `${LINE}.55)`;
-        ctx.fillText(`CUTS ${String(cuts).padStart(2, '0')}   PASSES ${String(passes).padStart(2, '0')}`, 18, 38);
+        ctx.fillText(`BORED ${String(bored).padStart(2, '0')}   CUT ${String(cuts).padStart(2, '0')}`, 18, 38);
         ctx.textAlign = 'right';
         ctx.fillStyle = `${LINE}.82)`;
-        ctx.fillText(`${playerControl ? 'PILOT' : 'AUTO'} ${bullets.length}/${MAX_BULLETS}`, W - 18, 18);
-        if (!playerControl) {
-          ctx.fillStyle = `${LINE}.4)`;
-          ctx.fillText(auto.mode.toUpperCase(), W - 18, 38);
-        }
-        if (ship.snag > .05) {
+        ctx.fillText(playerControl ? 'PILOT' : 'AUTO', W - 18, 18);
+        if (ship.buried > .25) {
           ctx.textAlign = 'center';
-          ctx.fillStyle = `${LINE}${(.5 * ship.snag).toFixed(3)})`;
-          ctx.fillText('TURBULENCE', W / 2, H - 34);
+          ctx.fillStyle = `${LINE}${(.45 * ship.buried).toFixed(3)})`;
+          ctx.fillText('IN THE CUT', W / 2, H - 34);
         }
         ctx.restore();
       }

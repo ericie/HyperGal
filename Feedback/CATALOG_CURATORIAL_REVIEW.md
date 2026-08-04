@@ -1,0 +1,339 @@
+# HyperGal: Curatorial Review of the Complete Catalog
+
+**Review date:** 4 August 2026  
+**Scope:** All 25 catalog entries, `001`–`025`  
+**Position:** Written from the perspective of a critical collector and curator assessing not only craft, but whether each work earns a place in a serious contemporary-media-art program.
+
+## Collector's verdict
+
+HyperGal already has a recognizable artistic intelligence. Its best recurring idea is not generative beauty or retro-game nostalgia; it is the rule reversal. Defense manufactures war. Success produces more labor. Survival requires assimilation. Resource extraction erases the ground that sustains it. In the strongest works, a familiar system continues to function while revealing that its definition of success is pathological.
+
+That is a real body of work. It is also not yet a consistently resolved collection.
+
+Too many pieces stop at an ingenious formal inversion, a handsome simulation, or a technically skilled homage. Arcade and design-history references often supply their emotional charge before the artist has made a claim of his own. Endless animation and frictionless reseeding also suppress consequence: extinction, destruction, depletion, and displacement become attractive events in an infinitely renewable visual economy. The catalog is most culturally relevant when a system retains damage. It is least relevant when the reset key absolves everything.
+
+The next step is not to paste topical labels onto the works. It is to make politics causal. If a piece concerns extraction, the resource should not return without a debt. If it concerns labor, success should alter the worker's conditions. If it invokes a cultural tradition, its sources and differences should be researched rather than collapsed into an aesthetic preset. Meaning should reside in the rules, duration, and residue of the work before it appears in wall text.
+
+## What makes the collection worth collecting
+
+- **Temporal consequence.** The tower in *unbreakable*, the scar ledger in *Paddle*, the growth history in *Growth Rings*, the erased veins in *Fuel Seekers*, and the tunnels in *Cloudcutter* all allow time to become material.
+
+- **Ethical inversions.** *Mutual Command*, *Paddle*, *Only Ghosts*, and *Fuel Seekers* do more than simulate a system; they expose the violence hidden inside its ordinary objective.
+
+- **Material range.** Textile DOM, phosphor vectors, cartographic marks, procedural stone, static SVG, and organic fields prevent the collection from collapsing into a single coding style.
+
+- **Archival autonomy.** The works are self-contained and make no external network requests. In an era of platform-dependent art, tracking, expiring APIs, and rented infrastructure, that is not merely technical hygiene. It is an anti-platform position worth making explicit.
+
+## What presently limits the collection
+
+1. **Borrowed cultural capital.** Pac-Man, Mario, Centipede, Missile Command, Asteroids, Hokusai-derived palettes, generic “Celtic” pattern, and marbling traditions arrive with histories the works do not always interrogate or credit. Citation and transformation must become part of the art.
+
+2. **The endless reset.** Replenishment and reseeding turn structural violence into spectacle without memory. A collector needs to see why this run matters, not simply that another run is possible.
+
+3. **Simulation without position.** Several works model ecologies, traffic, pattern, or flow while remaining neutral about what those models omit. Every model has a politics: its protected variables, disposable agents, and definition of equilibrium should be made visible.
+
+4. **Interface repetition.** The gray instrument panels shared by `021`–`023` are competent but make distinct material inquiries feel like presets in one generator product.
+
+5. **Study and finished work are not distinguished.** Twenty-five pieces produced in a rapid sequence read as an active studio, which is valuable, but not every experiment should carry equal curatorial weight. “Study,” “edition,” “simulation,” and “resolved work” would provide a more honest hierarchy.
+
+6. **Meaning is often trapped in the README.** A viewer should not need source notes to discover the central ethical reversal. The live work needs to reveal its duration, controls, stakes, and irreversible state.
+
+## Individual reviews
+
+### 001 — drift
+
+**Current status:** Atmospheric study.
+
+The restraint is appealing, but the work is so low-information that it risks becoming a tasteful screensaver. Its points drift, wrap, and trail without acquiring history or exposing a relation between viewer and system. Quietness alone is not yet a position.
+
+Move it toward a statement about attention economies and surveillance. Let points behave differently when observed by the cursor, a focused tab, or prolonged looking. Watched points might become efficient, aligned, and permanently traceable while unobserved points retain errancy. The viewer's attention would then cease to be innocent: looking would discipline the field.
+
+### 002 — all-wall
+
+**Current status:** Promising material metaphor, culturally under-specified.
+
+Falling textile bricks that flatten into a wall create a persuasive transformation from softness to structure. Yet the patterns currently function as interchangeable skins, and “wall” remains an abstract formal category rather than shelter, border, property, labor, or exclusion.
+
+Make each brick perform a double action: it shelters one space while sealing another. Let displaced openings remain visible offscreen or as a persistent negative ledger. Credit and research the textile sources rather than treating them as texture, and attach labor, place, or time to their placement. The piece could then ask who is protected by construction and who disappears behind it.
+
+### 003 — unbreakable
+
+**Current status:** Strong inversion; close to a resolved work.
+
+Reverse Breakout is immediately legible, and the endlessly growing wall turns success into an escalating obligation. The bomb, however, remains an arcade safety valve, and growth has little social or material cost. The Hokusai-derived palette supplies beauty without yet supplying historical necessity.
+
+Push the work toward accumulation, housing, and creative destruction. Each new cell could visibly evict an older row, converting expansion into displacement. A bomb could open a redevelopment corridor while recording who or what was removed; the damage should leave a permanent scar or ledger. The perfect paddle then reads as compulsory maintenance of a growth system rather than a heroic game mechanic.
+
+### 004 — hunt prey paint
+
+**Current status:** Rich systems study, weakened by managed equilibrium.
+
+Death becoming paint and elders erasing the field is a compelling material ecology. But population floors, caps, and balancing logic guarantee the spectacle's continuation. That design aestheticizes ecological crisis while quietly ensuring that extinction cannot interrupt the exhibition.
+
+Turn the work into a critique of managerial ecology and Anthropocene optimization. Allow the viewer or system to choose a protected metric—population, coverage, productivity—and show how optimizing it produces monoculture, soil debt, or irreversible blank zones. One regime should be capable of actual collapse. The work becomes culturally sharp when “balance” is revealed as an administrative decision, not a natural fact.
+
+### 005 — Only Invaders
+
+**Current status:** Clear political premise, consequence-free execution.
+
+The empty center and four perimeter defenders make the inversion readable: the security apparatus creates the war it claims to prevent. Yet perfect interceptions and celebratory bursts glamorize deterrence, while resets erase civilian or environmental cost.
+
+Draw ammunition from the territory being defended. Every interception should contaminate or consume the shared center, and the super-blast should permanently damage the defensive apparatus as well as the threat. A ceasefire reached only through exhaustion would turn the piece from a witty inversion into a critique of the military-industrial system's need to continuously produce danger.
+
+### 006 — Only Centipede
+
+**Current status:** Accomplished homage, not yet sufficiently transformed.
+
+Chain splitting, segment promotion, and mushroom degradation demonstrate fine systems craft, but the piece remains close to the inherited grammar of *Centipede*. Its cultural meaning is currently carried by recognition of the source game.
+
+Reframe it around pesticide resistance and ecological blowback. Every successful hit could increase the resistance or speed of the next generation, while mushrooms become accumulated toxic residue that obstructs both attacker and defender. The defense should eventually make the field less habitable than the infestation did. That causal reversal would justify the appropriation.
+
+### 007 — hydra
+
+**Current status:** Visually distinctive competitive ecology with latent political potential.
+
+The Prussian field, luminous bodies, and persistent remains give this work unusual material character. Its rich-get-richer aggression is present, but it takes prolonged observation to perceive, and the fossil aesthetic can romanticize domination as natural struggle.
+
+Develop the work as a model of platform monopoly and inherited infrastructure. Let resource distribution explicitly favor the largest incumbent. Dead giants could harden into roads, protocols, or barriers that new entrants must navigate, so yesterday's winner determines today's conditions even after disappearing. Concentration would then be historical and institutional, not merely biological.
+
+### 008 — Vectrex Asteroids
+
+**Current status:** Strong durational material system, overly sheltered by nostalgia.
+
+The coherent vector language and the welding, splitting, gravity, and glomming mechanics create an impressive long arc. But the Vectrex/Asteroids frame makes the ship heroic and the debris aesthetically pleasurable before the work has established why its matter persists.
+
+Make it explicitly about orbital debris or electronic waste. Bullets, destroyed hulls, and failed attempts should remain as collision mass; no restart should restore a clean field. Each launch would worsen the conditions for the next, eventually denying access altogether. The culturally relevant claim is simple and forceful: material cannot be externalized merely because an interface calls it a reset.
+
+### 009 — Mutual Command
+
+**Current status:** One of the catalog's strongest works.
+
+Automated symmetric war, ruined cities, and replenished rows expose a bureaucracy whose purpose is to keep conflict operable. The weakness is false equivalence: symmetry can imply that both parties possess equal power and responsibility, while replacement towns make civilian life infinitely substitutable.
+
+Give cities persistent populations, names, or histories, and make the defense optimize an explicit score that is not the preservation of life. Replacement settlements should arrive diminished rather than pristine. Introduce asymmetries in budgets, supply, or targeting authority and allow ruined ground to remain. The piece would then address algorithmic warfare without reducing it to a balanced two-player game.
+
+### 010 — Obstacles and How to Avoid Them
+
+**Current status:** Sophisticated generative instrument; not yet a sufficiently authored artwork.
+
+The broken continuations and flowing paths are visually assured, and the control surface makes the forces unusually discoverable. At present, however, the work largely offers viewers a well-made design tool. “Obstacle” remains a neutral Gestalt condition.
+
+Recast it around hostile architecture and differential mobility. Multiple path-bodies should possess different widths, turning radii, sensory ranges, or recognition thresholds, revealing that one supposedly safe city is passable for some and hostile to others. Rename controls as planning decisions—zoning, budget, enforcement, clearance—while avoiding the crude reduction of identities to colors. The panel should expose policy, not merely style.
+
+### 011 — Switch Stack
+
+**Current status:** Precise formal exercise with an overly literal binary.
+
+The black-and-white typography and viewer-paced scroll are decisive, but the ON/OFF transition currently says little beyond its own graphic operation. It needs an account of what classification discards.
+
+Begin with continuous, noisy, or ambiguous states. At the viewport threshold, force each state into ON or OFF while accumulating the rejected uncertainty at the margins. Faster scrolling could increase misclassification. The viewer would become the operator of a binary system and see that administrative clarity is manufactured by throwing information away.
+
+### 012 — Happiness Hunter
+
+**Current status:** Legible game-like system whose social premise remains too subtle.
+
+The yellow car's refusal to leave while other drivers can exit contains the seed of a strong critique, but the work initially reads as an elegant traffic simulation. Personality rules are less visible than passing and scoring.
+
+Make it a work about hustle culture and status optimization. Exits could visibly lead toward calm or abundance, yet the protagonist would continue to reject them. Every successful pass should narrow the road, gray the world, or add congestion; the score should measure the production of the condition that makes further striving necessary. Success becomes the inability to stop.
+
+### 013 — Paddle
+
+**Current status:** Among the most conceptually resolved pieces.
+
+Success returning the ball as more labor, failure leaving a permanent scar, and the exact performance ledger form a tight ethical machine. Its primary limitation is that the paddle itself bears no fatigue, and the significance of the precise miss schedule is more legible in documentation than in the encounter.
+
+Frame it explicitly around care, service, or content-moderation labor under a fixed KPI. Keep the target constant while progressively shrinking the worker's recovery window. Intentional misses could become the only available rest, even though the system records them as failure. This would preserve the severe formal economy while making the statistic an instrument of discipline.
+
+### 014 — Only Ghosts
+
+**Current status:** Excellent one-act inversion, still dependent on iconic IP.
+
+The irreversible transformation from pursued figure to ghost gives the piece a concise beginning, middle, and end. But the single conversion risks remaining a clever Pac-Man aphorism, and the transformed figure retains too little evidence of its prior identity.
+
+Treat the work as assimilation and institutional reproduction. The new ghost could retain a yellow seam, stutter, or memory, then encounter and pursue another Pac. Each conversion should leave residue in the maze. The horror would not be simply becoming the threat, but discovering that survival recruits the survivor into reproducing the institution.
+
+### 015 — Growth Rings
+
+**Current status:** Formal standout; its scientific authority needs accountability.
+
+The 44-second passage from sparse core to a complete 200-year specimen is one of the catalog's strongest bounded arcs. The map/instrument language creates authority, but invented environmental years and luxury palette options risk turning climate witness into aesthetic customization.
+
+Anchor at least one edition to a named species, place, and documented dataset, with sources and actual drought, fire, extraction, or policy years. Recorded facts should not be reseedable. Counterfactual controls may remain, but they must be clearly distinguished from evidence. Consider showing the wound made by coring the tree: knowledge itself extracts material.
+
+### 016 — Up Mario
+
+**Current status:** Beautifully crafted WIP, culturally over-reliant on corporate nostalgia.
+
+The pale-blue vertical world and autonomous, recoverable ascent are formally charming. Yet Mario and question blocks deliver an inherited emotional response, while endless upward progress and the safety net go largely unexamined.
+
+Make autoplay the subject: after any human interruption, the system should resume compulsory progress. Question blocks might yield empty metrics rather than rewards; ascent could discard routes and communities below; fatigue could accumulate despite the animation's cheerfulness. Unless the work is explicitly about Nintendo's cultural enclosure, an original figure would give the idea more ownership and longevity.
+
+### 017 — Knot Work
+
+**Current status:** Tactile decorative study with a provenance problem.
+
+The umber cord and worn ground are sensuous, but “Celtic” currently functions as a generalized heritage costume. The aged-paper treatment implies authenticity without locating a source, period, maker, region, or transmission history.
+
+Base future editions on credited historical examples and make variation encode transmission, migration, or repair. A border might break where a route was interrupted and be visibly mended by another strand. Provenance should travel through the image rather than sit outside it. Avoid presenting an invented generic antiquity as cultural memory.
+
+### 018 — Life Checkers
+
+**Current status:** Bold optical WIP, still primarily a cellular-automata exercise.
+
+The checkerboard ground productively destabilizes the familiar Life grid, and reset/stasis cycles give the work rhythm. Yet Conway's system is so canonical that visual novelty alone does not establish a new claim.
+
+Show the same seed under two nearly identical rule regimes divided by a seam. A tiny policy change should produce radically different survival, crowding, or extinction. The viewer's same intervention could have unequal outcomes on each side. This would move the subject from “life emerging” to the cultural power of rules that pretend to be neutral.
+
+### 019 — City of Signs
+
+**Current status:** Strong static interruption, unresolved as appropriation or translation.
+
+The crisp black-and-white architecture usefully interrupts a catalog dominated by motion. But if it reproduces a specific reference image, that relationship needs to be named; if it is an original city, the title's “signs” need a more developed social function.
+
+Either present it candidly as a credited translation study or make it address urban memory and standardization. Community-specific signs could be gradually replaced by universal symbols while the city's structure remains intact, with viewer gestures briefly restoring erased language. The work would then ask what a legible “international” city requires residents to surrender.
+
+### 020 — Soft Collapse
+
+**Current status:** Formally compelling WIP whose title promises more than the rules deliver.
+
+The fixed frame and sliding internal motifs offer a productive image of apparent stability. At present, however, movement is seamless and endlessly replaceable; little actually collapses, and nothing remembers displacement.
+
+Give motifs residency and neighborhood histories. Pressure from adjacent cells could force movement while the frames remain institutionally fixed. Departing motifs should leave shadows, and newcomers should inherit less room or fewer options. “Soft collapse” would then name the slow displacement concealed by a stable grid rather than a pleasing tile animation.
+
+### 021 — Marbles
+
+**Current status:** Technically exceptional generator; conceptually closest to a luxury-material showroom.
+
+The simulated depth, bookmatching, and polished surface are among the collection's strongest feats of image-making. But infinite flawless stone treats extraction as costless and turns geological time into a palette menu.
+
+Assign each edition one finite virtual slab. Every bookmatch or cut should consume coordinates, generate offcuts, and reduce what remains; “new slab” should visibly abandon the current material rather than innocently refresh it. Connect polish and relief to labor or energy. The piece becomes consequential when luxury depends on irreversible subtraction.
+
+### 022 — Hyper-Lichen
+
+**Current status:** Persuasive organic surface, ecologically frictionless and not publication-ready.
+
+The recolonizing field and mineral ground are visually convincing, but total regrowth makes ecological resilience automatic. Lichen is also not a singular organism but a negotiated symbiosis, a fact the current single-layer visual metaphor misses. The catalog entry additionally lacks both a README and its declared thumbnail.
+
+Model at least two co-dependent layers—fungal structure and photosynthetic partner—whose interests do not perfectly align. Pollution or mineral deposition should create persistent dead zones and slow succession rather than a clean cyclical overwrite. This would connect the work to lichen's use as an indicator of air quality and make coexistence, not mere coverage, the subject.
+
+### 023 — Marbled Water
+
+**Current status:** Strong interactive craft simulator with insufficient cultural specificity.
+
+The flowing bands, drops, combing, and manual placement make a beautiful and discoverable material process. The risk is that “marbling” becomes a generic global aesthetic, flattening distinct histories—such as suminagashi, ebru, and European combed-paper practices—into interchangeable controls and palettes.
+
+Research and clearly distinguish specific modes, each with its own tools, constraints, vocabulary, and citations. Add an irreversible paper-pull action that freezes one sheet while materially changing or depleting the bath. Cultural relevance will come from honoring differences in practice and transmission, not from attaching heritage labels to identical physics.
+
+### 024 — Fuel Seekers
+
+**Current status:** One of the catalog's clearest contemporary allegories.
+
+The low-contrast resource field, extractive stations, mobile consumers, erasing veins, and replacement frontier form an intelligible account of fossil capitalism. The problem is that the system guarantees a population of sixty and continually discovers new stations. Depletion therefore renews consumption, and popping can read as delightful rather than catastrophic.
+
+Make each new deposit poorer, smaller, and farther away. Station discovery should slow while the mandate to maintain sixty consumers increases failures and travel costs. Eventually the frontier must be unable to replace exhausted stations, leaving the erased field dominant. Track displaced mass or energy debt so that bubbles cannot be treated as weightless victims. This piece should be permitted to end.
+
+### 025 — Cloudcutter
+
+**Current status:** Memorable durational image with unclear downstream stakes.
+
+The hard icebreaker boring through soft, healing cloud matter is visually distinctive, and nearly minute-long tunnel memory gives the action weight. But the cloud currently functions only as obstacle. Healing repairs the image without accounting for water, weather, or populations downwind.
+
+Add a ground or rainfall register. Every bore could create a delayed absence of rain elsewhere, while visual healing fails to repay that water debt. Counters should measure displaced water or affected land rather than clouds conquered. Whether framed as aviation, geoengineering, or the supposedly immaterial digital “cloud,” the machine's progress must acquire an offscreen consequence.
+
+## A sharper curatorial structure
+
+Do not present all 25 works as equivalent tiles. Edit the catalog into explicit lines of inquiry:
+
+### Systems That Cannot Stop
+
+`003`, `005`, `008`, `009`, `012`, `013`, `014`, `024`, `025`
+
+These works address growth, security, labor, assimilation, extraction, and infrastructure through systems whose continued operation is itself the crisis. This is the strongest exhibition proposition.
+
+### Managed Natures
+
+`004`, `015`, `022`, `023`, `024`
+
+This group can investigate how software models classify, optimize, extract, and aestheticize living or geological systems. It requires more scientific provenance and more visible acknowledgment of what each model omits.
+
+### Pattern, Material, and Classification Studies
+
+`001`, `002`, `010`, `011`, `017`, `018`, `019`, `020`, `021`
+
+These should be candidly designated as studies until their formal operations are tied to attention, borders, access, classification, inheritance, displacement, or extraction. “Study” is not a demotion; it creates room for experimentation without overstating resolution.
+
+### The Autonomous Arcade
+
+`005`–`009`, `012`–`014`, `016`, `025`
+
+If retained as a series, state the research question: what happens when games play themselves and inherited goals continue after human desire has left? Without that frame, repeated counters, edge defenders, vector nostalgia, and click-to-reseed logic risk reading as dependence on borrowed game history.
+
+## Collection priorities
+
+1. **Choose five works for deep revision before adding more.** The best candidates are *Mutual Command*, *Paddle*, *Only Ghosts*, *Fuel Seekers*, and *Cloudcutter*. *unbreakable*, *Vectrex Asteroids*, and *Growth Rings* are close alternatives.
+
+2. **Make consequence irreversible.** Favor scars, depleted fields, inherited barriers, exhausted datasets, and bounded endings over clean reseeds. If a reset remains, make it an explicit new edition rather than an undo button.
+
+3. **Research and cite every borrowed lineage.** This includes games, artists, palettes, craft traditions, cultural patterns, and scientific datasets. Citation should change the work's rules, not merely decorate its README.
+
+4. **Expose the politics of each model.** Name what the system optimizes, what it refuses to count, who can exit, what gets replenished, and whose damage persists.
+
+5. **Foreground archival autonomy.** The collection's lack of tracking, remote dependencies, and expiring services is culturally meaningful. Publish this as an artistic commitment to durable, ownable browser works.
+
+6. **Give viewers temporal orientation.** Gallery metadata such as “one irreversible transformation,” “44-second growth,” or “one-minute healing memory” would let duration operate as an artistic medium rather than a hidden technical detail.
+
+7. **Separate interfaces from artworks.** Preserve accessible controls, but give `021`–`023` material-specific interfaces so they do not resemble presets in a shared product shell.
+
+8. **Finish the publication layer.** Restore `022-hyper-lichen/thumbnail.svg`, add its missing README, surface hidden keyboard/takeover controls, and backfill canvas descriptions, focus behavior, and reduced-motion states in the early works. Cultural seriousness includes how the work receives different bodies and modes of attention.
+
+## Formal and technical evidence
+
+The review combined a catalog-wide reading of manifests, metadata, source, and available notes with an independent formal assessment of the live gallery and representative works. The catalog contains 25 entries: 23 canvas works, one DOM/CSS work, and one static SVG work. No external HTTP or CDN dependency was found, supporting the collection's claim to self-contained archival behavior.
+
+The most material publication defect is `022`: its metadata declares `thumbnail.svg`, but that file is absent, and the piece has no README. Four WIP entries—`016`, `018`, `019`, and `020`—are also excluded from the gallery's default “Everything” view, which makes that label misleading.
+
+Accessibility improves markedly after `010`. Fourteen canvases currently have a semantic image role and description, thirteen are keyboard-focusable, and thirteen implement reduced-motion behavior. Early continuous-motion works, especially `001`, `004`–`009`, and `025`, need equivalent treatment. This is not merely compliance work: it asks the artist to define what the essential artwork is when motion, pointer control, or prolonged looking is unavailable.
+
+An automated interface detector produced two unique warnings after duplicate paths were removed. The typography warning for `023` was a false positive, and the compact hierarchy warning for `010` was not supported by live inspection. Neither warrants a design change. No console errors or warnings appeared in the sampled live pieces.
+
+### Collection interface heuristics
+
+These scores assess the catalog as an encounter, not the artistic quality of any one work. A score of 4 means excellent and 0 means seriously obstructive.
+
+| Heuristic | Score | Curatorial reading |
+|---|---:|---|
+| Visibility of system status | 2/4 | Strong HUDs and visible accumulation in selected works, but many central rules and durations remain hidden. |
+| Match between system and world | 3/4 | Motion and material metaphors are usually coherent; scientific and cultural references are sometimes simulated too casually. |
+| Viewer control and freedom | 2/4 | Reseeding is common, but it is often cosmetic agency; takeover controls are frequently undocumented. |
+| Consistency and standards | 3/4 | Catalog navigation and later input conventions are consistent, though WIP filtering and “Everything” conflict. |
+| Error prevention | 3/4 | Works are robust and self-contained, with safe reset patterns and no sampled runtime errors. |
+| Recognition rather than recall | 2/4 | README knowledge is too often required to perceive the governing rule or available interaction. |
+| Flexibility and efficiency | 3/4 | Later works support pointer, keyboard, focus, and reduced motion; the early group does not. |
+| Aesthetic and minimalist design | 3/4 | The art-first presentation is disciplined, but shared panels and repeated arcade grammar reduce individual identity. |
+| Error recognition and recovery | 3/4 | Reseeds are reliable and one WebGL fallback is explicit; the broken `022` thumbnail remains unexplained in the gallery. |
+| Help and documentation | 2/4 | Twenty-three READMEs provide substantial studio notes, but `002` and `022` lack them and live controls are inconsistently surfaced. |
+| **Total** | **26/40** | A strong foundation whose largest deficits are curatorial orientation, control discoverability, and accessibility consistency. |
+
+**Generic-AI aesthetic verdict:** The catalog does not read as generic AI output. The rule design, unusual state machines, and technical specificity demonstrate authorship. The closest it comes to a generator-product aesthetic is in `010` and `021`–`023`, where dense parameter panels and palette menus can make the works feel like configurable effects rather than irreducible artworks.
+
+**Cognitive and emotional journey:** The first encounter creates curiosity, followed by fascination as hidden rules become legible. Across a long visit, however, repeated autoplay, arcade citation, counters, and frictionless reseeding can flatten surprise into competent continuity. The desired arc is curiosity → recognition → ethical discomfort → residue. Too many works currently stop at recognition.
+
+**Persona red flags:** A critical game curator may see the arcade sequence as overly dependent on canonical IP; a craft historian may object to decontextualized “Celtic,” marble, or marbling references; a scientist may distrust invented documentary precision in `015`; and viewers using reduced motion or keyboard navigation receive a markedly weaker version of the early catalog.
+
+### Questions that should govern the next revision cycle
+
+- What is the one system in contemporary life that this work makes impossible to see innocently afterward?
+
+- Which variable does the system protect, and whose loss is excluded from that measurement?
+
+- What evidence survives the reset, and if nothing survives, why should this particular run matter?
+
+- Does a borrowed game, craft, artist, or scientific reference change the rules of the work, or merely improve its surface?
+
+- Could a viewer understand the ethical reversal from the artifact alone, before reading its README?
+
+## Final assessment
+
+HyperGal should resist becoming a feed of ingenious sketches. Its strongest future is a smaller, more exacting collection of durable browser works about systems that cannot stop: systems that convert success into labor, defense into violence, survival into conformity, and consumption into the destruction of its own ground.
+
+The code is already capable of carrying that argument. The curatorial task is to stop letting beauty, nostalgia, and automatic renewal rescue the systems from what they do.

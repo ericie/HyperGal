@@ -11,38 +11,39 @@
 
   <defs>
     <g id="station">
-      <circle r="25" fill="none" stroke="#d58b4b" stroke-opacity=".24"/>
-      <rect x="-9" y="-14" width="18" height="29" fill="#dc9552"/>
-      <rect x="-6" y="-9" width="12" height="7" fill="#242520"/>
-      <rect x="-12" y="14" width="24" height="4" fill="#11120f"/>
-      <rect x="-7" y="-18" width="14" height="4" fill="#11120f"/>
+      <path d="M-16-12H5L20 0 5 12h-21Z" fill="#dc9552" stroke="#f0b071" stroke-width="2"/>
     </g>
     <g id="bubble-low">
-      <circle r="9" fill="#643719" fill-opacity=".72" stroke="#dce2d8" stroke-opacity=".7" stroke-width="2"/>
-      <path d="M-7 2h14v7H-7z" fill="#d88746" fill-opacity=".72"/>
-      <path d="M-4-5a6 6 0 0 1 3-2" fill="none" stroke="#fffbe9" stroke-opacity=".75"/>
+      <path d="M17 1c0 10-6 17-17 16-11 0-18-6-17-17 0-10 7-17 17-16 10 0 17 6 17 17Z" fill="#d9e3d8" fill-opacity=".06" stroke="#dce2d8" stroke-opacity=".66" stroke-width="2"/>
+      <path d="M8 2c0 5-3 8-8 8s-9-3-8-9c0-5 4-8 8-8 5 0 8 3 8 9Z" fill="#c96f34" fill-opacity=".62"/>
     </g>
     <g id="bubble-high">
-      <circle r="11" fill="#a95c2d" fill-opacity=".74" stroke="#eef1e8" stroke-opacity=".76" stroke-width="2"/>
-      <path d="M-5-7a8 8 0 0 1 4-2" fill="none" stroke="#fffbe9" stroke-opacity=".82"/>
+      <path d="M20 1c0 12-7 20-20 19-12 0-21-7-20-20 0-12 8-20 20-19 12 0 20 7 20 20Z" fill="#dfe9df" fill-opacity=".07" stroke="#eef1e8" stroke-opacity=".72" stroke-width="2"/>
+      <path d="M14 1c0 8-5 14-14 13-8 0-14-5-13-14 0-8 5-13 13-13 8 0 14 5 14 14Z" fill="#d48142" fill-opacity=".7"/>
     </g>
     <g id="bubble-empty">
-      <circle r="7" fill="#e4ebe1" fill-opacity=".06" stroke="#cbd6ca" stroke-opacity=".62" stroke-width="1.5"/>
-      <path d="M-5 4h10v3H-5z" fill="#bd6d38" fill-opacity=".62"/>
+      <path d="M15 0c0 9-6 16-16 15-9 0-15-6-14-16 0-9 6-15 16-14 9 0 15 6 14 15Z" fill="#e4ebe1" fill-opacity=".035" stroke="#cbd6ca" stroke-opacity=".58" stroke-width="2"/>
+      <path d="M4 0c0 3-2 4-4 4s-4-2-4-4 2-4 4-4 4 2 4 4Z" fill="#bd6d38" fill-opacity=".5"/>
     </g>
   </defs>
 
+  <g fill="#20211f" opacity=".92">
+    <ellipse cx="390" cy="261" rx="75" ry="19" transform="rotate(-24 390 261)"/>
+    <ellipse cx="692" cy="165" rx="48" ry="13" transform="rotate(17 692 165)"/>
+    <ellipse cx="92" cy="489" rx="58" ry="15" transform="rotate(-31 92 489)"/>
+  </g>
+
   <g>
     <use href="#station" transform="translate(102 115)"/>
-    <use href="#station" transform="translate(282 133)"/>
+    <use href="#station" transform="translate(282 133) scale(-1 1)"/>
     <use href="#station" transform="translate(505 105)"/>
-    <use href="#station" transform="translate(692 165)"/>
+    <use href="#station" transform="translate(692 165) scale(-1 1)"/>
     <use href="#station" transform="translate(177 292)"/>
-    <use href="#station" transform="translate(390 261)"/>
+    <use href="#station" transform="translate(390 261) scale(-1 1)"/>
     <use href="#station" transform="translate(622 330)"/>
-    <use href="#station" transform="translate(92 489)"/>
+    <use href="#station" transform="translate(92 489) scale(-1 1)"/>
     <use href="#station" transform="translate(363 494)"/>
-    <use href="#station" transform="translate(704 483)"/>
+    <use href="#station" transform="translate(704 483) scale(-1 1)"/>
   </g>
 
   <g>

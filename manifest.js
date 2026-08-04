@@ -243,7 +243,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.svg",
-      "description": "Sixty bubbles cross a low-contrast marbled oil field between ten gas stations. Each one burns its visible fuel in motion, stops to refill at an empty station, and pops if the tank runs dry; replacements arrive from beyond the edge."
+      "description": "Sixty large abstract bubbles cross a low-contrast marbled oil field between ten five-sided stations. Refilling erases each station's vein; an exhausted station bursts and reappears over untouched resources, while bubbles that run dry are replaced from beyond the edge."
     },
     {
       "slug": "025-cloudcutter",
@@ -253,7 +253,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.svg",
-      "description": "A black-and-white vector Asteroids variant flown against weather instead of rock. Fluffy scallop-edged clouds stream right to left and never explode: a shot only takes a small bite out of the body, so the ship has to carve a path through one bite at a time. It picks a cloud, swings wide to get behind the line it means to cut, then flies strafing runs down that line with the guns going, breaking off at the last moment and coming around again when the way is still shut. Bites either close over as the cloud heals, or meet in the middle — and a slot that reaches all the way through halves the cloud into two drifting bodies that swell as they go. Severed scraps too small to survive blow away as vapor. Cloud contact does not kill; it drags, shoves the ship back out, and tears more vapor loose."
+      "description": "A black-and-white vector Asteroids variant flown against weather instead of rock. Nothing here explodes: a round takes a small chunk out of a cloud and no more, so the only way through a body is to bore a tunnel and fly down it. The ship never targets anything. It holds a wandering course with the guns held down, and where the sky is thick it grinds to a crawl until its own fire has opened the way — an icebreaker, not a hunter. Its hull reams out what the guns began, so it can never wedge itself in a bore too narrow to fly. Cloudscapes of scalloped cumulus pan endlessly left while the ship works up and down through them; the camera pans with the ship, which never leaves the frame. Bites close over as a cloud heals, or meet — and a bore that reaches all the way through halves the cloud into two bodies that swell as they drift."
     }
   ]
 };
