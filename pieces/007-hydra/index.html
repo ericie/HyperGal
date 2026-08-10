@@ -67,10 +67,10 @@
       const SAFE_BODY_BUFFER = 6;
       const LEADER_SMART_AT = 8;
       const LEADER_SMART_SPAN = 12;
-      const DENSIFY_AT = 24;
-      const DENSIFY_SPAN = 42;
-      const DENSITY_CLEARANCE = 6;
-      const DENSITY_REWARD = 12;
+      const DENSIFY_AT = 36;
+      const DENSIFY_SPAN = 28;
+      const DENSITY_RADIUS = 4;
+      const DENSITY_REWARD = 30;
 
       // Mega Man underground: near-black navy, tile indigo, electric cobalt,
       // water cyan, mineral violet and the small amber energy pickup.
@@ -298,13 +298,26 @@
         return Number.isFinite(best) ? best : GW + GH;
       }
 
-      function olderBodyClearance(body, p) {
-        let best = Infinity;
-        // Ignore the neck: it is always close and says nothing about packing.
-        for (let i = Math.min(8, body.length); i < body.length; i++) {
-          best = Math.min(best, tdist(p, body[i]));
+      function olderBodyDensity(body, p) {
+        const older = body.slice(Math.min(8, body.length));
+        const occupied = new Set(older.map(key));
+        let density = 0, enclosedDirections = 0;
+
+        // Nearby non-neck segments reward tight parallel lanes. Multiple body
+        // walls around the head add an enclosure bonus, guiding it into holes
+        // that earlier passes left inside an otherwise dense coil.
+        for (const b of older) {
+          const distance = tdist(p, b);
+          if (distance <= DENSITY_RADIUS) density += DENSITY_RADIUS + 1 - distance;
         }
-        return Number.isFinite(best) ? best : DENSITY_CLEARANCE;
+        for (const d of DIRS) {
+          for (let distance = 1; distance <= DENSITY_RADIUS + 1; distance++) {
+            if (!occupied.has(`${p.x + d.x * distance},${p.y + d.y * distance}`)) continue;
+            enclosedDirections++;
+            break;
+          }
+        }
+        return Math.min(16, density + Math.max(0, enclosedDirections - 1) * 2.5);
       }
 
       function canReachTail(s, start, body) {
@@ -409,13 +422,20 @@
         if (!inB(nx.x, nx.y) || hitSelf(s, nx) || hitOtherSnake(s, nx)) return -100000 - mouseDist;
 
         const future = futureBodyAfter(s, nx, ate);
+        const densify = densifyDrive(s);
         const area = floodArea(s, nx, future);
         const path = pathDistanceToMouse(s, nx, future);
         const eatGrowth = ate ? growthForNextMouse(s) : 0;
         const bodyNeed = s.body.length + s.grow + eatGrowth;
         const intelligence = leaderIntelligence(s);
-        const densify = densifyDrive(s);
-        const safeNeed = bodyNeed + Math.round(SAFE_BODY_BUFFER * intelligence);
+        // Requiring one free cell for every body segment imposes a permanent
+        // 50% density ceiling. A mature snake instead follows its tail through
+        // a much smaller reserve, letting it occupy most of the arena.
+        const bodyReserveScale = 1 - densify * 0.82;
+        const bufferScale = 1 - densify * 0.75;
+        const safeNeed = Math.max(10, Math.round(
+          bodyNeed * bodyReserveScale + SAFE_BODY_BUFFER * intelligence * bufferScale
+        ));
         const crampedPenalty = Math.max(0, safeNeed - area) * (55 + intelligence * 150);
         const escape = futureEscapeProfile(s, nx, future, d);
         const tailReachable = canReachTail(s, nx, future);
@@ -426,9 +446,9 @@
         // Once the body is very long, extra empty acreage stops being valuable.
         // Enough room to turn and reach the tail still scores fully; beyond that,
         // the leader is free to fold into denser parallel lanes.
-        const spaceCeiling = safeNeed * (3.2 - densify * 1.35);
+        const spaceCeiling = safeNeed * (2.5 - densify * 1.35);
         const usefulArea = Math.min(area, spaceCeiling);
-        const exitFreedom = 1 - densify * 0.55;
+        const exitFreedom = 1 - densify * 0.82;
         const dangerScore = usefulArea * 3
           + Math.min(8, nearestOtherDistance(s, nx)) * 16
           + escape.exits * (24 + intelligence * 54) * exitFreedom
@@ -436,9 +456,7 @@
           + (tailReachable ? 45 * intelligence : -220 * intelligence)
           - headRisk * (0.7 + intelligence * 1.8)
           - crampedPenalty;
-        const densityScore = densify
-          * Math.max(0, DENSITY_CLEARANCE - olderBodyClearance(future, nx))
-          * DENSITY_REWARD;
+        const densityScore = densify * olderBodyDensity(future, nx) * DENSITY_REWARD;
         const huntScore = pathScore + (ate ? FOOD_CAPTURE_BONUS + eatGrowth * 45 : 0);
         const trapScore = boxingScore(s, nx, future);
         const edgePressure = Math.max(0, 2 - borderDistance(h));

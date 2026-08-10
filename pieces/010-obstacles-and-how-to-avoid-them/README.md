@@ -27,14 +27,13 @@ each silhouette's angles. They compress into dense bundles in tight passages,
 retain that displacement downstream, and slowly fan back out when space returns.
 Small colored boids travel each path from left to right, revealing the line in
 their wake at a steady physical speed, including through large vertical detours.
-A translucent vision cone projects from each boid. Its leading edge stops against
-an obstacle just as the boid begins to turn, making the avoidance mechanic
-visible. Each boid has its own vision length as well as its own steering response,
-turn radius, bounded lane clearance, route choice, and recovery rate. Boids use
-distinct local avoidance tracks instead of collapsing onto one shared clearance
-line. Any route the solver cannot keep continuous is discarded rather than drawn
-as an abrupt connector. Every trail runs on an independent draw, linger, fade,
-and rest cadence,
+Each boid senses obstacles at its own distance, but that perception remains
+invisible so the moving heads and their trails carry the composition. Boids also
+have individual steering responses, turn radii, bounded lane clearances, route
+choices, and recovery rates. They use distinct local avoidance tracks instead
+of collapsing onto one shared clearance line. Any route the solver cannot keep
+continuous is discarded rather than drawn as an abrupt connector. Every trail
+runs on an independent draw, linger, fade, and rest cadence,
 so paths continually reappear across the field like rain rather than arriving in
 one batch. Reduced motion displays the complete static field.
 

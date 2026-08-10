@@ -5,5 +5,5 @@
   "category": "generative",
   "type": "interactive",
   "thumbnail": "thumbnail.jpg",
-  "description": "A full-window drawing of borderless Hokusai-toned walls, squares, and circles composed by adjustable gestalt forces. Boids with individually sized vision cones spot each obstacle, turn through distinct bounded lanes, and leave fine trails that slowly fan back out."
+  "description": "A full-window drawing of borderless Hokusai-toned walls, squares, and circles composed by adjustable gestalt forces. Boids sense each obstacle at individual distances, turn through distinct bounded lanes, and leave fine trails that slowly fan back out."
 }

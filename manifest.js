@@ -100,7 +100,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "A full-window drawing of borderless Hokusai-toned walls, squares, and circles composed by adjustable gestalt forces. Boids with individually sized vision cones spot each obstacle, turn through distinct bounded lanes, and leave fine trails that slowly fan back out."
+      "description": "A full-window drawing of borderless Hokusai-toned walls, squares, and circles composed by adjustable gestalt forces. Boids sense each obstacle at individual distances, turn through distinct bounded lanes, and leave fine trails that slowly fan back out."
     },
     {
       "slug": "011-switch-stack",
@@ -284,7 +284,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
-      "description": "A richly layered procedural botanical illustration. Roses, peonies, poppies, lilies, daisies, hydrangeas, buds, stems, and veined foliage are composed into a flattened garden on coral, then finished with the grain and tonal variation of a printed textile."
+      "description": "A procedural botanical plate on aged rag paper. Roses, peonies, poppies, lilies, daisies, anemones, hydrangeas, honeysuckle, and acanthus are engraved in madder, weld, and woad on sinuous stems that never run straight, inside a ruled border the growth escapes."
     },
     {
       "slug": "029-eyes-open",
@@ -295,6 +295,16 @@ window.HYPERGAL_MANIFEST = {
       "type": "generative",
       "thumbnail": "thumbnail.svg",
       "description": "A black field populated by bright graphic eyes. Ten to twenty are open at once on a phone, each arriving independently, holding its gaze, blinking shut, and vanishing before another appears elsewhere."
+    },
+    {
+      "slug": "030-obstacles-and-how-to-go-around-them",
+      "title": "Obstacles and How to Go Around Them",
+      "year": 2026,
+      "date": "2026-08-10",
+      "category": "generative",
+      "type": "interactive",
+      "thumbnail": "thumbnail.jpg",
+      "description": "Organic rocks reshape a continuous river field into shoals, deep pools, quick channels, and turbulent wakes. Petals collide on the surface, turn in three axes, and are occasionally pulled below by eddies."
     }
   ]
 };

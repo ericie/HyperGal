@@ -12,8 +12,11 @@ advantage in head-to-head collisions.
 The advantage is paired with judgment rather than recklessness. As a snake gets
 larger, it puts increasing weight on next-turn exits, reachable area, a route
 back to its moving tail, safe body clearance, and rival head threats. Once it
-has enough escape room, a very long snake folds into tighter parallel lanes
-instead of preserving every patch of open ground. Large snakes still hunt and
+has enough escape room, a very long snake folds into tight parallel lanes and
+actively fills holes inside its own coil instead of preserving open ground. Its
+free-space reserve shrinks as it matures, so the body can occupy most of the
+arena while still maintaining a route toward its moving tail.
+Large snakes still hunt and
 box opponents, but will abandon the shortest route to the mouse when it could
 close a trap around themselves. The rule set stays small:
 

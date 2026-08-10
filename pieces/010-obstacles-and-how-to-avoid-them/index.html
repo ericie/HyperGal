@@ -320,7 +320,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Obstacles and How to Avoid Them: repeating boids use different-length vision cones to spot borderless Hokusai-toned walls, squares, and circles, then turn in spaced lanes and leave fluid, fading trails around them."
+      aria-label="Obstacles and How to Avoid Them: repeating boids sense borderless Hokusai-toned walls, squares, and circles at different distances, then turn in spaced lanes and leave fluid, fading trails around them."
     ></canvas>
 
     <aside class="gestalt-panel is-collapsed" aria-label="Gestalt controls">
@@ -1483,7 +1483,6 @@
             color: template.color,
             spriteColor: WALL_COLORS[i % WALL_COLORS.length],
             visionLength: template.visionLength,
-            visionAngle: template.visionAngle,
             drawDuration,
             holdDuration: template.holdDuration,
             fadeDuration: template.fadeDuration,
@@ -1534,7 +1533,6 @@
             waveB: flowWaveB * rand(0.92, 1.08),
             wobble: lineGap * rand(0.06, 0.3),
             visionLength: clamp(lineGap * rand(1.8, 5.4), 28, 138),
-            visionAngle: rand(0.115, 0.19),
             steering: rand(0.62, 1.48),
             turnTightness,
             deflectionMemory: rand(0.38, 0.76),
@@ -2189,7 +2187,6 @@
 
       function drawLineSprite(line, head) {
         const radius = clamp(2.4 + line.stroke * 0.9, 3, 5.4);
-        drawVisionCone(line, head, radius);
         ctx.save();
         ctx.translate(head.x, head.y);
         ctx.rotate(head.angle);
@@ -2198,137 +2195,6 @@
         ctx.ellipse(0, 0, radius * 1.7, radius * 0.72, 0, 0, TAU);
         ctx.fill();
         ctx.restore();
-      }
-
-      function drawVisionCone(line, head, radius) {
-        const startDistance = radius * 1.55;
-        if (line.visionLength <= startDistance) return;
-
-        const apexX = head.x + Math.cos(head.angle) * startDistance;
-        const apexY = head.y + Math.sin(head.angle) * startDistance;
-        const sampleCount = 9;
-        const edgePoints = [];
-        let hasContact = false;
-
-        for (let i = 0; i < sampleCount; i++) {
-          const amount = i / (sampleCount - 1);
-          const angle =
-            head.angle + mix(-line.visionAngle, line.visionAngle, amount);
-          const dx = Math.cos(angle);
-          const dy = Math.sin(angle);
-          const hitDistance = nearestObstacleHit(
-            head.x,
-            head.y,
-            dx,
-            dy,
-            line.visionLength
-          );
-          const distance = Math.max(
-            startDistance,
-            hitDistance === null ? line.visionLength : hitDistance
-          );
-          hasContact ||= hitDistance !== null;
-          edgePoints.push({
-            x: head.x + dx * distance,
-            y: head.y + dy * distance,
-            contact: hitDistance !== null,
-          });
-        }
-
-        ctx.save();
-        ctx.fillStyle = line.spriteColor;
-        ctx.strokeStyle = line.spriteColor;
-        ctx.lineWidth = Math.max(0.65, line.stroke * 0.58);
-        const baseAlpha = ctx.globalAlpha;
-
-        ctx.globalAlpha = baseAlpha * (hasContact ? 0.16 : 0.085);
-        ctx.beginPath();
-        ctx.moveTo(apexX, apexY);
-        for (const point of edgePoints) ctx.lineTo(point.x, point.y);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.globalAlpha = baseAlpha * (hasContact ? 0.5 : 0.25);
-        ctx.beginPath();
-        ctx.moveTo(apexX, apexY);
-        for (const point of edgePoints) ctx.lineTo(point.x, point.y);
-        ctx.closePath();
-        ctx.stroke();
-
-        if (hasContact) {
-          ctx.globalAlpha = baseAlpha * 0.72;
-          for (const point of edgePoints) {
-            if (!point.contact) continue;
-            ctx.beginPath();
-            ctx.arc(point.x, point.y, 1.25, 0, TAU);
-            ctx.fill();
-          }
-        }
-        ctx.restore();
-      }
-
-      function nearestObstacleHit(originX, originY, dx, dy, maxDistance) {
-        let nearest = null;
-        for (const obstacle of obstacles) {
-          const distance = rayObstacleDistance(
-            originX,
-            originY,
-            dx,
-            dy,
-            obstacle,
-            maxDistance
-          );
-          if (distance === null) continue;
-          if (nearest === null || distance < nearest) nearest = distance;
-        }
-        return nearest;
-      }
-
-      function rayObstacleDistance(originX, originY, dx, dy, obstacle, maxDistance) {
-        const cos = Math.cos(obstacle.rotation);
-        const sin = Math.sin(obstacle.rotation);
-        const relX = originX - obstacle.x;
-        const relY = originY - obstacle.y;
-        const localX = relX * cos + relY * sin;
-        const localY = -relX * sin + relY * cos;
-        const localDx = dx * cos + dy * sin;
-        const localDy = -dx * sin + dy * cos;
-
-        if (obstacle.type === 'circle') {
-          const projection = -(localX * localDx + localY * localDy);
-          const closestSq =
-            localX * localX +
-            localY * localY -
-            projection * projection;
-          const radiusSq = obstacle.radius * obstacle.radius;
-          if (closestSq > radiusSq) return null;
-          const distance = projection - Math.sqrt(Math.max(0, radiusSq - closestSq));
-          return distance >= 0 && distance <= maxDistance ? distance : null;
-        }
-
-        const halfWidth = obstacle.width * 0.5;
-        const halfHeight = obstacle.height * 0.5;
-        let near = 0;
-        let far = maxDistance;
-        const axes = [
-          [localX, localDx, halfWidth],
-          [localY, localDy, halfHeight],
-        ];
-
-        for (const [origin, direction, halfSize] of axes) {
-          if (Math.abs(direction) < 0.00001) {
-            if (origin < -halfSize || origin > halfSize) return null;
-            continue;
-          }
-          let first = (-halfSize - origin) / direction;
-          let second = (halfSize - origin) / direction;
-          if (first > second) [first, second] = [second, first];
-          near = Math.max(near, first);
-          far = Math.min(far, second);
-          if (near > far) return null;
-        }
-
-        return near >= 0 && near <= maxDistance ? near : null;
       }
 
       function drawObstacles() {
