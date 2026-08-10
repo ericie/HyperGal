@@ -1,10 +1,11 @@
 # Soft Collapse
 
-A black-and-white field of geometric cells. Each cell is a fixed cropping
-frame. Its motif can slide straight out through the top, right, bottom, or left
-edge while a new motif enters from the opposite side. Frames never move,
-rotate, or scale. Several independent block transitions overlap so the field
-is always active without becoming hurried.
+A black-and-white field of geometric cells. Most occupy one unit of the grid;
+a handful interrupt it with motifs that span four-by-four units. Groups of
+sixteen small frames periodically merge into one large form, while large forms
+split back into sixteen independent cells. Motifs also slide straight through
+their cropped frames in four cardinal directions. Several independent
+transitions overlap so the field is always active without becoming hurried.
 
 Click or tap to move the block under the pointer. Press Space to pause or
 resume and R to build a new composition. Add `?seed=anything` to the URL to

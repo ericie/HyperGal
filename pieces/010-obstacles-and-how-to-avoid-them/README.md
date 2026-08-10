@@ -25,13 +25,18 @@ Irregularly spaced, fine field lines share long wave phases and flow through
 continuous cubic curves around rounded influence envelopes rather than tracing
 each silhouette's angles. They compress into dense bundles in tight passages,
 retain that displacement downstream, and slowly fan back out when space returns.
-Small colored drawing heads travel each path from left to right, revealing the
-line in their wake at a steady physical speed, including through large vertical
-detours. Every line runs on an independent draw, linger, fade, and rest cadence,
+Small colored boids travel each path from left to right, revealing the line in
+their wake at a steady physical speed, including through large vertical detours.
+A translucent vision cone projects from each boid. Its leading edge stops against
+an obstacle just as the boid begins to turn, making the avoidance mechanic
+visible. Each boid has its own vision length as well as its own steering response,
+turn radius, bounded lane clearance, route choice, and recovery rate. Boids use
+distinct local avoidance tracks instead of collapsing onto one shared clearance
+line. Any route the solver cannot keep continuous is discarded rather than drawn
+as an abrupt connector. Every trail runs on an independent draw, linger, fade,
+and rest cadence,
 so paths continually reappear across the field like rain rather than arriving in
-one batch. Each line also has its own obstacle-recognition distance, steering
-response, turn radius, lane clearance, route choice, and recovery rate. Reduced
-motion displays the complete static field.
+one batch. Reduced motion displays the complete static field.
 
 Click, tap, Space, or Enter to reseed the arrangement. Add `?seed=<value>` to
 the URL for a repeatable starting composition.

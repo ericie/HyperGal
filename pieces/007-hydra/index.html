@@ -5,20 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>hydra · HyperGal</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #001827; overflow: hidden; }
-      #stage { position: fixed; inset: 0; display: block; image-rendering: pixelated; }
+      html, body { margin: 0; height: 100%; background: #06091d; overflow: hidden; }
+      #stage { position: fixed; inset: 0; display: block; }
       .caption {
         position: fixed;
         bottom: 1rem;
         left: 1rem;
-        color: #ffd77b;
+        color: #8bd9ff;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: .8rem;
         letter-spacing: .12em;
         text-transform: uppercase;
         pointer-events: none;
         z-index: 10;
-        text-shadow: 0 0 9px rgba(255, 215, 123, .58), 0 0 20px rgba(168, 0, 44, .34);
+        text-shadow: 0 0 9px rgba(39, 164, 255, .7), 0 0 22px rgba(98, 54, 175, .55);
       }
     </style>
   </head>
@@ -26,59 +26,70 @@
     <canvas id="stage"></canvas>
     <div class="caption">hydra · 2026 · five contenders, one mouse · click to reseed</div>
     <script>
-      // hydra — autonomous traditional Snake, rendered as a woodblock fossil field.
+      // hydra — autonomous traditional Snake, rendered as a flooded cavern mural.
       //
       // Five contenders hunt one mouse. Snakes enter from beyond the arena with
       // varied length and aggression, which tilt each one between chasing the
-      // mouse and preserving room around bodies. Edge, self, and other-snake
-      // contact kill one snake; its body becomes a layered stain and bone trace.
+      // mouse and preserving room around bodies. The leaders compound their
+      // advantage, but also become increasingly careful about future escape space.
+      // Edge, self, and other-snake contact kill one snake; its body becomes a
+      // translucent watercolor gesture that mingles with the older marks.
       //
-      // The look is Growth Rings' Hokusai palette pushed into connected
-      // pigment bodies, rough bitmap remains, dry ribs, and a Prussian field.
+      // The look borrows the electric indigo, cyan, violet, and mineral pink of
+      // an 8-bit Mega Man underground stage, softened by wet-on-wet remains.
 
       const canvas = document.getElementById('stage');
       const ctx = canvas.getContext('2d');
-      ctx.imageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = true;
 
       // ---- tunables -------------------------------------------------------
-      const STEP = 0.16;         // starting seconds per snake move
-      const MIN_STEP = 0.12;     // longest snakes still need to be readable
-      const SPEEDUP_PER_SEG = 0.003;
-      const GROW = 1;            // base growth; consecutive mouse catches multiply it
+      const STEP = 0.18;         // starting seconds per snake move
+      const MIN_STEP = 0.075;    // a leader becomes visibly, decisively faster
+      const SPEEDUP_PER_SEG = 0.0048;
+      const STREAK_SPEEDUP = 0.008;
+      const GROW = 1;            // streak growth is triangular: 2, 4, 7, 11...
       const START_SNAKES = 5;
       const START_LEN_MIN = 4;
       const START_LEN_MAX = 9;
-      const MAX_POOLS = 80;      // keeps the visible corpse record bounded
-      const AGGRESSION_MIN = 0.28, AGGRESSION_MAX = 0.82;
-      const AGGRESSION_PER_SEG = 0.035;
-      const AGGRESSION_CAP = 0.96;
+      const MAX_POOLS = 64;      // enough translucent marks to form a shared wash
+      const MAX_SMEARS_PER_POOL = 8;
+      const AGGRESSION_MIN = 0.42, AGGRESSION_MAX = 0.88;
+      const AGGRESSION_PER_SEG = 0.045;
+      const AGGRESSION_CAP = 0.97;
+      const HUNT_DISTANCE_WEIGHT = 13;
+      const FOOD_CAPTURE_BONUS = 520;
       const BOX_SPACE_RATIO = 2.4; // opponent space must be tight relative to body length
       const BOX_PRESSURE_RADIUS = 7;
       const TURN_MARGIN = 5;     // keep moving straight unless a turn is clearly better
       const EDGE_TURN_MARGIN = 1.5;
-      const OFF_ROUTE_TURN_MARGIN = 2.5;
+      const OFF_ROUTE_TURN_MARGIN = 0.75;
       const EDGE_RELIEF_WEIGHT = 6;
+      const SAFE_BODY_BUFFER = 6;
+      const LEADER_SMART_AT = 8;
+      const LEADER_SMART_SPAN = 12;
+      const DENSIFY_AT = 24;
+      const DENSIFY_SPAN = 42;
+      const DENSITY_CLEARANCE = 6;
+      const DENSITY_REWARD = 12;
 
-      // Growth Rings / Hokusai: wheat, pale yellow, Prussian blue,
-      // Tyrian purple, burlywood.
-      const C_BG = '#001827';
-      const C_MOUSE = '#ffffb3';
-      const C_BORDER = '#ffd77b';
-      const C_BONE = '255,255,179';
-      const C_BONE_HOT = '255,215,123';
-      const C_CLOT = '0,24,39';
-      const GLOW = '#ffd77b';
+      // Mega Man underground: near-black navy, tile indigo, electric cobalt,
+      // water cyan, mineral violet and the small amber energy pickup.
+      const C_BG = '#06091d';
+      const C_MOUSE = '#ffd35a';
+      const C_BORDER = '#3267c8';
+      const C_CLOT = '6,9,29';
+      const GLOW = '#27a4ff';
       const SNAKE_PALETTE = [
-        { body: '#004b87', head: '#ffd77b', glow: '#004b87', ring: '0,75,135', accent: '255,215,123', dark: '0,24,43' },
-        { body: '#a8002c', head: '#ffffb3', glow: '#a8002c', ring: '168,0,44', accent: '222,184,135', dark: '50,0,13' },
-        { body: '#deb887', head: '#a8002c', glow: '#ffd77b', ring: '222,184,135', accent: '168,0,44', dark: '48,37,23' },
-        { body: '#ffd77b', head: '#ffffb3', glow: '#ffd77b', ring: '255,215,123', accent: '0,75,135', dark: '57,42,17' },
-        { body: '#ffffb3', head: '#a8002c', glow: '#ffd77b', ring: '255,255,179', accent: '168,0,44', dark: '55,46,21' },
-        { body: '#a8002c', head: '#ffd77b', glow: '#a8002c', ring: '168,0,44', accent: '255,215,123', dark: '42,0,11' },
-        { body: '#004b87', head: '#ffffb3', glow: '#004b87', ring: '0,75,135', accent: '222,184,135', dark: '0,21,38' },
-        { body: '#deb887', head: '#ffffb3', glow: '#ffd77b', ring: '222,184,135', accent: '0,75,135', dark: '44,34,22' },
-        { body: '#ffd77b', head: '#a8002c', glow: '#a8002c', ring: '255,215,123', accent: '168,0,44', dark: '52,31,12' },
-        { body: '#a8002c', head: '#deb887', glow: '#a8002c', ring: '168,0,44', accent: '0,75,135', dark: '45,0,12' },
+        { body: '#086bc1', head: '#8bd9ff', glow: '#27a4ff', ring: '8,107,193', accent: '139,217,255', dark: '20,38,100' },
+        { body: '#5933a8', head: '#bfa4ff', glow: '#815bd6', ring: '89,51,168', accent: '191,164,255', dark: '36,20,84' },
+        { body: '#b43d89', head: '#ff91c8', glow: '#d653a4', ring: '180,61,137', accent: '255,145,200', dark: '72,20,75' },
+        { body: '#274ac7', head: '#87a7ff', glow: '#496fe8', ring: '39,74,199', accent: '135,167,255', dark: '17,28,91' },
+        { body: '#079ba7', head: '#79f2ed', glow: '#20cbd2', ring: '7,155,167', accent: '121,242,237', dark: '10,53,79' },
+        { body: '#6d3db6', head: '#ff91c8', glow: '#945dd8', ring: '109,61,182', accent: '255,145,200', dark: '43,24,91' },
+        { body: '#0c82cf', head: '#d1f1ff', glow: '#27a4ff', ring: '12,130,207', accent: '209,241,255', dark: '15,42,104' },
+        { body: '#9b418f', head: '#bfa4ff', glow: '#c45aaf', ring: '155,65,143', accent: '191,164,255', dark: '62,25,78' },
+        { body: '#3159d0', head: '#79f2ed', glow: '#527cf0', ring: '49,89,208', accent: '121,242,237', dark: '21,33,98' },
+        { body: '#087e9f', head: '#8bd9ff', glow: '#24b7d0', ring: '8,126,159', accent: '139,217,255', dark: '9,45,72' },
       ];
 
       // ---- state ----------------------------------------------------------
@@ -103,10 +114,12 @@
       const newStartLength = () => START_LEN_MIN + ((Math.random() * (START_LEN_MAX - START_LEN_MIN + 1)) | 0);
       const newAggression = () => rand(AGGRESSION_MIN, AGGRESSION_MAX);
       const nextEatStreak = (s) => lastEater === s ? (s.eatStreak || 0) + 1 : 1;
-      const growthForStreak = (streak) => GROW * Math.max(1, streak);
-      const growthForNextMouse = (s) => growthForStreak(nextEatStreak(s));
+      const growthForStreak = (streak, length = START_LEN_MIN) => GROW + (streak * (streak + 1)) / 2 + Math.floor(Math.max(0, length - START_LEN_MIN) / 7);
+      const growthForNextMouse = (s) => growthForStreak(nextEatStreak(s), s.body.length);
       const effectiveAggression = (s) => Math.min(AGGRESSION_CAP, s.aggression + Math.max(0, s.body.length - START_LEN_MIN) * AGGRESSION_PER_SEG);
-      const moveInterval = (s) => Math.max(MIN_STEP, STEP - Math.max(0, s.body.length - START_LEN_MIN) * SPEEDUP_PER_SEG);
+      const leaderIntelligence = (s) => Math.min(1, Math.max(0, (s.body.length - LEADER_SMART_AT) / LEADER_SMART_SPAN) + (s.eatStreak || 0) * 0.12);
+      const densifyDrive = (s) => Math.min(1, Math.max(0, (s.body.length - DENSIFY_AT) / DENSIFY_SPAN));
+      const moveInterval = (s) => Math.max(MIN_STEP, STEP - Math.max(0, s.body.length - START_LEN_MIN) * SPEEDUP_PER_SEG - Math.min(0.032, (s.eatStreak || 0) * STREAK_SPEEDUP));
       const occupiedBySnakes = (x, y, list = snakes) => list.some(s => s.body.some(p => p.x === x && p.y === y));
 
       // ---- sizing ---------------------------------------------------------
@@ -115,7 +128,7 @@
         canvas.width = W * dpr; canvas.height = H * dpr;
         canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.imageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = true;
         CELL = Math.max(13, Math.round(Math.min(W, H) / 34));
         GW = Math.max(12, Math.floor((W - CELL * 3) / CELL));
         GH = Math.max(12, Math.floor((H - CELL * 4) / CELL));
@@ -285,6 +298,66 @@
         return Number.isFinite(best) ? best : GW + GH;
       }
 
+      function olderBodyClearance(body, p) {
+        let best = Infinity;
+        // Ignore the neck: it is always close and says nothing about packing.
+        for (let i = Math.min(8, body.length); i < body.length; i++) {
+          best = Math.min(best, tdist(p, body[i]));
+        }
+        return Number.isFinite(best) ? best : DENSITY_CLEARANCE;
+      }
+
+      function canReachTail(s, start, body) {
+        if (body.length < 2) return true;
+        const tail = body[body.length - 1];
+        const blocked = blockedCells(s, body, start);
+        blocked.delete(key(tail));
+        const seen = new Set([key(start)]);
+        const q = [start];
+        for (let qi = 0; qi < q.length; qi++) {
+          const p = q[qi];
+          if (sameCell(p, tail)) return true;
+          for (const d of DIRS) {
+            const n = { x: p.x + d.x, y: p.y + d.y };
+            const nk = key(n);
+            if (!inB(n.x, n.y) || blocked.has(nk) || seen.has(nk)) continue;
+            seen.add(nk); q.push(n);
+          }
+        }
+        return false;
+      }
+
+      function rivalHeadRisk(s, p) {
+        let risk = 0;
+        for (const other of snakes) {
+          if (other === s) continue;
+          const oh = other.body[0];
+          for (const d of DIRS) {
+            if (d.x === -other.dir.x && d.y === -other.dir.y) continue;
+            if (oh.x + d.x !== p.x || oh.y + d.y !== p.y) continue;
+            const sizeThreat = Math.max(0.6, other.body.length / Math.max(1, s.body.length));
+            risk += 90 * sizeThreat;
+          }
+        }
+        return risk;
+      }
+
+      function futureEscapeProfile(s, start, body, arrivalDir) {
+        let exits = 0, bestArea = 0;
+        for (const d of DIRS) {
+          if (d.x === -arrivalDir.x && d.y === -arrivalDir.y) continue;
+          const n = { x: start.x + d.x, y: start.y + d.y };
+          if (!inB(n.x, n.y)) continue;
+          const ownBlocked = body.slice(0, Math.max(1, body.length - 1)).some(p => sameCell(p, n));
+          if (ownBlocked || hitOtherSnake(s, n)) continue;
+          exits++;
+          const after = [n, ...body];
+          after.pop();
+          bestArea = Math.max(bestArea, floodArea(s, n, after));
+        }
+        return { exits, bestArea };
+      }
+
       function opponentEscapeArea(s, future, other) {
         const start = other.body[0];
         const blocked = new Set(future.map(key));
@@ -340,26 +413,55 @@
         const path = pathDistanceToMouse(s, nx, future);
         const eatGrowth = ate ? growthForNextMouse(s) : 0;
         const bodyNeed = s.body.length + s.grow + eatGrowth;
-        const crampedPenalty = Math.max(0, bodyNeed - area) * 45;
-        const pathScore = Number.isFinite(path) ? 140 - path * 7 : -mouseDist * 8 - 90;
-        const dangerScore = area * 3 + Math.min(8, nearestOtherDistance(s, nx)) * 16 - crampedPenalty;
-        const huntScore = pathScore + (ate ? 160 + eatGrowth * 35 : 0);
+        const intelligence = leaderIntelligence(s);
+        const densify = densifyDrive(s);
+        const safeNeed = bodyNeed + Math.round(SAFE_BODY_BUFFER * intelligence);
+        const crampedPenalty = Math.max(0, safeNeed - area) * (55 + intelligence * 150);
+        const escape = futureEscapeProfile(s, nx, future, d);
+        const tailReachable = canReachTail(s, nx, future);
+        const headRisk = rivalHeadRisk(s, nx);
+        const pathScore = Number.isFinite(path)
+          ? 180 - path * HUNT_DISTANCE_WEIGHT
+          : -mouseDist * HUNT_DISTANCE_WEIGHT - 120;
+        // Once the body is very long, extra empty acreage stops being valuable.
+        // Enough room to turn and reach the tail still scores fully; beyond that,
+        // the leader is free to fold into denser parallel lanes.
+        const spaceCeiling = safeNeed * (3.2 - densify * 1.35);
+        const usefulArea = Math.min(area, spaceCeiling);
+        const exitFreedom = 1 - densify * 0.55;
+        const dangerScore = usefulArea * 3
+          + Math.min(8, nearestOtherDistance(s, nx)) * 16
+          + escape.exits * (24 + intelligence * 54) * exitFreedom
+          + Math.min(usefulArea, escape.bestArea) * intelligence * 1.8
+          + (tailReachable ? 45 * intelligence : -220 * intelligence)
+          - headRisk * (0.7 + intelligence * 1.8)
+          - crampedPenalty;
+        const densityScore = densify
+          * Math.max(0, DENSITY_CLEARANCE - olderBodyClearance(future, nx))
+          * DENSITY_REWARD;
+        const huntScore = pathScore + (ate ? FOOD_CAPTURE_BONUS + eatGrowth * 45 : 0);
         const trapScore = boxingScore(s, nx, future);
         const edgePressure = Math.max(0, 2 - borderDistance(h));
         const edgeRelief = Math.max(0, borderDistance(nx) - borderDistance(h));
         const edgeScore = edgePressure * edgeRelief * EDGE_RELIEF_WEIGHT;
         const aggression = effectiveAggression(s);
-        return huntScore * aggression + dangerScore * (1 - aggression) + trapScore * (0.12 + aggression * 0.1) + edgeScore + Math.random() * 0.01;
+        // Aggression must remain a real tradeoff. Leader intelligence still
+        // rejects sealed traps, but no longer overwhelms every step toward food.
+        const survivalWeight = 0.14 + (1 - aggression) * 0.7 + intelligence * 0.55;
+        return huntScore * aggression + dangerScore * survivalWeight + densityScore
+          + trapScore * (0.12 + aggression * 0.1) + edgeScore + Math.random() * 0.01;
       }
 
       function hitSelf(s, p) {
-        return s.body.slice(1).some(b => b.x === p.x && b.y === p.y);
+        const tailVacates = s.grow <= 0;
+        const end = tailVacates ? -1 : s.body.length;
+        return s.body.slice(1, end).some(b => b.x === p.x && b.y === p.y);
       }
 
       function hitOtherSnake(s, p, moving = new Set()) {
         return snakes.some(other => {
           if (other === s) return false;
-          const body = moving.has(other) ? other.body.slice(1) : other.body;
+          const body = moving.has(other) && other.grow <= 0 ? other.body.slice(0, -1) : other.body;
           return body.some(b => b.x === p.x && b.y === p.y);
         });
       }
@@ -371,11 +473,38 @@
           color: colors.ring,
           accent: colors.accent || colors.ring,
           dark: colors.dark || C_CLOT,
-          bone: colors.bone || C_BONE,
           seed: Math.random() * 1000,
-          spread: rand(0.85, 1.25),
+          spread: rand(0.92, 1.2),
+          smears: [],
         });
         while (pools.length > MAX_POOLS) pools.shift();
+      }
+
+      function smearPoolsAt(p, dir) {
+        for (const pool of pools) {
+          // Watercolor extends slightly beyond its grid center, so grazing an
+          // adjacent corpse still drags pigment even without an exact cell hit.
+          const touches = pool.body.some(b => {
+            const dx = b.x - p.x, dy = b.y - p.y;
+            return dx * dx + dy * dy <= 1;
+          });
+          if (!touches) continue;
+
+          const previous = pool.smears[pool.smears.length - 1];
+          if (previous && sameCell(previous, p) && previous.dx === dir.x && previous.dy === dir.y) {
+            previous.strength = Math.min(1.6, previous.strength + 0.22);
+            continue;
+          }
+
+          pool.smears.push({
+            x: p.x,
+            y: p.y,
+            dx: dir.x,
+            dy: dir.y,
+            strength: rand(0.72, 1.08),
+          });
+          while (pool.smears.length > MAX_SMEARS_PER_POOL) pool.smears.shift();
+        }
       }
 
       // ---- one grid tick --------------------------------------------------
@@ -405,7 +534,10 @@
             if (dead.has(a) || dead.has(b)) continue;
             const an = plans.get(a).nx, bn = plans.get(b).nx;
             const aHead = a.body[0], bHead = b.body[0];
-            if (sameCell(an, bn) || (sameCell(an, bHead) && sameCell(bn, aHead))) dead.add(pick([a, b]));
+            if (sameCell(an, bn) || (sameCell(an, bHead) && sameCell(bn, aHead))) {
+              if (a.body.length === b.body.length) dead.add(pick([a, b]));
+              else dead.add(a.body.length < b.body.length ? a : b);
+            }
           }
         }
 
@@ -418,9 +550,10 @@
           const { nx } = plans.get(s);
           const ate = !dead.size && sameCell(nx, mouse);
           s.body.unshift(nx);
+          smearPoolsAt(nx, s.dir);
           if (ate) {
             s.eatStreak = nextEatStreak(s);
-            s.grow += growthForStreak(s.eatStreak);
+            s.grow += growthForStreak(s.eatStreak, s.body.length);
             mouseEaten = true;
             eater = s;
           }
@@ -453,17 +586,42 @@
         ctx.fillRect(cx - sz / 2, cy - sz / 2, sz, sz);
       }
 
+      function traceSmoothPath(points) {
+        if (!points.length) return;
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        if (points.length === 1) return;
+        if (points.length === 2) {
+          ctx.lineTo(points[1].x, points[1].y);
+          return;
+        }
+        for (let i = 1; i < points.length - 1; i++) {
+          const p = points[i], n = points[i + 1];
+          ctx.quadraticCurveTo(p.x, p.y, (p.x + n.x) / 2, (p.y + n.y) / 2);
+        }
+        const last = points[points.length - 1];
+        ctx.lineTo(last.x, last.y);
+      }
+
       function strokePath(points, color, width, glow, glowColor) {
         ctx.shadowColor = glowColor;
         ctx.shadowBlur = glow;
         ctx.strokeStyle = color;
         ctx.lineWidth = width;
-        ctx.lineCap = 'square';
+        ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        traceSmoothPath(points);
         ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+
+      function circleAt(cx, cy, radius, color, glow = 0, glowColor = GLOW) {
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = glow;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fill();
         ctx.shadowBlur = 0;
       }
 
@@ -476,156 +634,89 @@
         return x - Math.floor(x);
       }
 
-      function brushUnit() {
-        return Math.max(2, Math.round(CELL * 0.09));
-      }
-
-      function brushRect(cx, cy, w, h, rgb, alpha) {
-        if (alpha <= 0) return;
-        const unit = brushUnit();
-        const x = Math.round((cx - w / 2) / unit) * unit;
-        const y = Math.round((cy - h / 2) / unit) * unit;
-        const ww = Math.max(unit, Math.round(w / unit) * unit);
-        const hh = Math.max(unit, Math.round(h / unit) * unit);
-        ctx.fillStyle = rgba(rgb, Math.min(1, alpha));
-        ctx.fillRect(x, y, ww, hh);
-      }
-
-      function drawBrushLayer(pool, points, rgb, alpha, acrossScale, alongScale, seedOffset, chance = 1) {
-        if (points.length < 2) return;
-        const stepSize = Math.max(brushUnit(), CELL * 0.17);
-        for (let i = 1; i < points.length; i++) {
-          const a = points[i - 1], b = points[i];
-          const dx = b.x - a.x, dy = b.y - a.y;
-          const len = Math.hypot(dx, dy);
-          if (len <= 0) continue;
-          const dirx = dx / len, diry = dy / len;
-          const nx = -diry, ny = dirx;
-          const horizontal = Math.abs(dx) >= Math.abs(dy);
-          const count = Math.max(1, Math.ceil(len / stepSize));
-
-          for (let k = 0; k <= count; k++) {
-            const stamp = i * 131 + k * 17;
-            if (hash01(pool.seed + seedOffset, stamp) > chance) continue;
-            const u = k / count;
-            const wander = (hash01(pool.seed + seedOffset + 7, stamp) - 0.5) * CELL * acrossScale * 0.78;
-            const chatter = (hash01(pool.seed + seedOffset + 13, stamp) - 0.5) * CELL * 0.2;
-            const cx = a.x + dx * u + nx * wander + dirx * chatter;
-            const cy = a.y + dy * u + ny * wander + diry * chatter;
-            const across = CELL * acrossScale * (0.72 + hash01(pool.seed + seedOffset + 19, stamp) * 0.62) * pool.spread;
-            const along = CELL * alongScale * (0.7 + hash01(pool.seed + seedOffset + 23, stamp) * 0.9);
-            const a2 = alpha * (0.78 + hash01(pool.seed + seedOffset + 29, stamp) * 0.32);
-            brushRect(cx, cy, horizontal ? along : across, horizontal ? across : along, rgb, a2);
-          }
-        }
-      }
-
-      function drawDryBristles(pool, points, depth) {
-        if (points.length < 2) return;
-        const baseAlpha = 0.22 + depth * 0.22;
-        const stepSize = Math.max(brushUnit(), CELL * 0.3);
-        for (let i = 1; i < points.length; i++) {
-          const a = points[i - 1], b = points[i];
-          const dx = b.x - a.x, dy = b.y - a.y;
-          const len = Math.hypot(dx, dy);
-          if (len <= 0) continue;
-          const dirx = dx / len, diry = dy / len;
-          const nx = -diry, ny = dirx;
-          const horizontal = Math.abs(dx) >= Math.abs(dy);
-          const count = Math.max(1, Math.ceil(len / stepSize));
-
-          for (let k = 0; k <= count; k++) {
-            const stamp = i * 173 + k * 31;
-            if (hash01(pool.seed + 503, stamp) < 0.38) continue;
-            const u = k / count;
-            const side = hash01(pool.seed + 509, stamp) > 0.5 ? 1 : -1;
-            const reach = CELL * (0.3 + hash01(pool.seed + 521, stamp) * 0.72) * pool.spread;
-            const cx = a.x + dx * u + nx * side * reach;
-            const cy = a.y + dy * u + ny * side * reach;
-            const long = CELL * (0.18 + hash01(pool.seed + 541, stamp) * 0.28);
-            const thin = Math.max(brushUnit(), CELL * (0.045 + hash01(pool.seed + 547, stamp) * 0.06));
-            const rgb = hash01(pool.seed + 557, stamp) > 0.72 ? pool.accent : pool.color;
-            brushRect(cx, cy, horizontal ? thin : long, horizontal ? long : thin, rgb, baseAlpha);
-          }
-        }
-      }
-
-      function drawBrushChips(pool, points, depth) {
-        const chipAlpha = 0.24 + depth * 0.24;
-        for (let i = 0; i < points.length; i++) {
-          const p = points[i];
-          const chips = 2 + ((hash01(pool.seed + 601, i) * 4) | 0);
-          for (let j = 0; j < chips; j++) {
-            const stamp = i * 97 + j * 29;
-            const a = hash01(pool.seed + 607, stamp) * Math.PI * 2;
-            const r = CELL * (0.38 + hash01(pool.seed + 613, stamp) * 0.86) * pool.spread;
-            const size = CELL * (0.08 + hash01(pool.seed + 617, stamp) * 0.18);
-            const rgbRoll = hash01(pool.seed + 619, stamp);
-            const rgb = rgbRoll > 0.78 ? pool.accent : rgbRoll < 0.2 ? pool.dark : pool.color;
-            brushRect(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, size * 1.4, size, rgb, chipAlpha * (0.65 + rgbRoll * 0.35));
-          }
-        }
-      }
-
-      function drawStain(pool, points, depth) {
-        const ageAlpha = 0.5 + depth * 0.28;
-        ctx.shadowBlur = 0;
-        drawBrushLayer(pool, points, pool.dark, ageAlpha * 0.78, 1.18, 0.52, 211);
-        drawBrushLayer(pool, points, pool.color, ageAlpha * 0.82, 0.82, 0.42, 307, 0.96);
-        drawBrushLayer(pool, points, pool.accent, ageAlpha * 0.5, 0.38, 0.34, 401, 0.64);
-        drawBrushLayer(pool, points, pool.dark, ageAlpha * 0.62, 0.28, 0.22, 463, 0.45);
-        drawDryBristles(pool, points, depth);
-        drawBrushChips(pool, points, depth);
-      }
-
-      function drawBones(pool, points, depth) {
-        if (points.length < 2) return;
-        const alpha = 0.26 + depth * 0.24;
-
-        for (let i = 1; i < points.length; i++) {
-          const a = points[i - 1], b = points[i];
-          const dx = b.x - a.x, dy = b.y - a.y;
-          const len = Math.hypot(dx, dy);
-          if (len <= 0) continue;
-          const horizontal = Math.abs(dx) >= Math.abs(dy);
-          const count = Math.max(1, Math.ceil(len / (CELL * 0.38)));
-          for (let k = 0; k <= count; k++) {
-            const stamp = i * 197 + k * 37;
-            if (hash01(pool.seed + 701, stamp) < 0.16) continue;
-            const u = k / count;
-            const cx = a.x + dx * u + (hash01(pool.seed + 709, stamp) - 0.5) * CELL * 0.12;
-            const cy = a.y + dy * u + (hash01(pool.seed + 719, stamp) - 0.5) * CELL * 0.12;
-            const long = CELL * (0.14 + hash01(pool.seed + 727, stamp) * 0.22);
-            const thin = Math.max(brushUnit(), CELL * (0.055 + hash01(pool.seed + 733, stamp) * 0.04));
-            const rgb = hash01(pool.seed + 739, stamp) > 0.78 ? C_BONE_HOT : (pool.bone || C_BONE);
-            brushRect(cx, cy, horizontal ? long : thin, horizontal ? thin : long, rgb, alpha * 0.72);
-          }
-        }
-
-        for (let i = 1; i < points.length - 1; i += 2) {
-          const prev = points[i - 1], cur = points[i], next = points[i + 1];
+      function watercolorPath(pool, points, pass, wobble = 0.18, sideBias = 0) {
+        return points.map((p, i) => {
+          const prev = points[Math.max(0, i - 1)], next = points[Math.min(points.length - 1, i + 1)];
           const dx = next.x - prev.x, dy = next.y - prev.y;
           const len = Math.hypot(dx, dy) || 1;
           const nx = -dy / len, ny = dx / len;
-          const horizontal = Math.abs(dx) >= Math.abs(dy);
-          const rib = CELL * (0.22 + hash01(pool.seed + 751, i) * 0.22);
-          const pieces = 2 + ((hash01(pool.seed + 757, i) * 3) | 0);
+          const across = sideBias + (hash01(pool.seed + pass * 47, i * 19 + 3) - 0.5) * CELL * wobble;
+          const along = (hash01(pool.seed + pass * 59, i * 23 + 7) - 0.5) * CELL * wobble * 0.24;
+          let x = p.x + nx * across + (dx / len) * along;
+          let y = p.y + ny * across + (dy / len) * along;
+          let dragX = 0, dragY = 0;
 
-          for (const side of [-1, 1]) {
-            for (let j = 1; j <= pieces; j++) {
-              const f = j / pieces;
-              const jitter = (hash01(pool.seed + 761 + side, i * 11 + j) - 0.5) * CELL * 0.1;
-              const cx = cur.x + nx * side * rib * f + (dx / len) * jitter;
-              const cy = cur.y + ny * side * rib * f + (dy / len) * jitter;
-              const long = CELL * (0.1 + hash01(pool.seed + 769, i * 13 + j) * 0.12);
-              const thin = Math.max(brushUnit(), CELL * 0.06);
-              brushRect(cx, cy, horizontal ? thin : long, horizontal ? long : thin, pool.bone || C_BONE, alpha * (0.52 + f * 0.24));
-            }
+          // Each translucent pass catches a different amount of the drag. The
+          // low-drag passes retain the old silhouette while the others feather
+          // forward, which reads as wet pigment smeared by a passing body.
+          for (let si = 0; si < pool.smears.length; si++) {
+            const smear = pool.smears[si];
+            const sx = OX + (smear.x + 0.5) * CELL;
+            const sy = OY + (smear.y + 0.5) * CELL;
+            const distance = Math.hypot(p.x - sx, p.y - sy) / CELL;
+            let influence = Math.max(0, 1 - distance / 1.7);
+            if (influence <= 0) continue;
+            influence *= influence;
+            const passDrag = 0.12 + hash01(pool.seed + pass * 83, si * 29 + 17) * 1.02;
+            const pull = CELL * smear.strength * influence * passDrag;
+            dragX += smear.dx * pull;
+            dragY += smear.dy * pull;
           }
 
-          brushRect(cur.x, cur.y, CELL * 0.14, CELL * 0.1, C_BONE_HOT, alpha * 0.58);
-        }
+          const dragLength = Math.hypot(dragX, dragY);
+          const maxDrag = CELL * 1.9;
+          if (dragLength > maxDrag) {
+            dragX *= maxDrag / dragLength;
+            dragY *= maxDrag / dragLength;
+          }
+          x += dragX;
+          y += dragY;
+          return { x, y };
+        });
+      }
+
+      function washStroke(points, rgb, width, alpha, blur = 0) {
+        ctx.strokeStyle = rgba(rgb, alpha);
+        ctx.lineWidth = width;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.filter = blur > 0 ? `blur(${blur}px)` : 'none';
+        traceSmoothPath(points);
+        ctx.stroke();
+      }
+
+      function drawWatercolorMark(pool, points, depth) {
+        if (points.length < 2) return;
+        const freshness = 0.74 + depth * 0.26;
+        ctx.save();
         ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'screen';
+
+        // One wet underwash gives the whole body a shared silhouette; the
+        // translucent passes below bloom where separate deaths cross.
+        washStroke(watercolorPath(pool, points, 1, 0.12), pool.dark, CELL * 1.34 * pool.spread, 0.16 * freshness, CELL * 0.16);
+        washStroke(watercolorPath(pool, points, 2, 0.1), pool.color, CELL * 1.14 * pool.spread, 0.13 * freshness, CELL * 0.08);
+
+        for (let pass = 0; pass < 8; pass++) {
+          const roll = hash01(pool.seed + 311, pass);
+          const rgb = roll > 0.76 ? pool.accent : roll < 0.14 ? pool.dark : pool.color;
+          const width = CELL * pool.spread * (0.7 + hash01(pool.seed + 337, pass) * 0.34);
+          const alpha = (0.045 + hash01(pool.seed + 349, pass) * 0.035) * freshness;
+          washStroke(watercolorPath(pool, points, 20 + pass, 0.23), rgb, width, alpha, pass < 2 ? 0.7 : 0);
+        }
+
+        // Pigment gathers softly at the two brush edges, while a few continuous
+        // bristle trails keep each corpse legible as one gesture rather than stamps.
+        for (const side of [-1, 1]) {
+          const edge = side * CELL * 0.42 * pool.spread;
+          washStroke(watercolorPath(pool, points, 60 + side, 0.09, edge), pool.accent, CELL * 0.07, 0.13 * freshness, 0.5);
+          washStroke(watercolorPath(pool, points, 70 + side, 0.12, edge * 0.88), pool.color, CELL * 0.12, 0.1 * freshness);
+        }
+        for (let bristle = 0; bristle < 4; bristle++) {
+          const side = (hash01(pool.seed + 401, bristle) - 0.5) * CELL * 0.74;
+          washStroke(watercolorPath(pool, points, 90 + bristle, 0.12, side), pool.accent, Math.max(0.7, CELL * 0.025), 0.07 * freshness);
+        }
+        ctx.restore();
       }
 
       function drawPools() {
@@ -633,12 +724,7 @@
           const pool = pools[i];
           const depth = pools.length <= 1 ? 1 : i / (pools.length - 1);
           const points = pool.body.map(cellCenter);
-          drawStain(pool, points, depth);
-        }
-        for (let i = 0; i < pools.length; i++) {
-          const pool = pools[i];
-          const depth = pools.length <= 1 ? 1 : i / (pools.length - 1);
-          drawBones(pool, pool.body.map(cellCenter), depth);
+          drawWatercolorMark(pool, points, depth);
         }
         ctx.shadowBlur = 0;
         ctx.setLineDash([]);
@@ -654,7 +740,7 @@
       }
 
       function render() {
-        // ink-dark Prussian ground
+        // almost-black cavern ground
         ctx.shadowBlur = 0;
         ctx.fillStyle = C_BG; ctx.fillRect(0, 0, W, H);
 
@@ -683,11 +769,11 @@
           strokePath(path, colors.head, CELL * 0.92, 12, colors.glow);
           strokePath(path, colors.body, CELL * 0.62, 5, colors.glow);
           const head = points[0];
-          blockAt(head.x, head.y, colors.head, CELL * 0.14, 14, colors.glow);
-          ctx.shadowBlur = 0; ctx.fillStyle = C_BG;            // two dark eyes facing travel
+          circleAt(head.x, head.y, CELL * 0.38, colors.head, 14, colors.glow);
+          ctx.shadowBlur = 0;                                  // two dark eyes facing travel
           const ex = head.x + s.dir.x * CELL * 0.18, ey = head.y + s.dir.y * CELL * 0.18, e = Math.max(1, CELL * 0.1);
-          ctx.fillRect(ex - s.dir.y * CELL * 0.16 - e / 2, ey - s.dir.x * CELL * 0.16 - e / 2, e, e);
-          ctx.fillRect(ex + s.dir.y * CELL * 0.16 - e / 2, ey + s.dir.x * CELL * 0.16 - e / 2, e, e);
+          circleAt(ex - s.dir.y * CELL * 0.15, ey - s.dir.x * CELL * 0.15, e * 0.52, C_BG);
+          circleAt(ex + s.dir.y * CELL * 0.15, ey + s.dir.x * CELL * 0.15, e * 0.52, C_BG);
         }
 
         // soft vignette

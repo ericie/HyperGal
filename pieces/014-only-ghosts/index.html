@@ -45,14 +45,14 @@
 
       const BASE_MAZE = [
         '#################',
-        '#...............#',
-        '#.#############.#',
-        '#.#############.#',
-        '#.#############.#',
-        '#.#############.#',
-        '#.#############.#',
-        '#.#############.#',
-        '#.#############.#',
+        '#.....#...#.....#',
+        '#.###.#.#.#.###.#',
+        '#.#CC...#...CC#.#',
+        '#.#CC.#####.CC#.#',
+        '#.....#...#.....#',
+        '#.###.#.#.#.###.#',
+        '#.#CC...#...CC#.#',
+        '#.#CC.#####.CC#.#',
         '#...............#',
         '#################',
       ];
@@ -70,6 +70,10 @@
         wallEdge: '#244dff',
         wallEdgeSoft: 'rgba(69, 103, 255, .28)',
         gate: 'rgba(255, 153, 218, .82)',
+        changeFloor: '#23122f',
+        changeFloorHot: '#371748',
+        changeEdge: '#ff72d0',
+        changeInk: '#ffd6f2',
         pellet: '#ffdf82',
         fruit: '#ff3b7d',
         fruitStem: '#4dff9f',
@@ -77,7 +81,7 @@
         eye: '#f9fbff',
         pupil: '#263bff',
         text: 'rgba(245, 247, 255, .78)',
-        sight: 'rgba(255, 255, 255, .7)',
+        alarm: '#ff84da',
       };
 
       const AGENT_SPECS = [
@@ -105,13 +109,14 @@
       let maze = BASE_MAZE;
       let openCells = [];
       let foodCells = [];
+      let changingCells = [];
+      let changingRooms = [];
       let agents = [];
       let pellets = new Map();
       let pelletCount = 0;
       let fruit = null;
       let nextFruitAt = 0;
       let particles = [];
-      let sightLines = [];
       let boardClears = 0;
       let eatenPellets = 0;
       let transformations = 0;
@@ -165,7 +170,6 @@
         transformations = 0;
         boardClears = 0;
         particles = [];
-        sightLines = [];
         fruit = null;
         nextFruitAt = rand(7, 14);
         resizeCanvas();
@@ -240,12 +244,44 @@
       function rebuildCellCaches() {
         openCells = [];
         foodCells = [];
+        changingCells = [];
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS; c++) {
             if (isOpenCell(c, r)) openCells.push({ c, r });
             if (maze[r][c] === '.' || maze[r][c] === 'o') foodCells.push({ c, r });
+            if (maze[r][c] === 'C') changingCells.push({ c, r });
           }
         }
+        changingRooms = collectChangingRooms();
+      }
+
+      function collectChangingRooms() {
+        const rooms = [];
+        const seen = new Set();
+        for (const start of changingCells) {
+          if (seen.has(keyOf(start.c, start.r))) continue;
+          const cells = [];
+          const q = [start];
+          seen.add(keyOf(start.c, start.r));
+          for (let head = 0; head < q.length; head++) {
+            const p = q[head];
+            cells.push(p);
+            for (const d of DIRS) {
+              const c = p.c + d.x;
+              const r = p.r + d.y;
+              const key = keyOf(c, r);
+              if (seen.has(key) || !isChangingCell(c, r)) continue;
+              seen.add(key);
+              q.push({ c, r });
+            }
+          }
+          const minC = Math.min(...cells.map((p) => p.c));
+          const maxC = Math.max(...cells.map((p) => p.c));
+          const minR = Math.min(...cells.map((p) => p.r));
+          const maxR = Math.max(...cells.map((p) => p.r));
+          rooms.push({ cells, minC, maxC, minR, maxR });
+        }
+        return rooms;
       }
 
       function seedPellets() {
@@ -279,14 +315,17 @@
           nextDir: null,
           target: null,
           state: spec.pac ? 'pac' : 'ghost',
+          originalState: spec.pac ? 'pac' : 'ghost',
           confidence: spec.pac ? .86 : rand(.22, .58),
           speedBias: rand(-.18, .18),
           huntUntil: 0,
           huntTargetId: null,
           threatId: null,
           transformAt: 0,
+          alarmStartedAt: 0,
           exploredCells: new Set(),
           exploreTarget: null,
+          lastDecisionCell: null,
           turnAt: 0,
           mouth: rand(0, TAU),
           wobble: rand(0, TAU),
@@ -300,6 +339,8 @@
           morphUntil: 0,
           morphFrom: null,
           morphPartnerId: null,
+          returnToPacAt: 0,
+          immunityUntil: 0,
         };
       }
 
@@ -321,6 +362,9 @@
         updateConfidence(dt);
         applyVisibilityRules();
         for (const a of agents) updateAgent(a, dt);
+        for (const a of agents) {
+          if (isReturningToPac(a) && isChangingAt(a.x, a.y)) becomePacInChangingRoom(a);
+        }
         for (const a of agents) eatAtCurrentCell(a);
         resolveCollisions();
         applyVisibilityRules();
@@ -351,8 +395,16 @@
         a.wobble += dt * (a.state === 'ghost' ? .45 : 3.4);
         if (a.state === 'ghost') markExplored(a);
 
-        if (atCellCenter(a) || !canContinue(a)) {
+        const speed = agentSpeed(a);
+        const centerTolerance = Math.max(.035, speed * dt * .58);
+        const currentCell = cellOf(a.x, a.y);
+        const currentKey = keyOf(currentCell.c, currentCell.r);
+        const reachedNewCenter = atCellCenter(a, centerTolerance) && a.lastDecisionCell !== currentKey;
+
+        if (reachedNewCenter || !canContinue(a)) {
           snapToCenter(a);
+          const snappedCell = cellOf(a.x, a.y);
+          a.lastDecisionCell = keyOf(snappedCell.c, snappedCell.r);
           if (now >= a.turnAt || !canContinue(a)) {
             a.target = pickTarget(a);
             a.nextDir = a.target ? firstDirToward(a, a.target) : null;
@@ -366,12 +418,11 @@
           }
         }
 
-        const speed = agentSpeed(a);
         let nx = a.x + a.dir.x * speed * dt;
         let ny = a.y + a.dir.y * speed * dt;
         if (nx < -0.05 && wrapRow(Math.floor(a.y))) nx = COLS - .05;
         if (nx > COLS + .05 && wrapRow(Math.floor(a.y))) nx = .05;
-        if (isOpenAt(nx, ny)) {
+        if (isOpenAtForAgent(a, nx, ny)) {
           a.x = nx;
           a.y = ny;
         } else {
@@ -386,13 +437,13 @@
           return 3.1 + fleeBoost + a.speedBias * .6;
         }
         const huntBoost = isHunting(a) ? .3 : 0;
-        return 1.35 + huntBoost + a.speedBias * .22;
+        return 1.9 + huntBoost + a.speedBias * .22;
       }
 
       function decisionDelay(a) {
         if (a.state === 'pac') return a.threatId !== null ? rand(.32, .56) : rand(.92, 1.42);
-        if (isHunting(a)) return rand(.8, 1.25);
-        return rand(2.2, 4);
+        if (isHunting(a)) return rand(.42, .72);
+        return rand(.78, 1.28);
       }
 
       function randomTurnChance(a) {
@@ -447,13 +498,15 @@
         markExplored(a);
         if (a.exploreTarget && !a.exploredCells.has(keyOf(a.exploreTarget.c, a.exploreTarget.r))) return a.exploreTarget;
         const start = cellOf(a.x, a.y);
-        const target = bfsNearest(start, (c, r) => isOpenCell(c, r) && !a.exploredCells.has(keyOf(c, r)));
+        const target = bfsNearest(start, (c, r) => isOpenCell(c, r) && !a.exploredCells.has(keyOf(c, r)), a);
         if (target) {
           a.exploreTarget = target;
           return target;
         }
         resetExploration(a);
-        return bfsNearest(start, (c, r) => isOpenCell(c, r) && !a.exploredCells.has(keyOf(c, r))) || openCells[randi(0, openCells.length - 1)];
+        const allowedCells = openCells.filter((p) => canAgentEnterCell(a, p.c, p.r));
+        return bfsNearest(start, (c, r) => isOpenCell(c, r) && !a.exploredCells.has(keyOf(c, r)), a)
+          || allowedCells[randi(0, allowedCells.length - 1)];
       }
 
       function pickTarget(a) {
@@ -464,9 +517,11 @@
 
         if (a.state === 'pac') {
           const threat = threatFor(a);
-          if (threat) return fleeTargetFrom(threat, a);
+          if (threat) return nearestChangingRoomTarget(a, threat);
           return nearestFoodTarget(a);
         }
+
+        if (isReturningToPac(a)) return nearestChangingRoomTarget(a, null);
 
         const visiblePac = nearestAgent(a, (b) => b.state === 'pac' && canSee(a, b));
         if (visiblePac) {
@@ -502,7 +557,7 @@
           if (nc < 0) nc = COLS - 1;
           if (nc >= COLS) nc = 0;
         }
-        return isOpenCell(nc, nr);
+        return canAgentEnterCell(a, nc, nr);
       }
 
       function oppositeDir(dir) {
@@ -515,9 +570,30 @@
         const result = bfsNearest(start, (c, r) => {
           const p = pellets.get(keyOf(c, r));
           return !!(p && p.alive);
-        });
+        }, a);
         if (result) return result;
         return foodCells[randi(0, foodCells.length - 1)];
+      }
+
+      function nearestChangingRoomTarget(pac, threat) {
+        const start = cellOf(pac.x, pac.y);
+        const threatCell = threat ? cellOf(threat.x, threat.y) : null;
+        let best = null;
+        let bestScore = Infinity;
+        for (const room of changingRooms) {
+          for (const p of room.cells) {
+            const pacDistance = pathDistanceCells(start, p);
+            const threatDistance = threatCell ? pathDistanceCells(threatCell, p) : Infinity;
+            if (!Number.isFinite(pacDistance)) continue;
+            const safety = Number.isFinite(threatDistance) ? Math.min(8, threatDistance) * .14 : 0;
+            const score = pacDistance - safety + rng() * .025;
+            if (score < bestScore) {
+              bestScore = score;
+              best = p;
+            }
+          }
+        }
+        return best || changingCells[0] || start;
       }
 
       function fleeTargetFrom(threat, seeker = null) {
@@ -528,6 +604,7 @@
         const awayDir = seeker ? dirAwayFrom(seeker, threat) : null;
         for (let i = 0; i < openCells.length; i++) {
           const p = openCells[i];
+          if (seeker && !canAgentEnterCell(seeker, p.c, p.r)) continue;
           const threatDistance = pathDistanceCells(threatCell, p);
           if (!Number.isFinite(threatDistance)) continue;
           const seekerDistance = seekerCell ? pathDistanceCells(seekerCell, p) : 0;
@@ -593,9 +670,10 @@
         const pac = agents.find((a) => a.state === 'pac');
         const ghost = agents.find((a) => a.state === 'ghost');
         if (!pac || !ghost) return;
+        if (now < pac.immunityUntil) return;
         if (gridDistance(pac.x, pac.y, ghost.x, ghost.y) <= 1.18) {
-          if (pac.threatId === null) spawnSightLine(pac, ghost, COLORS.sight);
-          becomeGhostFromThreat(pac, ghost);
+          if (pac.threatId === null) beginThreatResponse(pac, ghost);
+          if (isChangingAt(pac.x, pac.y)) becomeGhostFromThreat(pac, ghost);
         }
       }
 
@@ -604,14 +682,18 @@
         if (!pac) return;
         const ghost = agents.find((a) => a.state === 'ghost');
         if (!ghost) return;
+        if (now < pac.immunityUntil) {
+          clearHuntsFor(pac);
+          return;
+        }
 
         const threat = threatFor(pac);
         if (threat) {
-          if (now >= pac.transformAt) {
+          if (isChangingAt(pac.x, pac.y)) {
             becomeGhostFromThreat(pac, threat);
             return;
           }
-          steerPacAway(pac, threat);
+          steerPacToChangingRoom(pac, threat);
           setHuntTarget(threat, pac);
           return;
         }
@@ -648,22 +730,22 @@
 
       function beginThreatResponse(pac, ghost) {
         pac.threatId = ghost.id;
-        pac.transformAt = now + 1.08;
+        pac.transformAt = 0;
+        pac.alarmStartedAt = now;
         pac.seenBy = ghost.id;
         pac.seenFlash = .7;
-        steerPacAway(pac, ghost);
+        steerPacToChangingRoom(pac, ghost);
         setHuntTarget(ghost, pac);
         ghost.target = cellOf(pac.x, pac.y);
         ghost.nextDir = firstDirToward(ghost, ghost.target);
         ghost.turnAt = Math.min(ghost.turnAt, now + .24);
-        spawnSightLine(pac, ghost, COLORS.sight);
       }
 
-      function steerPacAway(pac, ghost) {
-        pac.target = fleeTargetFrom(ghost, pac);
-        const awayDir = dirAwayFrom(pac, ghost);
+      function steerPacToChangingRoom(pac, ghost) {
+        pac.target = nearestChangingRoomTarget(pac, ghost);
         const routeDir = firstDirToward(pac, pac.target);
-        pac.nextDir = canMoveDir(pac, awayDir) ? awayDir : routeDir || awayDir;
+        const awayDir = dirAwayFrom(pac, ghost);
+        pac.nextDir = routeDir || awayDir;
         if (canMoveDir(pac, pac.nextDir)) pac.dir = pac.nextDir;
         pac.turnAt = Math.min(pac.turnAt, now + .12);
       }
@@ -679,12 +761,15 @@
         pac.state = 'ghost';
         pac.threatId = null;
         pac.transformAt = 0;
+        pac.alarmStartedAt = 0;
         pac.confidence = .24;
         pac.morphFrom = 'pac';
         pac.morphStartedAt = now;
         pac.morphUntil = morphUntil;
         pac.morphPartnerId = ghost.id;
         pac.transformLockUntil = now + .95;
+        pac.returnToPacAt = now + rand(5.5, 8.5);
+        pac.immunityUntil = 0;
         pac.lastTransform = now;
         pac.seenBy = ghost.id;
         pac.seenFlash = .48;
@@ -692,6 +777,41 @@
         pac.target = fleeTargetFrom(ghost, pac);
         pac.nextDir = firstDirToward(pac, pac.target) || pac.dir;
         pac.turnAt = pac.transformLockUntil;
+      }
+
+      function isReturningToPac(a) {
+        return a.state === 'ghost'
+          && a.originalState === 'pac'
+          && a.returnToPacAt > 0
+          && now >= a.returnToPacAt;
+      }
+
+      function becomePacInChangingRoom(a) {
+        if (!isReturningToPac(a)) return;
+        const morphUntil = now + (REDUCED ? .01 : .72);
+        const otherGhost = agents.find((b) => b !== a && b.state === 'ghost');
+
+        transformations++;
+        a.state = 'pac';
+        a.returnToPacAt = 0;
+        a.threatId = null;
+        a.alarmStartedAt = 0;
+        a.confidence = .72;
+        a.morphFrom = 'ghost';
+        a.morphStartedAt = now;
+        a.morphUntil = morphUntil;
+        a.morphPartnerId = otherGhost ? otherGhost.id : null;
+        a.transformLockUntil = now + 1.2;
+        a.immunityUntil = a.transformLockUntil;
+        a.lastTransform = now;
+        a.seenBy = null;
+        a.seenFlash = .4;
+        clearHuntTarget(a);
+        clearHuntsFor(a);
+        resetExploration(a);
+        a.target = nearestFoodTarget(a);
+        a.nextDir = firstDirToward(a, a.target) || a.dir;
+        a.turnAt = a.transformLockUntil;
       }
 
       function canSee(viewer, target) {
@@ -750,10 +870,6 @@
           p.vy *= Math.pow(.08, dt);
           if (p.life <= 0) particles.splice(i, 1);
         }
-        for (let i = sightLines.length - 1; i >= 0; i--) {
-          sightLines[i].life -= dt * 1.7;
-          if (sightLines[i].life <= 0) sightLines.splice(i, 1);
-        }
       }
 
       function spawnParticle(x, y, color, speed, life) {
@@ -776,10 +892,6 @@
         for (let i = 0; i < n; i++) spawnParticle(x, y, color, speed * rand(.45, 1.25), rand(.32, .86));
       }
 
-      function spawnSightLine(a, b, color) {
-        sightLines.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, color, life: 1, maxLife: 1 });
-      }
-
       function draw() {
         ctx.fillStyle = COLORS.bg;
         ctx.fillRect(0, 0, W, H);
@@ -787,7 +899,7 @@
         drawMaze();
         drawPellets();
         drawFruit();
-        drawSightLines();
+        drawAlarmLine();
         drawAgents();
         drawParticles();
         drawFrameText();
@@ -828,6 +940,7 @@
         ctx.translate(ox, oy);
         ctx.fillStyle = COLORS.void;
         ctx.fillRect(0, 0, COLS * cellX, ROWS * cellY);
+        drawChangingRooms();
 
         ctx.fillStyle = COLORS.wall;
         for (let r = 0; r < ROWS; r++) {
@@ -887,6 +1000,37 @@
         ctx.restore();
       }
 
+      function drawChangingRooms() {
+        const pulse = REDUCED ? .45 : .5 + .5 * Math.sin(now * 3.2);
+        for (const room of changingRooms) {
+          for (const p of room.cells) {
+            const x = p.c * cellX;
+            const y = p.r * cellY;
+            ctx.fillStyle = (p.c + p.r) % 2 ? COLORS.changeFloor : COLORS.changeFloorHot;
+            ctx.globalAlpha = .82 + pulse * .12;
+            ctx.fillRect(x, y, cellX, cellY);
+
+            ctx.strokeStyle = COLORS.changeEdge;
+            ctx.globalAlpha = .48 + pulse * .34;
+            ctx.lineWidth = Math.max(1, cell * .055);
+            if (!isChangingCell(p.c, p.r - 1)) line(x, y, x + cellX, y);
+            if (!isChangingCell(p.c, p.r + 1)) line(x, y + cellY, x + cellX, y + cellY);
+            if (!isChangingCell(p.c - 1, p.r)) line(x, y, x, y + cellY);
+            if (!isChangingCell(p.c + 1, p.r)) line(x + cellX, y, x + cellX, y + cellY);
+          }
+
+          const centerX = (room.minC + room.maxC + 1) * cellX * .5;
+          const centerY = (room.minR + room.maxR + 1) * cellY * .5;
+          ctx.globalAlpha = .62 + pulse * .25;
+          ctx.fillStyle = COLORS.changeInk;
+          ctx.font = `700 ${Math.max(7, Math.floor(cell * .23))}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('CHANGE', centerX, centerY);
+        }
+        ctx.globalAlpha = 1;
+      }
+
       function line(x1, y1, x2, y2) {
         ctx.beginPath();
         ctx.moveTo(x1, y1);
@@ -931,20 +1075,57 @@
         ctx.restore();
       }
 
-      function drawSightLines() {
+      function drawAlarmLine() {
+        const pac = agents.find((a) => a.state === 'pac');
+        const ghost = agents.find((a) => a.state === 'ghost');
+        if (!pac || !ghost || pac.threatId !== ghost.id) return;
+        const freshlySeen = now - pac.alarmStartedAt < .72;
+        if (!freshlySeen && !hasCorridorLine(pac, ghost)) return;
+
+        const pacEye = pacEyeGeometry(pac, px(pac.x), py(pac.y), cell * .72).pupil;
+        const ghostY = py(ghost.y) + Math.sin(now * .72 + ghost.wobble) * cell * .075;
+        const ghostEyes = ghostEyeGeometry(ghost, px(ghost.x), ghostY, cell * .68).pupils;
+        const ghostEye = ghostEyes.reduce((best, eye) => {
+          if (!best) return eye;
+          return distanceSquared(pacEye, eye) < distanceSquared(pacEye, best) ? eye : best;
+        }, null);
+        if (!ghostEye) return;
+
+        const dx = ghostEye.x - pacEye.x;
+        const dy = ghostEye.y - pacEye.y;
+        const length = Math.hypot(dx, dy);
+        if (length < 1) return;
+        const nx = -dy / length;
+        const ny = dx / length;
+        const waves = clamp(Math.round(length / Math.max(34, cell * 1.25)), 3, 11);
+        const amplitude = Math.min(cell * .15, length * .055);
+        const phase = REDUCED ? 0 : now * 12;
+        const steps = Math.max(20, waves * 8);
+
         ctx.save();
         ctx.lineCap = 'round';
-        for (const s of sightLines) {
-          const a = clamp(s.life / s.maxLife, 0, 1);
-          ctx.globalAlpha = a * .72;
-          ctx.strokeStyle = s.color;
-          ctx.lineWidth = Math.max(1, cell * (.08 + (1 - a) * .05));
-          ctx.beginPath();
-          ctx.moveTo(px(s.ax), py(s.ay));
-          ctx.lineTo(px(s.bx), py(s.by));
-          ctx.stroke();
+        ctx.lineJoin = 'round';
+        ctx.shadowColor = COLORS.alarm;
+        ctx.shadowBlur = Math.max(3, cell * .16);
+        ctx.strokeStyle = COLORS.alarm;
+        ctx.lineWidth = Math.max(1.5, cell * .065);
+        ctx.globalAlpha = .9;
+        ctx.beginPath();
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const envelope = Math.sin(Math.PI * t);
+          const offset = Math.sin(t * waves * TAU - phase) * amplitude * envelope;
+          const x = lerp(pacEye.x, ghostEye.x, t) + nx * offset;
+          const y = lerp(pacEye.y, ghostEye.y, t) + ny * offset;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
         }
+        ctx.stroke();
         ctx.restore();
+      }
+
+      function distanceSquared(a, b) {
+        return (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
       }
 
       function drawAgents() {
@@ -958,9 +1139,20 @@
         const x = px(a.x);
         const y = py(a.y);
         const r = cell * .72;
+        const morphing = now < a.morphUntil && a.morphFrom === 'ghost';
+        const progress = morphing ? morphProgress(a) : 1;
 
         ctx.save();
-        drawConfidenceHalo(a, x, y, r * 1.12);
+        if (morphing) {
+          drawMorphEcho(a, x, y, r);
+          const ghostExit = 1 - clamp(progress / .7, 0, 1);
+          const emergence = .58 + progress * .42;
+          const eyesAlpha = 1 - clamp(progress / .42, 0, 1);
+          drawGhostBody(a, x, y, r * .94, ghostExit, emergence, 0, eyesAlpha);
+        }
+
+        const pacAlpha = morphing ? clamp((progress - .08) / .64, 0, 1) : 1;
+        drawConfidenceHalo(a, x, y, r * 1.12, pacAlpha);
         if (a.seenFlash > 0) {
           ctx.globalAlpha = .18 + a.seenFlash * .22;
           ctx.fillStyle = a.color;
@@ -968,7 +1160,7 @@
           ctx.arc(x, y, r * (1.55 + .12 * Math.sin(now * 8)), 0, TAU);
           ctx.fill();
         }
-        drawPacBody(a, x, y, r, 1, 0);
+        drawPacBody(a, x, y, r, pacAlpha, morphing ? 1 - progress : 0);
         ctx.restore();
       }
 
@@ -987,11 +1179,36 @@
         ctx.arc(x, y, r, angle + mouth, angle - mouth, false);
         ctx.closePath();
         ctx.fill();
+        drawPacEye(a, x, y, r, alpha);
+        ctx.restore();
+      }
 
-        ctx.fillStyle = a.color;
-        ctx.globalAlpha = alpha * .84;
+      function pacEyeGeometry(a, x, y, r) {
+        const angle = facingDir(a).angle;
+        const fx = Math.cos(angle);
+        const fy = Math.sin(angle);
+        const eye = {
+          x: x + fx * r * .18,
+          y: y - r * .34,
+        };
+        return {
+          eye,
+          pupil: { x: eye.x + fx * r * .07, y: eye.y + fy * r * .055 },
+          angle: 0,
+        };
+      }
+
+      function drawPacEye(a, x, y, r, alpha) {
+        const geometry = pacEyeGeometry(a, x, y, r);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = COLORS.eye;
         ctx.beginPath();
-        ctx.arc(x - Math.sin(angle) * r * .34 + Math.cos(angle) * r * .10, y + Math.cos(angle) * r * .34 + Math.sin(angle) * r * .10, r * .11, 0, TAU);
+        ctx.ellipse(geometry.eye.x, geometry.eye.y, r * .17, r * .22, geometry.angle, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = COLORS.pupil;
+        ctx.beginPath();
+        ctx.arc(geometry.pupil.x, geometry.pupil.y, r * .082, 0, TAU);
         ctx.fill();
         ctx.restore();
       }
@@ -1077,20 +1294,30 @@
       }
 
       function drawAgentEyes(a, x, y, r, alpha = 1) {
-        const look = facingDir(a).angle;
-        const lx = Math.cos(look) * r * .12;
-        const ly = Math.sin(look) * r * .12;
+        const geometry = ghostEyeGeometry(a, x, y, r);
         ctx.globalAlpha = alpha;
         ctx.fillStyle = COLORS.eye;
         ctx.beginPath();
-        ctx.ellipse(x - r * .33, y, r * .23, r * .30, 0, 0, TAU);
-        ctx.ellipse(x + r * .33, y, r * .23, r * .30, 0, 0, TAU);
+        for (const eye of geometry.eyes) ctx.ellipse(eye.x, eye.y, r * .23, r * .30, 0, 0, TAU);
         ctx.fill();
         ctx.fillStyle = COLORS.pupil;
         ctx.beginPath();
-        ctx.arc(x - r * .33 + lx, y + ly, r * .095, 0, TAU);
-        ctx.arc(x + r * .33 + lx, y + ly, r * .095, 0, TAU);
+        for (const pupil of geometry.pupils) ctx.arc(pupil.x, pupil.y, r * .095, 0, TAU);
         ctx.fill();
+      }
+
+      function ghostEyeGeometry(a, x, y, r) {
+        const look = facingDir(a).angle;
+        const lx = Math.cos(look) * r * .12;
+        const ly = Math.sin(look) * r * .12;
+        const eyes = [
+          { x: x - r * .33, y },
+          { x: x + r * .33, y },
+        ];
+        return {
+          eyes,
+          pupils: eyes.map((eye) => ({ x: eye.x + lx, y: eye.y + ly })),
+        };
       }
 
       function drawConfidenceHalo(a, x, y, r, alpha = 1) {
@@ -1149,8 +1376,8 @@
             const mode = now < a.transformLockUntil
               ? 'settle'
               : a.state === 'pac'
-                ? (a.threatId !== null ? 'flee' : 'seek')
-                : (isHunting(a) ? 'hunt' : 'explore');
+                ? (a.threatId !== null ? 'change' : 'seek')
+                : (isReturningToPac(a) ? 'return' : isHunting(a) ? 'hunt' : 'explore');
             return `${a.name.padEnd(6)} ${a.state.padEnd(5)} ${mode.padEnd(7)} explored ${a.exploredCells.size} @ ${Math.floor(a.x)},${Math.floor(a.y)}`;
           }),
         ];
@@ -1165,6 +1392,21 @@
         return true;
       }
 
+      function isChangingCell(c, r) {
+        return r >= 0 && r < ROWS && c >= 0 && c < COLS && maze[r][c] === 'C';
+      }
+
+      function isChangingAt(x, y) {
+        return isChangingCell(Math.floor(x), Math.floor(y));
+      }
+
+      function canAgentEnterCell(a, c, r) {
+        if (!isOpenCell(c, r)) return false;
+        if (!isChangingCell(c, r)) return true;
+        if (a.state === 'pac') return a.threatId !== null;
+        return isReturningToPac(a);
+      }
+
       function isOpenAt(x, y) {
         const r = Math.floor(y);
         let c = Math.floor(x);
@@ -1173,6 +1415,16 @@
           if (c >= COLS) c = 0;
         }
         return isOpenCell(c, r);
+      }
+
+      function isOpenAtForAgent(a, x, y) {
+        const r = Math.floor(y);
+        let c = Math.floor(x);
+        if (wrapRow(r)) {
+          if (c < 0) c = COLS - 1;
+          if (c >= COLS) c = 0;
+        }
+        return canAgentEnterCell(a, c, r);
       }
 
       function neighbors(c, r) {
@@ -1189,13 +1441,28 @@
         return out;
       }
 
-      function bfsNearest(start, predicate) {
+      function neighborsForAgent(a, c, r) {
+        const out = [];
+        for (const d of DIRS) {
+          let nc = c + d.x;
+          const nr = r + d.y;
+          if (wrapRow(r)) {
+            if (nc < 0) nc = COLS - 1;
+            if (nc >= COLS) nc = 0;
+          }
+          if (canAgentEnterCell(a, nc, nr)) out.push({ c: nc, r: nr, dir: d });
+        }
+        return out;
+      }
+
+      function bfsNearest(start, predicate, agent = null) {
         const q = [start];
         const seen = new Set([keyOf(start.c, start.r)]);
         for (let head = 0; head < q.length; head++) {
           const p = q[head];
           if (predicate(p.c, p.r)) return p;
-          for (const n of neighbors(p.c, p.r)) {
+          const next = agent ? neighborsForAgent(agent, p.c, p.r) : neighbors(p.c, p.r);
+          for (const n of next) {
             const k = keyOf(n.c, n.r);
             if (seen.has(k)) continue;
             seen.add(k);
@@ -1227,7 +1494,7 @@
         if (!target || (start.c === target.c && start.r === target.r)) return null;
         const q = [];
         const seen = new Set([keyOf(start.c, start.r)]);
-        for (const n of neighbors(start.c, start.r)) {
+        for (const n of neighborsForAgent(a, start.c, start.r)) {
           const reverse = a.dir && n.dir.x === -a.dir.x && n.dir.y === -a.dir.y;
           const continuing = a.dir && n.dir.x === a.dir.x && n.dir.y === a.dir.y;
           const penalty = reverse && canContinue(a) ? 3.2 : continuing ? -.35 : .25;
@@ -1238,7 +1505,7 @@
         for (let head = 0; head < q.length; head++) {
           const p = q[head];
           if (p.c === target.c && p.r === target.r) return p.first;
-          for (const n of neighbors(p.c, p.r)) {
+          for (const n of neighborsForAgent(a, p.c, p.r)) {
             const k = keyOf(n.c, n.r);
             if (seen.has(k)) continue;
             seen.add(k);
@@ -1251,7 +1518,7 @@
       function legalDirsForAgent(a) {
         const c = Math.floor(a.x);
         const r = Math.floor(a.y);
-        return neighbors(c, r).map((n) => n.dir);
+        return neighborsForAgent(a, c, r).map((n) => n.dir);
       }
 
       function pickBestLegalDir(a, legal) {
@@ -1280,10 +1547,10 @@
         return best;
       }
 
-      function atCellCenter(a) {
+      function atCellCenter(a, tolerance = .035) {
         const c = Math.floor(a.x);
         const r = Math.floor(a.y);
-        return Math.abs(a.x - cellCenterX(c)) < .035 && Math.abs(a.y - cellCenterY(r)) < .035;
+        return Math.abs(a.x - cellCenterX(c)) < tolerance && Math.abs(a.y - cellCenterY(r)) < tolerance;
       }
 
       function snapToCenter(a) {
@@ -1303,7 +1570,7 @@
           if (nc < 0) nc = COLS - 1;
           if (nc >= COLS) nc = 0;
         }
-        return isOpenCell(nc, nr);
+        return canAgentEnterCell(a, nc, nr);
       }
 
       function dirFromVector(x, y) {

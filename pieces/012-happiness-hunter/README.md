@@ -14,6 +14,8 @@ traffic may or may not signal. Traffic avoids obstacles; if a car cannot move
 away safely, it stops until a lane opens. Cars do not drive through obstacles.
 The highway changes width as it scrolls, with wide five-lane sections
 collapsing into narrower two-lane bottlenecks and opening again.
+Alternating parcels of dark farmland move behind the narrower road, making the
+forward travel visible even when traffic is briefly still.
 
 Obstacles appear on the highway: construction, police cars, accidents, and
 road animals. The yellow car is the only car that scores: each gray car it

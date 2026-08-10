@@ -1,0 +1,961 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Nine still animal and military camouflage patterns change through a finely pixelated field."
+    />
+    <title>Camouflage · HyperGal</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #f7f3e8;
+        --dim: #aaa69d;
+        --panel: #11110f;
+        --rule: #4a4944;
+        --focus: #fff36d;
+      }
+
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #11110f;
+      }
+
+      body {
+        min-width: 320px;
+        color: var(--ink);
+        font-family: Arial, Helvetica, sans-serif;
+        overscroll-behavior: none;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        image-rendering: pixelated;
+        cursor: crosshair;
+        touch-action: manipulation;
+      }
+
+      .interface {
+        position: fixed;
+        z-index: 2;
+        right: max(12px, env(safe-area-inset-right));
+        bottom: max(12px, env(safe-area-inset-bottom));
+        left: max(12px, env(safe-area-inset-left));
+        display: flex;
+        align-items: stretch;
+        min-height: 54px;
+        border: 2px solid var(--panel);
+        background: var(--panel);
+        color: var(--ink);
+        user-select: none;
+      }
+
+      .identity {
+        display: flex;
+        width: 176px;
+        flex: 0 0 auto;
+        flex-direction: column;
+        justify-content: center;
+        padding: 8px 12px 7px;
+        border-right: 1px solid var(--rule);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+
+      .status {
+        margin: 5px 0 0;
+        overflow: hidden;
+        color: var(--dim);
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .patterns {
+        display: grid;
+        min-width: 0;
+        flex: 1 1 auto;
+        grid-template-columns: repeat(9, minmax(52px, 1fr));
+      }
+
+      .pattern {
+        position: relative;
+        min-width: 0;
+        border: 0;
+        border-right: 1px solid var(--rule);
+        padding: 23px 8px 7px;
+        overflow: hidden;
+        background: var(--panel);
+        color: var(--dim);
+        cursor: pointer;
+        font: 700 10px/1 Arial, Helvetica, sans-serif;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .pattern::before {
+        position: absolute;
+        top: 7px;
+        right: 8px;
+        left: 8px;
+        height: 8px;
+        background: var(--swatch);
+        content: "";
+        image-rendering: pixelated;
+      }
+
+      .pattern:hover { color: var(--ink); }
+
+      .pattern[aria-pressed="true"] {
+        background: var(--ink);
+        color: var(--panel);
+      }
+
+      .pattern[aria-pressed="true"]::before { background: var(--active-swatch); }
+
+      .pattern:focus-visible,
+      .pause:focus-visible,
+      canvas:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: -3px;
+      }
+
+      .pause {
+        display: grid;
+        width: 58px;
+        flex: 0 0 auto;
+        place-items: center;
+        border: 0;
+        padding: 0;
+        background: var(--panel);
+        color: var(--ink);
+        cursor: pointer;
+        font: 800 17px/1 Arial, Helvetica, sans-serif;
+      }
+
+      .pause:hover { background: #2b2a26; }
+
+      .hint {
+        position: fixed;
+        z-index: 2;
+        top: max(12px, env(safe-area-inset-top));
+        left: max(12px, env(safe-area-inset-left));
+        margin: 0;
+        padding: 7px 9px;
+        background: var(--panel);
+        color: var(--ink);
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1.1;
+        pointer-events: none;
+      }
+
+      body.chrome-hidden .interface,
+      body.chrome-hidden .hint { display: none; }
+      body.chrome-hidden canvas { cursor: none; }
+
+      @media (max-width: 700px) {
+        .interface {
+          right: max(8px, env(safe-area-inset-right));
+          bottom: max(8px, env(safe-area-inset-bottom));
+          left: max(8px, env(safe-area-inset-left));
+          flex-wrap: wrap;
+        }
+
+        .identity {
+          width: calc(100% - 50px);
+          height: 48px;
+          border-right: 1px solid var(--rule);
+          border-bottom: 1px solid var(--rule);
+        }
+
+        .patterns {
+          order: 3;
+          width: 100%;
+          flex-basis: 100%;
+          grid-template-columns: repeat(3, 1fr);
+        }
+
+        .pattern {
+          padding: 21px 4px 6px;
+          font-size: 9px;
+          text-align: center;
+        }
+
+        .pattern::before { right: 4px; left: 4px; }
+
+        .pause { width: 50px; height: 48px; border-bottom: 1px solid var(--rule); }
+        .hint { display: none; }
+      }
+
+      @media (max-width: 430px) {
+        .pattern { font-size: 0; }
+        .pattern::after {
+          content: attr(data-short);
+          font-size: 10px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        canvas { cursor: pointer; }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage" tabindex="0" aria-label="Still pixel camouflage. Click or press Enter to show the next pattern."></canvas>
+
+    <p class="hint">Click the field to change pattern</p>
+
+    <div class="interface" aria-label="Camouflage controls">
+      <div class="identity">
+        <h1>Camouflage</h1>
+        <p class="status" id="status" aria-live="polite">01 / Zebra</p>
+      </div>
+      <div class="patterns" id="patterns"></div>
+      <button class="pause" id="pause" type="button" aria-label="Pause automatic transitions" aria-pressed="false">Ⅱ</button>
+    </div>
+
+    <script>
+      (() => {
+        'use strict';
+
+        const canvas = document.getElementById('stage');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const buffer = document.createElement('canvas');
+        const bctx = buffer.getContext('2d', { alpha: false });
+        const patternsEl = document.getElementById('patterns');
+        const pauseEl = document.getElementById('pause');
+        const statusEl = document.getElementById('status');
+        const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+
+        const HOLD_MS = 9000;
+        const MORPH_MS = 2300;
+        const COLOR_PHASE = 0.28;
+        const FRAME_MS = 1000 / 30;
+
+        let width = 1;
+        let height = 1;
+        let pixelSize = 8;
+        let imageData;
+        let current = 0;
+        let next = 1;
+        let phase = 'hold';
+        let phaseStarted = performance.now();
+        let pausedAt = 0;
+        let isPaused = false;
+        let reducedMotion = motionQuery.matches;
+        let lastFrame = 0;
+        let seed = Math.random() * 1000;
+        let fieldMorph = null;
+
+        const palettes = [
+          {
+            name: 'Zebra', short: 'Z', swatch: 'linear-gradient(90deg,#eee9d9 0 26%,#141413 26% 39%,#eee9d9 39% 61%,#141413 61% 75%,#eee9d9 75%)',
+            active: '#141413', colors: [[17, 18, 17], [239, 236, 224]], sample: zebra,
+          },
+          {
+            name: 'Leopard', short: 'L', swatch: 'linear-gradient(90deg,#d69a2d 0 35%,#3b2513 35% 55%,#e7bd5a 55%)',
+            active: '#b87522', colors: [[39, 25, 15], [184, 116, 38], [216, 158, 65]], sample: leopard,
+          },
+          {
+            name: 'Ocelot', short: 'O', swatch: 'linear-gradient(90deg,#d1a36f 0 22%,#1b1711 22% 38%,#d1a36f 38% 55%,#1b1711 55% 78%,#d1a36f 78%)',
+            active: '#1b1711', colors: [[25, 21, 15], [211, 166, 115]], sample: ocelot,
+          },
+          {
+            name: 'Tiger', short: 'T', swatch: 'linear-gradient(90deg,#e16b19 0 42%,#25170f 42% 61%,#f39a2f 61%)',
+            active: '#c44b0e', colors: [[31, 20, 14], [222, 103, 26]], sample: tiger,
+          },
+          {
+            name: 'Giraffe', short: 'G', swatch: 'linear-gradient(90deg,#efe0a6 0 24%,#9b5421 24% 67%,#d8913d 67%)',
+            active: '#99501f', colors: [[109, 58, 31], [132, 68, 33], [239, 222, 181]], sample: giraffe,
+          },
+          {
+            name: 'Fawn', short: 'F', swatch: 'linear-gradient(90deg,#9f632f 0 34%,#f6eaca 34% 49%,#bc8044 49%)',
+            active: '#9c6233', colors: [[166, 99, 56], [236, 219, 185], [247, 235, 207]], sample: fawn,
+          },
+          {
+            name: 'Gaboon', short: 'GV', swatch: 'linear-gradient(90deg,#cdbd91 0 20%,#513b34 20% 39%,#1d1a17 39% 54%,#9f7168 54% 72%,#d1ac58 72%)',
+            active: '#513b34', colors: [[27, 24, 21], [68, 49, 39], [76, 52, 48], [119, 91, 68], [158, 103, 96], [207, 168, 81], [207, 190, 147]], sample: gaboon,
+          },
+          {
+            name: 'Woodland', short: 'W', swatch: 'linear-gradient(90deg,#83784a 0 24%,#53633a 24% 50%,#293720 50% 77%,#181a13 77%)',
+            active: '#3f4d2b', colors: [[24, 27, 19], [42, 61, 32], [82, 99, 55], [126, 105, 61]], sample: woodland,
+          },
+          {
+            name: 'Desert', short: 'D', swatch: 'linear-gradient(90deg,#d3bb82 0 28%,#aaa36f 28% 49%,#83552f 49% 73%,#28251d 73% 84%,#eee3bd 84%)',
+            active: '#a47543', colors: [[39, 35, 27], [116, 75, 43], [158, 110, 63], [171, 166, 112], [190, 151, 88], [211, 187, 130], [237, 225, 187]], sample: desert,
+          },
+        ];
+
+        const buttons = palettes.map((palette, index) => {
+          const button = document.createElement('button');
+          button.className = 'pattern';
+          button.type = 'button';
+          button.textContent = `${index + 1} ${palette.name}`;
+          button.dataset.short = palette.short;
+          button.setAttribute('aria-label', `Show ${palette.name} camouflage`);
+          button.setAttribute('aria-pressed', index === current ? 'true' : 'false');
+          button.style.setProperty('--swatch', palette.swatch);
+          button.style.setProperty('--active-swatch', palette.active);
+          button.addEventListener('click', event => {
+            event.stopPropagation();
+            choose(index);
+          });
+          patternsEl.append(button);
+          return button;
+        });
+
+        function clamp(value, low = 0, high = 1) {
+          return value < low ? low : value > high ? high : value;
+        }
+
+        function mix(a, b, t) {
+          return [
+            a[0] + (b[0] - a[0]) * t,
+            a[1] + (b[1] - a[1]) * t,
+            a[2] + (b[2] - a[2]) * t,
+          ];
+        }
+
+        function hash(x, y, salt = 0) {
+          let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul((salt + seed * 31) | 0, 1442695041);
+          h = Math.imul(h ^ (h >>> 13), 1274126177);
+          return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+        }
+
+        function noise(x, y, salt = 0) {
+          const ix = Math.floor(x);
+          const iy = Math.floor(y);
+          const fx = x - ix;
+          const fy = y - iy;
+          const ux = fx * fx * (3 - 2 * fx);
+          const uy = fy * fy * (3 - 2 * fy);
+          const a = hash(ix, iy, salt);
+          const b = hash(ix + 1, iy, salt);
+          const c = hash(ix, iy + 1, salt);
+          const d = hash(ix + 1, iy + 1, salt);
+          return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+        }
+
+        function fbm(x, y, salt = 0) {
+          let value = 0;
+          let weight = 0.55;
+          for (let octave = 0; octave < 3; octave += 1) {
+            value += noise(x, y, salt + octave * 19) * weight;
+            x = x * 2.03 + 11.7;
+            y = y * 1.97 - 7.4;
+            weight *= 0.48;
+          }
+          return value / 0.819;
+        }
+
+        function voronoi(x, y, scale, salt) {
+          const px = x / scale;
+          const py = y / scale;
+          const ix = Math.floor(px);
+          const iy = Math.floor(py);
+          let first = 99;
+          let second = 99;
+          let id = 0;
+          let bestX = 0;
+          let bestY = 0;
+          let bestGX = 0;
+          let bestGY = 0;
+          for (let oy = -1; oy <= 1; oy += 1) {
+            for (let ox = -1; ox <= 1; ox += 1) {
+              const gx = ix + ox;
+              const gy = iy + oy;
+              const jx = 0.12 + hash(gx, gy, salt) * 0.76;
+              const jy = 0.12 + hash(gx, gy, salt + 71) * 0.76;
+              const dx = gx + jx - px;
+              const dy = gy + jy - py;
+              const distance = Math.hypot(dx, dy);
+              if (distance < first) {
+                second = first;
+                first = distance;
+                id = hash(gx, gy, salt + 137);
+                bestX = dx;
+                bestY = dy;
+                bestGX = gx;
+                bestGY = gy;
+              } else if (distance < second) {
+                second = distance;
+              }
+            }
+          }
+          return { first, second, id, x: bestX, y: bestY, gx: bestGX, gy: bestGY };
+        }
+
+        function zebra(x, y) {
+          const period = 56;
+          const shiftedX = x + Math.sin(y * 0.014 + 1.2) * 2.6;
+          const spineIndex = Math.round(shiftedX / period);
+          const identity = hash(spineIndex, 0, 11);
+          const secondary = hash(spineIndex, 1, 13);
+          const localDrift = noise(spineIndex * 0.73, y * 0.017, 19);
+          const sway = 2.2 + identity * 3.9;
+          const spine = spineIndex * period + (identity - 0.5) * 10
+            + Math.sin(y * (0.021 + secondary * 0.014) + spineIndex * 1.73) * sway
+            + Math.sin(y * 0.091 + spineIndex * 0.61) * sway * 0.3;
+          const distance = Math.abs(x - spine);
+          const bendStrength = Math.min(1, distance / 7);
+          const bendScale = 2.1 + secondary * 2.5 + localDrift * 0.8;
+          const bend = (Math.sin(y * 0.038 + distance * (0.11 + identity * 0.06) + spineIndex * 1.31) * bendScale
+            + Math.sin(y * (0.074 + secondary * 0.024) - distance * 0.061 + identity * 5.4) * 1.2) * bendStrength;
+          const flowDistance = Math.max(0, distance + bend);
+          const exponent = 0.6 + identity * 0.19 + (localDrift - 0.5) * 0.09;
+          const frequency = 1.72 + secondary * 0.78;
+          const contour = Math.pow(flowDistance + 0.22, exponent) * frequency;
+          const ripple = Math.sin(distance * 0.17 - y * 0.052 + spineIndex * 1.9) * 0.92
+            + Math.sin(distance * 0.073 + y * 0.021 + spineIndex * 0.83 + identity * 6.2) * 0.68;
+          const warp = (fbm(x * 0.041, y * 0.038, 31) - 0.5) * 2.65;
+          const rise = 0.07 + hash(spineIndex, 2, 17) * 0.115;
+          const phase = contour + y * rise + ripple + warp;
+          const width = (fbm(x * 0.029, y * 0.034, 37) - 0.5) * 0.12;
+          return Math.sin(phase) < width ? [17, 18, 17] : [239, 236, 224];
+        }
+
+        function leopard(x, y) {
+          const vx = x + Math.sin(y * 0.073) * 1.1 + (fbm(x * 0.061, y * 0.058, 23) - 0.5) * 1.2;
+          const vy = y + Math.sin(x * 0.057 + 0.8) * 0.9;
+          const cell = voronoi(vx, vy, 9.2, 29);
+          const angle = Math.atan2(cell.y, cell.x);
+          const aspect = 0.82 + cell.id * 0.34;
+          const elliptical = Math.hypot(cell.x * aspect, cell.y / aspect);
+          const lobeCount = 5 + Math.floor(cell.id * 3);
+          const radius = 0.25 + cell.id * 0.095;
+          const lobe = radius * (0.94 + Math.sin(angle * lobeCount + cell.id * 11) * 0.08);
+          const segment = Math.floor(((angle + Math.PI) / (Math.PI * 2)) * 9);
+          const gap = hash(cell.gx, cell.gy, 37 + segment);
+          const ring = Math.abs(elliptical - lobe) < 0.061 && gap > 0.17;
+          const center = elliptical < radius - 0.085;
+          const satellite = voronoi(vx + 2.1, vy - 1.4, 5.3, 43);
+          const smallSpot = satellite.id > 0.72 && satellite.first < 0.13;
+          if (ring || smallSpot) return [39, 25, 15];
+          if (center && cell.id > 0.2) return [184, 116, 38];
+          return [216, 158, 65];
+        }
+
+        function ocelot(x, y) {
+          const vx = x + Math.sin(y * 0.082) * 1.05 + (fbm(x * 0.067, y * 0.061, 271) - 0.5) * 1.15;
+          const vy = y + Math.sin(x * 0.073 + 0.9) * 0.85;
+          const cell = voronoi(vx, vy, 6.8, 277);
+          const angle = Math.atan2(cell.y, cell.x);
+          const aspect = 0.72 + cell.id * 0.52;
+          const elliptical = Math.hypot(cell.x * aspect, cell.y / aspect);
+          const lobeCount = 4 + Math.floor(cell.id * 4);
+          const radius = 0.245 + cell.id * 0.105;
+          const lobe = radius * (0.9 + Math.sin(angle * lobeCount + cell.id * 13.7) * 0.13);
+          const segment = Math.floor(((angle + Math.PI) / (Math.PI * 2)) * 8);
+          const gap = hash(cell.gx, cell.gy, 281 + segment);
+          const ring = Math.abs(elliptical - lobe) < 0.084 && gap > 0.13;
+          const solid = cell.id > 0.73 && elliptical < radius * 0.82;
+          const satellite = voronoi(vx + 1.7, vy - 1.1, 4.5, 293);
+          const smallBlotch = satellite.id > 0.78 && satellite.first < 0.13;
+
+          if (ring || solid || smallBlotch) return [25, 21, 15];
+          return [211, 166, 115];
+        }
+
+        function tiger(x, y) {
+          const period = 10.8;
+          const blockHeight = 56;
+          const baseBlock = Math.floor(y / blockHeight);
+          let marked = false;
+
+          for (let block = baseBlock - 1; block <= baseBlock + 1; block += 1) {
+            const laneGuess = Math.round(x / period);
+            for (let lane = laneGuess - 1; lane <= laneGuess + 1; lane += 1) {
+              const identity = hash(lane, block, 53);
+              const centerY = (block + 0.5 + (hash(lane, block, 55) - 0.5) * 0.72) * blockHeight;
+              const halfHeight = 24 + hash(lane, block, 57) * 10;
+              const local = (y - centerY) / halfHeight;
+              if (Math.abs(local) >= 1) continue;
+
+              const direction = hash(lane, block, 59) > 0.5 ? 1 : -1;
+              const curve = Math.sin(local * Math.PI * 1.15 + identity * 5.4) * (1.3 + identity * 1.2);
+              const lean = local * (identity - 0.5) * 5.2;
+              const centerX = lane * period + (hash(lane, block, 61) - 0.5) * 4.6 + curve * direction + lean;
+              const taper = Math.pow(Math.sin(((local + 1) * 0.5) * Math.PI), 0.72);
+              const halfWidth = 0.12 + taper * (1.45 + hash(lane, block, 63) * 1.15);
+              if (Math.abs(x - centerX) <= halfWidth) marked = true;
+
+              const forkStart = 0.48 + hash(lane, block, 65) * 0.12;
+              const t = (local + 1) * 0.5;
+              if (identity > 0.56 && t > forkStart) {
+                const forkT = (t - forkStart) / (1 - forkStart);
+                const forkCenter = centerX + direction * forkT * (2.8 + hash(lane, block, 67) * 2.3);
+                const forkWidth = 0.08 + Math.pow(Math.sin(forkT * Math.PI), 0.8) * (0.62 + identity * 0.56);
+                if (Math.abs(x - forkCenter) <= forkWidth) marked = true;
+              }
+            }
+          }
+
+          return marked ? [31, 20, 14] : [222, 103, 26];
+        }
+
+        function giraffe(x, y) {
+          const vx = x + Math.sin(y * 0.029) * 1.4;
+          const vy = y + Math.sin(x * 0.027 + 1.1) * 1.2;
+          const cell = voronoi(vx, vy, 24.5, 83);
+          const seam = cell.second - cell.first;
+          if (seam < 0.06) return [239, 222, 181];
+          if (cell.id < 0.55) return [109, 58, 31];
+          return [132, 68, 33];
+        }
+
+        function fawn(x, y) {
+          const vx = x + Math.sin(y * 0.043) * 1.1 + (fbm(x * 0.045, y * 0.041, 149) - 0.5) * 0.9;
+          const vy = y + Math.sin(x * 0.031 + 0.7) * 0.7;
+          const cell = voronoi(vx, vy, 7.2, 151);
+          const identity = hash(cell.gx, cell.gy, 157);
+          const angle = 1.28 + (hash(cell.gx, cell.gy, 159) - 0.5) * 0.72;
+          const ca = Math.cos(angle);
+          const sa = Math.sin(angle);
+          const rx = cell.x * ca - cell.y * sa;
+          const ry = cell.x * sa + cell.y * ca;
+          const long = 0.135 + hash(cell.gx, cell.gy, 163) * 0.105;
+          const short = long * (0.5 + hash(cell.gx, cell.gy, 167) * 0.25);
+          const spotted = identity > 0.17 && Math.hypot(rx / long, ry / short) < 1;
+
+          if (spotted && identity > 0.68) return [247, 235, 207];
+          if (spotted) return [236, 219, 185];
+          return [166, 99, 56];
+        }
+
+        function gaboon(x, y) {
+          const tileWidth = 25;
+          const tileHeight = 18;
+          const warpX = x + (fbm(x * 0.031, y * 0.028, 311) - 0.5) * 2.2;
+          const warpY = y + (fbm(x * 0.027, y * 0.033, 313) - 0.5) * 1.7;
+
+          const diamondRow = Math.round(warpY / tileHeight);
+          const diamondStagger = (Math.abs(diamondRow) % 2) * tileWidth * 0.5;
+          const diamondColumn = Math.round((warpX - diamondStagger) / tileWidth);
+          const diamondX = warpX - (diamondColumn * tileWidth + diamondStagger);
+          const diamondY = warpY - diamondRow * tileHeight;
+          const diamondIdentity = hash(diamondColumn, diamondRow, 317);
+          const diamondOuter = Math.abs(diamondX) / (8.2 + diamondIdentity * 1.1)
+            + Math.abs(diamondY) / (8.1 + hash(diamondColumn, diamondRow, 319) * 0.7);
+          const diamondInner = Math.abs(diamondX) / (4.8 + diamondIdentity * 0.6)
+            + Math.abs(diamondY) / 6.1;
+          const centerBar = Math.abs(diamondX) < 1.15
+            && Math.abs(diamondY) < 4.8 - Math.abs(diamondX) * 0.8;
+
+          const linkRow = Math.round((warpY - tileHeight * 0.5) / tileHeight);
+          const linkYCenter = linkRow * tileHeight + tileHeight * 0.5;
+          const linkStagger = (Math.abs(linkRow + 1) % 2) * tileWidth * 0.5;
+          const linkColumn = Math.round((warpX - linkStagger) / tileWidth);
+          const linkX = warpX - (linkColumn * tileWidth + linkStagger);
+          const linkY = warpY - linkYCenter;
+          const linkHeight = 7.2 + hash(linkColumn, linkRow, 323) * 0.7;
+          const outerWidth = 1.85 + Math.abs(linkY) * 0.72;
+          const innerWidth = 0.7 + Math.abs(linkY) * 0.54;
+          const hourglassOuter = Math.abs(linkY) < linkHeight && Math.abs(linkX) < outerWidth;
+          const hourglassInner = Math.abs(linkY) < linkHeight - 0.8 && Math.abs(linkX) < innerWidth;
+
+          const flank = Math.abs(linkX) / 9 + Math.abs(linkY) / 5.4;
+          const flankCore = Math.abs(linkX) / 6.7 + Math.abs(linkY) / 3.7;
+
+          if (centerBar) return [158, 103, 96];
+          if (diamondInner < 1) return [207, 190, 147];
+          if (diamondOuter < 1) return [76, 52, 48];
+          if (hourglassInner) return [27, 24, 21];
+          if (hourglassOuter) return [207, 168, 81];
+          if (flankCore < 1) return [68, 49, 39];
+          if (flank < 1) return [154, 111, 91];
+          return [119, 91, 68];
+        }
+
+        function woodland(x, y) {
+          const warpX = x + (fbm(x * 0.022, y * 0.025, 181) - 0.5) * 11 + Math.sin(y * 0.032) * 3;
+          const warpY = y + (fbm(x * 0.024, y * 0.021, 183) - 0.5) * 10 + Math.sin(x * 0.028 + 1.4) * 2.5;
+          const canopy = fbm(warpX * 0.034, warpY * 0.028, 191);
+          const undergrowth = fbm((warpX + 23) * 0.043, (warpY - 11) * 0.033, 193);
+          const shadow = fbm((warpX - 17) * 0.046, (warpY + 29) * 0.022, 197);
+
+          if (shadow > 0.665 && undergrowth < 0.61) return [24, 27, 19];
+          if (canopy < 0.4) return [126, 105, 61];
+          if (canopy > 0.61 || undergrowth > 0.63) return [42, 61, 32];
+          return [82, 99, 55];
+        }
+
+        function desert(x, y) {
+          const warpX = x + Math.sin(y * 0.031) * 5 + (fbm(x * 0.022, y * 0.019, 211) - 0.5) * 9;
+          const warpY = y + Math.sin(x * 0.019 + 0.7) * 4;
+          const ground = fbm(warpX * 0.022, warpY * 0.018, 223);
+          const band = Math.abs(fbm((warpX + 31) * 0.026, (warpY - 19) * 0.021, 227) - 0.52);
+          const chip = voronoi(x + Math.sin(y * 0.08), y, 8.8, 229);
+          const chipPresent = chip.id > 0.7;
+          const blackChip = chipPresent && Math.hypot(chip.x + 0.055, chip.y + 0.04) < 0.125;
+          const whiteChip = chipPresent && Math.hypot(chip.x - 0.09, chip.y - 0.065) < 0.095;
+
+          if (blackChip) return [39, 35, 27];
+          if (whiteChip) return [237, 225, 187];
+          if (band < 0.055) return [116, 75, 43];
+          if (band < 0.12) return [158, 110, 63];
+          if (ground < 0.38) return [171, 166, 112];
+          if (ground > 0.67) return [190, 151, 88];
+          return [211, 187, 130];
+        }
+
+        function easeOutQuint(value) {
+          return 1 - Math.pow(1 - clamp(value), 5);
+        }
+
+        function paletteIndex(color, colors) {
+          let closest = 0;
+          let closestDistance = Infinity;
+          colors.forEach((candidate, index) => {
+            const distance = Math.abs(color[0] - candidate[0])
+              + Math.abs(color[1] - candidate[1])
+              + Math.abs(color[2] - candidate[2]);
+            if (distance < closestDistance) {
+              closest = index;
+              closestDistance = distance;
+            }
+          });
+          return closest;
+        }
+
+        function palettePosition(color, colors) {
+          const index = paletteIndex(color, colors);
+          return colors.length === 1 ? 0 : index / (colors.length - 1);
+        }
+
+        function hardColorAtPalettePosition(colors, position) {
+          const index = Math.round(clamp(position) * (colors.length - 1));
+          return colors[index];
+        }
+
+        function shiftedPaletteColor(color, fromPalette, toPalette, amount) {
+          const position = palettePosition(color, fromPalette.colors);
+          const target = hardColorAtPalettePosition(toPalette.colors, position);
+          return mix(color, target, amount);
+        }
+
+        function patternLabels(palette, outputColorCount, sampleScale) {
+          const labels = new Uint8Array(buffer.width * buffer.height);
+          let offset = 0;
+          for (let y = 0; y < buffer.height; y += 1) {
+            for (let x = 0; x < buffer.width; x += 1) {
+              const color = palette.sample(x * sampleScale, y * sampleScale);
+              const role = palettePosition(color, palette.colors);
+              labels[offset++] = Math.round(role * (outputColorCount - 1));
+            }
+          }
+          return labels;
+        }
+
+        function chamferDistance(labels, targetLabel) {
+          const size = buffer.width * buffer.height;
+          const distance = new Float32Array(size);
+          const far = buffer.width + buffer.height;
+          const diagonal = Math.SQRT2;
+          let found = false;
+
+          for (let index = 0; index < size; index += 1) {
+            if (labels[index] === targetLabel) {
+              distance[index] = 0;
+              found = true;
+            } else {
+              distance[index] = far;
+            }
+          }
+          if (!found) return null;
+
+          for (let y = 0; y < buffer.height; y += 1) {
+            for (let x = 0; x < buffer.width; x += 1) {
+              const index = y * buffer.width + x;
+              let value = distance[index];
+              if (x > 0) value = Math.min(value, distance[index - 1] + 1);
+              if (y > 0) {
+                value = Math.min(value, distance[index - buffer.width] + 1);
+                if (x > 0) value = Math.min(value, distance[index - buffer.width - 1] + diagonal);
+                if (x + 1 < buffer.width) value = Math.min(value, distance[index - buffer.width + 1] + diagonal);
+              }
+              distance[index] = value;
+            }
+          }
+
+          for (let y = buffer.height - 1; y >= 0; y -= 1) {
+            for (let x = buffer.width - 1; x >= 0; x -= 1) {
+              const index = y * buffer.width + x;
+              let value = distance[index];
+              if (x + 1 < buffer.width) value = Math.min(value, distance[index + 1] + 1);
+              if (y + 1 < buffer.height) {
+                value = Math.min(value, distance[index + buffer.width] + 1);
+                if (x > 0) value = Math.min(value, distance[index + buffer.width - 1] + diagonal);
+                if (x + 1 < buffer.width) value = Math.min(value, distance[index + buffer.width + 1] + diagonal);
+              }
+              distance[index] = value;
+            }
+          }
+          return distance;
+        }
+
+        function buildFieldMorph() {
+          const sampleScale = pixelSize / 8;
+          const fromPalette = palettes[current];
+          const toPalette = palettes[next];
+          const colorCount = toPalette.colors.length;
+          const fromLabels = patternLabels(fromPalette, colorCount, sampleScale);
+          const toLabels = patternLabels(toPalette, colorCount, sampleScale);
+          const labels = [];
+          const fromFields = [];
+          const toFields = [];
+          const birthDistance = Math.max(4, Math.min(buffer.width, buffer.height) * 0.022);
+
+          for (let label = 0; label < colorCount; label += 1) {
+            const toField = chamferDistance(toLabels, label);
+            if (!toField) continue;
+            let fromField = chamferDistance(fromLabels, label);
+            if (!fromField) {
+              fromField = new Float32Array(toField.length);
+              for (let index = 0; index < toField.length; index += 1) {
+                fromField[index] = toField[index] + birthDistance;
+              }
+            }
+            labels.push(label);
+            fromFields.push(fromField);
+            toFields.push(toField);
+          }
+
+          fieldMorph = { width: buffer.width, height: buffer.height, labels, fromFields, toFields };
+        }
+
+        function fieldMorphColor(index, progress) {
+          const eased = progress * progress * (3 - 2 * progress);
+          let winningLabel = fieldMorph.labels[0];
+          let winningDistance = Infinity;
+
+          for (let field = 0; field < fieldMorph.labels.length; field += 1) {
+            const fromDistance = fieldMorph.fromFields[field][index];
+            const toDistance = fieldMorph.toFields[field][index];
+            const distance = fromDistance + (toDistance - fromDistance) * eased;
+            if (distance < winningDistance) {
+              winningDistance = distance;
+              winningLabel = fieldMorph.labels[field];
+            }
+          }
+          return palettes[next].colors[winningLabel];
+        }
+
+        function render(now) {
+          if (!imageData) return;
+          const data = imageData.data;
+          const sampleScale = pixelSize / 8;
+          const elapsed = isPaused ? pausedAt - phaseStarted : now - phaseStarted;
+          let progress = phase === 'morph' ? clamp(elapsed / MORPH_MS) : 0;
+
+          if (!isPaused && !reducedMotion) {
+            if (phase === 'hold' && elapsed >= HOLD_MS) startMorph((current + 1) % palettes.length, now);
+            if (phase === 'morph' && progress >= 1) settle(now);
+          }
+
+          if (phase === 'morph') {
+            progress = clamp((isPaused ? pausedAt - phaseStarted : now - phaseStarted) / MORPH_MS);
+          }
+
+          let offset = 0;
+          for (let y = 0; y < buffer.height; y += 1) {
+            const colorProgress = phase === 'morph' ? easeOutQuint(progress / COLOR_PHASE) : 0;
+            const shapeProgress = phase === 'morph'
+              ? clamp((progress - COLOR_PHASE) / (1 - COLOR_PHASE))
+              : 0;
+
+            for (let x = 0; x < buffer.width; x += 1) {
+              let color;
+              if (shapeProgress > 0 && fieldMorph) {
+                color = fieldMorphColor(y * buffer.width + x, shapeProgress);
+              } else {
+                const from = palettes[current].sample(x * sampleScale, y * sampleScale);
+                color = phase === 'morph'
+                  ? shiftedPaletteColor(from, palettes[current], palettes[next], colorProgress)
+                  : from;
+              }
+              data[offset++] = color[0];
+              data[offset++] = color[1];
+              data[offset++] = color[2];
+              data[offset++] = 255;
+            }
+          }
+
+          bctx.putImageData(imageData, 0, 0);
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(buffer, 0, 0, buffer.width, buffer.height, 0, 0, width, height);
+          updateStatus(progress);
+        }
+
+        /*
+          The patterns above are deliberately time-free. They are fixed seeded
+          surfaces. During a change, categorical distance fields interpolate
+          across both axes so regions can expand, contract, split, and merge.
+        */
+
+        function frame(now) {
+          if (!isPaused && !reducedMotion && phase === 'hold' && now - phaseStarted >= HOLD_MS) {
+            startMorph((current + 1) % palettes.length, now);
+          }
+          if (phase === 'morph' && !isPaused && now - lastFrame >= FRAME_MS) {
+            lastFrame = now;
+            render(now);
+          }
+          requestAnimationFrame(frame);
+        }
+
+        function startMorph(index, now = performance.now()) {
+          if (index === current && phase === 'hold') return;
+          if (reducedMotion) {
+            current = index;
+            next = (current + 1) % palettes.length;
+            fieldMorph = null;
+            phase = 'hold';
+            phaseStarted = now;
+            render(now);
+            return;
+          }
+          next = index;
+          buildFieldMorph();
+          phase = 'morph';
+          phaseStarted = performance.now();
+          if (isPaused) pausedAt = phaseStarted;
+          updateButtons();
+          if (isPaused) render(now);
+        }
+
+        function settle(now) {
+          current = next;
+          next = (current + 1) % palettes.length;
+          fieldMorph = null;
+          phase = 'hold';
+          phaseStarted = now;
+          updateButtons();
+        }
+
+        function choose(index) {
+          if (phase === 'morph' && index === next) return;
+          if (index === current && phase === 'hold') {
+            phaseStarted = performance.now();
+            return;
+          }
+          startMorph(index);
+        }
+
+        function advance() {
+          choose(phase === 'morph' ? (next + 1) % palettes.length : (current + 1) % palettes.length);
+        }
+
+        function updateButtons() {
+          buttons.forEach((button, index) => {
+            button.setAttribute('aria-pressed', index === (phase === 'morph' ? next : current) ? 'true' : 'false');
+          });
+        }
+
+        function updateStatus(progress) {
+          if (phase === 'morph') {
+            statusEl.textContent = `${String(current + 1).padStart(2, '0')} ${palettes[current].name}  →  ${String(next + 1).padStart(2, '0')} ${palettes[next].name}  ${Math.round(progress * 100)}%`;
+          } else {
+            statusEl.textContent = `${String(current + 1).padStart(2, '0')} / ${palettes[current].name}${isPaused ? ' / paused' : ''}`;
+          }
+        }
+
+        function togglePause() {
+          const now = performance.now();
+          isPaused = !isPaused;
+          if (isPaused) {
+            pausedAt = now;
+          } else {
+            phaseStarted += now - pausedAt;
+          }
+          pauseEl.textContent = isPaused ? '▶' : 'Ⅱ';
+          pauseEl.setAttribute('aria-label', isPaused ? 'Resume automatic transitions' : 'Pause automatic transitions');
+          pauseEl.setAttribute('aria-pressed', String(isPaused));
+          updateStatus(phase === 'morph' ? clamp((now - phaseStarted) / MORPH_MS) : 0);
+        }
+
+        function resize() {
+          width = Math.max(1, innerWidth);
+          height = Math.max(1, innerHeight);
+          const dpr = Math.min(2, devicePixelRatio || 1);
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          pixelSize = clamp(Math.round(Math.min(width, height) / 176), 3, 6);
+          buffer.width = Math.ceil(width / pixelSize);
+          buffer.height = Math.ceil(height / pixelSize);
+          imageData = bctx.createImageData(buffer.width, buffer.height);
+          if (phase === 'morph') buildFieldMorph();
+          render(performance.now());
+        }
+
+        canvas.addEventListener('pointerdown', advance);
+        canvas.addEventListener('keydown', event => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            advance();
+          }
+        });
+        pauseEl.addEventListener('click', event => {
+          event.stopPropagation();
+          togglePause();
+        });
+        addEventListener('keydown', event => {
+          if (event.key === ' ' && !(event.target instanceof HTMLButtonElement) && !event.repeat) {
+            event.preventDefault();
+            togglePause();
+          } else if (/^[1-9]$/.test(event.key)) {
+            choose(Number(event.key) - 1);
+          } else if (event.key.toLowerCase() === 'r') {
+            seed = Math.random() * 1000;
+            phaseStarted = performance.now();
+            if (phase === 'morph') buildFieldMorph();
+            render(phaseStarted);
+          } else if (event.key.toLowerCase() === 'h') {
+            document.body.classList.toggle('chrome-hidden');
+          }
+        });
+        addEventListener('resize', resize, { passive: true });
+
+        const onMotionChange = event => {
+          reducedMotion = event.matches;
+          if (reducedMotion && phase === 'morph') {
+            const now = performance.now();
+            settle(now);
+            render(now);
+          }
+        };
+        if (typeof motionQuery.addEventListener === 'function') motionQuery.addEventListener('change', onMotionChange);
+        else if (typeof motionQuery.addListener === 'function') motionQuery.addListener(onMotionChange);
+
+        updateButtons();
+        resize();
+        requestAnimationFrame(frame);
+      })();
+    </script>
+  </body>
+</html>

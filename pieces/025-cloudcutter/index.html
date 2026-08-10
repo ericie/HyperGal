@@ -31,8 +31,12 @@
       const LINE = 'rgba(244,255,250,';
       const FIELD_T = .4;          // field threshold: the visible cloud edge
       const VIS = Math.sqrt(1 - Math.sqrt(.4));  // visible radius / kernel radius
-      const BITE_S = 2.6;          // how hard one shot subtracts from the field
-      const BITE_R = 6.4;          // one round takes a small chunk, nothing more
+      const BITE_S = 5;            // a round punches decisively through the field
+      const BITE_R = 21.5;         // a broad radial crater, not only a forward bore
+      const BITE_SETTLE = 18;      // eased expansion, never an instant geometry pop
+      const HEAL_HOLD = 18;        // seconds a fresh cut keeps its full shape
+      const HEAL_MIN = 540;        // nine to thirteen minutes of visible closure
+      const HEAL_MAX = 780;
       const BULLET_SPEED = 680;
       const BULLET_RANGE = 330;    // the guns only reach a little way ahead
       const MAX_BULLETS = 26;
@@ -43,21 +47,20 @@
       const CLOUD_DRAG = 6.4;      // buried in a body: down to a crawl
       const SHIP_R = 8;
       const REAM_CD = .1;          // the hull widens what the guns opened
-      const MAX_SCALE = 1.7;
       const MIN_KEEP_AREA = 900;   // below this a lone cloud has been shot away
-      const MIN_COMP_AREA = 2600;  // below this a severed piece is only vapor
-      const TRAIL_MAX = 64;
       const MAX_WISPS = 240;
+      const MAX_CHUNKS = 120;
 
       let W = 0, H = 0, dpr = 1;
       let last = 0, raf = 0, now = 0, serial = 0;
-      let clouds, bullets, wisps, streaks;
+      let clouds, bullets, wisps, chunks, streaks;
       let ship, cam, score, cuts, bored, playerControl, spawnCd, cloudTarget;
       let liveR = 0, killR = 0;
       const keys = new Set();
 
       const rand = (a, b) => a + Math.random() * (b - a);
       const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+      const smootherstep = (t) => t * t * t * (t * (t * 6 - 15) + 10);
 
       const normAngle = (a) => {
         a = (a + Math.PI) % TAU;
@@ -83,6 +86,7 @@
         clouds = [];
         bullets = [];
         wisps = [];
+        chunks = [];
         serial = 0;
         score = 0;
         cuts = 0;
@@ -97,12 +101,11 @@
         const viewR = Math.hypot(W, H) * .5;
         liveR = viewR * 1.55;
         killR = viewR * 2.4;
-        cloudTarget = clamp(Math.round(7.2 * Math.PI * liveR * liveR / (W * H)), 12, 40);
+        cloudTarget = clamp(Math.round(1.8 * Math.PI * liveR * liveR / (W * H)), 6, 14);
         ship = {
           x: 0, y: 0,
           vx: 150, vy: 0,
           a: 0,
-          roll: 0,
           turn: 0,
           thrusting: false,
           fireCd: 0,
@@ -112,7 +115,6 @@
           insideFor: 0,
           load: 0,
           buried: 0,
-          trail: [],
         };
         cam = { x: 0, y: 0 };
         streaks = makeStreaks();
@@ -165,19 +167,18 @@
           size,
           vx: -rand(9, 30) * (120 / (80 + size)),
           scale: 1,
-          growTo: 1,
-          growRate: 0,
-          budAt: Infinity,
           puffs: makePuffs(size),
           bites: [],
           contours: [],
-          detail: [],
+          renderContours: [],
           bounds: { minx: -size, miny: -size, maxx: size, maxy: size },
           radius: size,
           phase: rand(0, TAU),
           bob: rand(0, TAU),
-          healRate: rand(.018, .06),
+          healRate: rand(.008, .014),
           cutCd: 0,
+          cutEnergy: 0,
+          severed: false,
           flash: 0,
           dirty: true,
           nextBuild: 0,
@@ -186,46 +187,64 @@
         return cloud;
       }
 
-      // A cumulus: a row of shoulders along a flattish base with taller lobes
-      // stacked above the middle. Sized by the visible radius of each lobe and
-      // spaced so neighbouring lobes always overlap, which is what welds the
-      // union together and what gives the silhouette its scallops.
+      // A cumulus built on a wide, shared baseline. The shoulders taper toward
+      // both ends while two or three crowns stay near the middle, preventing
+      // the narrow, vertical silhouettes that read as generic blobs.
       function makePuffs(size) {
         const lobes = [];
-        const base = size * .5;
-        // Shoulders along a level underside — cumulus sit on a flat bottom.
-        // Each is stepped along by less than the two radii it spans, so the
-        // row is always one connected chain and never sheds a loose circle.
-        const n = 4 + ((Math.random() * 3) | 0);
-        const radii = [];
+        const base = [];
+        const baseline = size * .34;
+        const n = 5 + ((Math.random() * 3) | 0);
+        const span = size * rand(1.18, 1.42);
         for (let i = 0; i < n; i++) {
-          const t = n === 1 ? .5 : i / (n - 1);
-          const taper = 1 - Math.abs(t - .5) * rand(.3, .62);
-          radii.push(size * (.12 + rand(.18, .3) * taper));
+          const t = i / (n - 1);
+          const middle = 1 - Math.abs(t - .5) * 2;
+          const vr = size * (.17 + middle * .065 + rand(-.012, .018));
+          const x = (t - .5) * span + (i > 0 && i < n - 1 ? rand(-.018, .018) * size : 0);
+          const puff = { x, y: baseline - vr, vr };
+          base.push(puff);
+          lobes.push(puff);
         }
-        let x = 0;
-        for (let i = 0; i < n; i++) {
-          lobes.push({ x, y: base - radii[i] + rand(-.03, .03) * size, vr: radii[i] });
-          if (i < n - 1) x += (radii[i] + radii[i + 1]) * rand(.56, .76);
-        }
-        // Billows piled on a shoulder, and crowns piled on a billow. Each one
-        // is hung off a lobe that already exists, so it cannot float free.
-        const m = 3 + ((Math.random() * 3) | 0);
-        const stack = (hostFrom, hostCount, lo, hi, spread) => {
-          const host = lobes[hostFrom + ((Math.random() * hostCount) | 0)] || lobes[0];
-          const vr = size * rand(lo, hi);
-          const a = -Math.PI / 2 + rand(-spread, spread);
-          const reach = (host.vr + vr) * rand(.5, .78);
-          lobes.push({ x: host.x + Math.cos(a) * reach, y: host.y + Math.sin(a) * reach, vr });
-        };
-        for (let i = 0; i < m; i++) stack(0, n, .22, .36, .85);
-        const c = (Math.random() * 3) | 0;
-        for (let i = 0; i < c; i++) stack(n, m, .18, .3, .7);
 
-        let cx = 0, cy = 0;
-        for (const p of lobes) { cx += p.x; cy += p.y; }
-        cx /= lobes.length;
-        cy /= lobes.length;
+        const crowns = [];
+        const crownCount = 2 + ((Math.random() * 3) | 0);
+        for (let i = 0; i < crownCount; i++) {
+          const t = (i + 1) / (crownCount + 1);
+          const x = (t - .5) * span * .64 + rand(-.035, .035) * size;
+          let host = base[0];
+          for (const candidate of base) {
+            if (Math.abs(candidate.x - x) < Math.abs(host.x - x)) host = candidate;
+          }
+          const middle = 1 - Math.abs(t - .5) * 2;
+          const vr = size * rand(.205 + middle * .025, .27 + middle * .035);
+          const crown = {
+            x,
+            y: host.y - (host.vr + vr) * rand(.5, .61),
+            vr,
+          };
+          crowns.push(crown);
+          lobes.push(crown);
+        }
+
+        // Taller clouds get one centered cap, still anchored to an existing
+        // crown so it cannot turn into a detached or column-like lobe.
+        if (Math.random() < .58) {
+          let host = crowns[0];
+          for (const candidate of crowns) if (candidate.y < host.y) host = candidate;
+          const vr = size * rand(.17, .225);
+          lobes.push({
+            x: host.x + rand(-.025, .025) * size,
+            y: host.y - (host.vr + vr) * rand(.48, .56),
+            vr,
+          });
+        }
+
+        let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+        for (const p of lobes) {
+          minx = Math.min(minx, p.x - p.vr); miny = Math.min(miny, p.y - p.vr);
+          maxx = Math.max(maxx, p.x + p.vr); maxy = Math.max(maxy, p.y + p.vr);
+        }
+        const cx = (minx + maxx) * .5, cy = (miny + maxy) * .5;
         return lobes.map((p) => ({ x: p.x - cx, y: p.y - cy, vr: p.vr, r: p.vr / VIS }));
       }
 
@@ -281,10 +300,6 @@
 
       function fieldWorld(cloud, wx, wy) {
         return fieldLocal(cloud, (wx - cloud.x) / cloud.scale, (wy - cloud.y) / cloud.scale);
-      }
-
-      function cloudToWorld(cloud, p) {
-        return { x: cloud.x + p.x * cloud.scale, y: cloud.y + p.y * cloud.scale };
       }
 
       function cloudAt(wx, wy) {
@@ -429,12 +444,6 @@
         return a / 2;
       }
 
-      function polyCentroid(pts) {
-        let cx = 0, cy = 0;
-        for (const p of pts) { cx += p.x; cy += p.y; }
-        return { x: cx / pts.length, y: cy / pts.length };
-      }
-
       function pointInPolygon(p, poly) {
         let inside = false;
         for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -443,15 +452,6 @@
               p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
         }
         return inside;
-      }
-
-      function nearestVertexDist(p, poly) {
-        let best = Infinity;
-        for (const q of poly) {
-          const d = Math.hypot(q.x - p.x, q.y - p.y);
-          if (d < best) best = d;
-        }
-        return best;
       }
 
       // ---------- geometry rebuild, severing, dissolving ----------
@@ -469,21 +469,84 @@
         const solids = info.filter((l) => l.depth % 2 === 0).sort((a, b) => b.area - a.area);
         if (!solids.length) return { empty: true, solids: [] };
 
-        let keep = solids, drop = [];
-        if (solids.length === 1) {
-          if (solids[0].area < MIN_KEEP_AREA) return { empty: true, solids: [] };
-        } else {
-          const total = solids.reduce((s, l) => s + l.area, 0);
-          const floor = Math.max(MIN_COMP_AREA, total * .09);
-          keep = solids.filter((l, i) => i === 0 || l.area >= floor);
-          drop = solids.filter((l, i) => i !== 0 && l.area < floor);
+        if (solids.length === 1 && solids[0].area < MIN_KEEP_AREA) return { empty: true, solids: [] };
+
+        // Render only solid outer boundaries. Enclosed voids still affect the
+        // field and can join a bore later, but never appear as internal rings.
+        setCloudContours(cloud, solids.map((l) => dressLoop(resampleLoop(l.pts, 96))));
+        return { empty: false, solids };
+      }
+
+      // Marching squares can add or drop vertices between rebuilds. Sampling
+      // every outline to the same count gives the renderer stable points to
+      // chase, so cutting and healing flow rather than stepping cell by cell.
+      function resampleLoop(pts, count) {
+        if (!pts.length) return [];
+        const lengths = new Array(pts.length);
+        let perimeter = 0;
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i], b = pts[(i + 1) % pts.length];
+          perimeter += Math.hypot(b.x - a.x, b.y - a.y);
+          lengths[i] = perimeter;
         }
+        if (perimeter <= 0) return pts.slice();
 
-        cloud.contours = loops.map(dressLoop);
-        cloud.detail = buildDetail(cloud).map(dressLoop);
+        // Keep winding and the starting landmark stable across rebuilds.
+        if (polyArea(pts) < 0) pts = pts.slice().reverse();
+        let start = 0;
+        for (let i = 1; i < pts.length; i++) {
+          if (pts[i].x < pts[start].x || (pts[i].x === pts[start].x && pts[i].y < pts[start].y)) start = i;
+        }
+        pts = pts.slice(start).concat(pts.slice(0, start));
 
-        for (const d of drop) shedPiece(cloud, d);
-        return { empty: false, solids: keep, pruned: drop.length > 0 };
+        perimeter = 0;
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i], b = pts[(i + 1) % pts.length];
+          perimeter += Math.hypot(b.x - a.x, b.y - a.y);
+          lengths[i] = perimeter;
+        }
+        const out = [];
+        let edge = 0, before = 0;
+        for (let i = 0; i < count; i++) {
+          const distance = i / count * perimeter;
+          while (edge < lengths.length - 1 && lengths[edge] < distance) {
+            before = lengths[edge++];
+          }
+          const a = pts[edge], b = pts[(edge + 1) % pts.length];
+          const span = lengths[edge] - before || 1;
+          const t = clamp((distance - before) / span, 0, 1);
+          out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+        }
+        return out;
+      }
+
+      function cloneContours(contours) {
+        return contours.map((loop) => loop.map((p) => ({ ...p })));
+      }
+
+      function setCloudContours(cloud, contours) {
+        const compatible = cloud.renderContours.length === contours.length &&
+          contours.every((loop, i) => cloud.renderContours[i]?.length === loop.length);
+        cloud.contours = contours;
+        if (!compatible) cloud.renderContours = cloneContours(contours);
+      }
+
+      function easeCloudContours(cloud, dt) {
+        if (cloud.renderContours.length !== cloud.contours.length) return;
+        const speed = cloud.cutEnergy > 0 ? 34 : 5;
+        const k = 1 - Math.exp(-dt * speed);
+        for (let j = 0; j < cloud.contours.length; j++) {
+          const target = cloud.contours[j], shown = cloud.renderContours[j];
+          if (!shown || shown.length !== target.length) continue;
+          for (let i = 0; i < target.length; i++) {
+            const a = shown[i], b = target[i];
+            a.x += (b.x - a.x) * k;
+            a.y += (b.y - a.y) * k;
+            a.nx += (b.nx - a.nx) * k;
+            a.ny += (b.ny - a.ny) * k;
+            a.k += (b.k - a.k) * k;
+          }
+        }
       }
 
       function dressLoop(pts) {
@@ -491,121 +554,6 @@
           const len = Math.hypot(p.x, p.y) || 1;
           return { x: p.x, y: p.y, nx: p.x / len, ny: p.y / len, k: (p.x + p.y) * .045 };
         });
-      }
-
-      // Interior scallops: each lobe's own curve, kept only along the arc that
-      // some other lobe has swallowed. That is exactly the fold where two puffs
-      // meet, and it vanishes wherever the guns have opened the body up.
-      function buildDetail(cloud) {
-        const out = [];
-        const steps = 30;
-        for (const p of cloud.puffs) {
-          let run = null;
-          for (let k = 0; k <= steps; k++) {
-            const a = k / steps * TAU;
-            const x = p.x + Math.cos(a) * p.vr * .93;
-            const y = p.y + Math.sin(a) * p.vr * .93;
-            let v = 0;
-            for (const q of cloud.puffs) {
-              // Only the fatter lobe of a pair keeps its arc, otherwise every
-              // overlap draws twice and the fold reads as a lens.
-              if (q === p || q.vr < p.vr || (q.vr === p.vr && q.x <= p.x)) continue;
-              const dx = x - q.x, dy = y - q.y;
-              const r2 = q.r * q.r, d2 = dx * dx + dy * dy;
-              if (d2 < r2) {
-                const t = 1 - d2 / r2;
-                if (t * t > v) v = t * t;
-              }
-            }
-            for (const b of cloud.bites) {
-              let dx = x - b.x, dy = y - b.y;
-              const ex = b.x2 - b.x, ey = b.y2 - b.y;
-              const len2 = ex * ex + ey * ey;
-              if (len2 > 0) {
-                let t = (dx * ex + dy * ey) / len2;
-                t = t < 0 ? 0 : t > 1 ? 1 : t;
-                dx -= ex * t;
-                dy -= ey * t;
-              }
-              const r2 = b.r * b.r, d2 = dx * dx + dy * dy;
-              if (d2 < r2) {
-                const t2 = 1 - d2 / r2;
-                v -= b.s * t2 * t2;
-              }
-            }
-            if (v > FIELD_T * 1.2) {
-              if (!run) run = [];
-              run.push({ x, y });
-            } else {
-              if (run && run.length > 2) out.push(run);
-              run = null;
-            }
-          }
-          if (run && run.length > 2) out.push(run);
-        }
-        return out;
-      }
-
-      // A severed piece too small to survive: erased for good and released as vapor.
-      function shedPiece(cloud, comp) {
-        const c = polyCentroid(comp.pts);
-        let r = 0;
-        for (const p of comp.pts) r = Math.max(r, Math.hypot(p.x - c.x, p.y - c.y));
-        cloud.bites.push({ x: c.x, y: c.y, x2: c.x, y2: c.y, len: 0, r: r * 1.12 + 2, s: 2.6, heal: 0 });
-        const w = cloudToWorld(cloud, c);
-        for (let i = 0; i < 6; i++) {
-          puffWisp(w.x + rand(-r, r) * cloud.scale, w.y + rand(-r, r) * cloud.scale, r * .5 * cloud.scale, cloud.vx);
-        }
-        score += 25;
-      }
-
-      function splitCloud(cloud, comps) {
-        const kids = [];
-        for (const comp of comps) {
-          const puffs = cloud.puffs.filter((p) => pointInPolygon(p, comp.pts));
-          if (!puffs.length) continue;
-          const c = polyCentroid(comp.pts);
-          const kid = makeCloud(cloud.x + c.x * cloud.scale, cloud.y + c.y * cloud.scale, cloud.size);
-          kid.puffs = puffs.map((p) => ({ x: p.x - c.x, y: p.y - c.y, vr: p.vr, r: p.r }));
-          kid.bites = cloud.bites
-            .filter((b) => pointInPolygon(b, comp.pts) || pointInPolygon({ x: b.x2, y: b.y2 }, comp.pts)
-              || nearestVertexDist(b, comp.pts) < b.r * 1.15)
-            .map((b) => ({
-              x: b.x - c.x, y: b.y - c.y, x2: b.x2 - c.x, y2: b.y2 - c.y,
-              len: b.len, r: b.r, s: b.s, heal: b.heal && cloud.healRate * 2.1,
-            }));
-          kid.scale = cloud.scale;
-          kid.healRate = cloud.healRate;
-          kid.vx = cloud.vx + rand(-4, 4);
-          kid.growTo = Math.min(MAX_SCALE, cloud.scale * rand(1.25, 1.6));
-          kid.growRate = rand(.05, .105);
-          kid.budAt = now + rand(.6, 1.6);
-          kid.cutCd = rand(5, 9);
-          kid.flash = 1;
-          const push = Math.hypot(c.x, c.y) || 1;
-          kid.driftX = c.x / push * 14;
-          kid.driftY = c.y / push * 18;
-          updateBounds(kid);
-          kids.push(kid);
-        }
-        if (kids.length < 2) return [];
-        // The halves are shouldered apart once, here — after that they only
-        // pan, like everything else in the sky.
-        for (const kid of kids) {
-          kid.x += kid.driftX;
-          kid.y += kid.driftY;
-          delete kid.driftX;
-          delete kid.driftY;
-        }
-        const w = { x: cloud.x, y: cloud.y };
-        for (let i = 0; i < 10; i++) {
-          puffWisp(w.x + rand(-1, 1) * cloud.radius * cloud.scale,
-                   w.y + rand(-1, 1) * cloud.radius * cloud.scale * .6,
-                   rand(4, 11), cloud.vx);
-        }
-        cuts++;
-        score += 300;
-        return kids;
       }
 
       function dissipate(cloud) {
@@ -629,21 +577,42 @@
           if (b.len > 90 || Math.abs(b.r - r) > r * .35) continue;
           const d = Math.hypot(lx - b.x2, ly - b.y2);
           if (d > r * 1.4) continue;
-          b.x2 = lx;
-          b.y2 = ly;
+          b.tx2 = lx;
+          b.ty2 = ly;
           b.len += d;
-          if (r > b.r) b.r = r;
+          if (r > b.targetR) b.targetR = r;
+          b.maxR = Math.max(b.maxR ?? b.targetR, r);
+          b.maxS = Math.max(b.maxS ?? b.targetS, BITE_S);
+          b.targetS = Math.max(b.targetS, BITE_S);
+          b.hold = HEAL_HOLD;
+          b.healAge = 0;
+          b.healDuration = rand(HEAL_MIN, HEAL_MAX);
           cloud.dirty = true;
           cloud.nextBuild = 0;
           return;
         }
-        bites.push({ x: lx, y: ly, x2: lx, y2: ly, len: 0, r, s: BITE_S, heal: cloud.healRate });
+        bites.push({
+          x: lx, y: ly, x2: lx, y2: ly, tx2: lx, ty2: ly, len: 0,
+          r: r * .72, targetR: r, s: BITE_S * .82, targetS: BITE_S,
+          heal: cloud.healRate, hold: HEAL_HOLD,
+          maxR: r, maxS: BITE_S, healAge: 0,
+          healDuration: rand(HEAL_MIN, HEAL_MAX),
+        });
         if (bites.length > 130) bites.shift();
         cloud.dirty = true;
         cloud.nextBuild = 0;
         // Rounds land many times a second; only some of them show as vapor,
         // or the cut disappears behind its own smoke.
         if (Math.random() < .3) puffWisp(wx + rand(-5, 5), wy + rand(-5, 5), rand(3.5, 7), cloud.vx);
+      }
+
+      // Gunfire removes matter at once. The outline catches up sharply while
+      // several small pieces keep moving outward from the missing chunk.
+      function impactCloud(cloud, wx, wy, rWorld) {
+        biteCloud(cloud, wx, wy, rWorld);
+        cloud.cutEnergy = 1;
+        cloud.flash = Math.max(cloud.flash, .85);
+        explodeCloudChunks(cloud, wx, wy, rWorld);
       }
 
       // ---------- per-frame cloud upkeep ----------
@@ -653,26 +622,37 @@
           const cloud = clouds[i];
           cloud.x += cloud.vx * dt;   // weather only ever pans, never rises
           if (cloud.cutCd > 0) cloud.cutCd -= dt;
+          if (cloud.cutEnergy > 0) cloud.cutEnergy = Math.max(0, cloud.cutEnergy - dt * 7);
           if (cloud.flash > 0) cloud.flash = Math.max(0, cloud.flash - dt * 1.6);
 
-          let healing = false;
+          let changing = false;
           for (let k = cloud.bites.length - 1; k >= 0; k--) {
             const b = cloud.bites[k];
             if (!b.heal) continue;
-            healing = true;
-            b.s -= b.heal * dt;
-            b.r -= b.heal * dt * 1.7;
-            if (b.s <= .12 || b.r <= 2.5) cloud.bites.splice(k, 1);
-          }
-          if (healing) cloud.dirty = true;
-
-          if (cloud.scale < cloud.growTo) {
-            cloud.scale = Math.min(cloud.growTo, cloud.scale + cloud.growRate * dt);
-            if (now > cloud.budAt) {
-              budCloud(cloud);
-              cloud.budAt = now + rand(.9, 2.1);
+            const settle = 1 - Math.exp(-dt * BITE_SETTLE);
+            b.x2 += ((b.tx2 ?? b.x2) - b.x2) * settle;
+            b.y2 += ((b.ty2 ?? b.y2) - b.y2) * settle;
+            b.r += (b.targetR - b.r) * settle;
+            b.s += (b.targetS - b.s) * settle;
+            if (b.hold > 0) b.hold -= dt;
+            else {
+              b.healAge = (b.healAge ?? 0) + dt;
+              b.healDuration ??= rand(HEAL_MIN, HEAL_MAX);
+              const progress = clamp(b.healAge / b.healDuration, 0, 1);
+              const flow = smootherstep(progress);
+              const maxR = b.maxR ?? b.r;
+              const maxS = b.maxS ?? b.s;
+              b.targetR = 2.5 + (maxR - 2.5) * (1 - flow);
+              // Keep the wound deep while its edges flow together. Fading the
+              // subtraction only near the end avoids a sudden threshold pop.
+              const fade = smootherstep(clamp((progress - .86) / .14, 0, 1));
+              b.targetS = maxS * (1 - fade);
             }
+            changing = true;
+            if (b.healAge >= b.healDuration && b.s <= .12) cloud.bites.splice(k, 1);
           }
+          if (changing) cloud.dirty = true;
+          easeCloudContours(cloud, dt);
 
           const ext = cloud.radius * cloud.scale;
           if (Math.hypot(cloud.x - cam.x, cloud.y - cam.y) > killR + ext) clouds.splice(i, 1);
@@ -708,61 +688,26 @@
           return;
         }
       }
-
-
-
-
-      function budCloud(cloud) {
-        if (cloud.puffs.length >= 20 || cloud.radius > cloud.size * 1.9) return;
-        const host = cloud.puffs[(Math.random() * cloud.puffs.length) | 0];
-        const a = rand(0, TAU);
-        const vr = host.vr * rand(.5, .78);
-        cloud.puffs.push({
-          x: host.x + Math.cos(a) * (host.vr + vr) * .72,
-          y: host.y + Math.sin(a) * (host.vr + vr) * .72,
-          vr,
-          r: vr / VIS,
-        });
-        updateBounds(cloud);
-        cloud.dirty = true;
-        cloud.nextBuild = 0;
-      }
-
       function processCloudGeometry() {
         let removed = null;
-        let spawned = null;
         for (const cloud of clouds) {
           if (!cloud.dirty || now < cloud.nextBuild) continue;
           cloud.dirty = false;
-          cloud.nextBuild = now + .06;
+          cloud.nextBuild = now + .032;
           const res = buildCloudGeometry(cloud);
           if (res.empty) {
             dissipate(cloud);
             (removed || (removed = new Set())).add(cloud);
             continue;
           }
-          if (res.pruned) {
-            cloud.dirty = true;
-            cloud.nextBuild = 0;
-            continue;
-          }
-          if (res.solids.length >= 2 && clouds.length < cloudTarget + 10) {
-            const kids = splitCloud(cloud, res.solids);
-            if (kids.length >= 2) {
-              (removed || (removed = new Set())).add(cloud);
-              (spawned || (spawned = [])).push(...kids);
-            }
+          if (res.solids.length >= 2) {
+            if (!cloud.severed) { cuts++; score += 300; }
+            cloud.severed = true;
+          } else {
+            cloud.severed = false;
           }
         }
         if (removed) clouds = clouds.filter((c) => !removed.has(c));
-        if (spawned) {
-          for (const kid of spawned) {
-            clouds.push(kid);
-            buildCloudGeometry(kid);
-            kid.dirty = true;
-            kid.nextBuild = now + .12;
-          }
-        }
       }
 
       // ---------- ship ----------
@@ -785,6 +730,7 @@
         updateClouds(dt);
         processCloudGeometry();
         updateWisps(dt);
+        updateCloudChunks(dt);
         updateStreaks(dt, cam.x - px, cam.y - py);
       }
 
@@ -810,9 +756,6 @@
         ship.x += ship.vx * dt;
         ship.y += ship.vy * dt;
 
-        ship.roll += (ship.turn - ship.roll) * Math.min(1, dt * 5);
-        ship.trail.push({ x: ship.x, y: ship.y });
-        if (ship.trail.length > TRAIL_MAX) ship.trail.shift();
         ship.fireCd -= dt;
       }
 
@@ -980,7 +923,7 @@
               const ext = cloud.radius * cloud.scale + 8;
               if (Math.abs(x - cloud.x) > ext || Math.abs(y - cloud.y) > ext) continue;
               if (fieldWorld(cloud, x, y) <= FIELD_T) continue;
-              biteCloud(cloud, x, y, r);
+              impactCloud(cloud, x, y, r);
               struck = true;
             }
           }
@@ -1037,6 +980,41 @@
         }
       }
 
+      function explodeCloudChunks(cloud, x, y, r) {
+        const outward = Math.atan2(y - cloud.y, x - cloud.x);
+        const count = 4 + ((Math.random() * 4) | 0);
+        for (let i = 0; i < count; i++) {
+          const a = outward + rand(-1.35, 1.35);
+          const speed = rand(42, 118);
+          chunks.push({
+            x: x + Math.cos(a) * rand(2, r * .3),
+            y: y + Math.sin(a) * rand(2, r * .3),
+            vx: Math.cos(a) * speed + cloud.vx,
+            vy: Math.sin(a) * speed,
+            size: rand(2.2, 5.8),
+            angle: rand(0, TAU),
+            spin: rand(-8, 8),
+            age: 0,
+            life: rand(.38, .72),
+            seed: rand(.72, 1.25),
+          });
+        }
+        if (chunks.length > MAX_CHUNKS) chunks.splice(0, chunks.length - MAX_CHUNKS);
+      }
+
+      function updateCloudChunks(dt) {
+        for (let i = chunks.length - 1; i >= 0; i--) {
+          const chunk = chunks[i];
+          chunk.age += dt;
+          if (chunk.age >= chunk.life) { chunks.splice(i, 1); continue; }
+          chunk.x += chunk.vx * dt;
+          chunk.y += chunk.vy * dt;
+          chunk.vx *= Math.max(0, 1 - dt * 1.8);
+          chunk.vy *= Math.max(0, 1 - dt * 1.8);
+          chunk.angle += chunk.spin * dt;
+        }
+      }
+
       function updateStreaks(dt, camDx, camDy) {
         for (const s of streaks) {
           s.x -= s.v * dt + camDx * s.depth;
@@ -1056,14 +1034,19 @@
         drawStreaks();
         ctx.save();
         ctx.translate(W / 2 - cam.x, H / 2 - cam.y);
-        drawTrail();
+        const visibleClouds = [];
         for (const cloud of clouds) {
           const ext = cloud.radius * cloud.scale + 30;
           if (Math.abs(cloud.x - cam.x) > W / 2 + ext) continue;
           if (Math.abs(cloud.y - cam.y) > H / 2 + ext) continue;
-          drawCloud(cloud);
+          visibleClouds.push(cloud);
         }
+        // Opaque bodies mask the distant haze first; outlines are composed in
+        // a second pass so nothing can show through a cloud's interior.
+        for (const cloud of visibleClouds) fillCloud(cloud);
+        for (const cloud of visibleClouds) drawCloud(cloud);
         drawWisps();
+        drawCloudChunks();
         drawBullets();
         drawShip();
         ctx.restore();
@@ -1080,14 +1063,74 @@
         const w1 = now * 1.15 + cloud.phase;
         const w2 = now * .63 - cloud.phase;
         const lift = cloud.flash * .18;
-        for (const loop of cloud.contours) {
+        for (const loop of cloud.renderContours) {
           const pts = loopPoints(cloud, loop, w1, w2);
-          strokePath(pts, true, 3.4, .05 + lift * .3);
-          strokePath(pts, true, 1.3, .76 + lift);
+          for (const run of visibleCloudRuns(cloud, pts)) {
+            strokePath(run.points, run.close, 3.4, .05 + lift * .3);
+            strokePath(run.points, run.close, 1.3, .76 + lift);
+          }
         }
-        for (const arc of cloud.detail) {
-          strokePath(loopPoints(cloud, arc, w1, w2), false, .95, .24 + lift * .5);
+      }
+
+      function fillCloud(cloud) {
+        const w1 = now * 1.15 + cloud.phase;
+        const w2 = now * .63 - cloud.phase;
+        ctx.save();
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        for (const loop of cloud.renderContours) {
+          const pts = loopPoints(cloud, loop, w1, w2);
+          if (!pts.length) continue;
+          ctx.moveTo(pts[0].x, pts[0].y);
+          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+          ctx.closePath();
         }
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // When two bodies overlap, hide every edge that falls inside the other
+      // body. The weather reads as one outer silhouette instead of nested
+      // circles or crossing construction lines.
+      function visibleCloudRuns(cloud, pts) {
+        const n = pts.length;
+        const visible = new Array(n);
+        let firstHidden = -1;
+        for (let i = 0; i < n; i++) {
+          const q = pts[(i + 1) % n];
+          visible[i] = !insideOtherCloud(cloud, (pts[i].x + q.x) * .5, (pts[i].y + q.y) * .5);
+          if (!visible[i] && firstHidden < 0) firstHidden = i;
+        }
+        if (firstHidden < 0) return [{ points: pts, close: true }];
+
+        const runs = [];
+        let run = null;
+        for (let step = 1; step <= n; step++) {
+          const i = (firstHidden + step) % n;
+          const q = pts[(i + 1) % n];
+          if (visible[i]) {
+            if (!run) run = [pts[i]];
+            run.push(q);
+          } else if (run) {
+            if (run.length > 1) runs.push({ points: run, close: false });
+            run = null;
+          }
+        }
+        if (run && run.length > 1) runs.push({ points: run, close: false });
+        return runs;
+      }
+
+      function insideOtherCloud(cloud, wx, wy) {
+        for (const other of clouds) {
+          if (other === cloud) continue;
+          const ext = other.radius * other.scale + 4;
+          if (Math.abs(wx - other.x) > ext || Math.abs(wy - other.y) > ext) continue;
+          const p = { x: (wx - other.x) / other.scale, y: (wy - other.y) / other.scale };
+          for (const loop of other.renderContours) {
+            if (pointInPolygon(p, loop)) return true;
+          }
+        }
+        return false;
       }
 
       function loopPoints(cloud, loop, w1, w2) {
@@ -1096,31 +1139,57 @@
         for (let i = 0; i < loop.length; i++) {
           const p = loop[i];
           const d = Math.sin(w1 + p.k) * 1.15 + Math.sin(w2 + p.k * 1.9) * .8;
-          out[i] = { x: cloud.x + (p.x + p.nx * d) * s, y: cloud.y + (p.y + p.ny * d) * s };
+          out[i] = {
+            x: cloud.x + (p.x + p.nx * d) * s,
+            y: cloud.y + (p.y + p.ny * d) * s,
+          };
         }
         return out;
       }
 
       function drawWisps() {
         for (const w of wisps) {
+          // Vapor born from a cut stays hidden until it clears the cloud's
+          // outer silhouette, so smoke can never read as construction lines.
+          if (insideCloudEnvelope(w.x, w.y)) continue;
           const p = clamp(w.age / w.life, 0, 1);
           const a = (1 - p) * .46;
-          const r = w.r * (1 + p * 1.5);
+          const len = w.r * (1.2 + p * 2.4);
+          const angle = Math.atan2(w.vy, w.vx || 1) + Math.sin(w.seed) * .45;
+          const ca = Math.cos(angle), sa = Math.sin(angle);
           const pts = [];
-          for (let i = 0; i < 13; i++) {
-            const ang = i / 13 * TAU;
-            const rr = r * (1 + Math.sin(ang * 3 + w.seed) * .13);
-            pts.push({ x: w.x + Math.cos(ang) * rr, y: w.y + Math.sin(ang) * rr });
+          for (let i = 0; i < 5; i++) {
+            const t = i / 4 - .5;
+            const bend = Math.sin(t * Math.PI * 2 + w.seed) * w.r * .16 * (1 - p);
+            pts.push({
+              x: w.x + ca * t * len - sa * bend,
+              y: w.y + sa * t * len + ca * bend,
+            });
           }
-          strokePath(pts, true, .9, a);
+          strokePath(pts, false, .8, a);
         }
       }
 
-      function drawTrail() {
-        const n = ship.trail.length;
-        for (let i = 1; i < n; i++) {
-          strokePath([ship.trail[i - 1], ship.trail[i]], false, 1, (i / n) * .3);
+      function drawCloudChunks() {
+        for (const chunk of chunks) {
+          const life = clamp(chunk.age / chunk.life, 0, 1);
+          const size = chunk.size * (1 - life * .45);
+          const pts = [];
+          for (let i = 0; i < 4; i++) {
+            const a = chunk.angle + i / 4 * TAU;
+            const r = size * (i % 2 ? chunk.seed : 1);
+            pts.push({ x: chunk.x + Math.cos(a) * r, y: chunk.y + Math.sin(a) * r });
+          }
+          strokePath(pts, true, .9, (1 - life) * .82);
         }
+      }
+
+      function insideCloudEnvelope(wx, wy) {
+        for (const cloud of clouds) {
+          const ext = cloud.radius * cloud.scale + 4;
+          if (Math.hypot(wx - cloud.x, wy - cloud.y) <= ext) return true;
+        }
+        return false;
       }
 
       function drawBullets() {
@@ -1130,18 +1199,16 @@
       }
 
       function drawShip() {
-        const rs = Math.cos(ship.roll * .95);
-        const bank = ship.roll * 2.6;
         const cx = ship.x, cy = ship.y;
         const nose = pointFrom(cx, cy, ship.a, 13, 0);
-        const left = pointFrom(cx, cy, ship.a, -8, -7.5 * rs);
-        const notch = pointFrom(cx, cy, ship.a, -4.5, bank);
-        const right = pointFrom(cx, cy, ship.a, -8, 7.5 * rs);
+        const left = pointFrom(cx, cy, ship.a, -8, -7.5);
+        const notch = pointFrom(cx, cy, ship.a, -4.5, 0);
+        const right = pointFrom(cx, cy, ship.a, -8, 7.5);
         strokePath([nose, left, notch, right], true, 1.25, ship.buried > .3 ? .66 : .95);
         if (ship.thrusting) {
-          const f1 = pointFrom(cx, cy, ship.a, -7, -3.2 * rs);
-          const f2 = pointFrom(cx, cy, ship.a, -15 - Math.sin(now * 64) * 4, bank * .4);
-          const f3 = pointFrom(cx, cy, ship.a, -7, 3.2 * rs);
+          const f1 = pointFrom(cx, cy, ship.a, -7, -3.2);
+          const f2 = pointFrom(cx, cy, ship.a, -15 - Math.sin(now * 64) * 4, 0);
+          const f3 = pointFrom(cx, cy, ship.a, -7, 3.2);
           strokePath([f1, f2, f3], false, .9, .6);
         }
       }

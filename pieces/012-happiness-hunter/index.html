@@ -51,7 +51,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Happiness Hunter: one yellow car and many gray cars slide between lanes, avoid obstacles, and score only when the yellow car passes traffic."
+      aria-label="Happiness Hunter: one yellow car and many gray cars slide between lanes on a narrow highway, passing alternating fields, avoiding obstacles, and scoring only when the yellow car passes traffic."
     ></canvas>
 
     <script>
@@ -69,6 +69,7 @@
         const ROAD_TRANSITION_METERS = 88;
         const HERO_YELLOW = '#ffd21f';
         const TRAFFIC_GRAYS = ['#545b65', '#656d78', '#777f8a', '#8a929d', '#9da4ae'];
+        const FIELD_COLORS = ['#233a27', '#4a3820', '#2f4828', '#342c45'];
         const COLORS = {
           sky: '#070910',
           asphalt: '#1a1f28',
@@ -193,7 +194,7 @@
           canvas.style.height = `${height}px`;
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           ctx.imageSmoothingEnabled = false;
-          roadWidth = Math.round(clamp(width * (width < 640 ? 0.88 : 0.68), 280, 760));
+          roadWidth = Math.round(clamp(width * (width < 640 ? 0.76 : 0.58), 250, 720));
           roadLeft = Math.round((width - roadWidth) / 2);
           laneWidth = roadWidth / LANES;
           metersToPixels = clamp(height / 138, 4.3, 7.4);
@@ -1169,11 +1170,42 @@
         function render(t) {
           ctx.fillStyle = COLORS.sky;
           ctx.fillRect(0, 0, width, height);
+          drawTravelFields();
           drawRoad();
           drawExits();
           drawObstacles(t);
           drawVehicles(t);
           drawHud(t);
+        }
+
+        function drawTravelFields() {
+          const parcelMeters = 18;
+          const nearestS = screenToWorldY(height);
+          const farthestS = screenToWorldY(0);
+          const firstParcel = Math.floor(nearestS / parcelMeters) - 1;
+          const lastParcel = Math.ceil(farthestS / parcelMeters) + 1;
+          const splitX = Math.round(width * 0.5);
+
+          for (let parcel = firstParcel; parcel <= lastParcel; parcel += 1) {
+            const top = Math.floor(worldToY((parcel + 1) * parcelMeters));
+            const bottom = Math.ceil(worldToY(parcel * parcelMeters));
+            const parcelHeight = Math.max(1, bottom - top);
+            const leftColor = FIELD_COLORS[mod(parcel, FIELD_COLORS.length)];
+            const rightColor = FIELD_COLORS[mod(parcel + 2, FIELD_COLORS.length)];
+
+            rect(0, top, splitX, parcelHeight + 1, leftColor);
+            rect(splitX, top, width - splitX, parcelHeight + 1, rightColor);
+            rect(0, top, width, 3, 'rgba(7, 9, 16, 0.42)');
+
+            const furrowColor = parcel % 2 === 0
+              ? 'rgba(255, 246, 201, 0.055)'
+              : 'rgba(7, 9, 16, 0.12)';
+            for (let x = 12; x < width; x += 24) {
+              rect(x, top + 5, 2, Math.max(0, parcelHeight - 9), furrowColor);
+            }
+          }
+
+          rect(splitX - 2, 0, 4, height, 'rgba(7, 9, 16, 0.24)');
         }
 
         function drawRoad() {

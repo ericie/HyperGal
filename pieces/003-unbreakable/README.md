@@ -7,17 +7,15 @@ inverts cleanly: the paddle's job stops being *defense* and becomes *supply*.
 A single paddle patrols the floor — shadowing the ball, physically incapable of
 missing — and lobs it upward over and over. Where the original game chips a
 brick away on contact, this one lays a brick down. An underside hit extends a
-tower and returns the ball to the paddle. A side hit fills an adjacent corridor
-cell and reverses only the horizontal motion. A climbing ball keeps climbing; a
-returning ball keeps falling instead of cutting through the tower.
+column and returns the ball to the paddle. Each trip follows one clean arc to
+one chosen column and back.
 
-The wall therefore grows *downward* toward the paddle and *inward* through its
-own passages. Each newly completed brick creeps the shared lattice upward,
-carrying old bricks off the top. The opening wall already fills roughly the top
-two-fifths of the screen, which shortens the ball's return cycle. It is never
-finished and never breached. Unbreakable.
+The wall grows *downward* toward the paddle. Each newly completed brick creeps
+the shared lattice upward, carrying old bricks off the top. The opening wall
+already fills roughly the top two-fifths of the screen, which shortens the
+ball's return cycle. It is never finished and never breached. Unbreakable.
 
-## Keeping it solid — and giving it shape
+## Keeping it solid — and level
 
 A single ball feeding a whole wall needs precise geometry without invisible
 guard rails. Three rules keep the construction coherent without sanding all of
@@ -26,44 +24,29 @@ its character away:
 - **Every brick is a real occupied cell.** Bricks store integer rows and
   columns, never freeform screen positions. Empty corridor cells have no hidden
   collision line; only a swept contact with an occupied brick can make an
-  impact. As old rows leave the screen, the moving lattice completes one real
-  occupied row across the top, keeping the ceiling watertight without a hidden
-  boundary.
-- **Brick faces behave differently.** An underside impact reserves the next
-  block beneath that brick and sends the ball down. A side impact reserves the
-  empty cell on the approached side while preserving the ball's vertical
-  direction. In both cases the new block locks in after the ball clears it, so
-  growth never embeds or teleports the ball. Corridors close behind the ricochet
-  instead of opening in front of it. A top-face contact also reflects; no
-  direction of travel is allowed to pass through a brick.
-- **The paddle develops temporary intentions.** It now favors longer, narrow
-  tower-building runs, occasionally switching to a deeper bank or repairing a
-  starved column. Taller towers create the side faces that turn the upper wall
-  into a reverse-Breakout pinball corridor. Tower depth has no imposed maximum.
+  impact. Every column starts on the same row. As old rows leave the screen,
+  the moving lattice completes one real occupied row across the top, keeping
+  the ceiling watertight without a hidden boundary.
+- **The exposed front is the only collision surface.** An underside impact
+  reserves the next block beneath that column and sends the ball down. The new
+  brick locks in only after the ball clears its cell, so growth never embeds or
+  teleports the ball.
+- **The paddle always chooses a nearest low column.** Each completed column is
+  excluded until the rest catch up, so the front advances in even passes while
+  the ball avoids wild cross-screen routes.
 
 Every newly completed cell advances the shared lattice upward by one column's
 fraction of a brick. A bounce that cannot add a genuinely empty cell does not
-move the grid. No timer or invisible boundary moves the wall, and tower depth
-has no placement limit.
+move the grid. No timer or invisible boundary moves the wall.
 
-The bomb is not a power-up or a random event. It is a recovery rule for a ball
-that keeps building without making it back to the paddle. Each bounce that
-successfully completes a new cell adds one to that trip's counter. Reaching the
-paddle resets the counter; reaching ten turns the ball into a bomb. A trapped
-ball stops, stays pinned to its pocket while it blinks three times, and blows an
-elliptical hole through nearby occupied cells. The spent bomb then falls through
-the wall without colliding; the paddle catches it and relaunches it as the normal
-building ball.
-
-Add `?debug` to the URL for a live overlay of ball, brick, front, underside-hit,
-side-hit, top-hit, completed-cell, current-trip, bomb, and pending-deposit stats.
+Add `?debug` to the URL for a live overlay of frame rate, ball and paddle state,
+wall hits, completed cells, front spread, missed deposits, and recoveries.
 
 ## Color
 
-The wall uses Growth Rings' Hokusai palette: wheat, pale yellow, Prussian blue,
-Tyrian purple, and burlywood against a deep green-black field. The opening wall
-is loosely randomized, while every five paddle-made bricks contain all five
-swatches with the blue and purple interleaved among the warmer tones.
+The wall uses Growth Rings' Renaissance palette: chestnut, pale brown, crimson,
+peach, and eggshell against a deep aubergine field. The opening wall is loosely
+randomized, while every five paddle-made bricks contain all five swatches.
 
 ## Interaction
 

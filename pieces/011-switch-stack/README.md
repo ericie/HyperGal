@@ -1,17 +1,19 @@
 # Switch Stack
 
-A pure black-and-white scroll piece about the exact moment a state changes.
+A black-and-white scroll piece with a hot-pink threshold, about the exact
+moment a state changes.
 
-The page is a tall stack of boxes, one or two per row. Every box begins black
-and says ON in block glyphs. Single-box rows shift width and alignment so the
-stack does not become a dead grid. As scrolling carries a box toward the
-vertical midpoint, a binary dither clears the surface from black to white. The
-state word clears a small binary field before drawing, so the label stays crisp
-while the surrounding box remains noisy. At the midpoint the surface is fully
-white and the word flips to OFF.
+The page is a varied-height masonry of boxes packed edge to edge. Half contain
+block-glyph ON/OFF labels; half contain utilitarian light-switch diagrams with
+a faceplate, screw heads, markings, pivot, and moving lever. Boxes below the
+hot-pink midpoint are black and ON; boxes above it are white and OFF. Crossing
+the line triggers a self-contained ten-frame binary transition instead of tying
+the fill amount to scroll position. Dither is restricted to word tiles; switch
+tiles keep solid fields while the lever travels toward its new marking over the
+same ten frames. The sequence reverses when a box crosses back.
 
 There are no gradients, opacity fades, gray values, external assets, external
-scripts, or dependencies. The piece is drawn with Canvas 2D rectangles in only
-`#000` and `#fff`.
+scripts, or dependencies. The piece is drawn with Canvas 2D rectangles in
+`#000`, `#fff`, and a single `#ff1493` overlay line.
 
 Open `index.html` directly in any browser.

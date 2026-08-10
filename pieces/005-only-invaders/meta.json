@@ -4,6 +4,6 @@
   "date": "2026-06-24",
   "category": "games",
   "type": "interactive",
-  "thumbnail": "thumbnail.svg",
-  "description": "Space Invaders after the invaders have vanished. Four defenders hold the top, right, bottom, and left edges, trading single shots, sudden volleys, and rare charged super bullets across an empty center. Every bullet is intercepted in midair; super bullets detonate in a white-screen shock that clears the field and resets the scores."
+  "thumbnail": "thumbnail.jpg",
+  "description": "Space Invaders after the invaders have vanished. Four defenders spend finite ammunition to attack and intercept only the bullets aimed at their own territory. When one reaches its last round, it deploys a suicide nuke whose shockwave destroys every cannon, including itself."
 }

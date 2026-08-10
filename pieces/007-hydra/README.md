@@ -1,31 +1,42 @@
 # hydra
 
-An autonomous game of traditional Snake, painted like a luminous fossil field.
+An autonomous game of traditional Snake, glowing like a flooded 8-bit cavern.
 
 There are five contenders and one mouse. New snakes enter from offscreen with
 random starting lengths and aggression values: higher aggression makes one chase
 the mouse harder, lower aggression makes it preserve more space around its own
-body and the other snakes. As a snake grows, its effective aggression rises, and
-every snake may look for chances to box another snake in when its available
-space is small relative to the hunter's body length. Consecutive mouse catches
-by the same snake increase its growth multiplier. The rule set stays small:
+body and the other snakes. Success compounds quickly. A repeat winner gains
+triangular growth, an increasing length bonus, a faster move interval, and an
+advantage in head-to-head collisions.
+
+The advantage is paired with judgment rather than recklessness. As a snake gets
+larger, it puts increasing weight on next-turn exits, reachable area, a route
+back to its moving tail, safe body clearance, and rival head threats. Once it
+has enough escape room, a very long snake folds into tighter parallel lanes
+instead of preserving every patch of open ground. Large snakes still hunt and
+box opponents, but will abandon the shortest route to the mouse when it could
+close a trap around themselves. The rule set stays small:
 
 - touching the **mouse** grows the snake and creates a new mouse,
-- consecutive mouse catches by the **same snake** grow it by 1x, 2x, 3x, ...,
-- larger snakes move faster and become more aggressive,
+- consecutive catches by the **same snake** grow it by 2, 4, 7, 11, ... segments,
+- established leaders earn an additional length bonus and move much faster,
+- larger snakes increasingly favor multi-step escape space over a tempting trap,
+- in a head-to-head collision, the larger snake survives; equal lengths break randomly,
 - touching the **border** kills the snake,
 - touching its **own body** anywhere kills the snake,
 - touching **another snake** kills one snake,
-- when the snake dies, its body remains as layered stain and bone memory,
+- when the snake dies, its body remains as a translucent watercolor stroke,
+- living snakes drag and feather those wet remains when they cross them,
 - once only one survivor remains, new contenders enter from beyond the border.
 
 ## The look
 
-Growth Rings' Hokusai palette: wheat, pale yellow, Prussian blue, Tyrian
-purple, and burlywood. The living snakes read as thick pigment marks on an
-ink-dark Prussian field with one pale mouse and a wheat border. Dead snakes
-accumulate like distressed woodblock impressions: rough bitmap brushstrokes,
-dry bristles, dark chips, and pale bone fragments under the living hunt.
+An underground Mega Man palette: near-black cavern navy, tile indigo, electric
+cobalt, water cyan, mineral violet and pink, with one tiny amber energy pickup.
+Living snakes are continuous, rounded bands of light rather than linked boxes.
+Dead snakes accumulate underneath as broad wet-on-wet gestures: a blurred
+underwash, layered translucent pigment, soft edge blooms, and long bristle trails.
+Crossing marks brighten and mingle into a shared subterranean mural.
 
 ## Interaction
 

@@ -44,35 +44,25 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Switch Stack: a scrollable stack of black and white boxes changes from ON to OFF at the vertical midpoint."
+      aria-label="Switch Stack: an edge-to-edge masonry of word labels and light-switch diagrams changes between ON and OFF as each box crosses a hot-pink line at the vertical midpoint."
     ></canvas>
 
     <script>
       (() => {
         const BLACK = '#000';
         const WHITE = '#fff';
+        const HOT_PINK = '#ff1493';
         const CELL_COLS = 30;
         const CELL_ROWS = 18;
-        const ROWS = [
-          { cols: 1, scale: 0.88, align: 0.5 },
-          { cols: 2 },
-          { cols: 2 },
-          { cols: 1, scale: 0.62, align: 0 },
-          { cols: 2 },
-          { cols: 1, scale: 0.76, align: 1 },
-          { cols: 2 },
-          { cols: 2 },
-          { cols: 1, scale: 0.68, align: 0.36 },
-          { cols: 2 },
-          { cols: 1, scale: 0.94, align: 0.5 },
-          { cols: 2 },
-          { cols: 2 },
-          { cols: 1, scale: 0.58, align: 1 },
-          { cols: 2 },
-          { cols: 1, scale: 0.78, align: 0.08 },
-          { cols: 2 },
-          { cols: 2 },
-          { cols: 1, scale: 0.72, align: 0.64 },
+        const TRANSITION_FRAMES = 10;
+        const FRAME_MS = 1000 / 60;
+        const TILE_RATIOS = [
+          0.72, 1.08, 0.86, 1.3, 0.64, 0.96, 1.18, 0.78,
+          1.38, 0.88, 1.04, 0.7, 1.24, 0.82, 1.12, 0.68,
+          0.94, 1.34, 0.76, 1.16, 0.84, 1.28, 0.66, 1,
+          1.2, 0.74, 1.4, 0.9, 1.1, 0.62, 1.26, 0.8,
+          1.02, 1.32, 0.7, 1.14, 0.86, 1.36, 0.76, 0.98,
+          1.22, 0.68, 1.06, 0.82, 1.3, 0.72, 1.16, 0.9,
         ];
         const GLYPHS = {
           O: ['11111', '10001', '10001', '10001', '10001', '10001', '11111'],
@@ -123,44 +113,39 @@
         }
 
         function compose() {
-          const margin = clamp(viewportW * 0.055, 18, 72);
-          const gap = Math.round(clamp(viewportW * 0.018, 12, 30));
-          const rowGap = Math.round(clamp(viewportH * 0.04, 22, 48));
-          const contentW = Math.round(Math.min(1160, viewportW - margin * 2));
-          const originX = Math.round((viewportW - contentW) / 2);
-          const topPad = Math.round(viewportH * 0.88);
-          const bottomPad = Math.round(viewportH * 0.78);
-          let y = topPad;
-          let id = 0;
+          const columns = Math.max(2, Math.min(5, Math.ceil(viewportW / 320)));
+          const columnHeights = Array(columns).fill(0);
 
           boxes = [];
-          for (const row of ROWS) {
-            const cols = row.cols;
-            const rowContentW = cols === 1 ? Math.round(contentW * row.scale) : contentW;
-            const boxW = cols === 1 ? rowContentW : Math.round((contentW - gap) / 2);
-            const boxH =
-              cols === 1
-                ? Math.round(clamp(boxW * 0.44, 170, 350))
-                : Math.round(clamp(boxW * 0.64, 150, 330));
-            const rowW = cols === 1 ? boxW : boxW * 2 + gap;
-            const rowX = Math.round(originX + (contentW - rowW) * (cols === 1 ? row.align : 0.5));
+          for (let id = 0; id < TILE_RATIOS.length; id += 1) {
+            const column = shortestColumn(columnHeights);
+            const x = Math.round((column * viewportW) / columns);
+            const nextX = Math.round(((column + 1) * viewportW) / columns);
+            const w = nextX - x;
+            const h = Math.max(112, Math.round(w * TILE_RATIOS[id]));
+            const y = columnHeights[column];
 
-            for (let col = 0; col < cols; col += 1) {
-              boxes.push({
-                id,
-                x: rowX + col * (boxW + gap),
-                y,
-                w: boxW,
-                h: boxH,
-                order: makeDitherOrder(id),
-              });
-              id += 1;
-            }
-
-            y += boxH + rowGap;
+            boxes.push({
+              id,
+              x,
+              y,
+              w,
+              h,
+              kind: id % 2 === 0 ? 'switch' : 'word',
+              order: makeDitherOrder(id),
+              initialized: false,
+              targetOff: false,
+              progress: 0,
+              fromProgress: 0,
+              toProgress: 0,
+              animationStart: 0,
+              animating: false,
+            });
+            columnHeights[column] += h;
           }
 
-          document.body.style.height = `${y + bottomPad}px`;
+          const contentH = Math.max(...columnHeights);
+          document.body.style.height = `${Math.max(viewportH, contentH + Math.ceil(viewportH / 2))}px`;
         }
 
         function requestRender() {
@@ -169,11 +154,11 @@
           requestAnimationFrame(render);
         }
 
-        function render() {
+        function render(now = performance.now()) {
           needsRender = false;
           const scrollY = pageYOffset || document.documentElement.scrollTop || 0;
           const midpoint = Math.round(viewportH / 2);
-          const reach = clamp(viewportH * 0.62, 280, 680);
+          let isAnimating = false;
 
           ctx.globalCompositeOperation = 'source-over';
           ctx.fillStyle = WHITE;
@@ -183,20 +168,69 @@
             const y = Math.round(box.y - scrollY);
             if (y > viewportH + 80 || y + box.h < -80) continue;
             const centerY = y + box.h / 2;
-            const rawProgress = clamp((midpoint + reach - centerY) / reach, 0, 1);
-            const progress = prefersReducedMotion ? (centerY <= midpoint ? 1 : 0) : smootherStep(rawProgress);
-            drawBox(box, y, progress, centerY <= midpoint);
+            const targetOff = centerY <= midpoint;
+
+            updateBoxState(box, targetOff, now);
+            isAnimating = box.animating || isAnimating;
+            drawBox(box, y);
           }
 
           drawMidpoint(midpoint);
+          if (isAnimating) requestRender();
         }
 
         function handleMotionPreference(event) {
           prefersReducedMotion = event.matches;
+          if (prefersReducedMotion) {
+            for (const box of boxes) {
+              box.progress = box.targetOff ? 1 : 0;
+              box.fromProgress = box.progress;
+              box.toProgress = box.progress;
+              box.animating = false;
+            }
+          }
           requestRender();
         }
 
-        function drawBox(box, y, progress, isOff) {
+        function updateBoxState(box, targetOff, now) {
+          const targetProgress = targetOff ? 1 : 0;
+
+          if (!box.initialized) {
+            box.initialized = true;
+            box.targetOff = targetOff;
+            box.progress = targetProgress;
+            box.fromProgress = targetProgress;
+            box.toProgress = targetProgress;
+            return;
+          }
+
+          if (targetOff !== box.targetOff) {
+            box.targetOff = targetOff;
+            box.fromProgress = box.progress;
+            box.toProgress = targetProgress;
+            box.animationStart = now;
+            box.animating = !prefersReducedMotion;
+
+            if (prefersReducedMotion) box.progress = targetProgress;
+          }
+
+          if (!box.animating) return;
+
+          const frame = Math.min(
+            TRANSITION_FRAMES,
+            Math.floor((now - box.animationStart) / FRAME_MS) + 1,
+          );
+          const amount = frame / TRANSITION_FRAMES;
+          box.progress = box.fromProgress + (box.toProgress - box.fromProgress) * amount;
+
+          if (frame === TRANSITION_FRAMES) {
+            box.progress = box.toProgress;
+            box.animating = false;
+          }
+        }
+
+        function drawBox(box, y) {
+          const progress = box.progress;
           const border = Math.round(clamp(Math.min(box.w, box.h) * 0.035, 5, 12));
           const innerX = box.x + border;
           const innerY = y + border;
@@ -206,7 +240,10 @@
           ctx.fillStyle = BLACK;
           ctx.fillRect(box.x, y, box.w, box.h);
 
-          if (progress >= 1) {
+          if (box.kind === 'switch') {
+            ctx.fillStyle = progress >= 0.52 ? WHITE : BLACK;
+            ctx.fillRect(innerX, innerY, innerW, innerH);
+          } else if (progress >= 1) {
             ctx.fillStyle = WHITE;
             ctx.fillRect(innerX, innerY, innerW, innerH);
           } else if (progress > 0) {
@@ -226,10 +263,136 @@
           }
 
           drawBorder(box.x, y, box.w, box.h, border);
+          const fieldIsWhite = progress >= 0.52;
+          const inkColor = fieldIsWhite ? BLACK : WHITE;
+          const fieldColor = fieldIsWhite ? WHITE : BLACK;
+
+          if (box.kind === 'switch') {
+            drawSwitchDiagram(box.x, y, box.w, box.h, progress, inkColor, fieldColor);
+            return;
+          }
+
           if (progress < 0.52) {
-            drawWord(isOff ? words.OFF : words.ON, box.x, y, box.w, box.h, WHITE, BLACK);
+            drawWord(box.targetOff ? words.OFF : words.ON, box.x, y, box.w, box.h, WHITE, BLACK);
           } else {
-            drawWord(isOff ? words.OFF : words.ON, box.x, y, box.w, box.h, BLACK, WHITE);
+            drawWord(box.targetOff ? words.OFF : words.ON, box.x, y, box.w, box.h, BLACK, WHITE);
+          }
+        }
+
+        function drawSwitchDiagram(x, y, w, h, offAmount, color, fieldColor) {
+          const plateH = Math.round(Math.min(h * 0.84, w * 1.05));
+          const plateW = Math.round(Math.min(w * 0.66, plateH * 0.7));
+          const plateX = Math.round(x + (w - plateW) / 2);
+          const plateY = Math.round(y + (h - plateH) / 2);
+          const unit = Math.max(2, Math.round(Math.min(plateW, plateH) * 0.035));
+          const screwSize = Math.max(3, unit * 2);
+          const centerX = Math.round(plateX + plateW / 2);
+          const pivotY = Math.round(plateY + plateH / 2);
+
+          ctx.fillStyle = fieldColor;
+          ctx.fillRect(plateX, plateY, plateW, plateH);
+          drawOutline(plateX, plateY, plateW, plateH, unit, color);
+
+          drawScrew(centerX, plateY + unit * 3, screwSize, color, fieldColor);
+          drawScrew(centerX, plateY + plateH - unit * 3, screwSize, color, fieldColor);
+
+          const labelCell = Math.max(
+            1,
+            Math.min(
+              Math.floor((plateW * 0.52) / words.OFF.cols),
+              Math.floor((plateH * 0.15) / words.OFF.rows),
+            ),
+          );
+          drawMiniWord(
+            words.ON,
+            centerX,
+            plateY + Math.round(plateH * 0.19),
+            labelCell,
+            color,
+          );
+          drawMiniWord(
+            words.OFF,
+            centerX,
+            plateY + Math.round(plateH * 0.81),
+            labelCell,
+            color,
+          );
+
+          const openingW = Math.max(unit * 6, Math.round(plateW * 0.34));
+          const openingH = Math.max(unit * 9, Math.round(plateH * 0.36));
+          const openingX = Math.round(centerX - openingW / 2);
+          const openingY = Math.round(pivotY - openingH / 2);
+          ctx.fillStyle = color;
+          ctx.fillRect(openingX, openingY, openingW, openingH);
+          ctx.fillStyle = fieldColor;
+          ctx.fillRect(
+            openingX + unit,
+            openingY + unit,
+            openingW - unit * 2,
+            openingH - unit * 2,
+          );
+
+          const travelY = openingH * 0.28;
+          const travelX = openingW * 0.16;
+          const endX = centerX + lerp(travelX, -travelX, offAmount);
+          const endY = pivotY + lerp(-travelY, travelY, offAmount);
+
+          ctx.save();
+          ctx.strokeStyle = color;
+          ctx.lineWidth = unit * 2;
+          ctx.lineCap = 'square';
+          ctx.beginPath();
+          ctx.moveTo(centerX, pivotY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+          ctx.restore();
+
+          const capW = Math.max(unit * 4, Math.round(openingW * 0.56));
+          const capH = Math.max(unit * 2, Math.round(openingH * 0.09));
+          ctx.fillStyle = color;
+          ctx.fillRect(
+            Math.round(endX - capW / 2),
+            Math.round(endY - capH / 2),
+            capW,
+            capH,
+          );
+
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(centerX, pivotY, unit * 2.1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = fieldColor;
+          ctx.beginPath();
+          ctx.arc(centerX, pivotY, unit * 0.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        function drawOutline(x, y, w, h, thickness, color) {
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, w, thickness);
+          ctx.fillRect(x, y + h - thickness, w, thickness);
+          ctx.fillRect(x, y, thickness, h);
+          ctx.fillRect(x + w - thickness, y, thickness, h);
+        }
+
+        function drawScrew(centerX, centerY, size, color, fieldColor) {
+          const x = Math.round(centerX - size / 2);
+          const y = Math.round(centerY - size / 2);
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, size, size);
+          ctx.fillStyle = fieldColor;
+          ctx.fillRect(centerX - Math.max(1, Math.floor(size * 0.32)), centerY, Math.max(2, Math.floor(size * 0.64)), 1);
+        }
+
+        function drawMiniWord(word, centerX, centerY, cell, color) {
+          const wordW = word.cols * cell;
+          const wordH = word.rows * cell;
+          const startX = Math.round(centerX - wordW / 2);
+          const startY = Math.round(centerY - wordH / 2);
+
+          ctx.fillStyle = color;
+          for (const dot of word.dots) {
+            ctx.fillRect(startX + dot.x * cell, startY + dot.y * cell, cell, cell);
           }
         }
 
@@ -260,12 +423,17 @@
         }
 
         function drawMidpoint(midpoint) {
-          const h = Math.round(clamp(viewportH * 0.012, 6, 14));
-          ctx.save();
-          ctx.globalCompositeOperation = 'difference';
-          ctx.fillStyle = WHITE;
+          const h = Math.round(clamp(viewportH * 0.006, 4, 8));
+          ctx.fillStyle = HOT_PINK;
           ctx.fillRect(0, midpoint - Math.floor(h / 2), viewportW, h);
-          ctx.restore();
+        }
+
+        function shortestColumn(heights) {
+          let result = 0;
+          for (let index = 1; index < heights.length; index += 1) {
+            if (heights[index] < heights[result]) result = index;
+          }
+          return result;
         }
 
         function makeWord(text) {
@@ -307,9 +475,8 @@
           return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
         }
 
-        function smootherStep(value) {
-          const t = clamp(value, 0, 1);
-          return t * t * t * (t * (t * 6 - 15) + 10);
+        function lerp(start, end, amount) {
+          return start + (end - start) * amount;
         }
 
         function clamp(value, min, max) {

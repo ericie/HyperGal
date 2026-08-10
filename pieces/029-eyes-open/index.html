@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <title>Eyes Open · HyperGal</title>
+    <style>
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+      }
+
+      body {
+        padding:
+          env(safe-area-inset-top)
+          env(safe-area-inset-right)
+          env(safe-area-inset-bottom)
+          env(safe-area-inset-left);
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="field"
+      role="img"
+      aria-label="Colored eyes opening and blinking away on a black field"
+    ></canvas>
+
+    <script>
+      (() => {
+        'use strict';
+
+        const canvas = document.getElementById('field');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const motion = matchMedia('(prefers-reduced-motion: reduce)');
+        const palette = [
+          '#ef3ea7', // hot pink
+          '#20b66b', // green
+          '#22a8e8', // cyan blue
+          '#f2ca3a', // yellow
+          '#f06b45', // orange
+          '#8d62d8', // violet
+        ];
+
+        let width = 0;
+        let height = 0;
+        let pixelRatio = 1;
+        let eyes = [];
+        let frameRequest = 0;
+        let lastTime = 0;
+        let resizeRequest = 0;
+        let safeArea = { top: 0, right: 0, bottom: 0, left: 0 };
+
+        const random = (min, max) => min + Math.random() * (max - min);
+        const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+        const easeOutQuart = value => 1 - Math.pow(1 - value, 4);
+        const smootherstep = value => value * value * value * (value * (value * 6 - 15) + 10);
+
+        function eyeCount() {
+          // About 15–18 eyes on contemporary portrait phones, with a ceiling
+          // that keeps large desktop canvases airy instead of turning into a grid.
+          return clamp(Math.round((width * height) / 22000), 12, 32);
+        }
+
+        function baseEyeWidth() {
+          const cell = Math.sqrt((width * height) / eyeCount());
+          return clamp(cell * 0.64, 58, 138);
+        }
+
+        function makeEye(now, initial = false) {
+          const base = baseEyeWidth();
+          const eye = {
+            x: width * 0.5,
+            y: height * 0.5,
+            width: base * random(0.72, 1.26),
+            height: 0,
+            angle: random(-0.12, 0.12),
+            iris: palette[(Math.random() * palette.length) | 0],
+            gazeX: random(-0.12, 0.12),
+            gazeY: random(-0.09, 0.09),
+            openFor: random(0.32, 0.52),
+            holdFor: random(1.8, 5.2),
+            closeFor: random(0.2, 0.36),
+            goneFor: random(0.12, 0.72),
+            bornAt: now,
+          };
+
+          eye.height = eye.width * random(0.38, 0.48);
+          placeEye(eye);
+
+          if (initial && !motion.matches) {
+            const visibleSpan = eye.openFor + eye.holdFor + eye.closeFor;
+            // Begin mostly in the visible part of the cycle so a phone opens
+            // immediately with the requested 10–20 eyes rather than an empty field.
+            eye.bornAt -= random(eye.openFor * 0.35, visibleSpan * 0.88) * 1000;
+          }
+
+          return eye;
+        }
+
+        function placeEye(eye) {
+          const edge = Math.max(10, Math.min(width, height) * 0.025);
+          const minX = safeArea.left + edge + eye.width * 0.53;
+          const maxX = width - safeArea.right - edge - eye.width * 0.53;
+          const minY = safeArea.top + edge + eye.height * 0.72;
+          const maxY = height - safeArea.bottom - edge - eye.height * 0.72;
+          let best = null;
+
+          for (let attempt = 0; attempt < 70; attempt++) {
+            const x = random(minX, maxX);
+            const y = random(minY, maxY);
+            let clearance = Infinity;
+
+            for (const other of eyes) {
+              if (other === eye) continue;
+              const dx = x - other.x;
+              const dy = y - other.y;
+              const distance = Math.hypot(dx, dy);
+              const needed = (eye.width + other.width) * 0.34;
+              clearance = Math.min(clearance, distance - needed);
+            }
+
+            if (!best || clearance > best.clearance) best = { x, y, clearance };
+            if (clearance > 6) break;
+          }
+
+          eye.x = best ? best.x : random(0, width);
+          eye.y = best ? best.y : random(0, height);
+        }
+
+        function recycleEye(eye, now) {
+          const base = baseEyeWidth();
+          eye.width = base * random(0.72, 1.26);
+          eye.height = eye.width * random(0.38, 0.48);
+          eye.angle = random(-0.12, 0.12);
+          eye.iris = palette[(Math.random() * palette.length) | 0];
+          eye.gazeX = random(-0.12, 0.12);
+          eye.gazeY = random(-0.09, 0.09);
+          eye.openFor = random(0.32, 0.52);
+          eye.holdFor = random(1.8, 5.2);
+          eye.closeFor = random(0.2, 0.36);
+          eye.goneFor = random(0.12, 0.72);
+          eye.bornAt = now;
+          placeEye(eye);
+        }
+
+        function openness(eye, now) {
+          if (motion.matches) return 1;
+
+          const age = (now - eye.bornAt) / 1000;
+          const closeAt = eye.openFor + eye.holdFor;
+          const goneAt = closeAt + eye.closeFor;
+          const cycleEnd = goneAt + eye.goneFor;
+
+          if (age < eye.openFor) return easeOutQuart(clamp(age / eye.openFor, 0, 1));
+          if (age < closeAt) return 1;
+          if (age < goneAt) return 1 - smootherstep((age - closeAt) / eye.closeFor);
+          if (age >= cycleEnd) recycleEye(eye, now);
+          return 0;
+        }
+
+        function eyePath(eye, amount) {
+          const halfWidth = eye.width * 0.5;
+          const lid = eye.height * amount;
+          ctx.beginPath();
+          ctx.moveTo(-halfWidth, 0);
+          ctx.quadraticCurveTo(0, -lid, halfWidth, 0);
+          ctx.quadraticCurveTo(0, lid, -halfWidth, 0);
+          ctx.closePath();
+        }
+
+        function drawEye(eye, amount) {
+          // Below this threshold the lids have met: the eye is absent, not a
+          // lingering line. That hard disappearance is the central behavior.
+          if (amount < 0.018) return;
+
+          ctx.save();
+          ctx.translate(eye.x, eye.y);
+          ctx.rotate(eye.angle);
+
+          eyePath(eye, amount);
+          ctx.fillStyle = '#f1f0eb';
+          ctx.fill();
+
+          ctx.save();
+          eyePath(eye, amount);
+          ctx.clip();
+
+          const irisRadius = eye.height * 0.48;
+          const irisX = eye.gazeX * eye.width;
+          const irisY = eye.gazeY * eye.height;
+
+          ctx.beginPath();
+          ctx.arc(irisX, irisY, irisRadius, 0, Math.PI * 2);
+          ctx.fillStyle = eye.iris;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(irisX, irisY, irisRadius * 0.39, 0, Math.PI * 2);
+          ctx.fillStyle = '#080808';
+          ctx.fill();
+          ctx.restore();
+
+          // A compact black keyline preserves the screen-printed graphic edge
+          // of the reference without separating the eye from the black field.
+          eyePath(eye, amount);
+          ctx.lineWidth = clamp(eye.width * 0.025, 1.5, 3.5);
+          ctx.strokeStyle = '#080808';
+          ctx.stroke();
+
+          ctx.restore();
+        }
+
+        function render(now = performance.now()) {
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, width, height);
+
+          for (const eye of eyes) drawEye(eye, openness(eye, now));
+        }
+
+        function frame(now) {
+          if (!lastTime) lastTime = now;
+          render(now);
+          lastTime = now;
+          frameRequest = requestAnimationFrame(frame);
+        }
+
+        function seed() {
+          eyes = [];
+          const now = performance.now();
+          const count = eyeCount();
+          for (let index = 0; index < count; index++) {
+            eyes.push(makeEye(now, true));
+          }
+        }
+
+        function start() {
+          cancelAnimationFrame(frameRequest);
+          frameRequest = 0;
+          lastTime = 0;
+          render();
+          if (!motion.matches && !document.hidden) {
+            frameRequest = requestAnimationFrame(frame);
+          }
+        }
+
+        function resize() {
+          pixelRatio = Math.min(devicePixelRatio || 1, 2.5);
+          width = innerWidth;
+          height = innerHeight;
+          const bodyStyle = getComputedStyle(document.body);
+          safeArea = {
+            top: parseFloat(bodyStyle.paddingTop) || 0,
+            right: parseFloat(bodyStyle.paddingRight) || 0,
+            bottom: parseFloat(bodyStyle.paddingBottom) || 0,
+            left: parseFloat(bodyStyle.paddingLeft) || 0,
+          };
+          canvas.width = Math.round(width * pixelRatio);
+          canvas.height = Math.round(height * pixelRatio);
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+          seed();
+          start();
+        }
+
+        addEventListener('resize', () => {
+          cancelAnimationFrame(resizeRequest);
+          resizeRequest = requestAnimationFrame(resize);
+        });
+
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) {
+            cancelAnimationFrame(frameRequest);
+            frameRequest = 0;
+          } else {
+            const now = performance.now();
+            for (const eye of eyes) eye.bornAt = now - random(0.4, 3.2) * 1000;
+            start();
+          }
+        });
+
+        const onMotionChange = () => {
+          seed();
+          start();
+        };
+
+        if (motion.addEventListener) motion.addEventListener('change', onMotionChange);
+        else motion.addListener(onMotionChange);
+
+        resize();
+      })();
+    </script>
+  </body>
+</html>

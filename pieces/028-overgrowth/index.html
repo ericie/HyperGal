@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="A richly layered procedural botanical illustration drawn fresh on every opening."
+    />
+    <title>Overgrowth · HyperGal</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #e99886;
+      }
+
+      body {
+        overscroll-behavior: none;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      canvas:focus-visible {
+        outline: 3px solid #fff8e8;
+        outline-offset: -7px;
+      }
+
+      .sr-only {
+        position: fixed;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="garden"
+      tabindex="0"
+      role="img"
+      aria-label="Overgrowth. A dense procedural botanical illustration on coral, filled with layered roses, peonies, poppies, lilies, daisies, anemones, hydrangeas, stems, and foliage. Click or press R to draw a new garden."
+    ></canvas>
+    <p id="status" class="sr-only" aria-live="polite"></p>
+
+    <script>
+      (() => {
+        'use strict';
+
+        const canvas = document.getElementById('garden');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const status = document.getElementById('status');
+        const TAU = Math.PI * 2;
+        const GOLDEN = 0.61803398875;
+
+        const colors = {
+          ground: '#e99886',
+          groundLight: '#f5b09a',
+          grain: '#b9535a',
+          cream: '#fff7df',
+          white: '#fffdf2',
+          pollen: '#f2c536',
+          umber: '#5a241f',
+          burgundy: '#711b31',
+          oxblood: '#8e1736',
+          vermilion: '#d9412d',
+          orange: '#ef6a2e',
+          apricot: '#f4a340',
+          blush: '#efada7',
+          plum: '#772246',
+          blue: '#3f7185',
+          blueDark: '#274d59',
+          leafDark: '#123f3c',
+          leaf: '#24624e',
+          leafMid: '#3d7a59',
+          leafLight: '#699266',
+          olive: '#6f7c3e',
+          stem: '#315b43',
+          vein: '#bdd09a',
+        };
+
+        const species = [
+          { name: 'garden rose', flower: 'rose', bloomCount: [1, 3], leaf: 'rose', scale: [0.72, 1.18] },
+          { name: 'peony', flower: 'peony', bloomCount: [1, 2], leaf: 'round', scale: [0.8, 1.2] },
+          { name: 'cosmos', flower: 'cosmos', bloomCount: [2, 5], leaf: 'fine', scale: [0.66, 1.02] },
+          { name: 'wild poppy', flower: 'poppy', bloomCount: [1, 3], leaf: 'fine', scale: [0.78, 1.1] },
+          { name: 'white daisy', flower: 'daisy', bloomCount: [2, 5], leaf: 'small', scale: [0.62, 0.98] },
+          { name: 'tiger lily', flower: 'lily', bloomCount: [1, 3], leaf: 'lance', scale: [0.74, 1.08] },
+          { name: 'hydrangea', flower: 'hydrangea', bloomCount: [1, 2], leaf: 'round', scale: [0.78, 1.16] },
+          { name: 'blue anemone', flower: 'anemone', bloomCount: [1, 4], leaf: 'small', scale: [0.66, 1.02] },
+          { name: 'greenery', flower: 'none', bloomCount: [0, 0], leaf: 'large', scale: [0.84, 1.28] },
+        ];
+
+        let width = 1;
+        let height = 1;
+        let dpr = 1;
+        let plants = [];
+        let seed = 0x7a43e19;
+        let random = mulberry32(seed);
+        let nextId = 1;
+        let resizeFrame = 0;
+
+        resize(true);
+        bindEvents();
+        regrow();
+
+        function bindEvents() {
+          addEventListener('resize', () => {
+            cancelAnimationFrame(resizeFrame);
+            resizeFrame = requestAnimationFrame(() => {
+              resize(false);
+              regrow();
+            });
+          }, { passive: true });
+          canvas.addEventListener('pointerdown', () => {
+            seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
+            regrow();
+            announce('A new garden was drawn');
+          });
+          canvas.addEventListener('keydown', (event) => {
+            if (event.key === 'r' || event.key === 'R' || event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              seed = (seed + 0x9e3779b9) >>> 0;
+              regrow();
+              announce('A new garden was drawn');
+            }
+          });
+        }
+
+        function resize(firstRun) {
+          const oldWidth = width;
+          const oldHeight = height;
+          width = Math.max(1, innerWidth);
+          height = Math.max(1, innerHeight);
+          if (!firstRun && width === oldWidth && height === oldHeight) return;
+
+          dpr = Math.min(2, devicePixelRatio || 1);
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          if (!firstRun && plants.length) {
+            const sx = width / oldWidth;
+            const sy = height / oldHeight;
+            for (const plant of plants) {
+              plant.x *= sx;
+              plant.y *= sy;
+            }
+          }
+        }
+
+        function regrow() {
+          random = mulberry32(seed);
+          nextId = 1;
+          plants = [];
+
+          const area = width * height;
+          const count = clamp(Math.round(area / 14500), 46, 92);
+          const cols = Math.max(4, Math.round(Math.sqrt(count * width / height)));
+          const rows = Math.ceil(count / cols);
+          const cellW = width / cols;
+          const cellH = height / rows;
+
+          for (let i = 0; i < count; i += 1) {
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            const x = (col + 0.12 + random() * 0.86) * cellW;
+            const y = (row + 0.7 + random() * 0.62) * cellH;
+            const forced = i < species.length ? i : null;
+            const plant = createPlant(x, y, forced);
+            plant.depth = i + random();
+            plants.push(plant);
+          }
+
+          // Let several stems enter from beyond the frame like a cut textile repeat.
+          for (let i = 0; i < 14; i += 1) {
+            const edge = i % 4;
+            const x = edge === 0 ? -10 : edge === 1 ? width + 10 : random() * width;
+            const y = edge === 2 ? 30 : edge === 3 ? height + 80 : random() * height;
+            const plant = createPlant(x, y, i % species.length);
+            plant.scale *= 1.12;
+            plant.depth = i % 2 ? -10 + i : count + i;
+            plants.push(plant);
+          }
+
+          // Large foreground blooms create the generous overlaps of a printed floral textile.
+          const anchors = Math.round(clamp(area / 150000, 5, 10));
+          const anchorTypes = [0, 1, 3, 6, 5, 0, 1, 6, 3, 7];
+          for (let i = 0; i < anchors; i += 1) {
+            const plant = createPlant(
+              ((i + 0.12 + random() * 0.76) / anchors) * width,
+              lerp(height * 0.38, height * 1.34, random()),
+              anchorTypes[i]
+            );
+            plant.scale *= lerp(1.48, 1.92, random());
+            plant.depth = count + 20 + i;
+            plants.push(plant);
+          }
+
+          sortPlants();
+          draw();
+          plants = [];
+        }
+
+        function createPlant(x, y, forcedSpecies) {
+          const typeIndex = forcedSpecies == null
+            ? weightedSpecies(random())
+            : forcedSpecies % species.length;
+          const type = species[typeIndex];
+          const localSeed = (Math.floor(random() * 0xffffffff) ^ nextId * 2654435761) >>> 0;
+          const r = mulberry32(localSeed);
+          const scale = lerp(type.scale[0], type.scale[1], r()) * clamp(Math.min(width, height) / 590, 0.9, 1.48);
+          const heightLocal = lerp(125, 230, r());
+          const lean = lerp(-45, 45, r());
+          const bloomCount = randInt(r, type.bloomCount[0], type.bloomCount[1]);
+          const branchCount = Math.max(bloomCount, randInt(r, 2, type.flower === 'none' ? 6 : 5));
+          const branches = [];
+          const leaves = [];
+          const blooms = [];
+
+          for (let i = 0; i < branchCount; i += 1) {
+            const t = (i + 1) / (branchCount + 1);
+            const side = i % 2 ? 1 : -1;
+            const spread = lerp(20, 56, r()) * side * (0.45 + t * 0.7);
+            const start = pointOnStem(t * 0.78, heightLocal, lean);
+            const end = {
+              x: start.x + spread,
+              y: start.y - lerp(22, 60, r()) * (0.55 + t * 0.5),
+            };
+            branches.push({
+              start,
+              end,
+              bend: spread * 0.35,
+              width: lerp(1.1, 2.2, r()),
+              bud: type.flower !== 'none' && r() > 0.64,
+              budSize: lerp(4.5, 8.5, r()),
+            });
+            leaves.push(makeLeaf(r, start.x + spread * 0.48, start.y + (end.y - start.y) * 0.45, spread > 0 ? -0.35 : Math.PI + 0.35, type.leaf, t));
+            if (r() > 0.28 || type.flower === 'none') {
+              const stemPoint = pointOnStem(clamp(t * 0.82 + 0.08, 0.1, 0.86), heightLocal, lean);
+              leaves.push(makeLeaf(r, stemPoint.x, stemPoint.y, spread > 0 ? Math.PI - 0.22 : 0.22, type.leaf, t));
+            }
+          }
+
+          if (type.flower !== 'none') {
+            for (let i = 0; i < bloomCount; i += 1) {
+              let at;
+              if (i === 0) {
+                at = pointOnStem(1, heightLocal, lean);
+              } else {
+                const branch = branches[(i * 2 - 1) % branches.length];
+                at = branch.end;
+              }
+              const baseSize = flowerSize(type.flower);
+              blooms.push({
+                x: at.x,
+                y: at.y,
+                r: baseSize * lerp(0.78, 1.24, r()),
+                rotation: r() * TAU,
+                phase: r() * TAU,
+                variant: r(),
+              });
+            }
+          } else {
+            leaves.push(makeLeaf(r, lean, -heightLocal, lean > 0 ? -0.2 : Math.PI + 0.2, 'large', 1));
+          }
+
+          const plant = {
+            id: nextId++,
+            x,
+            y,
+            depth: plants.length,
+            typeIndex,
+            name: type.name,
+            flower: type.flower,
+            scale,
+            rotation: lerp(-0.16, 0.16, r()),
+            height: heightLocal,
+            lean,
+            trunkWidth: lerp(1.6, 3.1, r()),
+            branches,
+            leaves,
+            blooms,
+            seed: localSeed,
+          };
+          return plant;
+        }
+
+        function makeLeaf(r, x, y, angle, kind, t) {
+          const sizeByKind = {
+            rose: [16, 28], round: [20, 36], fine: [8, 16], small: [12, 21],
+            lance: [13, 29], large: [27, 49],
+          };
+          const range = sizeByKind[kind] || sizeByKind.rose;
+          return {
+            x,
+            y,
+            angle: angle + lerp(-0.28, 0.28, r()),
+            length: lerp(range[0], range[1], r()) * (0.7 + t * 0.35),
+            width: lerp(0.38, 0.62, r()),
+            kind,
+            shade: r(),
+            phase: r() * TAU,
+          };
+        }
+
+        function pointOnStem(t, h, lean) {
+          const eased = t * t * (3 - 2 * t);
+          return {
+            x: lean * eased + Math.sin(t * Math.PI) * lean * 0.14,
+            y: -h * t,
+          };
+        }
+
+        function flowerSize(kind) {
+          return {
+            rose: 26, peony: 31, cosmos: 19, poppy: 26,
+            daisy: 18, lily: 28, hydrangea: 34, anemone: 20,
+          }[kind] || 20;
+        }
+
+        function weightedSpecies(r) {
+          const weights = [15, 11, 13, 10, 13, 9, 8, 9, 12];
+          let value = r * weights.reduce((sum, n) => sum + n, 0);
+          for (let i = 0; i < weights.length; i += 1) {
+            value -= weights[i];
+            if (value <= 0) return i;
+          }
+          return weights.length - 1;
+        }
+
+        function draw() {
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.fillStyle = colors.ground;
+          ctx.fillRect(0, 0, width, height);
+          drawGroundGrain();
+
+          for (const plant of plants) drawPlant(plant);
+          drawPrintFinish();
+        }
+
+        function drawGroundGrain() {
+          ctx.save();
+          const wash = ctx.createRadialGradient(
+            width * 0.38,
+            height * 0.28,
+            0,
+            width * 0.48,
+            height * 0.52,
+            Math.max(width, height) * 0.82
+          );
+          wash.addColorStop(0, colors.groundLight);
+          wash.addColorStop(0.55, colors.ground);
+          wash.addColorStop(1, '#d88178');
+          ctx.fillStyle = wash;
+          ctx.fillRect(0, 0, width, height);
+
+          const paperRandom = mulberry32((seed ^ 0x4f93a671) >>> 0);
+          ctx.globalAlpha = 0.026;
+          for (let i = 0; i < 180; i += 1) {
+            const x = paperRandom() * width;
+            const y = paperRandom() * height;
+            const radius = lerp(16, 86, paperRandom());
+            ctx.fillStyle = paperRandom() > 0.5 ? colors.cream : colors.grain;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, TAU);
+            ctx.fill();
+          }
+
+          ctx.globalAlpha = 0.07;
+          ctx.fillStyle = colors.grain;
+          const spacing = 17;
+          const offset = (seed % spacing + spacing) % spacing;
+          for (let y = offset; y < height; y += spacing) {
+            for (let x = (y / spacing % 2) * 8; x < width; x += spacing) {
+              const n = hash2(x, y, seed);
+              if (n > 0.58) ctx.fillRect(x, y, n > 0.84 ? 1.4 : 0.8, 0.8);
+            }
+          }
+          ctx.restore();
+        }
+
+        function drawPrintFinish() {
+          const r = mulberry32((seed ^ 0xd13975ab) >>> 0);
+          ctx.save();
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.strokeStyle = '#7b4946';
+          ctx.lineWidth = 0.45;
+          ctx.globalAlpha = 0.08;
+          for (let i = 0; i < Math.round(width * height / 1700); i += 1) {
+            const x = r() * width;
+            const y = r() * height;
+            const length = lerp(1.5, 8, r());
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + length, y + lerp(-0.8, 0.8, r()));
+            ctx.stroke();
+          }
+          ctx.globalCompositeOperation = 'screen';
+          ctx.fillStyle = '#fff6de';
+          ctx.globalAlpha = 0.045;
+          for (let i = 0; i < Math.round(width * height / 2600); i += 1) {
+            const x = r() * width;
+            const y = r() * height;
+            ctx.fillRect(x, y, lerp(0.4, 1.2, r()), lerp(0.4, 1.2, r()));
+          }
+          ctx.restore();
+        }
+
+        function drawPlant(plant) {
+          ctx.save();
+          ctx.translate(plant.x, plant.y);
+          ctx.rotate(plant.rotation);
+          ctx.scale(plant.scale, plant.scale);
+
+          drawStem(plant);
+
+          for (let i = 0; i < plant.branches.length; i += 1) {
+            drawBranch(plant.branches[i]);
+            if (plant.branches[i].bud) drawBud(plant.branches[i], plant.flower);
+          }
+
+          for (const leaf of plant.leaves) {
+            drawLeaf(leaf);
+          }
+
+          for (const bloom of plant.blooms) {
+            ctx.save();
+            ctx.translate(bloom.x, bloom.y);
+            ctx.rotate(bloom.rotation);
+            drawFlower(plant.flower, bloom, plant.seed);
+            ctx.restore();
+          }
+
+          ctx.restore();
+        }
+
+        function drawStem(plant) {
+          ctx.save();
+          ctx.lineCap = 'round';
+          ctx.lineWidth = plant.trunkWidth;
+          ctx.strokeStyle = colors.stem;
+          ctx.beginPath();
+          ctx.moveTo(0, 3);
+          ctx.bezierCurveTo(
+            plant.lean * 0.05,
+            -plant.height * 0.32,
+            plant.lean * 0.7,
+            -plant.height * 0.7,
+            plant.lean,
+            -plant.height
+          );
+          ctx.stroke();
+          ctx.globalAlpha = 0.55;
+          ctx.lineWidth = Math.max(0.45, plant.trunkWidth * 0.3);
+          ctx.strokeStyle = colors.vein;
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        function drawBranch(branch) {
+          ctx.save();
+          ctx.lineCap = 'round';
+          ctx.lineWidth = branch.width;
+          ctx.strokeStyle = colors.stem;
+          ctx.beginPath();
+          ctx.moveTo(branch.start.x, branch.start.y);
+          ctx.quadraticCurveTo(
+            (branch.start.x + branch.end.x) * 0.5 + branch.bend,
+            (branch.start.y + branch.end.y) * 0.5 - 7,
+            branch.end.x,
+            branch.end.y
+          );
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        function drawBud(branch, kind) {
+          const size = branch.budSize;
+          const angle = Math.atan2(branch.end.y - branch.start.y, branch.end.x - branch.start.x) + Math.PI / 2;
+          const petalColor = kind === 'lily' || kind === 'cosmos'
+            ? colors.orange
+            : kind === 'daisy'
+              ? colors.cream
+              : kind === 'anemone'
+                ? colors.blue
+                : colors.oxblood;
+          ctx.save();
+          ctx.translate(branch.end.x, branch.end.y);
+          ctx.rotate(angle);
+          ctx.fillStyle = colors.leafDark;
+          for (let i = -1; i <= 1; i += 1) {
+            ctx.save();
+            ctx.rotate(i * 0.48);
+            ctx.beginPath();
+            ctx.moveTo(0, 2);
+            ctx.quadraticCurveTo(-size * 0.42, -size * 0.25, 0, -size * 0.95);
+            ctx.quadraticCurveTo(size * 0.42, -size * 0.25, 0, 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          const budWash = ctx.createRadialGradient(-size * 0.2, -size * 0.55, 0, 0, -size * 0.45, size);
+          budWash.addColorStop(0, colors.blush);
+          budWash.addColorStop(0.55, petalColor);
+          budWash.addColorStop(1, colors.burgundy);
+          ctx.fillStyle = budWash;
+          ctx.beginPath();
+          ctx.ellipse(0, -size * 0.55, size * 0.58, size * 0.82, 0, 0, TAU);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        function drawLeaf(leaf) {
+          const shade = leaf.shade < 0.25
+            ? colors.leafDark
+            : leaf.shade < 0.62
+              ? colors.leaf
+              : leaf.shade < 0.85
+                ? colors.leafMid
+                : colors.olive;
+          const w = leaf.length * leaf.width;
+
+          ctx.save();
+          ctx.translate(leaf.x, leaf.y);
+          ctx.rotate(leaf.angle);
+          const leafWash = ctx.createLinearGradient(0, -w * 0.4, leaf.length, w * 0.28);
+          leafWash.addColorStop(0, leaf.shade > 0.72 ? colors.leafLight : colors.leafMid);
+          leafWash.addColorStop(0.42, shade);
+          leafWash.addColorStop(1, colors.leafDark);
+          ctx.fillStyle = leafWash;
+          ctx.strokeStyle = colors.leafDark;
+          ctx.lineWidth = 0.65;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+
+          if (leaf.kind === 'fine') {
+            ctx.bezierCurveTo(leaf.length * 0.3, -w * 0.33, leaf.length * 0.78, -w * 0.22, leaf.length, 0);
+            ctx.bezierCurveTo(leaf.length * 0.72, w * 0.2, leaf.length * 0.3, w * 0.28, 0, 0);
+          } else if (leaf.kind === 'lance') {
+            ctx.bezierCurveTo(leaf.length * 0.34, -w * 0.24, leaf.length * 0.77, -w * 0.18, leaf.length, 0);
+            ctx.bezierCurveTo(leaf.length * 0.73, w * 0.2, leaf.length * 0.28, w * 0.24, 0, 0);
+          } else if (leaf.kind === 'round' || leaf.kind === 'large') {
+            ctx.bezierCurveTo(leaf.length * 0.2, -w * 0.7, leaf.length * 0.78, -w * 0.62, leaf.length, 0);
+            ctx.bezierCurveTo(leaf.length * 0.72, w * 0.62, leaf.length * 0.18, w * 0.65, 0, 0);
+          } else {
+            ctx.bezierCurveTo(leaf.length * 0.22, -w * 0.52, leaf.length * 0.78, -w * 0.46, leaf.length, 0);
+            ctx.bezierCurveTo(leaf.length * 0.72, w * 0.48, leaf.length * 0.2, w * 0.5, 0, 0);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.globalAlpha = 0.43;
+          ctx.stroke();
+
+          ctx.globalAlpha = 0.58;
+          ctx.strokeStyle = colors.vein;
+          ctx.lineWidth = 0.65;
+          ctx.beginPath();
+          ctx.moveTo(1, 0);
+          ctx.quadraticCurveTo(leaf.length * 0.48, -1, leaf.length * 0.88, 0);
+          ctx.stroke();
+
+          if (leaf.kind !== 'fine') {
+            ctx.globalAlpha = 0.28;
+            ctx.lineWidth = 0.42;
+            for (let i = 1; i <= 5; i += 1) {
+              const t = i / 6;
+              const veinX = leaf.length * t;
+              const reach = w * (1 - t) * 0.66;
+              ctx.beginPath();
+              ctx.moveTo(veinX, 0);
+              ctx.lineTo(veinX - leaf.length * 0.1, -reach);
+              ctx.moveTo(veinX, 0);
+              ctx.lineTo(veinX - leaf.length * 0.1, reach);
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
+        }
+
+        function drawFlower(kind, bloom, plantSeed) {
+          switch (kind) {
+            case 'rose': drawRose(bloom, plantSeed); break;
+            case 'peony': drawPeony(bloom, plantSeed); break;
+            case 'cosmos': drawCosmos(bloom); break;
+            case 'poppy': drawPoppy(bloom); break;
+            case 'daisy': drawDaisy(bloom); break;
+            case 'lily': drawLily(bloom); break;
+            case 'hydrangea': drawHydrangea(bloom, plantSeed); break;
+            case 'anemone': drawAnemone(bloom); break;
+            default: break;
+          }
+        }
+
+        function petalWash(light, middle, dark, length) {
+          const gradient = ctx.createLinearGradient(0, -length * 0.58, 0, length * 0.52);
+          gradient.addColorStop(0, light);
+          gradient.addColorStop(0.46, middle);
+          gradient.addColorStop(1, dark);
+          return gradient;
+        }
+
+        function drawRose(bloom, plantSeed) {
+          const r = bloom.r;
+          const rng = mulberry32((plantSeed + Math.floor(bloom.phase * 10000)) >>> 0);
+          const palette = bloom.variant > 0.64
+            ? [colors.burgundy, colors.oxblood, colors.vermilion]
+            : [colors.oxblood, colors.vermilion, '#ec6b54'];
+
+          ctx.save();
+          ctx.shadowColor = 'rgba(73, 24, 26, 0.18)';
+          ctx.shadowBlur = 3;
+          for (let ring = 0; ring < 4; ring += 1) {
+            const count = 10 - ring * 2;
+            const radius = r * (0.72 - ring * 0.14);
+            for (let i = 0; i < count; i += 1) {
+              const angle = (i / count) * TAU + ring * 0.55;
+              const px = Math.cos(angle) * r * (0.34 - ring * 0.07);
+              const py = Math.sin(angle) * r * (0.28 - ring * 0.06);
+              ctx.save();
+              ctx.translate(px, py);
+              ctx.rotate(angle + Math.PI / 2);
+              const petalLength = radius * lerp(0.82, 1.12, rng());
+              const middle = palette[Math.min(palette.length - 1, Math.floor(ring * 0.8))];
+              ctx.fillStyle = petalWash('#ef9a8e', middle, colors.burgundy, petalLength);
+              ctx.strokeStyle = 'rgba(83, 20, 39, 0.34)';
+              ctx.lineWidth = 0.42;
+              petal(petalLength, radius * 0.58, 0.48, true);
+              ctx.restore();
+            }
+          }
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = colors.burgundy;
+          ctx.beginPath();
+          ctx.arc(0, 0, r * 0.16, 0, TAU);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        function drawPeony(bloom, plantSeed) {
+          const r = bloom.r;
+          const rng = mulberry32((plantSeed ^ Math.floor(bloom.phase * 30000)) >>> 0);
+          const pale = bloom.variant > 0.52;
+          const palette = pale
+            ? ['#d9888d', colors.blush, '#f5c8bd', colors.cream]
+            : [colors.burgundy, colors.oxblood, '#c84358', '#e77878'];
+          ctx.save();
+          for (let ring = 0; ring < 5; ring += 1) {
+            const count = 11 - ring;
+            for (let i = 0; i < count; i += 1) {
+              const angle = (i / count) * TAU + ring * 0.7;
+              const spread = r * (0.42 - ring * 0.07);
+              ctx.save();
+              ctx.translate(Math.cos(angle) * spread, Math.sin(angle) * spread * 0.82);
+              ctx.rotate(angle + Math.PI / 2 + lerp(-0.16, 0.16, rng()));
+              const petalLength = r * (0.62 - ring * 0.055);
+              const middle = palette[Math.min(ring, palette.length - 1)];
+              ctx.fillStyle = petalWash(
+                pale ? colors.cream : '#ef8b8a',
+                middle,
+                pale ? '#c86f7e' : colors.burgundy,
+                petalLength
+              );
+              ctx.strokeStyle = pale ? 'rgba(126, 68, 76, 0.28)' : 'rgba(93, 24, 46, 0.3)';
+              ctx.lineWidth = 0.4;
+              ctx.globalAlpha = 0.92;
+              petal(petalLength, r * lerp(0.28, 0.42, rng()), 0.55, true);
+              ctx.restore();
+            }
+          }
+          ctx.fillStyle = pale ? '#eab8a6' : colors.burgundy;
+          ctx.beginPath();
+          ctx.arc(0, 0, r * 0.13, 0, TAU);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        function drawCosmos(bloom) {
+          const r = bloom.r;
+          const palette = bloom.variant > 0.5
+            ? [colors.orange, colors.apricot]
+            : [colors.vermilion, '#ef7950'];
+          for (let i = 0; i < 8; i += 1) {
+            ctx.save();
+            ctx.rotate(i * TAU / 8);
+            ctx.translate(0, -r * 0.38);
+            ctx.fillStyle = petalWash('#ffc271', palette[i % 2], colors.vermilion, r * 0.78);
+            ctx.strokeStyle = 'rgba(129, 48, 28, 0.34)';
+            ctx.lineWidth = 0.48;
+            petal(r * 0.78, r * 0.32, 0.3, true);
+            ctx.restore();
+          }
+          pollenCenter(r * 0.28, colors.umber, colors.pollen, 18);
+        }
+
+        function drawPoppy(bloom) {
+          const r = bloom.r;
+          const palette = bloom.variant > 0.5
+            ? [colors.vermilion, '#ef5b35']
+            : [colors.oxblood, '#bc2941'];
+          ctx.save();
+          ctx.globalAlpha = 0.96;
+          for (let i = 0; i < 5; i += 1) {
+            ctx.save();
+            ctx.rotate(i * TAU / 5 + 0.12);
+            ctx.translate(0, -r * 0.28);
+            ctx.fillStyle = petalWash('#ef735d', palette[i % 2], colors.burgundy, r * 0.95);
+            ctx.strokeStyle = 'rgba(89, 22, 38, 0.3)';
+            ctx.lineWidth = 0.55;
+            petal(r * 0.95, r * 0.55, 0.63, true);
+            ctx.restore();
+          }
+          ctx.restore();
+          pollenCenter(r * 0.29, '#2c2923', '#6e7b45', 16);
+        }
+
+        function drawDaisy(bloom) {
+          const r = bloom.r;
+          for (let i = 0; i < 13; i += 1) {
+            ctx.save();
+            ctx.rotate(i * TAU / 13);
+            ctx.translate(0, -r * 0.43);
+            ctx.fillStyle = petalWash(colors.white, i % 3 ? '#fff8e7' : '#f5eee1', '#d9c8b6', r * 0.86);
+            ctx.strokeStyle = 'rgba(104, 89, 70, 0.24)';
+            ctx.lineWidth = 0.6;
+            petal(r * 0.86, r * 0.22, 0.25, true);
+            ctx.restore();
+          }
+          pollenCenter(r * 0.3, '#d99c1d', colors.pollen, 20);
+        }
+
+        function drawAnemone(bloom) {
+          const r = bloom.r;
+          for (let i = 0; i < 9; i += 1) {
+            ctx.save();
+            ctx.rotate(i * TAU / 9);
+            ctx.translate(0, -r * 0.34);
+            ctx.fillStyle = petalWash('#8fb5b6', i % 2 ? colors.blue : '#4e8493', colors.blueDark, r * 0.76);
+            ctx.strokeStyle = 'rgba(28, 68, 74, 0.34)';
+            ctx.lineWidth = 0.48;
+            petal(r * 0.76, r * 0.34, 0.42, true);
+            ctx.restore();
+          }
+          pollenCenter(r * 0.32, colors.blueDark, colors.pollen, 18);
+        }
+
+        function drawLily(bloom) {
+          const r = bloom.r;
+          for (let i = 0; i < 6; i += 1) {
+            ctx.save();
+            ctx.rotate(i * TAU / 6);
+            ctx.translate(0, -r * 0.16);
+            ctx.fillStyle = petalWash('#ffbd67', i % 2 ? colors.orange : '#f07a32', '#bd3c2b', r * 1.08);
+            ctx.strokeStyle = colors.vermilion;
+            ctx.lineWidth = 0.7;
+            petal(r * 1.08, r * 0.29, 0.16, true);
+            ctx.fillStyle = colors.burgundy;
+            for (let d = 0; d < 4; d += 1) {
+              ctx.beginPath();
+              ctx.arc((d % 2 ? -1 : 1) * r * 0.08, -r * (0.16 + d * 0.12), 0.9, 0, TAU);
+              ctx.fill();
+            }
+            ctx.restore();
+          }
+          ctx.strokeStyle = colors.umber;
+          ctx.fillStyle = colors.umber;
+          ctx.lineWidth = 0.8;
+          for (let i = 0; i < 5; i += 1) {
+            const angle = -0.7 + i * 0.35;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(Math.sin(angle) * r * 0.45, -r * 0.28, Math.sin(angle) * r * 0.56, -r * 0.58);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.ellipse(Math.sin(angle) * r * 0.56, -r * 0.6, 1.4, 3.2, angle, 0, TAU);
+            ctx.fill();
+          }
+        }
+
+        function drawHydrangea(bloom, plantSeed) {
+          const r = bloom.r;
+          const rng = mulberry32((plantSeed + Math.floor(bloom.variant * 99999)) >>> 0);
+          const palette = bloom.variant > 0.58
+            ? ['#c78495', '#e0a3a0', '#f1c1b0']
+            : ['#c74f62', '#db7881', '#efaba3'];
+          const florets = 22;
+          for (let i = 0; i < florets; i += 1) {
+            const angle = i * GOLDEN * TAU;
+            const dist = Math.sqrt(i / florets) * r * 0.8;
+            const x = Math.cos(angle) * dist;
+            const y = Math.sin(angle) * dist * 0.88;
+            const sr = r * lerp(0.12, 0.19, rng());
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            for (let p = 0; p < 4; p += 1) {
+              ctx.save();
+              ctx.rotate(p * Math.PI / 2);
+              ctx.translate(0, -sr * 0.45);
+              const middle = palette[(i + p) % palette.length];
+              ctx.fillStyle = petalWash('#f5c8bd', middle, '#a74161', sr);
+              ctx.strokeStyle = 'rgba(105, 42, 64, 0.22)';
+              ctx.lineWidth = 0.34;
+              petal(sr, sr * 0.52, 0.46, true);
+              ctx.restore();
+            }
+            ctx.fillStyle = colors.cream;
+            ctx.beginPath();
+            ctx.arc(0, 0, sr * 0.18, 0, TAU);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+
+        function petal(length, widthPetal, shoulder, stroke) {
+          ctx.beginPath();
+          ctx.moveTo(0, length * 0.48);
+          ctx.bezierCurveTo(
+            -widthPetal,
+            length * shoulder * 0.35,
+            -widthPetal * 0.82,
+            -length * 0.36,
+            0,
+            -length * 0.52
+          );
+          ctx.bezierCurveTo(
+            widthPetal * 0.82,
+            -length * 0.36,
+            widthPetal,
+            length * shoulder * 0.35,
+            0,
+            length * 0.48
+          );
+          ctx.closePath();
+          ctx.fill();
+          if (stroke) ctx.stroke();
+        }
+
+        function pollenCenter(radius, base, dot, count) {
+          const centerWash = ctx.createRadialGradient(-radius * 0.28, -radius * 0.32, 0, 0, 0, radius);
+          centerWash.addColorStop(0, dot);
+          centerWash.addColorStop(0.34, base);
+          centerWash.addColorStop(1, '#2f2921');
+          ctx.fillStyle = centerWash;
+          ctx.beginPath();
+          ctx.arc(0, 0, radius, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = dot;
+          for (let i = 0; i < count; i += 1) {
+            const angle = i * GOLDEN * TAU;
+            const d = Math.sqrt(i / count) * radius * 0.8;
+            ctx.beginPath();
+            ctx.arc(Math.cos(angle) * d, Math.sin(angle) * d, Math.max(0.7, radius * 0.065), 0, TAU);
+            ctx.fill();
+          }
+        }
+
+        function sortPlants() {
+          plants.sort((a, b) => a.depth - b.depth || a.id - b.id);
+        }
+
+        function announce(message) {
+          status.textContent = '';
+          requestAnimationFrame(() => { status.textContent = message; });
+        }
+
+        function hash2(x, y, n) {
+          let h = Math.imul((x + n) | 0, 374761393) ^ Math.imul((y - n) | 0, 668265263);
+          h = (h ^ (h >>> 13)) >>> 0;
+          return ((Math.imul(h, 1274126177) ^ (h >>> 16)) >>> 0) / 4294967296;
+        }
+
+        function mulberry32(a) {
+          return function () {
+            let t = a += 0x6d2b79f5;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        function randInt(r, min, max) {
+          return Math.floor(r() * (max - min + 1)) + min;
+        }
+
+        function lerp(a, b, t) {
+          return a + (b - a) * t;
+        }
+
+        function clamp(value, min, max) {
+          return Math.max(min, Math.min(max, value));
+        }
+      })();
+    </script>
+  </body>
+</html>

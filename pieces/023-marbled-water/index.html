@@ -333,7 +333,7 @@
       aria-label="Marbled Water: ink drops expand across a floating bath and repel older colors into a marbled-paper pattern. Automatic clearing drops open white space. Use the panel to adjust the drops or comb the pattern."
     ></canvas>
 
-    <aside class="water-panel" aria-label="Marbled water controls">
+    <aside class="water-panel is-collapsed" aria-label="Marbled water controls">
       <div class="panel-header">
         <div class="panel-heading">
           <h1>Marbled Water</h1>
@@ -346,10 +346,10 @@
             data-action="collapse"
             type="button"
             aria-controls="water-controls"
-            aria-expanded="true"
-            aria-label="Collapse marbling controls"
-            title="Collapse controls"
-          >−</button>
+            aria-expanded="false"
+            aria-label="Expand marbling controls"
+            title="Expand controls"
+          >+</button>
           <button
             class="panel-button"
             id="reseed"
@@ -465,8 +465,10 @@
         const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 
         const PAPER = '#f3f1e9';
-        const POINT_COUNT = 96;
+        const POINT_COUNT = 144;
+        const INITIAL_DROP_COUNT = 20;
         const MAX_SHAPES = 220;
+        const TAU = Math.PI * 2;
 
         const PALETTES = [
           ['#b62b59', '#d84c31', '#d4a51f', '#1c4f91', '#1c7562', '#1f1c1d'],
@@ -539,11 +541,83 @@
           colorIndex = 0;
           random = mulberry32(seed);
 
-          const radius = Math.min(width, height) * 0.035;
-          startDrop(width * 0.5, height * 0.5, radius, nextInkColor(), false, performance.now());
+          seedInitialBath();
           nextDropAt = performance.now() + dropInterval();
           updateBathNumber();
           render();
+        }
+
+        function seedInitialBath() {
+          const base = Math.min(width, height) * Number(controls.dropSize.value) / 1000;
+          const variation = Number(controls.sizeVariation.value) / 100;
+          const marginX = Math.min(width * 0.12, base * 2.4);
+          const marginY = Math.min(height * 0.12, base * 2.4);
+          const poolCount = clamp(Math.round(Math.sqrt(width / Math.max(1, height)) * 4), 4, 7);
+          const pools = Array.from({ length: poolCount }, () => ({
+            x: marginX + random() * Math.max(1, width - marginX * 2),
+            y: marginY + random() * Math.max(1, height - marginY * 2)
+          }));
+
+          for (let i = 0; i < INITIAL_DROP_COUNT; i++) {
+            const pool = pools[i % pools.length];
+            const angle = random() * TAU;
+            const distance = i < pools.length
+              ? 0
+              : base * (0.45 + Math.pow(random(), 0.8) * 2.05);
+            const x = clamp(pool.x + Math.cos(angle) * distance, marginX, width - marginX);
+            const y = clamp(pool.y + Math.sin(angle) * distance, marginY, height - marginY);
+            const sizeJitter = (random() * 2 - 1) * variation;
+            const radius = Math.max(5, base * (1.38 + sizeJitter * 0.95));
+            placeSettledInk(x, y, radius, nextInkColor());
+          }
+
+          settleInitialField(pools, base);
+
+          // The opening field is the bath's starting material. Complexity tracks
+          // only the new drops that move it toward the next clearing pass.
+          complexity = 0;
+        }
+
+        function placeSettledInk(x, y, radius, color) {
+          const form = createDropForm();
+          const shape = {
+            color,
+            clearing: false,
+            form,
+            points: circlePoints(x, y, 0.01, form)
+          };
+          shapes.push(shape);
+          applyDropExpansion({
+            shape,
+            x,
+            y,
+            currentRadius: 0.01
+          }, radius);
+        }
+
+        function settleInitialField(pools, base) {
+          const eddies = pools.map((pool) => ({
+            x: pool.x + (random() * 2 - 1) * base * 0.9,
+            y: pool.y + (random() * 2 - 1) * base * 0.9,
+            radius: base * (3.4 + random() * 2.2),
+            turn: (random() < 0.5 ? -1 : 1) * (0.18 + random() * 0.16)
+          }));
+
+          for (const shape of shapes) {
+            for (const point of shape.points) {
+              for (const eddy of eddies) {
+                const dx = point.x - eddy.x;
+                const dy = point.y - eddy.y;
+                const influence = Math.exp(-(dx * dx + dy * dy) /
+                  (2 * eddy.radius * eddy.radius));
+                const angle = eddy.turn * influence;
+                const cosine = Math.cos(angle);
+                const sine = Math.sin(angle);
+                point.x = eddy.x + dx * cosine - dy * sine;
+                point.y = eddy.y + dx * sine + dy * cosine;
+              }
+            }
+          }
         }
 
         function tick(time) {
@@ -602,10 +676,12 @@
         function startDrop(x, y, radius, color, clearing, time) {
           completeActiveDrop();
 
+          const form = createDropForm();
           const shape = {
             color,
             clearing,
-            points: circlePoints(x, y, 0.01)
+            form,
+            points: circlePoints(x, y, 0.01, form)
           };
           shapes.push(shape);
 
@@ -680,7 +756,7 @@
           }
 
           drop.currentRadius = radius;
-          setCirclePoints(drop.shape.points, drop.x, drop.y, radius);
+          setCirclePoints(drop.shape.points, drop.x, drop.y, radius, drop.shape.form);
         }
 
         function startComb(sign) {
@@ -690,30 +766,56 @@
           const angle = Number(controls.combDirection.value) * Math.PI / 180;
           const spacing = Number(controls.combSpacing.value);
           const pull = Number(controls.combPull.value) / 100;
-          const maxDisplacement = Math.min(width, height) * (0.08 + pull * 0.18);
-          const duration = 1200;
           const span = Math.hypot(width, height) * 1.15;
+          const finePull = spacing * (0.18 + pull * 0.35);
 
-          activeComb = {
+          activeComb = createCombPass(angle, sign, spacing, finePull, span, 0, 1250);
+          activeComb.threadLength = spacing * (0.9 + pull * 1.6);
+          activeComb.start = performance.now();
+
+          complexity += 2;
+          updateBathNumber();
+          status.textContent = sign > 0
+            ? 'Comb teeth drawing through the floating ink.'
+            : 'Comb teeth drawing back through the floating ink.';
+
+          if (motionPreference.matches) {
+            applyCombSweep(activeComb, activeComb.span * 0.5);
+            addCombFilaments(activeComb);
+            activeComb = null;
+            render();
+          }
+        }
+
+        function createCombPass(
+          angle,
+          sign,
+          spacing,
+          maxDisplacement,
+          span,
+          offset,
+          duration
+        ) {
+          const firstTine = -Math.ceil(span / spacing * 0.5) * spacing + offset;
+          const tineCount = Math.ceil(span / spacing) + 2;
+          const tines = Array.from({ length: tineCount }, (_, index) => ({
+            across: firstTine + index * spacing + (random() * 2 - 1) * spacing * 0.045,
+            width: spacing * (0.23 + random() * 0.045),
+            drag: 0.9 + random() * 0.2
+          }));
+
+          return {
             angle,
             spacing,
             sign,
             maxDisplacement,
             span,
+            firstTine,
+            tines,
             processed: new WeakSet(),
-            start: performance.now(),
+            start: 0,
             duration
           };
-
-          complexity += 2;
-          updateBathNumber();
-          status.textContent = sign > 0 ? 'Comb swiping forward.' : 'Comb swiping in reverse.';
-
-          if (motionPreference.matches) {
-            applyCombSweep(activeComb, activeComb.span * 0.5);
-            activeComb = null;
-            render();
-          }
         }
 
         function updateComb(time) {
@@ -725,9 +827,89 @@
           applyCombSweep(comb, front);
 
           if (progress >= 1) {
+            addCombFilaments(comb);
             activeComb = null;
             nextDropAt = time + Math.max(120, dropInterval() * 0.35);
+            status.textContent = 'Comb pass complete.';
           }
+        }
+
+        function addCombFilaments(comb) {
+          const directionX = Math.cos(comb.angle) * comb.sign;
+          const directionY = Math.sin(comb.angle) * comb.sign;
+          const normalX = -directionY;
+          const normalY = directionX;
+          const centerX = width * 0.5;
+          const centerY = height * 0.5;
+          const threadWidth = clamp(comb.spacing * 0.055, 1.5, 4);
+          const rebuilt = [];
+
+          for (const shape of shapes) {
+            rebuilt.push(shape);
+            if (shape.clearing || shape.filament || shape.points.length < 3) continue;
+            let shapeFilaments = 0;
+
+            for (const tine of comb.tines) {
+              if (shapeFilaments >= 6) break;
+              const intersections = [];
+
+              for (let index = 0; index < shape.points.length; index++) {
+                const a = shape.points[index];
+                const b = shape.points[(index + 1) % shape.points.length];
+                const ax = a.x - centerX;
+                const ay = a.y - centerY;
+                const bx = b.x - centerX;
+                const by = b.y - centerY;
+                const aAcross = ax * normalX + ay * normalY;
+                const bAcross = bx * normalX + by * normalY;
+                const crosses = (aAcross <= tine.across && bAcross > tine.across) ||
+                  (bAcross <= tine.across && aAcross > tine.across);
+                if (!crosses) continue;
+
+                const ratio = (tine.across - aAcross) / (bAcross - aAcross);
+                const aAlong = ax * directionX + ay * directionY;
+                const bAlong = bx * directionX + by * directionY;
+                intersections.push(aAlong + (bAlong - aAlong) * ratio);
+              }
+
+              intersections.sort((a, b) => a - b);
+              for (let index = 0; index + 1 < intersections.length; index += 2) {
+                const entry = intersections[index];
+                const exit = intersections[index + 1];
+                if (exit - entry < threadWidth * 1.5) continue;
+
+                const start = exit - threadWidth;
+                const length = comb.threadLength * (0.82 + random() * 0.36);
+                const tip = exit + length;
+                const shoulder = tip - length * 0.24;
+                rebuilt.push({
+                  color: shape.color,
+                  clearing: false,
+                  filament: true,
+                  edge: null,
+                  points: [
+                    combPoint(start, tine.across - threadWidth, centerX, centerY, directionX, directionY, normalX, normalY),
+                    combPoint(shoulder, tine.across - threadWidth * 0.72, centerX, centerY, directionX, directionY, normalX, normalY),
+                    combPoint(tip, tine.across, centerX, centerY, directionX, directionY, normalX, normalY),
+                    combPoint(shoulder, tine.across + threadWidth * 0.72, centerX, centerY, directionX, directionY, normalX, normalY),
+                    combPoint(start, tine.across + threadWidth, centerX, centerY, directionX, directionY, normalX, normalY)
+                  ]
+                });
+                shapeFilaments++;
+                if (shapeFilaments >= 6) break;
+              }
+            }
+          }
+
+          shapes = rebuilt;
+          pruneShapes();
+        }
+
+        function combPoint(along, across, centerX, centerY, directionX, directionY, normalX, normalY) {
+          return {
+            x: centerX + directionX * along + normalX * across,
+            y: centerY + directionY * along + normalY * across
+          };
         }
 
         function applyCombSweep(comb, front) {
@@ -737,7 +919,6 @@
           const normalY = directionX;
           const centerX = width * 0.5;
           const centerY = height * 0.5;
-          const sigma = comb.spacing * 0.24;
 
           for (const shape of shapes) {
             for (const point of shape.points) {
@@ -748,11 +929,21 @@
               if (along > front) continue;
 
               const across = relativeX * normalX + relativeY * normalY;
-              const wrapped = mod(across + comb.spacing * 0.5, comb.spacing) - comb.spacing * 0.5;
-              const influence = Math.exp(-(wrapped * wrapped) / (2 * sigma * sigma));
-              const displacement = comb.maxDisplacement * influence;
-              point.x += directionX * displacement;
-              point.y += directionY * displacement;
+              const estimatedIndex = Math.round((across - comb.firstTine) / comb.spacing);
+              let entrainment = 0;
+
+              for (let offset = -1; offset <= 1; offset++) {
+                const tine = comb.tines[estimatedIndex + offset];
+                if (!tine) continue;
+                const distance = across - tine.across;
+                entrainment += Math.exp(-0.5 * Math.pow(distance / tine.width, 2)) *
+                  tine.drag;
+              }
+
+              const displacedAlong = along + comb.maxDisplacement * entrainment;
+
+              point.x = centerX + directionX * displacedAlong + normalX * across;
+              point.y = centerY + directionY * displacedAlong + normalY * across;
               comb.processed.add(point);
             }
           }
@@ -772,7 +963,9 @@
           if (points.length < 3) return;
 
           ctx.beginPath();
-          const first = midpoint(points[points.length - 1], points[0]);
+          const lastPoint = points[points.length - 1];
+          const firstPoint = points[0];
+          const first = midpoint(lastPoint, firstPoint);
           ctx.moveTo(first.x, first.y);
 
           for (let i = 0; i < points.length; i++) {
@@ -792,38 +985,57 @@
           const alpha = Math.sin(progress * Math.PI) * 0.34;
           if (alpha <= 0.001) return;
 
-          const directionX = Math.cos(comb.angle);
-          const directionY = Math.sin(comb.angle);
+          const directionX = Math.cos(comb.angle) * comb.sign;
+          const directionY = Math.sin(comb.angle) * comb.sign;
           const normalX = -directionY;
           const normalY = directionX;
           const eased = smootherStep(progress);
-          const travel = (-comb.span * 0.5 + eased * comb.span) * comb.sign;
+          const travel = -comb.span * 0.5 + eased * comb.span;
           const centerX = width * 0.5 + directionX * travel;
           const centerY = height * 0.5 + directionY * travel;
 
           ctx.save();
-          ctx.globalAlpha = alpha;
+          ctx.globalAlpha = alpha * 1.25;
           ctx.strokeStyle = '#111';
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(centerX - normalX * comb.span, centerY - normalY * comb.span);
           ctx.lineTo(centerX + normalX * comb.span, centerY + normalY * comb.span);
+
+          for (const tine of comb.tines) {
+            const x = centerX + normalX * tine.across;
+            const y = centerY + normalY * tine.across;
+            ctx.moveTo(x - directionX * 7, y - directionY * 7);
+            ctx.lineTo(x + directionX * 13, y + directionY * 13);
+          }
+
           ctx.stroke();
           ctx.restore();
         }
 
-        function circlePoints(cx, cy, radius) {
+        function createDropForm() {
+          return {
+            stretch: 0.94 + random() * 0.12,
+            rotation: random() * TAU
+          };
+        }
+
+        function circlePoints(cx, cy, radius, form) {
           const points = new Array(POINT_COUNT);
           for (let i = 0; i < POINT_COUNT; i++) points[i] = { x: cx, y: cy };
-          setCirclePoints(points, cx, cy, radius);
+          setCirclePoints(points, cx, cy, radius, form);
           return points;
         }
 
-        function setCirclePoints(points, cx, cy, radius) {
+        function setCirclePoints(points, cx, cy, radius, form) {
           for (let i = 0; i < points.length; i++) {
-            const angle = i / points.length * Math.PI * 2;
-            points[i].x = cx + Math.cos(angle) * radius;
-            points[i].y = cy + Math.sin(angle) * radius;
+            const angle = i / points.length * TAU;
+            const stretch = form ? form.stretch : 1;
+            const rotation = form ? form.rotation : 0;
+            const localX = Math.cos(angle) * radius * stretch;
+            const localY = Math.sin(angle) * radius / stretch;
+            points[i].x = cx + localX * Math.cos(rotation) - localY * Math.sin(rotation);
+            points[i].y = cy + localX * Math.sin(rotation) + localY * Math.cos(rotation);
           }
         }
 
@@ -857,7 +1069,17 @@
           });
 
           if (shapes.length > MAX_SHAPES) {
-            shapes.splice(0, shapes.length - MAX_SHAPES);
+            let overflow = shapes.length - MAX_SHAPES;
+            shapes = shapes.filter((shape) => {
+              if (overflow > 0 && shape.filament) {
+                overflow--;
+                return false;
+              }
+              return true;
+            });
+            if (shapes.length > MAX_SHAPES) {
+              shapes.splice(0, shapes.length - MAX_SHAPES);
+            }
           }
         }
 

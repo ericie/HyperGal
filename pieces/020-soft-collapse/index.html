@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="A field of black-and-white geometric cells whose motifs slide through fixed, cropped frames in four cardinal directions."
+      content="A field of black-and-white geometric cells whose one-unit frames merge into four-by-four forms, split apart again, and slide motifs in four cardinal directions."
     />
     <title>Soft Collapse · HyperGal</title>
     <style>
@@ -59,7 +59,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Soft Collapse: an edge-to-edge black-and-white geometric field. Individual motifs slide out of fixed cropped frames and new motifs slide in from the opposite side. Click to move a block, press Space to pause, and R to recompose."
+      aria-label="Soft Collapse: an edge-to-edge black-and-white geometric field where groups of small cells merge into large four-by-four forms and split apart again. Motifs also slide out of cropped frames while new motifs enter from the opposite side. Click to change a block, press Space to pause, and R to recompose."
     ></canvas>
     <p id="status" class="status" aria-live="polite"></p>
 
@@ -76,6 +76,9 @@
         const TARGET_CELL = 62;
         const MIN_CELL = 42;
         const MAX_CELL = 76;
+        const LARGE_CELL_SPAN = 4;
+        const LARGE_CELL_AREA = LARGE_CELL_SPAN * LARGE_CELL_SPAN;
+        const STRUCTURE_CHANGE_CHANCE = 0.3;
         const EVENT_GAP = 520;
         const SLIDE_DURATION = 2600;
         const DIRECTIONS = [
@@ -94,6 +97,7 @@
         let offsetX = 0;
         let offsetY = 0;
         let cells = [];
+        let cellAt = [];
         let events = [];
         let paused = reducedMotion.matches;
         let lastTime = 0;
@@ -174,7 +178,8 @@
         function compose() {
           const previousRandom = random;
           random = makeRandom(seed);
-          cells = new Array(cols * rows);
+          cells = [];
+          cellAt = new Array(cols * rows);
           const middle = (cols - 1) / 2;
 
           for (let y = 0; y < rows; y += 1) {
@@ -187,16 +192,84 @@
               const facing = x < middle ? 0 : 2;
               const quarter = (Math.floor(hash(mirrorX, localY, band + 31) * 4) + facing) & 3;
 
-              cells[y * cols + x] = {
+              const cell = {
                 x,
                 y,
+                span: 1,
                 motif,
                 quarter,
                 event: null
               };
+              cells.push(cell);
+              cellAt[y * cols + x] = cell;
             }
           }
+
+          placeLargeCells();
           random = previousRandom;
+        }
+
+        function placeLargeCells() {
+          const edge = 1;
+          if (cols < LARGE_CELL_SPAN + edge * 2 || rows < LARGE_CELL_SPAN + edge * 2) return;
+
+          const visibleCells = Math.max(1, Math.floor(width / size))
+            * Math.max(1, Math.floor(height / size));
+          const targetCount = Math.max(
+            1,
+            Math.min(5, Math.round(visibleCells / (LARGE_CELL_AREA * 5)))
+          );
+          const compositionRandom = makeRandom(`${seed}:large:${cols}x${rows}`);
+          const candidates = [];
+          const regions = [];
+
+          for (let y = edge; y <= rows - LARGE_CELL_SPAN - edge; y += 1) {
+            for (let x = edge; x <= cols - LARGE_CELL_SPAN - edge; x += 1) {
+              candidates.push({ x, y, order: compositionRandom() });
+            }
+          }
+          candidates.sort((a, b) => a.order - b.order);
+
+          for (const candidate of candidates) {
+            if (regions.length >= targetCount) break;
+            const separated = regions.every((region) => (
+              candidate.x + LARGE_CELL_SPAN < region.x
+              || region.x + LARGE_CELL_SPAN < candidate.x
+              || candidate.y + LARGE_CELL_SPAN < region.y
+              || region.y + LARGE_CELL_SPAN < candidate.y
+            ));
+            if (separated) regions.push(candidate);
+          }
+
+          if (!regions.length) return;
+
+          const covered = new Uint8Array(cols * rows);
+          for (const region of regions) {
+            for (let y = region.y; y < region.y + LARGE_CELL_SPAN; y += 1) {
+              for (let x = region.x; x < region.x + LARGE_CELL_SPAN; x += 1) {
+                covered[y * cols + x] = 1;
+              }
+            }
+          }
+          cells = cells.filter((cell) => !covered[cell.y * cols + cell.x]);
+
+          for (const region of regions) {
+            const cell = {
+              x: region.x,
+              y: region.y,
+              span: LARGE_CELL_SPAN,
+              motif: chooseMotif(compositionRandom(), Math.floor(compositionRandom() * 4)),
+              quarter: Math.floor(compositionRandom() * 4),
+              event: null
+            };
+            cells.push(cell);
+
+            for (let y = cell.y; y < cell.y + cell.span; y += 1) {
+              for (let x = cell.x; x < cell.x + cell.span; x += 1) {
+                cellAt[y * cols + x] = cell;
+              }
+            }
+          }
         }
 
         function chooseMotif(value, bias = 0) {
@@ -234,14 +307,27 @@
 
         function beginSlide(x, y, time, forced) {
           if (x < 0 || x >= cols || y < 0 || y >= rows) return false;
-          const cell = cells[y * cols + x];
+          let cell = cellAt[y * cols + x];
           if (cell.event && !forced) return false;
-          if (cell.event) finishEvent(cell.event);
+          if (cell.event) {
+            finishEvent(cell.event);
+            cell = cellAt[y * cols + x];
+          }
+
+          const changeStructure = forced || random() < STRUCTURE_CHANGE_CHANCE;
+          if (changeStructure && cell.span === LARGE_CELL_SPAN) {
+            return beginSplit(cell, time);
+          }
+          if (changeStructure && cell.span === 1) {
+            const region = findMergeRegion(x, y);
+            if (region && beginMerge(region, time)) return true;
+          }
 
           const direction = DIRECTIONS[Math.floor(random() * DIRECTIONS.length)];
           const event = {
+            kind: 'motif',
             start: time,
-            duration: SLIDE_DURATION + random() * 600,
+            duration: (SLIDE_DURATION + random() * 600) * (cell.span > 1 ? 1.45 : 1),
             cell,
             dx: direction[0],
             dy: direction[1]
@@ -249,6 +335,98 @@
 
           cell.event = event;
           cell.nextMotif = chooseDifferentMotif(cell);
+          events.push(event);
+          return true;
+        }
+
+        function findMergeRegion(selectedX, selectedY) {
+          const candidates = [];
+          const minX = Math.max(1, selectedX - LARGE_CELL_SPAN + 1);
+          const maxX = Math.min(selectedX, cols - LARGE_CELL_SPAN - 1);
+          const minY = Math.max(1, selectedY - LARGE_CELL_SPAN + 1);
+          const maxY = Math.min(selectedY, rows - LARGE_CELL_SPAN - 1);
+
+          for (let y = minY; y <= maxY; y += 1) {
+            for (let x = minX; x <= maxX; x += 1) {
+              const regionCells = [];
+              let available = true;
+
+              for (let cellY = y; cellY < y + LARGE_CELL_SPAN && available; cellY += 1) {
+                for (let cellX = x; cellX < x + LARGE_CELL_SPAN; cellX += 1) {
+                  const cell = cellAt[cellY * cols + cellX];
+                  if (!cell || cell.span !== 1 || cell.event) {
+                    available = false;
+                    break;
+                  }
+                  regionCells.push(cell);
+                }
+              }
+
+              if (available) candidates.push({ x, y, cells: regionCells });
+            }
+          }
+
+          if (!candidates.length) return null;
+          return candidates[Math.floor(random() * candidates.length)];
+        }
+
+        function beginSplit(cell, time) {
+          const direction = DIRECTIONS[Math.floor(random() * DIRECTIONS.length)];
+          const nextCells = [];
+
+          for (let y = cell.y; y < cell.y + LARGE_CELL_SPAN; y += 1) {
+            for (let x = cell.x; x < cell.x + LARGE_CELL_SPAN; x += 1) {
+              nextCells.push({
+                x,
+                y,
+                span: 1,
+                motif: chooseMotif(random(), (x + y) % 4),
+                quarter: Math.floor(random() * 4),
+                event: null
+              });
+            }
+          }
+
+          return beginStructureEvent('split', [cell], nextCells, cell.x, cell.y, time, direction);
+        }
+
+        function beginMerge(region, time) {
+          const direction = DIRECTIONS[Math.floor(random() * DIRECTIONS.length)];
+          const largeCell = {
+            x: region.x,
+            y: region.y,
+            span: LARGE_CELL_SPAN,
+            motif: chooseMotif(random(), Math.floor(random() * 4)),
+            quarter: Math.floor(random() * 4),
+            event: null
+          };
+
+          return beginStructureEvent(
+            'merge',
+            region.cells,
+            [largeCell],
+            region.x,
+            region.y,
+            time,
+            direction
+          );
+        }
+
+        function beginStructureEvent(kind, fromCells, toCells, x, y, time, direction) {
+          const event = {
+            kind,
+            start: time,
+            duration: (SLIDE_DURATION + random() * 600) * 1.45,
+            fromCells,
+            toCells,
+            x,
+            y,
+            span: LARGE_CELL_SPAN,
+            dx: direction[0],
+            dy: direction[1]
+          };
+
+          for (const cell of fromCells) cell.event = event;
           events.push(event);
           return true;
         }
@@ -270,10 +448,34 @@
         }
 
         function finishEvent(event) {
+          if (event.kind === 'split' || event.kind === 'merge') {
+            finishStructureEvent(event);
+            return;
+          }
+
           const cell = event.cell;
           if (cell.event !== event) return;
           cell.motif = cell.nextMotif;
           cell.event = null;
+          const index = events.indexOf(event);
+          if (index >= 0) events.splice(index, 1);
+        }
+
+        function finishStructureEvent(event) {
+          if (!event.fromCells.every((cell) => cell.event === event)) return;
+          const replaced = new Set(event.fromCells);
+          cells = cells.filter((cell) => !replaced.has(cell));
+
+          for (const cell of event.toCells) {
+            cell.event = null;
+            cells.push(cell);
+            for (let y = cell.y; y < cell.y + cell.span; y += 1) {
+              for (let x = cell.x; x < cell.x + cell.span; x += 1) {
+                cellAt[y * cols + x] = cell;
+              }
+            }
+          }
+
           const index = events.indexOf(event);
           if (index >= 0) events.splice(index, 1);
         }
@@ -295,44 +497,82 @@
 
         function drawSlideEvent(event, time) {
           const raw = clamp((time - event.start) / event.duration, 0, 1);
-          const travel = smootherStep(raw) * size;
+          if (event.kind === 'split' || event.kind === 'merge') {
+            drawStructureEvent(event, raw);
+            return;
+          }
+
           const cell = event.cell;
+          const cellSize = size * cell.span;
+          const travel = smootherStep(raw) * cellSize;
           const frameX = offsetX + cell.x * size;
           const frameY = offsetY + cell.y * size;
-          const centerX = frameX + size * 0.5;
-          const centerY = frameY + size * 0.5;
+          const centerX = frameX + cellSize * 0.5;
+          const centerY = frameY + cellSize * 0.5;
 
           ctx.save();
           ctx.beginPath();
-          ctx.rect(frameX, frameY, size, size);
+          ctx.rect(frameX, frameY, cellSize, cellSize);
           ctx.clip();
 
           drawCellAt(
             centerX + event.dx * travel,
             centerY + event.dy * travel,
             cell.motif,
-            cell.quarter
+            cell.quarter,
+            cellSize
           );
           drawCellAt(
-            centerX + event.dx * (travel - size),
-            centerY + event.dy * (travel - size),
+            centerX + event.dx * (travel - cellSize),
+            centerY + event.dy * (travel - cellSize),
             cell.nextMotif,
-            cell.quarter
+            cell.quarter,
+            cellSize
           );
           ctx.restore();
         }
 
-        function drawCell(cell, motif, quarter) {
-          const x = offsetX + (cell.x + 0.5) * size;
-          const y = offsetY + (cell.y + 0.5) * size;
-          drawCellAt(x, y, motif, quarter);
+        function drawStructureEvent(event, raw) {
+          const cellSize = size * event.span;
+          const travel = smootherStep(raw) * cellSize;
+          const frameX = offsetX + event.x * size;
+          const frameY = offsetY + event.y * size;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(frameX, frameY, cellSize, cellSize);
+          ctx.clip();
+
+          drawCellGroup(event.fromCells, event.dx * travel, event.dy * travel);
+          drawCellGroup(
+            event.toCells,
+            event.dx * (travel - cellSize),
+            event.dy * (travel - cellSize)
+          );
+          ctx.restore();
         }
 
-        function drawCellAt(x, y, motif, quarter) {
+        function drawCellGroup(group, translateX, translateY) {
+          for (const cell of group) {
+            const drawSize = size * cell.span;
+            const x = offsetX + cell.x * size + drawSize * 0.5 + translateX;
+            const y = offsetY + cell.y * size + drawSize * 0.5 + translateY;
+            drawCellAt(x, y, cell.motif, cell.quarter, drawSize);
+          }
+        }
+
+        function drawCell(cell, motif, quarter) {
+          const cellSize = size * cell.span;
+          const x = offsetX + cell.x * size + cellSize * 0.5;
+          const y = offsetY + cell.y * size + cellSize * 0.5;
+          drawCellAt(x, y, motif, quarter, cellSize);
+        }
+
+        function drawCellAt(x, y, motif, quarter, drawSize = size) {
           ctx.save();
           ctx.translate(x, y);
           ctx.rotate(quarter * Math.PI * 0.5);
-          ctx.scale(size, size);
+          ctx.scale(drawSize, drawSize);
           drawMotif(motif);
           ctx.restore();
         }
@@ -451,16 +691,66 @@
             beginSlide(x, y, performance.now(), true);
             paused = false;
             nextEventAt = performance.now() + EVENT_GAP;
-            status.textContent = 'A block is sliding to a new motif.';
+            status.textContent = 'A block is changing.';
           }
         }
 
         function changeImmediately(x, y) {
           if (x < 0 || x >= cols || y < 0 || y >= rows) return;
-          const cell = cells[y * cols + x];
-          if (cell.event) finishEvent(cell.event);
+          let cell = cellAt[y * cols + x];
+          if (cell.event) {
+            finishEvent(cell.event);
+            cell = cellAt[y * cols + x];
+          }
+
+          if (cell.span === LARGE_CELL_SPAN) {
+            const nextCells = [];
+            for (let cellY = cell.y; cellY < cell.y + LARGE_CELL_SPAN; cellY += 1) {
+              for (let cellX = cell.x; cellX < cell.x + LARGE_CELL_SPAN; cellX += 1) {
+                nextCells.push({
+                  x: cellX,
+                  y: cellY,
+                  span: 1,
+                  motif: chooseMotif(random(), (cellX + cellY) % 4),
+                  quarter: Math.floor(random() * 4),
+                  event: null
+                });
+              }
+            }
+            replaceCells([cell], nextCells);
+            render(performance.now());
+            return;
+          }
+
+          const region = findMergeRegion(x, y);
+          if (region) {
+            replaceCells(region.cells, [{
+              x: region.x,
+              y: region.y,
+              span: LARGE_CELL_SPAN,
+              motif: chooseMotif(random(), Math.floor(random() * 4)),
+              quarter: Math.floor(random() * 4),
+              event: null
+            }]);
+            render(performance.now());
+            return;
+          }
+
           cell.motif = chooseDifferentMotif(cell);
           render(performance.now());
+        }
+
+        function replaceCells(fromCells, toCells) {
+          const replaced = new Set(fromCells);
+          cells = cells.filter((cell) => !replaced.has(cell));
+          for (const cell of toCells) {
+            cells.push(cell);
+            for (let y = cell.y; y < cell.y + cell.span; y += 1) {
+              for (let x = cell.x; x < cell.x + cell.span; x += 1) {
+                cellAt[y * cols + x] = cell;
+              }
+            }
+          }
         }
 
         function onKeyDown(event) {

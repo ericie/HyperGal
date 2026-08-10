@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-labelledby="title desc">
+  <title id="title">Eyes Open</title>
+  <desc id="desc">Bright colored eyes scattered across a black square.</desc>
+  <rect width="800" height="800" fill="#000"/>
+  <g stroke="#080808" stroke-width="5">
+    <g transform="translate(145 110) rotate(-5)">
+      <path d="M-96 0Q0-76 96 0Q0 76-96 0Z" fill="#f1f0eb"/>
+      <circle r="37" fill="#ef3ea7"/><circle r="15" fill="#080808"/>
+    </g>
+    <g transform="translate(535 96) rotate(4)">
+      <path d="M-120 0Q0-86 120 0Q0 86-120 0Z" fill="#f1f0eb"/>
+      <circle cx="-8" cy="2" r="43" fill="#20b66b"/><circle cx="-8" cy="2" r="17" fill="#080808"/>
+    </g>
+    <g transform="translate(340 265) rotate(2)">
+      <path d="M-105 0Q0-78 105 0Q0 78-105 0Z" fill="#f1f0eb"/>
+      <circle cx="8" cy="-2" r="40" fill="#22a8e8"/><circle cx="8" cy="-2" r="16" fill="#080808"/>
+    </g>
+    <g transform="translate(680 286) rotate(-7)">
+      <path d="M-84 0Q0-61 84 0Q0 61-84 0Z" fill="#f1f0eb"/>
+      <circle cx="-4" r="31" fill="#f2ca3a"/><circle cx="-4" r="13" fill="#080808"/>
+    </g>
+    <g transform="translate(110 360) rotate(6)">
+      <path d="M-78 0Q0-58 78 0Q0 58-78 0Z" fill="#f1f0eb"/>
+      <circle cx="5" r="29" fill="#8d62d8"/><circle cx="5" r="12" fill="#080808"/>
+    </g>
+    <g transform="translate(520 440) rotate(-2)">
+      <path d="M-126 0Q0-92 126 0Q0 92-126 0Z" fill="#f1f0eb"/>
+      <circle cx="10" cy="2" r="46" fill="#ef3ea7"/><circle cx="10" cy="2" r="18" fill="#080808"/>
+    </g>
+    <g transform="translate(190 570) rotate(-4)">
+      <path d="M-112 0Q0-82 112 0Q0 82-112 0Z" fill="#f1f0eb"/>
+      <circle cx="-7" r="42" fill="#f06b45"/><circle cx="-7" r="17" fill="#080808"/>
+    </g>
+    <g transform="translate(645 650) rotate(5)">
+      <path d="M-94 0Q0-69 94 0Q0 69-94 0Z" fill="#f1f0eb"/>
+      <circle cx="5" r="35" fill="#20b66b"/><circle cx="5" r="14" fill="#080808"/>
+    </g>
+    <g transform="translate(390 720) rotate(1)">
+      <path d="M-70 0Q0-50 70 0Q0 50-70 0Z" fill="#f1f0eb"/>
+      <circle r="26" fill="#22a8e8"/><circle r="11" fill="#080808"/>
+    </g>
+  </g>
+</svg>

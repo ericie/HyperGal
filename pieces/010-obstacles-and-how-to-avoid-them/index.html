@@ -320,10 +320,10 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Obstacles and How to Avoid Them: repeating drawing heads leave fluid, fading field lines around borderless Hokusai-toned walls, squares, and circles."
+      aria-label="Obstacles and How to Avoid Them: repeating boids use different-length vision cones to spot borderless Hokusai-toned walls, squares, and circles, then turn in spaced lanes and leave fluid, fading trails around them."
     ></canvas>
 
-    <aside class="gestalt-panel" aria-label="Gestalt controls">
+    <aside class="gestalt-panel is-collapsed" aria-label="Gestalt controls">
       <div class="panel-header">
         <h1>Composition</h1>
         <div class="panel-actions">
@@ -332,10 +332,10 @@
             id="collapse-panel"
             type="button"
             aria-controls="composition-controls"
-            aria-expanded="true"
-            aria-label="Collapse composition controls"
-            title="Collapse controls"
-          >-</button>
+            aria-expanded="false"
+            aria-label="Expand composition controls"
+            title="Expand controls"
+          >+</button>
           <button class="reseed-button" id="reseed" type="button" aria-label="New composition" title="New composition">
             &#8635;
           </button>
@@ -620,7 +620,7 @@
       function assignRoutingGroups(routing, lineGap) {
         const parent = routing.map((_, index) => index);
         const clearance = clamp(lineGap * 0.42, 5, 8);
-        const widestLane = clamp(lineGap * 0.5 * 1.28, 5, 17);
+        const widestLane = clamp(lineGap * 0.5 * 2.2, 5, 32);
         const mergeGap = clearance * 2 + widestLane * 1.5;
 
         const find = (index) => {
@@ -1374,20 +1374,44 @@
               const obstacle = activeObstacles[o];
               const exact = shapeIntervalAtX(obstacle, x, clearance);
               const soft = fluidIntervalAtX(obstacle, x, template);
-              if (!soft) continue;
+              const seen = shapeIntervalAtX(
+                obstacle,
+                x + template.visionLength,
+                clearance
+              );
+              if (!soft && !exact && !seen) continue;
 
-              const lane = lineLaneOffset(baseY, lineGap, template);
-              const softLane =
-                lane * mix(0.22, 0.5, (template.steering - 0.62) / 0.86);
               const side = sideForRoute(
                 baseY,
                 template,
                 obstacle,
-                soft,
+                soft || seen || exact,
                 lineGap,
-                softLane,
+                0,
                 y
               );
+              const lane = lineLaneOffset(
+                baseY,
+                lineGap,
+                template
+              );
+              const softLane =
+                lane * mix(0.62, 0.82, (template.steering - 0.62) / 0.86);
+
+              if (seen && !exact) {
+                const sightTarget =
+                  side < 0 ? seen.top - lane : seen.bottom + lane;
+                const sightStrength = clamp(
+                  0.026 * template.steering,
+                  0.018,
+                  0.052
+                );
+                const correction = (sightTarget - y) * sightStrength;
+                if (Math.abs(correction) > 0.01) constrained = true;
+                y += correction;
+              }
+
+              if (!soft) continue;
               const softTarget = side < 0 ? soft.top - softLane : soft.bottom + softLane;
               const insideSoft = y > soft.top && y < soft.bottom;
 
@@ -1431,6 +1455,7 @@
           }
 
           relaxAndConstrain(points, baseY, template, lineGap, activeObstacles);
+          if (pathHasDiscontinuity(points, xStep)) continue;
           const curves = makeLineCurves(points, activeObstacles, clearance);
           for (const point of points) {
             const mapped = toScreen(point);
@@ -1457,6 +1482,8 @@
             stroke: stroke * template.weight,
             color: template.color,
             spriteColor: WALL_COLORS[i % WALL_COLORS.length],
+            visionLength: template.visionLength,
+            visionAngle: template.visionAngle,
             drawDuration,
             holdDuration: template.holdDuration,
             fadeDuration: template.fadeDuration,
@@ -1467,6 +1494,16 @@
         }
 
         return made;
+      }
+
+      function pathHasDiscontinuity(points, xStep) {
+        const maximumRise = xStep * 8;
+        for (let i = 1; i < points.length; i++) {
+          if (Math.abs(points[i].y - points[i - 1].y) > maximumRise) {
+            return true;
+          }
+        }
+        return false;
       }
 
       function makeLineTemplates() {
@@ -1496,12 +1533,13 @@
             waveA: flowWaveA * rand(0.94, 1.06),
             waveB: flowWaveB * rand(0.92, 1.08),
             wobble: lineGap * rand(0.06, 0.3),
-            recognition: rand(0.62, 1.62),
+            visionLength: clamp(lineGap * rand(1.8, 5.4), 28, 138),
+            visionAngle: rand(0.115, 0.19),
             steering: rand(0.62, 1.48),
             turnTightness,
             deflectionMemory: rand(0.38, 0.76),
             release: mix(0.984, 0.9994, Math.pow(random(), 0.4)),
-            laneScale: rand(0.78, 1.28),
+            laneScale: rand(0.55, 2.2),
             routeSalt: rand(-1000, 1000),
             relaxPasses: Math.round(mix(8, 4, (turnTightness - 0.62) / 0.88)),
             freeSoftenPasses: Math.round(
@@ -1591,7 +1629,7 @@
       }
 
       function lineLaneOffset(baseY, lineGap, template) {
-        return clamp(lineGap * 0.5 * template.laneScale, 5, 17);
+        return clamp(lineGap * 0.5 * template.laneScale, 5, 32);
       }
 
       function relaxAndConstrain(points, baseY, template, lineGap, activeObstacles) {
@@ -1675,8 +1713,6 @@
         const minY = -lineGap * 2.2;
         const maxY = height + lineGap * 2.2;
         const clearance = clamp(lineGap * 0.42, 5, 8);
-        const lane = lineLaneOffset(baseY, lineGap, template);
-
         for (const p of points) {
           for (const obstacle of activeObstacles) {
             const interval = shapeIntervalAtX(obstacle, p.x, clearance);
@@ -1687,8 +1723,13 @@
               obstacle,
               interval,
               lineGap,
-              lane,
+              0,
               p.y
+            );
+            const lane = lineLaneOffset(
+              baseY,
+              lineGap,
+              template
             );
             const target = side < 0 ? interval.top - lane : interval.bottom + lane;
             if ((side < 0 && p.y > target) || (side > 0 && p.y < target)) p.y = target;
@@ -1705,7 +1746,6 @@
         activeObstacles
       ) {
         const clearance = clamp(lineGap * 0.42, 5, 8);
-        const lane = lineLaneOffset(baseY, lineGap, template);
         const minY = -lineGap * 2.2;
         const maxY = height + lineGap * 2.2;
 
@@ -1730,8 +1770,13 @@
                   obstacle,
                   interval,
                   lineGap,
-                  lane,
+                  0,
                   y
+                );
+                const lane = lineLaneOffset(
+                  baseY,
+                  lineGap,
+                  template
                 );
                 const target =
                   side < 0 ? interval.top - lane : interval.bottom + lane;
@@ -1852,7 +1897,7 @@
       function fluidIntervalAtX(obstacle, x, template) {
         const radiusX =
           obstacle._fluidBoundsX +
-          obstacle._fluidApproach * 3.4 * template.recognition;
+          template.visionLength;
         const radiusY =
           obstacle._fluidBoundsY +
           obstacle._fluidApproach *
@@ -2144,6 +2189,7 @@
 
       function drawLineSprite(line, head) {
         const radius = clamp(2.4 + line.stroke * 0.9, 3, 5.4);
+        drawVisionCone(line, head, radius);
         ctx.save();
         ctx.translate(head.x, head.y);
         ctx.rotate(head.angle);
@@ -2152,6 +2198,137 @@
         ctx.ellipse(0, 0, radius * 1.7, radius * 0.72, 0, 0, TAU);
         ctx.fill();
         ctx.restore();
+      }
+
+      function drawVisionCone(line, head, radius) {
+        const startDistance = radius * 1.55;
+        if (line.visionLength <= startDistance) return;
+
+        const apexX = head.x + Math.cos(head.angle) * startDistance;
+        const apexY = head.y + Math.sin(head.angle) * startDistance;
+        const sampleCount = 9;
+        const edgePoints = [];
+        let hasContact = false;
+
+        for (let i = 0; i < sampleCount; i++) {
+          const amount = i / (sampleCount - 1);
+          const angle =
+            head.angle + mix(-line.visionAngle, line.visionAngle, amount);
+          const dx = Math.cos(angle);
+          const dy = Math.sin(angle);
+          const hitDistance = nearestObstacleHit(
+            head.x,
+            head.y,
+            dx,
+            dy,
+            line.visionLength
+          );
+          const distance = Math.max(
+            startDistance,
+            hitDistance === null ? line.visionLength : hitDistance
+          );
+          hasContact ||= hitDistance !== null;
+          edgePoints.push({
+            x: head.x + dx * distance,
+            y: head.y + dy * distance,
+            contact: hitDistance !== null,
+          });
+        }
+
+        ctx.save();
+        ctx.fillStyle = line.spriteColor;
+        ctx.strokeStyle = line.spriteColor;
+        ctx.lineWidth = Math.max(0.65, line.stroke * 0.58);
+        const baseAlpha = ctx.globalAlpha;
+
+        ctx.globalAlpha = baseAlpha * (hasContact ? 0.16 : 0.085);
+        ctx.beginPath();
+        ctx.moveTo(apexX, apexY);
+        for (const point of edgePoints) ctx.lineTo(point.x, point.y);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.globalAlpha = baseAlpha * (hasContact ? 0.5 : 0.25);
+        ctx.beginPath();
+        ctx.moveTo(apexX, apexY);
+        for (const point of edgePoints) ctx.lineTo(point.x, point.y);
+        ctx.closePath();
+        ctx.stroke();
+
+        if (hasContact) {
+          ctx.globalAlpha = baseAlpha * 0.72;
+          for (const point of edgePoints) {
+            if (!point.contact) continue;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 1.25, 0, TAU);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
+
+      function nearestObstacleHit(originX, originY, dx, dy, maxDistance) {
+        let nearest = null;
+        for (const obstacle of obstacles) {
+          const distance = rayObstacleDistance(
+            originX,
+            originY,
+            dx,
+            dy,
+            obstacle,
+            maxDistance
+          );
+          if (distance === null) continue;
+          if (nearest === null || distance < nearest) nearest = distance;
+        }
+        return nearest;
+      }
+
+      function rayObstacleDistance(originX, originY, dx, dy, obstacle, maxDistance) {
+        const cos = Math.cos(obstacle.rotation);
+        const sin = Math.sin(obstacle.rotation);
+        const relX = originX - obstacle.x;
+        const relY = originY - obstacle.y;
+        const localX = relX * cos + relY * sin;
+        const localY = -relX * sin + relY * cos;
+        const localDx = dx * cos + dy * sin;
+        const localDy = -dx * sin + dy * cos;
+
+        if (obstacle.type === 'circle') {
+          const projection = -(localX * localDx + localY * localDy);
+          const closestSq =
+            localX * localX +
+            localY * localY -
+            projection * projection;
+          const radiusSq = obstacle.radius * obstacle.radius;
+          if (closestSq > radiusSq) return null;
+          const distance = projection - Math.sqrt(Math.max(0, radiusSq - closestSq));
+          return distance >= 0 && distance <= maxDistance ? distance : null;
+        }
+
+        const halfWidth = obstacle.width * 0.5;
+        const halfHeight = obstacle.height * 0.5;
+        let near = 0;
+        let far = maxDistance;
+        const axes = [
+          [localX, localDx, halfWidth],
+          [localY, localDy, halfHeight],
+        ];
+
+        for (const [origin, direction, halfSize] of axes) {
+          if (Math.abs(direction) < 0.00001) {
+            if (origin < -halfSize || origin > halfSize) return null;
+            continue;
+          }
+          let first = (-halfSize - origin) / direction;
+          let second = (halfSize - origin) / direction;
+          if (first > second) [first, second] = [second, first];
+          near = Math.max(near, first);
+          far = Math.min(far, second);
+          if (near > far) return null;
+        }
+
+        return near >= 0 && near <= maxDistance ? near : null;
       }
 
       function drawObstacles() {

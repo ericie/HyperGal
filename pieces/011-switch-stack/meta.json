@@ -4,6 +4,6 @@
   "date": "2026-07-01",
   "category": "generative",
   "type": "interactive",
-  "thumbnail": "thumbnail.svg",
-  "description": "A pure black-and-white scroll stack. Each row holds one or two boxes; as a box reaches the viewport midpoint, its binary dither has finished clearing from black to white and its block-letter state flips from ON to OFF."
+  "thumbnail": "thumbnail.jpg",
+  "description": "An edge-to-edge masonry of black-and-white labels and utilitarian light-switch diagrams. Each box flips between ON and OFF in a discrete ten-frame transition as its center crosses a hot-pink midpoint line."
 }

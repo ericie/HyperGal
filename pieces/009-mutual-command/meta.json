@@ -4,6 +4,6 @@
   "date": "2026-07-15",
   "category": "games",
   "type": "interactive",
-  "thumbnail": "thumbnail.svg",
+  "thumbnail": "thumbnail.jpg",
   "description": "A two-sided Missile Command riff. A north row and south row of pixel towns and batteries launch paired attacks while their defenses try to erase incoming missiles at roughly the same rate. Each side starts at 1000 points and loses score as cities, batteries, and ground are destroyed; when a side reaches zero, the ruined row is cleared and a fresh set of towns slides in from the side."
 }

@@ -5,6 +5,6 @@
   "category": "generative",
   "type": "generative",
   "wip": true,
-  "thumbnail": "thumbnail.svg",
-  "description": "A field of black-and-white geometric cells where individual motifs slide through fixed cropped frames in four cardinal directions. Click to move a block; press Space to pause and R to recompose."
+  "thumbnail": "thumbnail.jpg",
+  "description": "A field of black-and-white geometric cells where sixteen small frames merge into four-by-four forms, split apart again, and slide motifs through fixed crops. Click to change a block; press Space to pause and R to recompose."
 }

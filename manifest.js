@@ -3,12 +3,13 @@ window.HYPERGAL_MANIFEST = {
   "pieces": [
     {
       "slug": "001-drift",
-      "title": "drift",
+      "title": "Drift a POC",
       "year": 2026,
       "date": "2026-06-16",
       "category": "generative",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
+      "wip": true,
+      "thumbnail": "thumbnail.jpg",
       "description": "A field of slowly drifting points on a low-contrast ground. Generative, runs forever."
     },
     {
@@ -18,7 +19,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-06-18",
       "category": "generative",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
+      "thumbnail": "thumbnail.jpg",
       "description": "A patterned wall of falling bricks. One color pair and one high-contrast textile tile seed each run; staggered rows scroll downward while new faux-3D bricks tumble in from above, flatten, and join the wall. Click to reshuffle."
     },
     {
@@ -28,8 +29,8 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-06-19",
       "category": "games",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
-      "description": "Breakout in reverse. An infallible paddle favors uncapped Hokusai-colored towers. Brick impacts fill adjacent cells while solid faces preserve true ricochets, and only a newly completed cell creeps the aligned lattice upward. Ten cell-making bounces without a paddle return turn the ball into a bomb that blasts an escape hole, falls back to the paddle, and becomes the building ball again. No player, no losing. Click to rebuild."
+      "thumbnail": "thumbnail.jpg",
+      "description": "Breakout in reverse. An infallible paddle sends one ball on a clean arc to the nearest low column of a level Renaissance-colored wall. Each underside hit reserves one new brick, and only that completed cell creeps the aligned lattice upward. No player, no losing. Click to rebuild."
     },
     {
       "slug": "004-hunt-prey-paint",
@@ -38,7 +39,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-06-24",
       "category": "generative",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
+      "thumbnail": "thumbnail.jpg",
       "description": "An abstract ecosystem that paints itself in watercolour and cartographic linework, then wipes the painting clean forever. Over a pale NES-bright pixel terrain, blocky prey graze, grow into spiny square emblems that age toward white, and flee hunters with their own alertness and sprint speed. Spiny prey trundle toward richer plant patches and, when they die, burst into clean eraser blasts that wipe stains, foliage, food, and husks instead of fertilizing the ground. Compact black arcade hunters run prey down, fatten, and breed only by splitting in half. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats."
     },
     {
@@ -48,8 +49,8 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-06-24",
       "category": "games",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
-      "description": "Space Invaders after the invaders have vanished. Four defenders hold the top, right, bottom, and left edges, trading single shots, sudden volleys, and rare charged super bullets across an empty center. Every bullet is intercepted in midair; super bullets detonate in a white-screen shock that clears the field and resets the scores."
+      "thumbnail": "thumbnail.jpg",
+      "description": "Space Invaders after the invaders have vanished. Four defenders spend finite ammunition to attack and intercept only the bullets aimed at their own territory. When one reaches its last round, it deploys a suicide nuke whose shockwave destroys every cannon, including itself."
     },
     {
       "slug": "006-only-centipede",
@@ -58,7 +59,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-06-25",
       "category": "games",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
+      "thumbnail": "thumbnail.jpg",
       "description": "A Centipede riff with small defenders at the top and bottom, one straight bullet each, and fast, hard-edged centipedes that enter from offscreen once the field is nearly cleared. Head shots remove the head and promote the next segment; body shots split the chain. Every hit segment becomes a three-shot mushroom that dents and deforms in the centipede's color."
     },
     {
@@ -68,8 +69,8 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-06-25",
       "category": "games",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
-      "description": "Autonomous traditional Snake on an ink-dark Prussian field. Five contenders with random starting lengths and aggression values enter from offscreen to hunt one mouse. Eating grows a snake; consecutive catches by the same snake raise its growth multiplier, larger snakes move faster and become more aggressive, and any snake may box when another snake's available space is small relative to its own length. Touching the border, itself, or another snake kills one snake. Dead snakes remain as distressed bitmap brushstrokes, dry bristles, dark chips, and pale bone fragments in Growth Rings' Hokusai palette. Click to reseed."
+      "thumbnail": "thumbnail.jpg",
+      "description": "Five autonomous snakes hunt one mouse in an 8-bit underground Mega Man palette. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Continuous rounded bodies cross a cavern-dark field; dead snakes remain as translucent watercolor gestures that bloom and blend into a shared mural. Click to reseed."
     },
     {
       "slug": "008-vectrex-asteroids",
@@ -78,7 +79,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-06-25",
       "category": "games",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
+      "thumbnail": "thumbnail.jpg",
       "description": "A black-and-white Vectrex-style Asteroids variant. The ship tries to park with visible retrograde burns, predicts asteroid paths, and fires tight two- or three-shot bursts one bullet at a time until a player takes over, thrusting mainly to dodge and keeping only three shots alive at once. Bullets split asteroids into deeper generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Heavier fragments accelerate slowly, drift together under stronger gravity, bump instead of passing through, settle before they glom, and weld into rough integrated asteroid outlines that animate from their joined pieces. Any asteroid can kill the ship on contact."
     },
     {
@@ -88,7 +89,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-15",
       "category": "games",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
+      "thumbnail": "thumbnail.jpg",
       "description": "A two-sided Missile Command riff. A north row and south row of pixel towns and batteries launch paired attacks while their defenses try to erase incoming missiles at roughly the same rate. Each side starts at 1000 points and loses score as cities, batteries, and ground are destroyed; when a side reaches zero, the ruined row is cleared and a fresh set of towns slides in from the side."
     },
     {
@@ -98,8 +99,8 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-15",
       "category": "generative",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
-      "description": "A full-window drawing of borderless Hokusai-toned walls, squares, and circles composed by adjustable gestalt forces. Open side safe zones, extreme scale, and a dominant broken continuation shape the obstacles while adjustable fine lines flow through tight passages and slowly fan out again."
+      "thumbnail": "thumbnail.jpg",
+      "description": "A full-window drawing of borderless Hokusai-toned walls, squares, and circles composed by adjustable gestalt forces. Boids with individually sized vision cones spot each obstacle, turn through distinct bounded lanes, and leave fine trails that slowly fan back out."
     },
     {
       "slug": "011-switch-stack",
@@ -108,8 +109,8 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-01",
       "category": "generative",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
-      "description": "A pure black-and-white scroll stack. Each row holds one or two boxes; as a box reaches the viewport midpoint, its binary dither has finished clearing from black to white and its block-letter state flips from ON to OFF."
+      "thumbnail": "thumbnail.jpg",
+      "description": "An edge-to-edge masonry of black-and-white labels and utilitarian light-switch diagrams. Each box flips between ON and OFF in a discrete ten-frame transition as its center crosses a hot-pink midpoint line."
     },
     {
       "slug": "012-happiness-hunter",
@@ -118,7 +119,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-15",
       "category": "games",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
+      "thumbnail": "thumbnail.jpg",
       "description": "One yellow arcade car hunts for the fastest lane through compact gray traffic, buses, and semi trucks, signaling, speeding up, surging, or backing off to make openings, but never exits. Other gray vehicles have wider speed personalities, from aggressive squeezers to conservative gap-waiters, and try to pass too. Slow traffic packs tighter while fast traffic leaves more room. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray vehicles can take diagonal ramps offscreen and leave the highway. Every vehicle claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car scores +1 for every pass, loses 1 when most vehicles pass it, and loses 5 when a semi passes it."
     },
     {
@@ -128,7 +129,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-17",
       "category": "games",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
+      "thumbnail": "thumbnail.jpg",
       "description": "One-player Pong folded into a cylinder. A single paddle stands where the net used to be; the ball leaves one edge and returns from the other, so every save comes back around and the only way to be rid of the ball is to miss. The two counters tally edge crossings, left and right, and exactly one crossing happens per lap — a catch sends the ball back out the edge behind it, a miss lets it through to the far one, so the paddle decides which side a point lands on but never whether one lands. It catches eight of every ten, striking off-centre on purpose to keep the rally alive, and each miss burns a permanent bar into the centre line, which slowly becomes a histogram of where this paddle fails."
     },
     {
@@ -138,8 +139,8 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-22",
       "category": "games",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
-      "description": "A two-body Pac-Man inversion on a fixed 17-by-11 course. When Pac sees a slow, floating Ghost as a threat, Pac turns and runs; its yellow silhouette compresses while a Ghost body and eyes emerge in motion. The pursuer never changes. The encounter leaves only ghosts."
+      "thumbnail": "thumbnail.jpg",
+      "description": "A two-body Pac-Man inversion on a fixed 17-by-11 course. A wavy eye-to-eye alarm sends Pac racing for one of four changing rooms, the only places where its yellow silhouette can fold into a Ghost. The pursuer never changes. The encounter leaves only ghosts."
     },
     {
       "slug": "015-growth-rings",
@@ -148,7 +149,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-22",
       "category": "generative",
       "type": "interactive",
-      "thumbnail": "thumbnail.png",
+      "thumbnail": "thumbnail.jpg",
       "description": "A trunk cross-section that grows toward 200 years one ring at a time. Latitude, solar angle, wind exposure, temperature, rainfall, and ground slope push the cambium out of symmetry; heavy rain years bloom into wider uneven rings while severity-scaled fire and pest incidents suppress 1-5 years of growth without cutting into older wood."
     },
     {
@@ -159,8 +160,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "wip": true,
-      "thumbnail": "thumbnail.svg",
-      "description": "A vertical platformer drawn as flat kawaii illustration in one blue. A small round climber in a cap runs, jumps and hauls himself up an endless shaft of soft clouds, hitting question boxes from below, taking ladders, stairs and poles in either direction, with every arm and leg animated off a skeleton."
+      "thumbnail": "thumbnail.jpg",
+      "description": "A vertical platformer drawn as flat kawaii illustration in one blue. A small round climber runs across fluffy, flat-bottomed clouds that rain underfoot and vanish behind traversal jumps, hitting question boxes and climbing strictly vertical ladders."
     },
     {
       "slug": "017-knot-work",
@@ -169,7 +170,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-25",
       "category": "generative",
       "type": "generative",
-      "thumbnail": "thumbnail.svg",
+      "thumbnail": "thumbnail.jpg",
       "description": "An edge-to-edge field of loose Celtic interlace printed in dark brown on worn paper. Continuous rounded cords pass through a Truchet-like knot grid, alternating over and under at crossings and running beyond every side of the browser. Click or press Enter/Space to reseed."
     },
     {
@@ -180,7 +181,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "wip": true,
-      "thumbnail": "thumbnail.svg",
+      "thumbnail": "thumbnail.jpg",
       "description": "Conway's Game of Life played across a shifting four-color checkerboard. At reset, the dead checkerboard changes from top to bottom before the new live cells fade in through ten quick batches."
     },
     {
@@ -191,7 +192,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "illustration",
       "wip": true,
-      "thumbnail": "thumbnail.png",
+      "thumbnail": "thumbnail.jpg",
       "description": "A precise black-and-white geometric city reconstructed from circles, rectangles, polygons, and filled arcs. Seven joined towers carry flags, circular domes, arches, rosettes, diamonds, and a dense center gate above a continuous ornamental belt and shared arcade."
     },
     {
@@ -202,8 +203,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "wip": true,
-      "thumbnail": "thumbnail.svg",
-      "description": "A field of black-and-white geometric cells where individual motifs slide through fixed cropped frames in four cardinal directions. Click to move a block; press Space to pause and R to recompose."
+      "thumbnail": "thumbnail.jpg",
+      "description": "A field of black-and-white geometric cells where sixteen small frames merge into four-by-four forms, split apart again, and slide motifs through fixed crops. Click to change a block; press Space to pause and R to recompose."
     },
     {
       "slug": "021-marbles",
@@ -222,7 +223,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-08-01",
       "category": "generative",
       "type": "generative",
-      "thumbnail": "thumbnail.svg",
+      "thumbnail": "thumbnail.jpg",
       "description": "Crustose lichen colonies continuously recolonize an entire dark stone surface in full-coverage radial waves of mint, sage, cream, and pale pink. Each completed layer immediately gives way to the next."
     },
     {
@@ -232,7 +233,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-08-03",
       "category": "generative",
       "type": "interactive",
-      "thumbnail": "thumbnail.svg",
+      "thumbnail": "thumbnail.jpg",
       "description": "Ink drops expand across a floating water bath, repelling older colors into a growing marbled-paper pattern. Automatic clearing drops restore open space, while adjustable combs rake the accumulated contours in either direction."
     },
     {
@@ -242,7 +243,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-08-03",
       "category": "generative",
       "type": "generative",
-      "thumbnail": "thumbnail.svg",
+      "thumbnail": "thumbnail.jpg",
       "description": "Sixty large abstract bubbles cross a low-contrast marbled oil field between ten five-sided stations. Refilling erases each station's vein; an exhausted station bursts and reappears over untouched resources, while bubbles that run dry are replaced from beyond the edge."
     },
     {
@@ -252,8 +253,48 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-08-03",
       "category": "games",
       "type": "interactive",
+      "thumbnail": "thumbnail.jpg",
+      "description": "A black-and-white vector Asteroids variant flown against weather instead of rock. Rounds explosively punch broad chunks out of wide, scalloped cumulus, so the only way through a body is to bore a tunnel and fly down it. The ship never targets anything. It holds a wandering course with the guns held down, and where the sky is thick it grinds to a crawl until its own fire has opened the way — an icebreaker, not a hunter. Its hull reams out what the guns began, so it can never wedge itself in a bore too narrow to fly. Sparse cloudscapes pan endlessly left while the ship works up and down through them; the camera follows, keeping it in frame. Bites heal slowly like liquid, and a bore that reaches all the way through leaves the exact same cloud outline divided into two halves."
+    },
+    {
+      "slug": "026-top-of-the-heap",
+      "title": "Top of the Heap",
+      "year": 2026,
+      "date": "2026-08-05",
+      "category": "generative",
+      "type": "generative",
+      "thumbnail": "thumbnail.jpg",
+      "description": "A bright ball character defends a twenty-storey cube pyramid from waves of wide spring-snakes that reserve individual squares, hunting whichever coil is closest to the summit. ON wins by lighting every cube; OFF wins by taking the top."
+    },
+    {
+      "slug": "027-camouflage",
+      "title": "Camouflage",
+      "year": 2026,
+      "date": "2026-08-07",
+      "category": "generative",
+      "type": "interactive",
+      "thumbnail": "thumbnail.jpg",
+      "description": "Nine still, finely pixelated fields include zebra, leopard, ocelot, tiger, giraffe, fawn, Gaboon viper, woodland, and desert camouflage. Palette shifts lead into hard-edged distance-field morphs that split, merge, expand, and contract each region into the next pattern."
+    },
+    {
+      "slug": "028-overgrowth",
+      "title": "Overgrowth",
+      "year": 2026,
+      "date": "2026-08-07",
+      "category": "generative",
+      "type": "generative",
+      "thumbnail": "thumbnail.jpg",
+      "description": "A richly layered procedural botanical illustration. Roses, peonies, poppies, lilies, daisies, hydrangeas, buds, stems, and veined foliage are composed into a flattened garden on coral, then finished with the grain and tonal variation of a printed textile."
+    },
+    {
+      "slug": "029-eyes-open",
+      "title": "Eyes Open",
+      "year": 2026,
+      "date": "2026-08-08",
+      "category": "generative",
+      "type": "generative",
       "thumbnail": "thumbnail.svg",
-      "description": "A black-and-white vector Asteroids variant flown against weather instead of rock. Nothing here explodes: a round takes a small chunk out of a cloud and no more, so the only way through a body is to bore a tunnel and fly down it. The ship never targets anything. It holds a wandering course with the guns held down, and where the sky is thick it grinds to a crawl until its own fire has opened the way — an icebreaker, not a hunter. Its hull reams out what the guns began, so it can never wedge itself in a bore too narrow to fly. Cloudscapes of scalloped cumulus pan endlessly left while the ship works up and down through them; the camera pans with the ship, which never leaves the frame. Bites close over as a cloud heals, or meet — and a bore that reaches all the way through halves the cloud into two bodies that swell as they drift."
+      "description": "A black field populated by bright graphic eyes. Ten to twenty are open at once on a phone, each arriving independently, holding its gaze, blinking shut, and vanishing before another appears elsewhere."
     }
   ]
 };

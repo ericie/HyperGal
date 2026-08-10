@@ -1,0 +1,1072 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="A bright, legged ball defends a twenty-storey cube pyramid from waves of wide spring-snakes."
+    />
+    <title>Top of the Heap · HyperGal</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ground: #140d32;
+        --focus: #fff46b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--ground);
+      }
+
+      body {
+        overscroll-behavior: none;
+        touch-action: manipulation;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: var(--ground);
+      }
+
+      canvas:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: -6px;
+      }
+
+      .status {
+        position: fixed;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="stage"
+      tabindex="0"
+      role="img"
+      aria-label="Top of the Heap. A tall pyramid of equal-size cubes fills the portrait screen. A bright ball character with bouncy legs patrols up and down the pyramid, turning cubes on while defending the summit from waves of wide spring-shaped snakes. Each snake occupies its own cube and waits when both upward squares are claimed. The hunter hunts and squashes whichever snake is closest to the top. The ON side scores by lighting the entire pyramid. The OFF side scores by reaching the summit. Press R to restart the match."
+    ></canvas>
+    <p id="status" class="status" aria-live="polite"></p>
+
+    <script>
+      (() => {
+        'use strict';
+
+        const canvas = document.getElementById('stage');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const status = document.getElementById('status');
+        const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+        const TAU = Math.PI * 2;
+
+        const palettes = [
+          {
+            bg: '#140d32',
+            aura: '#3b1766',
+            ink: '#fff8c9',
+            inactive: { h: 257, s: 58, l: 27 },
+            on: 48,
+            ball: '#fff15b',
+            ballShade: '#ff6b3d',
+          },
+          {
+            bg: '#071d34',
+            aura: '#074966',
+            ink: '#e9fff8',
+            inactive: { h: 202, s: 64, l: 25 },
+            on: 163,
+            ball: '#ff734d',
+            ballShade: '#b92b68',
+          },
+          {
+            bg: '#2a0c22',
+            aura: '#6b163b',
+            ink: '#fff7df',
+            inactive: { h: 336, s: 54, l: 26 },
+            on: 57,
+            ball: '#63ecff',
+            ballShade: '#4055f4',
+          },
+          {
+            bg: '#102417',
+            aura: '#1f5a39',
+            ink: '#f6ffe2',
+            inactive: { h: 143, s: 43, l: 25 },
+            on: 83,
+            ball: '#ffda43',
+            ballShade: '#f14273',
+          },
+          {
+            bg: '#241308',
+            aura: '#6c3512',
+            ink: '#fff4d4',
+            inactive: { h: 24, s: 55, l: 25 },
+            on: 194,
+            ball: '#9cff5d',
+            ballShade: '#12a8a0',
+          },
+        ];
+
+        let width = 1;
+        let height = 1;
+        let dpr = 1;
+        let rows = 20;
+        let halfW = 10;
+        let halfH = 4;
+        let sideH = 17;
+        let stepY = 21;
+        let topX = 0;
+        let topY = 110;
+        let cubes = [];
+        let players = [];
+        let splats = [];
+        let sparks = [];
+        let stars = [];
+        let ball = null;
+        let level = 1;
+        let onScore = 0;
+        let offScore = 0;
+        let onCount = 0;
+        let totalCubes = 0;
+        let paletteIndex = 0;
+        let palette = palettes[0];
+        let matchTime = 0;
+        let lastFrameAt = 0;
+        let nextSpawnAt = 0;
+        let nextWaveAt = 0;
+        let waveRemaining = 0;
+        let waveIndex = 0;
+        let waveHue = 112;
+        let phase = 'play';
+        let blinkStartedAt = 0;
+        let roundWinner = 'off';
+        let reducedMotion = motionQuery.matches;
+        let random = mulberry32((Date.now() ^ 0x87a51) >>> 0);
+        let raf = 0;
+
+        resize(true);
+        bindEvents();
+        resetLevel(false);
+        raf = requestAnimationFrame(frame);
+
+        function bindEvents() {
+          addEventListener('resize', () => resize(false), { passive: true });
+          canvas.addEventListener('pointerdown', () => {
+            canvas.focus({ preventScroll: true });
+          });
+          canvas.addEventListener('keydown', (event) => {
+            if (event.key === 'r' || event.key === 'R') restartMatch();
+          });
+          document.addEventListener('visibilitychange', () => {
+            lastFrameAt = 0;
+            if (!document.hidden && !raf) raf = requestAnimationFrame(frame);
+          });
+          const onMotionChange = () => {
+            reducedMotion = motionQuery.matches;
+            lastFrameAt = 0;
+          };
+          if (typeof motionQuery.addEventListener === 'function') {
+            motionQuery.addEventListener('change', onMotionChange);
+          } else if (typeof motionQuery.addListener === 'function') {
+            motionQuery.addListener(onMotionChange);
+          }
+        }
+
+        function resize(firstRun) {
+          const oldWidth = width;
+          const oldHeight = height;
+          width = Math.max(1, innerWidth);
+          height = Math.max(1, innerHeight);
+          if (!firstRun && width === oldWidth && height === oldHeight) return;
+
+          dpr = Math.min(2, devicePixelRatio || 1);
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          rows = width / height < 0.72 ? 20 : width < 760 ? 18 : 15;
+          halfW = Math.min(
+            (width - Math.max(22, width * 0.06)) / (rows * 2),
+            (height - 150) / (rows * 2.08)
+          );
+          halfW = Math.max(5.5, halfW);
+          halfH = halfW * 0.39;
+          sideH = halfW * 1.66;
+          stepY = halfH + sideH;
+          topX = width * 0.5;
+
+          const boardHeight = (rows - 1) * stepY + halfH + sideH;
+          const headerSpace = clamp(height * 0.12, 78, 118);
+          topY = clamp(
+            headerSpace + halfH,
+            78 + halfH,
+            Math.max(86 + halfH, (height - boardHeight) * 0.42)
+          );
+
+          makeStars();
+          if (cubes.length) resetLevel(false);
+        }
+
+        function restartMatch() {
+          level = 1;
+          onScore = 0;
+          offScore = 0;
+          paletteIndex = Math.floor(random() * palettes.length);
+          palette = palettes[paletteIndex];
+          resetLevel(false);
+          status.textContent = 'New match';
+        }
+
+        function resetLevel(advancePalette) {
+          if (advancePalette) {
+            level += 1;
+            paletteIndex = (paletteIndex + 1 + Math.floor(random() * 2)) % palettes.length;
+            palette = palettes[paletteIndex];
+          }
+
+          cubes = [];
+          onCount = 0;
+          totalCubes = (rows * (rows + 1)) / 2;
+          for (let row = 0; row < rows; row += 1) {
+            const line = [];
+            for (let column = 0; column <= row; column += 1) {
+              line.push({ row, column, on: false, pulse: 0 });
+            }
+            cubes.push(line);
+          }
+
+          players = [];
+          splats = [];
+          sparks = [];
+          matchTime = 0;
+          nextSpawnAt = 0;
+          nextWaveAt = 0.75;
+          waveRemaining = 0;
+          waveIndex = 0;
+          phase = 'play';
+          ball = makeBall();
+          updateRootColor();
+        }
+
+        function updateRootColor() {
+          document.documentElement.style.setProperty('--ground', palette.bg);
+          document.documentElement.style.setProperty('--focus', palette.ball);
+        }
+
+        function makeBall() {
+          const apex = nodePoint(0, 0);
+          return {
+            row: -1,
+            column: 0,
+            from: { x: apex.x + halfW * 0.15, y: -Math.max(48, height * 0.1) },
+            to: apex,
+            startedAt: matchTime,
+            duration: reducedMotion ? 1.15 : 0.82,
+            mode: 'entry',
+            nextRow: 0,
+            nextColumn: 0,
+            previousRow: -1,
+            previousColumn: 0,
+            targetId: null,
+            trail: [],
+          };
+        }
+
+        function spawnSnake() {
+          if (players.length >= 8 || phase !== 'play') return false;
+          const openColumns = [];
+          for (let column = 0; column < rows; column += 1) {
+            if (!snakeClaimsSquare(rows - 1, column, null)) openColumns.push(column);
+          }
+          if (!openColumns.length) return false;
+
+          const column = openColumns[Math.floor(random() * openColumns.length)];
+          const target = nodePoint(rows - 1, column);
+          const approach = random() < 0.5 ? -1 : 1;
+          players.push({
+            id: `${matchTime}-${random()}`,
+            hue: waveHue + (random() - 0.5) * 9,
+            row: rows,
+            column,
+            from: {
+              x: target.x + approach * halfW * 2.3,
+              y: target.y + sideH * 2.5,
+            },
+            to: target,
+            startedAt: matchTime,
+            duration: reducedMotion ? 1.15 : 0.72 + random() * 0.18,
+            entering: true,
+            waiting: false,
+            nextColumn: column,
+            dead: false,
+            springPhase: random() * TAU,
+          });
+          return true;
+        }
+
+        function beginWave() {
+          waveIndex += 1;
+          waveHue = 98 + random() * 38;
+          waveRemaining = 3 + Math.floor(random() * 3);
+          nextSpawnAt = matchTime;
+          status.textContent = `Spring wave ${waveIndex}: ${waveRemaining} snakes.`;
+        }
+
+        function frame(now) {
+          raf = 0;
+          if (document.hidden) return;
+          const seconds = now * 0.001;
+          if (!lastFrameAt) lastFrameAt = seconds;
+          const dt = Math.min(0.04, Math.max(0, seconds - lastFrameAt));
+          lastFrameAt = seconds;
+          update(dt);
+          draw();
+          raf = requestAnimationFrame(frame);
+        }
+
+        function update(dt) {
+          const speed = reducedMotion ? 0.44 : 1;
+          matchTime += dt * speed;
+
+          for (const row of cubes) {
+            for (const cube of row) cube.pulse = Math.max(0, cube.pulse - dt * 3.8);
+          }
+
+          splats = splats.filter((splat) => matchTime - splat.at < 0.7);
+          sparks = sparks.filter((spark) => matchTime - spark.at < spark.life);
+
+          if (phase === 'blink') {
+            if (matchTime - blinkStartedAt >= (reducedMotion ? 0.72 : 1.45)) {
+              resetLevel(true);
+              status.textContent = `Level ${level}`;
+            }
+            return;
+          }
+
+          if (waveRemaining === 0 && matchTime >= nextWaveAt) beginWave();
+
+          if (waveRemaining > 0 && matchTime >= nextSpawnAt) {
+            if (spawnSnake()) {
+              waveRemaining -= 1;
+              nextSpawnAt = matchTime + 0.26 + random() * 0.18;
+              if (waveRemaining === 0) {
+                nextWaveAt = matchTime + 6.5 + random() * 2.5;
+              }
+            } else {
+              nextSpawnAt = matchTime + 0.5;
+            }
+          }
+
+          updateBall();
+          for (const player of players) updatePlayer(player);
+          checkCrushes();
+          players = players.filter((player) => !player.dead);
+        }
+
+        function updateBall() {
+          if (!ball) return;
+          const progress = (matchTime - ball.startedAt) / ball.duration;
+          const position = ballPosition();
+          ball.trail.push({ x: position.x, y: position.y, at: matchTime });
+          ball.trail = ball.trail.filter((dot) => matchTime - dot.at < 0.18);
+          if (progress < 1) return;
+
+          ball.previousRow = ball.row;
+          ball.previousColumn = ball.column;
+          ball.row = ball.mode === 'entry' ? 0 : ball.nextRow;
+          ball.column = ball.mode === 'entry' ? 0 : ball.nextColumn;
+          strikeCube(ball.row, ball.column);
+          if (phase === 'blink') return;
+
+          const next = chooseBallNextNode();
+          ball.from = nodePoint(ball.row, ball.column);
+          ball.to = nodePoint(next.row, next.column);
+          ball.nextRow = next.row;
+          ball.nextColumn = next.column;
+          ball.startedAt = matchTime;
+          ball.duration = reducedMotion ? 1.08 : 0.38 + random() * 0.1;
+          ball.mode = 'bounce';
+        }
+
+        function chooseBallNextNode() {
+          const candidates = ballNeighbors(ball.row, ball.column);
+          const livePlayers = players.filter((player) => !player.dead);
+
+          if (livePlayers.length) {
+            const ballPoint = nodePoint(ball.row, ball.column);
+            const threats = livePlayers.map((player) => {
+              const progress = clamp(
+                (matchTime - player.startedAt) / player.duration,
+                0,
+                1
+              );
+              const jumpsFromTop = player.entering
+                ? rows
+                : player.waiting
+                  ? player.row
+                  : Math.max(0, player.row - progress);
+              const point = playerPosition(player);
+              const distance =
+                Math.abs(point.x - ballPoint.x) +
+                Math.abs(point.y - ballPoint.y) * 0.22;
+              return { player, jumpsFromTop, distance };
+            });
+            threats.sort((a, b) =>
+              a.jumpsFromTop - b.jumpsFromTop || a.distance - b.distance
+            );
+            const target = threats[0].player;
+            ball.targetId = target.id;
+
+            const targetPoint = playerPosition(target);
+            const scored = candidates.map((candidate) => {
+              const point = nodePoint(candidate.row, candidate.column);
+              const distance =
+                Math.abs(point.x - targetPoint.x) +
+                Math.abs(point.y - targetPoint.y) * 0.42;
+              const offBonus = cubes[candidate.row][candidate.column].on ? 0 : halfW * 0.82;
+              const reversal =
+                candidate.row === ball.previousRow &&
+                candidate.column === ball.previousColumn
+                  ? halfW * 0.55
+                  : 0;
+              return { ...candidate, score: distance - offBonus + reversal };
+            });
+            scored.sort((a, b) => a.score - b.score);
+            if (scored.length === 1) return scored[0];
+            if (Math.abs(scored[0].score - scored[1].score) < halfW * 0.18) {
+              return random() < 0.5 ? scored[0] : scored[1];
+            }
+            return scored[0];
+          }
+
+          return nextStepTowardOffCube(candidates) || candidates[Math.floor(random() * candidates.length)];
+        }
+
+        function nextStepTowardOffCube(initialSteps) {
+          const queue = [];
+          const visited = new Set([`${ball.row}:${ball.column}`]);
+          for (const step of initialSteps) {
+            const key = `${step.row}:${step.column}`;
+            visited.add(key);
+            queue.push({ row: step.row, column: step.column, first: step });
+          }
+
+          let cursor = 0;
+          while (cursor < queue.length) {
+            const current = queue[cursor];
+            cursor += 1;
+            if (!cubes[current.row][current.column].on) return current.first;
+
+            for (const neighbor of ballNeighbors(current.row, current.column)) {
+              const key = `${neighbor.row}:${neighbor.column}`;
+              if (visited.has(key)) continue;
+              visited.add(key);
+              queue.push({ ...neighbor, first: current.first });
+            }
+          }
+          return null;
+        }
+
+        function ballNeighbors(row, column) {
+          const neighbors = [];
+          if (row > 0) {
+            if (column < row) neighbors.push({ row: row - 1, column });
+            if (column > 0) neighbors.push({ row: row - 1, column: column - 1 });
+          }
+          if (row < rows - 1) {
+            neighbors.push({ row: row + 1, column });
+            neighbors.push({ row: row + 1, column: column + 1 });
+          }
+          return neighbors;
+        }
+
+        function updatePlayer(player) {
+          if (player.dead) return;
+          const progress = (matchTime - player.startedAt) / player.duration;
+          if (progress < 1) return;
+
+          if (player.entering) {
+            player.row = rows - 1;
+            player.entering = false;
+          } else if (!player.waiting) {
+            player.row -= 1;
+            player.column = player.nextColumn;
+          }
+
+          if (player.row <= 0) {
+            status.textContent = `Spring-snake took the top. OFF ${offScore + 1}, ON ${onScore}.`;
+            beginBlink('off');
+            return;
+          }
+
+          const candidateColumns = [];
+          if (player.column < player.row) candidateColumns.push(player.column);
+          if (player.column > 0) candidateColumns.push(player.column - 1);
+          if (candidateColumns.length > 1 && random() < 0.5) candidateColumns.reverse();
+
+          const nextRow = player.row - 1;
+          const nextColumn = candidateColumns.find(
+            (column) => !snakeClaimsSquare(nextRow, column, player)
+          );
+          player.from = nodePoint(player.row, player.column);
+          player.startedAt = matchTime;
+
+          if (nextColumn === undefined) {
+            player.waiting = true;
+            player.to = player.from;
+            player.nextColumn = player.column;
+            player.duration = reducedMotion ? 0.72 : 0.2 + random() * 0.1;
+            return;
+          }
+
+          player.waiting = false;
+          player.to = nodePoint(nextRow, nextColumn);
+          player.nextColumn = nextColumn;
+          player.duration = reducedMotion ? 1.18 : 0.62 + random() * 0.22;
+        }
+
+        function snakeClaimsSquare(row, column, exceptPlayer) {
+          for (const other of players) {
+            if (other.dead || other === exceptPlayer) continue;
+
+            if (other.entering) {
+              if (row === rows - 1 && column === other.column) return true;
+              continue;
+            }
+
+            if (row === other.row && column === other.column) return true;
+            if (
+              !other.waiting &&
+              row === other.row - 1 &&
+              column === other.nextColumn
+            ) {
+              return true;
+            }
+          }
+          return false;
+        }
+
+        function beginBlink(winner) {
+          if (phase === 'blink') return;
+          roundWinner = winner;
+          if (winner === 'on') onScore += 1;
+          else offScore += 1;
+          phase = 'blink';
+          blinkStartedAt = matchTime;
+          makeSparks(nodePoint(0, 0), palette.on, 28);
+        }
+
+        function strikeCube(row, column) {
+          const cube = cubes[row] && cubes[row][column];
+          if (!cube) return;
+          if (!cube.on) {
+            cube.on = true;
+            onCount += 1;
+            cube.pulse = 1;
+            makeSparks(nodePoint(row, column), palette.on, row === 0 ? 12 : 5);
+          } else {
+            cube.pulse = Math.max(cube.pulse, 0.32);
+          }
+
+          if (onCount === totalCubes) {
+            status.textContent = `The whole pyramid is on. ON ${onScore + 1}, OFF ${offScore}.`;
+            beginBlink('on');
+          }
+        }
+
+        function checkCrushes() {
+          if (!ball || ball.mode === 'entry' && ball.row < 0) return;
+          const bp = ballPosition();
+          const ballRadius = Math.max(6, halfW * 0.78);
+          for (const player of players) {
+            if (player.dead) continue;
+            const pp = playerPosition(player);
+            const dx = bp.x - pp.x;
+            const dy = bp.y - pp.y;
+            const hitRadius = ballRadius + Math.max(4, halfW * 0.78);
+            if (dx * dx + dy * dy > hitRadius * hitRadius) continue;
+
+            player.dead = true;
+            if (ball.targetId === player.id) ball.targetId = null;
+            splats.push({ x: pp.x, y: pp.y + halfW * 0.25, hue: player.hue, at: matchTime });
+            makeSparks(pp, player.hue, 11);
+            status.textContent = `Spring-snake crushed. ON ${onScore}, OFF ${offScore}.`;
+          }
+        }
+
+        function ballPosition() {
+          if (!ball) return { x: -100, y: -100 };
+          const raw = clamp((matchTime - ball.startedAt) / ball.duration, 0, 1);
+          let t = raw;
+          let lift = 0;
+          if (ball.mode === 'entry') {
+            t = 1 - Math.pow(1 - raw, 2.35);
+          } else if (ball.mode === 'bounce') {
+            lift = reducedMotion ? 0 : Math.sin(Math.PI * raw) * halfW * 3.15;
+          }
+          return {
+            x: lerp(ball.from.x, ball.to.x, t),
+            y: lerp(ball.from.y, ball.to.y, t) - lift - halfW * 0.8,
+          };
+        }
+
+        function ballGroundPosition() {
+          if (!ball) return { x: -100, y: -100 };
+          const raw = clamp((matchTime - ball.startedAt) / ball.duration, 0, 1);
+          const t = ball.mode === 'entry' ? 1 - Math.pow(1 - raw, 2.35) : raw;
+          return {
+            x: lerp(ball.from.x, ball.to.x, t),
+            y: lerp(ball.from.y, ball.to.y, t),
+          };
+        }
+
+        function playerPosition(player) {
+          const raw = clamp((matchTime - player.startedAt) / player.duration, 0, 1);
+          const t = smooth(raw);
+          const jumpHeight = player.entering ? 1.35 : 2.65;
+          const lift = reducedMotion ? 0 : Math.sin(Math.PI * raw) * halfW * jumpHeight;
+          return {
+            x: lerp(player.from.x, player.to.x, t),
+            y: lerp(player.from.y, player.to.y, t) - lift - halfW * 0.28,
+          };
+        }
+
+        function nodePoint(row, column) {
+          return {
+            x: topX + (column * 2 - row) * halfW,
+            y: topY + row * stepY,
+          };
+        }
+
+        function makeSparks(point, hue, count) {
+          if (reducedMotion) return;
+          for (let i = 0; i < count; i += 1) {
+            const angle = random() * TAU;
+            const speed = halfW * (0.8 + random() * 2.3);
+            sparks.push({
+              x: point.x,
+              y: point.y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed - halfW,
+              hue,
+              at: matchTime,
+              life: 0.25 + random() * 0.28,
+            });
+          }
+        }
+
+        function makeStars() {
+          stars = [];
+          const count = Math.round(clamp((width * height) / 11000, 24, 86));
+          const starRandom = mulberry32((width * 19 + height * 31) >>> 0);
+          for (let i = 0; i < count; i += 1) {
+            stars.push({
+              x: starRandom() * width,
+              y: starRandom() * height,
+              size: 0.5 + starRandom() * 1.7,
+              alpha: 0.12 + starRandom() * 0.32,
+            });
+          }
+        }
+
+        function draw() {
+          drawBackdrop();
+          drawScoreboard();
+          drawBoardShadow();
+          for (let row = 0; row < rows; row += 1) {
+            for (let column = 0; column <= row; column += 1) {
+              drawCube(cubes[row][column]);
+            }
+          }
+
+          drawSplats();
+          const actors = players
+            .filter((player) => !player.dead)
+            .map((player) => ({ type: 'player', value: player, y: playerPosition(player).y }));
+          if (ball) actors.push({ type: 'ball', value: ball, y: ballPosition().y });
+          actors.sort((a, b) => a.y - b.y);
+          for (const actor of actors) {
+            if (actor.type === 'ball') drawBall();
+            else drawPlayer(actor.value);
+          }
+          drawSparks();
+
+          if (phase === 'blink') drawBlink();
+        }
+
+        function drawBackdrop() {
+          ctx.fillStyle = palette.bg;
+          ctx.fillRect(0, 0, width, height);
+
+          const aura = ctx.createRadialGradient(
+            topX,
+            topY + rows * stepY * 0.5,
+            0,
+            topX,
+            topY + rows * stepY * 0.55,
+            Math.max(width, height) * 0.68
+          );
+          aura.addColorStop(0, palette.aura);
+          aura.addColorStop(0.48, palette.bg);
+          aura.addColorStop(1, palette.bg);
+          ctx.fillStyle = aura;
+          ctx.fillRect(0, 0, width, height);
+
+          ctx.fillStyle = palette.ink;
+          for (const star of stars) {
+            ctx.globalAlpha = star.alpha;
+            ctx.fillRect(star.x, star.y, star.size, star.size);
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        function drawScoreboard() {
+          const pad = clamp(width * 0.045, 16, 34);
+          const scoreSize = clamp(width * 0.065, 20, 34);
+          const labelSize = clamp(width * 0.026, 10, 13);
+          const top = Math.max(24, envSafeTop() + 17);
+
+          ctx.textBaseline = 'top';
+          ctx.fillStyle = palette.ink;
+          ctx.font = `900 ${scoreSize}px Arial, Helvetica, sans-serif`;
+          ctx.textAlign = 'left';
+          ctx.fillText(String(onScore).padStart(2, '0'), pad, top);
+          ctx.textAlign = 'right';
+          ctx.fillText(String(offScore).padStart(2, '0'), width - pad, top);
+
+          ctx.globalAlpha = 0.82;
+          ctx.font = `800 ${labelSize}px Arial, Helvetica, sans-serif`;
+          ctx.letterSpacing = '0.05em';
+          ctx.textAlign = 'left';
+          ctx.fillText('ON', pad, top + scoreSize + 1);
+          ctx.textAlign = 'right';
+          ctx.fillText('OFF', width - pad, top + scoreSize + 1);
+          ctx.textAlign = 'center';
+          ctx.fillText(`HEAP ${level}`, width * 0.5, top + scoreSize * 0.52);
+          ctx.globalAlpha = 1;
+          ctx.letterSpacing = '0px';
+        }
+
+        function drawBoardShadow() {
+          const base = nodePoint(rows - 1, Math.floor((rows - 1) / 2));
+          ctx.save();
+          ctx.translate(base.x, base.y + sideH * 1.45);
+          ctx.scale(1, 0.24);
+          const shadow = ctx.createRadialGradient(0, 0, 0, 0, 0, width * 0.48);
+          shadow.addColorStop(0, 'rgba(0,0,0,.55)');
+          shadow.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = shadow;
+          ctx.beginPath();
+          ctx.arc(0, 0, width * 0.48, 0, TAU);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        function drawCube(cube) {
+          const point = nodePoint(cube.row, cube.column);
+          const activeHue = cube.on ? palette.on : palette.inactive.h;
+          const saturation = cube.on ? 84 : palette.inactive.s;
+          const lightness = cube.on ? 59 : palette.inactive.l;
+          const pulse = cube.pulse * 12;
+
+          ctx.beginPath();
+          ctx.moveTo(point.x - halfW, point.y);
+          ctx.lineTo(point.x, point.y + halfH);
+          ctx.lineTo(point.x, point.y + halfH + sideH);
+          ctx.lineTo(point.x - halfW, point.y + sideH);
+          ctx.closePath();
+          ctx.fillStyle = `hsl(${activeHue} ${Math.max(32, saturation - 15)}% ${Math.max(13, lightness - 19)}%)`;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.moveTo(point.x + halfW, point.y);
+          ctx.lineTo(point.x, point.y + halfH);
+          ctx.lineTo(point.x, point.y + halfH + sideH);
+          ctx.lineTo(point.x + halfW, point.y + sideH);
+          ctx.closePath();
+          ctx.fillStyle = `hsl(${activeHue} ${Math.max(34, saturation - 8)}% ${Math.max(17, lightness - 11)}%)`;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.moveTo(point.x, point.y - halfH);
+          ctx.lineTo(point.x + halfW, point.y);
+          ctx.lineTo(point.x, point.y + halfH);
+          ctx.lineTo(point.x - halfW, point.y);
+          ctx.closePath();
+          ctx.fillStyle = `hsl(${activeHue} ${saturation}% ${Math.min(79, lightness + pulse)}%)`;
+          ctx.fill();
+
+          ctx.strokeStyle = 'rgba(7, 5, 22, .72)';
+          ctx.lineWidth = Math.max(0.7, halfW * 0.055);
+          ctx.stroke();
+
+          if (cube.pulse > 0) {
+            ctx.globalAlpha = cube.pulse * 0.45;
+            ctx.fillStyle = palette.ink;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+          }
+        }
+
+        function drawBall() {
+          const p = ballPosition();
+          const radius = Math.max(6, halfW * 0.78);
+          const raw = clamp((matchTime - ball.startedAt) / ball.duration, 0, 1);
+          const hop = ball.mode === 'bounce' && !reducedMotion ? Math.sin(Math.PI * raw) : 0;
+          const landing = ball.mode === 'bounce' && !reducedMotion
+            ? Math.pow(Math.abs(Math.cos(Math.PI * raw)), 7)
+            : 0;
+          const direction = clamp((ball.to.x - ball.from.x) / Math.max(1, halfW), -1, 1);
+
+          for (let i = 0; i < ball.trail.length; i += 1) {
+            const dot = ball.trail[i];
+            const age = clamp((matchTime - dot.at) / 0.18, 0, 1);
+            ctx.globalAlpha = (1 - age) * 0.24;
+            ctx.fillStyle = palette.ball;
+            ctx.beginPath();
+            ctx.arc(dot.x, dot.y, radius * (0.2 + (1 - age) * 0.34), 0, TAU);
+            ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+
+          const ground = ballGroundPosition();
+          ctx.fillStyle = 'rgba(0,0,0,.28)';
+          ctx.beginPath();
+          ctx.ellipse(
+            ground.x + radius * 0.12,
+            ground.y + halfW * 0.38,
+            radius * (0.9 - hop * 0.24),
+            radius * 0.24,
+            0,
+            0,
+            TAU
+          );
+          ctx.fill();
+
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          const legLength = radius * (0.62 + (1 - hop) * 0.5);
+          const stride = Math.sin(raw * TAU) * radius * 0.28;
+          const hipY = radius * 0.5;
+          const footY = hipY + legLength;
+          const legColor = palette.ballShade;
+
+          ctx.strokeStyle = 'rgba(8, 5, 27, .8)';
+          ctx.lineWidth = Math.max(2.6, radius * 0.36);
+          drawBallLeg(-radius * 0.32, hipY, -radius * 0.36 - stride, footY);
+          drawBallLeg(radius * 0.32, hipY, radius * 0.36 + stride, footY);
+          ctx.strokeStyle = legColor;
+          ctx.lineWidth = Math.max(1.35, radius * 0.18);
+          drawBallLeg(-radius * 0.32, hipY, -radius * 0.36 - stride, footY);
+          drawBallLeg(radius * 0.32, hipY, radius * 0.36 + stride, footY);
+
+          ctx.fillStyle = 'rgba(8, 5, 27, .82)';
+          ctx.beginPath();
+          ctx.ellipse(-radius * 0.43 - stride, footY, radius * 0.36, radius * 0.18, -0.08, 0, TAU);
+          ctx.ellipse(radius * 0.43 + stride, footY, radius * 0.36, radius * 0.18, 0.08, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = legColor;
+          ctx.beginPath();
+          ctx.ellipse(-radius * 0.43 - stride, footY - radius * 0.04, radius * 0.26, radius * 0.1, -0.08, 0, TAU);
+          ctx.ellipse(radius * 0.43 + stride, footY - radius * 0.04, radius * 0.26, radius * 0.1, 0.08, 0, TAU);
+          ctx.fill();
+
+          ctx.save();
+          ctx.scale(1 + landing * 0.16, 1 - landing * 0.12);
+          const shine = ctx.createRadialGradient(
+            -radius * 0.36,
+            -radius * 0.42,
+            radius * 0.04,
+            0,
+            0,
+            radius
+          );
+          shine.addColorStop(0, '#ffffff');
+          shine.addColorStop(0.16, palette.ball);
+          shine.addColorStop(0.76, palette.ball);
+          shine.addColorStop(1, palette.ballShade);
+          ctx.fillStyle = shine;
+          ctx.beginPath();
+          ctx.arc(0, 0, radius, 0, TAU);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(8, 5, 27, .78)';
+          ctx.lineWidth = Math.max(1, halfW * 0.09);
+          ctx.stroke();
+
+          const gazeX = direction * radius * 0.11;
+          const eyeY = -radius * 0.18;
+          ctx.fillStyle = '#fffdf2';
+          ctx.beginPath();
+          ctx.ellipse(-radius * 0.3, eyeY, radius * 0.2, radius * 0.26, 0, 0, TAU);
+          ctx.ellipse(radius * 0.3, eyeY, radius * 0.2, radius * 0.26, 0, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = '#120b2c';
+          ctx.beginPath();
+          ctx.arc(-radius * 0.3 + gazeX, eyeY + radius * 0.04, radius * 0.09, 0, TAU);
+          ctx.arc(radius * 0.3 + gazeX, eyeY + radius * 0.04, radius * 0.09, 0, TAU);
+          ctx.fill();
+          ctx.strokeStyle = '#120b2c';
+          ctx.lineWidth = Math.max(0.8, radius * 0.09);
+          ctx.beginPath();
+          ctx.arc(0, radius * 0.28, radius * 0.22, 0.15 * Math.PI, 0.85 * Math.PI);
+          ctx.stroke();
+          ctx.restore();
+          ctx.restore();
+        }
+
+        function drawBallLeg(startX, startY, endX, endY) {
+          const bend = (endX - startX) * 0.55;
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.quadraticCurveTo(startX - bend, (startY + endY) * 0.5, endX, endY);
+          ctx.stroke();
+        }
+
+        function drawPlayer(player) {
+          const p = playerPosition(player);
+          const size = Math.max(4.5, halfW * 0.61);
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.strokeStyle = `hsl(${player.hue} 88% 64%)`;
+          ctx.fillStyle = `hsl(${player.hue} 92% 61%)`;
+          ctx.lineWidth = Math.max(1.2, halfW * 0.13);
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          ctx.fillStyle = 'rgba(0,0,0,.3)';
+          ctx.beginPath();
+          ctx.ellipse(0, size * 1.05, size * 0.72, size * 0.2, 0, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = `hsl(${player.hue} 92% 61%)`;
+
+          const raw = clamp((matchTime - player.startedAt) / player.duration, 0, 1);
+          const bounce = reducedMotion ? 0 : Math.sin(Math.PI * raw);
+          const stretch = 1 + bounce * 0.48;
+          const squeeze = 1 - bounce * 0.1;
+          ctx.scale(squeeze, stretch);
+
+          ctx.strokeStyle = 'rgba(7, 5, 22, .76)';
+          ctx.lineWidth = Math.max(2.9, halfW * 0.3);
+          ctx.beginPath();
+          for (let coil = 0; coil <= 16; coil += 1) {
+            const t = coil / 16;
+            const x = Math.sin(t * TAU * 4 + player.springPhase) * size * 0.72;
+            const y = size * 0.75 - t * size * 1.82;
+            if (coil === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+
+          ctx.strokeStyle = `hsl(${player.hue} 88% 64%)`;
+          ctx.lineWidth = Math.max(1.45, halfW * 0.14);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.ellipse(0, -size * 1.22, size * 0.62, size * 0.34, 0, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = palette.bg;
+          const eye = Math.max(1, size * 0.1);
+          ctx.fillRect(-size * 0.24, -size * 1.35, eye, eye);
+          ctx.fillRect(size * 0.15, -size * 1.35, eye, eye);
+          ctx.restore();
+        }
+
+        function drawSplats() {
+          for (const splat of splats) {
+            const age = clamp((matchTime - splat.at) / 0.7, 0, 1);
+            const spread = halfW * (0.35 + age * 0.8);
+            ctx.globalAlpha = 1 - age;
+            ctx.fillStyle = `hsl(${splat.hue} 90% 58%)`;
+            ctx.beginPath();
+            ctx.ellipse(splat.x, splat.y, spread, spread * 0.24, 0, 0, TAU);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+          }
+        }
+
+        function drawSparks() {
+          for (const spark of sparks) {
+            const age = matchTime - spark.at;
+            const t = age / spark.life;
+            const x = spark.x + spark.vx * age;
+            const y = spark.y + spark.vy * age + halfW * 3 * age * age;
+            ctx.globalAlpha = 1 - t;
+            ctx.fillStyle = `hsl(${spark.hue} 94% 70%)`;
+            const size = Math.max(1, halfW * 0.13 * (1 - t));
+            ctx.fillRect(x - size * 0.5, y - size * 0.5, size, size);
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        function drawBlink() {
+          const elapsed = matchTime - blinkStartedAt;
+          const on = reducedMotion || Math.floor(elapsed / 0.12) % 2 === 0;
+          if (!on) return;
+          ctx.globalAlpha = reducedMotion ? 0.22 : 0.66;
+          ctx.fillStyle = palette.ink;
+          ctx.fillRect(0, 0, width, height);
+          ctx.globalAlpha = 1;
+
+          ctx.fillStyle = palette.bg;
+          ctx.font = `900 ${clamp(width * 0.082, 26, 46)}px Arial, Helvetica, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(roundWinner === 'on' ? 'ALL ON!' : 'TOP TAKEN!', width * 0.5, height * 0.5);
+        }
+
+        function envSafeTop() {
+          return 0;
+        }
+
+        function clamp(value, min, max) {
+          return Math.max(min, Math.min(max, value));
+        }
+
+        function lerp(a, b, t) {
+          return a + (b - a) * t;
+        }
+
+        function smooth(t) {
+          return t * t * (3 - 2 * t);
+        }
+
+        function mulberry32(seed) {
+          return function next() {
+            let t = (seed += 0x6d2b79f5);
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+      })();
+    </script>
+  </body>
+</html>

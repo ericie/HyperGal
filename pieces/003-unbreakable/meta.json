@@ -4,6 +4,6 @@
   "date": "2026-06-19",
   "category": "games",
   "type": "interactive",
-  "thumbnail": "thumbnail.svg",
-  "description": "Breakout in reverse. An infallible paddle favors uncapped Hokusai-colored towers. Brick impacts fill adjacent cells while solid faces preserve true ricochets, and only a newly completed cell creeps the aligned lattice upward. Ten cell-making bounces without a paddle return turn the ball into a bomb that blasts an escape hole, falls back to the paddle, and becomes the building ball again. No player, no losing. Click to rebuild."
+  "thumbnail": "thumbnail.jpg",
+  "description": "Breakout in reverse. An infallible paddle sends one ball on a clean arc to the nearest low column of a level Renaissance-colored wall. Each underside hit reserves one new brick, and only that completed cell creeps the aligned lattice upward. No player, no losing. Click to rebuild."
 }

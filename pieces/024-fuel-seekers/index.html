@@ -67,7 +67,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Fuel Seekers: sixty large abstract bubbles travel among ten five-sided stations placed over a low-contrast marbled oil field. Filling a bubble erases the vein beneath its station. Empty stations burst and new stations emerge over untouched resources. Bubbles that run dry also pop, and replacements enter from beyond the edge. Press R to reseed the field."
+      aria-label="Fuel Seekers: sixty round bubbles with vertical fuel levels travel among ten five-sided stations placed over a low-contrast marbled oil field. Full bubbles roam playfully and permanently mark their paths with cool-colored lines while bumping one another without overlapping. At one-quarter fuel they seek a station and draw permanent warm-colored lines. Filling a bubble erases the vein beneath its station. Empty stations burst and new stations emerge over untouched resources. Bubbles that run dry also pop, and replacements enter from beyond the edge. Press R to reseed the field."
     ></canvas>
     <p id="status" class="status" aria-live="polite"></p>
 
@@ -80,12 +80,17 @@
         const status = document.getElementById('status');
         const fieldCanvas = document.createElement('canvas');
         const fieldCtx = fieldCanvas.getContext('2d', { alpha: false });
+        const trailCanvas = document.createElement('canvas');
+        const trailCtx = trailCanvas.getContext('2d');
         const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
         const params = new URLSearchParams(location.search);
 
         const TAU = Math.PI * 2;
         const BUBBLE_COUNT = 60;
         const STATION_COUNT = 10;
+        const REFUEL_THRESHOLD = 0.25;
+        const COLLISION_GAP = 1.5;
+        const COLLISION_PASSES = 6;
         const FIELD_BASE = [31, 32, 30];
         const OIL_TINT = [25, 20, 8];
 
@@ -182,6 +187,7 @@
         function buildScene() {
           random = mulberry32(seed ^ 0x6c8e9cf5);
           buildFieldTexture();
+          resetTrailCanvas();
           depletedPatches = [];
           pendingStations = [];
           stationPops = [];
@@ -205,8 +211,9 @@
             bubble.fuel = 0.16 + random() * 0.72;
             bubble.fillRate = 0.25 + random() * 0.24;
             bubble.dockSide = station.side;
-            bubble.x = station.x + station.side * station.size * 0.9;
-            bubble.y = station.y - station.size * 0.1;
+            const dock = bubbleDockPosition(bubble, station);
+            bubble.x = dock.x;
+            bubble.y = dock.y;
             bubble.vx = 0;
             bubble.vy = 0;
             station.occupant = bubble;
@@ -216,7 +223,16 @@
             chooseTarget(bubbles[i], true);
           }
 
+          resolveSceneCollisions(false, COLLISION_PASSES * 2);
           draw();
+        }
+
+        function resetTrailCanvas() {
+          trailCanvas.width = canvas.width;
+          trailCanvas.height = canvas.height;
+          trailCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          trailCtx.lineCap = 'round';
+          trailCtx.lineJoin = 'round';
         }
 
         function buildFieldTexture() {
@@ -359,7 +375,7 @@
         }
 
         function createStation(point, entering) {
-          const size = clamp(Math.min(width, height) * 0.03, 15, 24);
+          const size = clamp(Math.min(width, height) * 0.022, 11, 18);
           const capacity = 3.6 + point.value * 2.8 + random() * 1.2;
           return {
             id: nextStationId++,
@@ -420,6 +436,8 @@
             age: random() * 14,
             phase: random() * TAU,
             wobble: 0.7 + random() * 1.2,
+            trailX: null,
+            trailY: null,
             dead: false
           };
 
@@ -456,6 +474,12 @@
         }
 
         function chooseTarget(bubble, avoidCurrent) {
+          if (bubble.fuel > REFUEL_THRESHOLD) {
+            bubble.target = null;
+            bubble.retargetIn = 0.5 + random() * 0.8;
+            return;
+          }
+
           const available = stations.filter((station) =>
             !station.occupant &&
             station.remaining > 0 &&
@@ -518,6 +542,9 @@
             }
           }
 
+          resolveSceneCollisions(true, COLLISION_PASSES);
+          updateBubbleTrails();
+
           for (let i = pops.length - 1; i >= 0; i -= 1) {
             pops[i].age += dt;
             if (pops[i].age >= pops[i].duration) pops.splice(i, 1);
@@ -526,6 +553,37 @@
           for (let i = stationPops.length - 1; i >= 0; i -= 1) {
             stationPops[i].age += dt;
             if (stationPops[i].age >= stationPops[i].duration) stationPops.splice(i, 1);
+          }
+        }
+
+        function updateBubbleTrails() {
+          for (const bubble of bubbles) {
+            if (bubble.dead || bubble.state !== 'travel') {
+              bubble.trailX = null;
+              bubble.trailY = null;
+              continue;
+            }
+
+            if (bubble.trailX === null || bubble.trailY === null) {
+              bubble.trailX = bubble.x;
+              bubble.trailY = bubble.y;
+              continue;
+            }
+
+            const moved = Math.hypot(bubble.x - bubble.trailX, bubble.y - bubble.trailY);
+            if (moved < 0.35) continue;
+
+            const seeking = bubble.fuel <= REFUEL_THRESHOLD;
+            trailCtx.strokeStyle = seeking
+              ? 'rgba(244, 145, 70, 0.58)'
+              : 'rgba(127, 203, 193, 0.42)';
+            trailCtx.lineWidth = Math.max(1.1, bubble.radius * 0.13);
+            trailCtx.beginPath();
+            trailCtx.moveTo(bubble.trailX, bubble.trailY);
+            trailCtx.lineTo(bubble.x, bubble.y);
+            trailCtx.stroke();
+            bubble.trailX = bubble.x;
+            bubble.trailY = bubble.y;
           }
         }
 
@@ -552,11 +610,10 @@
             return;
           }
 
-          const targetX = station.x + bubble.dockSide * station.size * 0.92;
-          const targetY = station.y - station.size * 0.12;
+          const dock = bubbleDockPosition(bubble, station);
           const settle = 1 - Math.exp(-dt * 12);
-          bubble.x += (targetX - bubble.x) * settle;
-          bubble.y += (targetY - bubble.y) * settle;
+          bubble.x += (dock.x - bubble.x) * settle;
+          bubble.y += (dock.y - bubble.y) * settle;
           bubble.vx = 0;
           bubble.vy = 0;
           const requested = Math.min(1 - bubble.fuel, bubble.fillRate * dt);
@@ -576,7 +633,7 @@
             bubble.target = null;
             bubble.vx = bubble.dockSide * bubble.speed * 0.42;
             bubble.vy = -bubble.speed * 0.18;
-            chooseTarget(bubble, true);
+            bubble.retargetIn = 0.5 + random() * 0.8;
           }
         }
 
@@ -598,7 +655,7 @@
             y: station.y,
             age: 0,
             duration: 1.05,
-            radius: station.size,
+            radius: currentStationSize(station),
             side: station.side,
             phase: station.phase
           });
@@ -628,30 +685,35 @@
         }
 
         function updateTravelingBubble(bubble, dt) {
+          const seekingFuel = bubble.fuel <= REFUEL_THRESHOLD;
           bubble.retargetIn -= dt;
-          if (bubble.target && !stations.includes(bubble.target)) {
-            bubble.target = null;
-            bubble.retargetIn = 0;
-          }
-          if (!bubble.target || bubble.retargetIn <= 0) {
-            chooseTarget(bubble, bubble.station !== null);
-          }
-
-          if (bubble.target && bubble.target.occupant) {
-            const distanceToBusyTarget = Math.hypot(
-              bubble.target.x - bubble.x,
-              bubble.target.y - bubble.y
-            );
-            if (distanceToBusyTarget < bubble.target.size * 4.2) {
+          if (seekingFuel) {
+            if (bubble.target && !stations.includes(bubble.target)) {
+              bubble.target = null;
+              bubble.retargetIn = 0;
+            }
+            if (!bubble.target || bubble.retargetIn <= 0) {
               chooseTarget(bubble, bubble.station !== null);
             }
+
+            if (bubble.target && bubble.target.occupant) {
+              const distanceToBusyTarget = Math.hypot(
+                bubble.target.x - bubble.x,
+                bubble.target.y - bubble.y
+              );
+              if (distanceToBusyTarget < bubble.target.size * 4.2) {
+                chooseTarget(bubble, bubble.station !== null);
+              }
+            }
+          } else {
+            bubble.target = null;
           }
 
           let desiredX;
           let desiredY;
           let distance = Infinity;
 
-          if (bubble.target) {
+          if (seekingFuel && bubble.target) {
             const dx = bubble.target.x - bubble.x;
             const dy = bubble.target.y - bubble.y;
             distance = Math.max(0.001, Math.hypot(dx, dy));
@@ -662,17 +724,40 @@
             const dx = width * 0.5 - bubble.x;
             const dy = height * 0.5 - bubble.y;
             const centerDistance = Math.max(1, Math.hypot(dx, dy));
-            const curl = Math.sin(bubble.phase + bubble.age * bubble.wobble) * 0.72;
-            desiredX = dx / centerDistance * 0.22 - bubble.vy / Math.max(1, bubble.speed) * curl;
-            desiredY = dy / centerDistance * 0.22 + bubble.vx / Math.max(1, bubble.speed) * curl;
+            const velocity = Math.max(1, Math.hypot(bubble.vx, bubble.vy));
+            const forwardX = bubble.vx / velocity;
+            const forwardY = bubble.vy / velocity;
+            const energy = clamp(
+              (bubble.fuel - REFUEL_THRESHOLD) / (1 - REFUEL_THRESHOLD),
+              0,
+              1
+            );
+            const turn =
+              Math.sin(bubble.phase + bubble.age * bubble.wobble * 1.45) *
+                (0.34 + energy * 0.52) +
+              Math.sin(bubble.phase * 1.8 - bubble.age * 0.57) * (0.12 + energy * 0.2);
+            const edgeDistance = Math.min(
+              bubble.x,
+              width - bubble.x,
+              bubble.y,
+              height - bubble.y
+            );
+            const edgeMargin = Math.max(70, Math.min(width, height) * 0.16);
+            const centerPull = 0.06 + clamp(1 - edgeDistance / edgeMargin, 0, 1) * 1.3;
+            desiredX = forwardX - forwardY * turn + dx / centerDistance * centerPull;
+            desiredY = forwardY + forwardX * turn + dy / centerDistance * centerPull;
           }
 
           const desiredLength = Math.max(0.001, Math.hypot(desiredX, desiredY));
           desiredX /= desiredLength;
           desiredY /= desiredLength;
-          const steering = 1 - Math.exp(-dt * 2.1);
-          bubble.vx += (desiredX * bubble.speed - bubble.vx) * steering;
-          bubble.vy += (desiredY * bubble.speed - bubble.vy) * steering;
+          const energy = seekingFuel
+            ? 0
+            : clamp((bubble.fuel - REFUEL_THRESHOLD) / (1 - REFUEL_THRESHOLD), 0, 1);
+          const cruiseSpeed = bubble.speed * (seekingFuel ? 1 : 0.92 + energy * 0.38);
+          const steering = 1 - Math.exp(-dt * (2.1 + energy * 0.8));
+          bubble.vx += (desiredX * cruiseSpeed - bubble.vx) * steering;
+          bubble.vy += (desiredY * cruiseSpeed - bubble.vy) * steering;
 
           const oldX = bubble.x;
           const oldY = bubble.y;
@@ -681,7 +766,12 @@
           const traveled = Math.hypot(bubble.x - oldX, bubble.y - oldY);
           bubble.fuel -= traveled / bubble.range + dt * 0.0025;
 
-          if (bubble.target && distance <= bubble.target.size * 0.82 + bubble.radius) {
+          if (
+            seekingFuel &&
+            bubble.target &&
+            Math.hypot(bubble.target.x - bubble.x, bubble.target.y - bubble.y) <=
+              bubbleStationContactDistance(bubble, bubble.target)
+          ) {
             if (!bubble.target.occupant) dockBubble(bubble, bubble.target);
             else {
               bubble.target = null;
@@ -706,6 +796,140 @@
           bubble.fillRate = 0.26 + random() * 0.22;
           bubble.vx = 0;
           bubble.vy = 0;
+        }
+
+        function bubbleDockPosition(bubble, station) {
+          const clearance = bubbleStationContactDistance(bubble, station);
+          return {
+            x: station.x + bubble.dockSide * clearance,
+            y: station.y
+          };
+        }
+
+        function bubbleCollisionRadius(bubble) {
+          return bubble.radius * 1.06;
+        }
+
+        function stationCollisionRadius(station) {
+          const born = 1 - Math.pow(1 - station.birth, 3);
+          return currentStationSize(station) * born * 1.06;
+        }
+
+        function bubbleStationContactDistance(bubble, station) {
+          return bubbleCollisionRadius(bubble) + stationCollisionRadius(station) + COLLISION_GAP;
+        }
+
+        function resolveSceneCollisions(applyImpulse, passes) {
+          for (let pass = 0; pass < passes; pass += 1) {
+            resolveBubbleStationCollisions(applyImpulse && pass === 0);
+            resolveBubbleCollisions(applyImpulse && pass === 0);
+          }
+
+          for (const bubble of bubbles) {
+            if (bubble.dead || bubble.state === 'filling') continue;
+            const velocity = Math.hypot(bubble.vx, bubble.vy);
+            const maximum = bubble.speed * 1.45;
+            if (velocity > maximum) {
+              bubble.vx = bubble.vx / velocity * maximum;
+              bubble.vy = bubble.vy / velocity * maximum;
+            }
+          }
+        }
+
+        function resolveBubbleCollisions(applyImpulse) {
+          for (let i = 0; i < bubbles.length; i += 1) {
+            const first = bubbles[i];
+            if (first.dead) continue;
+
+            for (let j = i + 1; j < bubbles.length; j += 1) {
+              const second = bubbles[j];
+              if (second.dead) continue;
+
+              let dx = second.x - first.x;
+              let dy = second.y - first.y;
+              const minimum =
+                bubbleCollisionRadius(first) + bubbleCollisionRadius(second) + COLLISION_GAP;
+              const distanceSquared = dx * dx + dy * dy;
+              if (distanceSquared >= minimum * minimum) continue;
+
+              let distance = Math.sqrt(distanceSquared);
+              if (distance < 0.001) {
+                const angle = ((first.id * 37 + second.id * 71) % 360) / 360 * TAU;
+                dx = Math.cos(angle);
+                dy = Math.sin(angle);
+                distance = 1;
+              }
+
+              const normalX = dx / distance;
+              const normalY = dy / distance;
+              const overlap = minimum - distance;
+              let firstMobility = first.state === 'filling' ? 0 : 1;
+              let secondMobility = second.state === 'filling' ? 0 : 1;
+              if (firstMobility + secondMobility === 0) {
+                firstMobility = 1;
+                secondMobility = 1;
+              }
+              const totalMobility = firstMobility + secondMobility;
+
+              first.x -= normalX * overlap * firstMobility / totalMobility;
+              first.y -= normalY * overlap * firstMobility / totalMobility;
+              second.x += normalX * overlap * secondMobility / totalMobility;
+              second.y += normalY * overlap * secondMobility / totalMobility;
+
+              if (!applyImpulse) continue;
+              const relativeX = second.vx - first.vx;
+              const relativeY = second.vy - first.vy;
+              const closingSpeed = relativeX * normalX + relativeY * normalY;
+              if (closingSpeed >= 0) continue;
+
+              const impulse = -(1 + 0.52) * closingSpeed / totalMobility;
+              if (first.state !== 'filling') {
+                first.vx -= normalX * impulse * firstMobility;
+                first.vy -= normalY * impulse * firstMobility;
+              }
+              if (second.state !== 'filling') {
+                second.vx += normalX * impulse * secondMobility;
+                second.vy += normalY * impulse * secondMobility;
+              }
+            }
+          }
+        }
+
+        function resolveBubbleStationCollisions(applyImpulse) {
+          for (const bubble of bubbles) {
+            if (bubble.dead) continue;
+
+            for (const station of stations) {
+              if (bubble.state === 'filling' && bubble.station === station) continue;
+
+              let dx = bubble.x - station.x;
+              let dy = bubble.y - station.y;
+              const minimum = bubbleStationContactDistance(bubble, station);
+              const distanceSquared = dx * dx + dy * dy;
+              if (distanceSquared >= minimum * minimum) continue;
+
+              let distance = Math.sqrt(distanceSquared);
+              if (distance < 0.001) {
+                const angle = ((bubble.id * 53 + station.id * 97) % 360) / 360 * TAU;
+                dx = Math.cos(angle);
+                dy = Math.sin(angle);
+                distance = 1;
+              }
+
+              const normalX = dx / distance;
+              const normalY = dy / distance;
+              const overlap = minimum - distance;
+              bubble.x += normalX * overlap;
+              bubble.y += normalY * overlap;
+
+              if (!applyImpulse || bubble.state === 'filling') continue;
+              const inwardSpeed = bubble.vx * normalX + bubble.vy * normalY;
+              if (inwardSpeed < 0) {
+                bubble.vx -= normalX * inwardSpeed * 1.42;
+                bubble.vy -= normalY * inwardSpeed * 1.42;
+              }
+            }
+          }
         }
 
         function popBubble(bubble) {
@@ -738,6 +962,7 @@
           for (const station of stations) {
             drawDepletionPatch(station, 1 - station.remaining / station.capacity);
           }
+          ctx.drawImage(trailCanvas, 0, 0, width, height);
           for (const station of stations) drawStation(station);
           for (const pop of stationPops) drawStationPop(pop);
           for (const pop of pops) drawPop(pop);
@@ -816,9 +1041,10 @@
         }
 
         function drawStation(station) {
-          const { x, y, size: s } = station;
+          const { x, y } = station;
           const occupied = Boolean(station.occupant);
           const reserve = clamp(station.remaining / station.capacity, 0, 1);
+          const s = currentStationSize(station);
           const born = 1 - Math.pow(1 - station.birth, 3);
 
           ctx.save();
@@ -853,6 +1079,12 @@
           ctx.restore();
         }
 
+        function currentStationSize(station) {
+          const reserve = clamp(station.remaining / station.capacity, 0, 1);
+          const reserveScale = 0.22 + Math.sqrt(reserve) * 0.78;
+          return station.size * reserveScale;
+        }
+
         function traceStationShape(size, side) {
           ctx.beginPath();
           ctx.moveTo(-side * size * 0.58, -size * 0.62);
@@ -871,67 +1103,56 @@
 
           ctx.save();
           ctx.translate(bubble.x, bubble.y);
-          ctx.rotate(Math.atan2(bubble.vy, bubble.vx) * 0.08);
 
-          traceBubbleShape(bubble, r * 1.06, 1.8);
+          traceBubbleShape(r * 1.06);
           ctx.fillStyle = 'rgba(205, 220, 205, 0.035)';
           ctx.fill();
           ctx.strokeStyle = 'rgba(188, 205, 190, 0.2)';
           ctx.lineWidth = Math.max(0.7, r * 0.055);
           ctx.stroke();
 
-          traceBubbleShape(bubble, r, 0);
+          traceBubbleShape(r);
           ctx.fillStyle = filling
             ? 'rgba(231, 224, 197, 0.1)'
             : 'rgba(215, 228, 215, 0.055)';
           ctx.fill();
+
+          if (fuel > 0.002) {
+            const fuelTop = r - fuel * r * 2;
+            ctx.save();
+            traceBubbleShape(r);
+            ctx.clip();
+            ctx.fillStyle = filling
+              ? 'rgba(234, 151, 73, 0.72)'
+              : 'rgba(201, 111, 50, 0.62)';
+            ctx.fillRect(-r, fuelTop, r * 2, r * 2);
+            ctx.restore();
+
+            if (fuel < 0.998) {
+              const surfaceHalfWidth = Math.sqrt(Math.max(0, r * r - fuelTop * fuelTop));
+              ctx.beginPath();
+              ctx.moveTo(-surfaceHalfWidth, fuelTop);
+              ctx.lineTo(surfaceHalfWidth, fuelTop);
+              ctx.strokeStyle = filling
+                ? 'rgba(255, 211, 148, 0.78)'
+                : 'rgba(232, 153, 86, 0.58)';
+              ctx.lineWidth = Math.max(0.8, r * 0.055);
+              ctx.stroke();
+            }
+          }
+
+          traceBubbleShape(r);
           ctx.strokeStyle = filling
             ? 'rgba(255, 224, 174, 0.82)'
             : 'rgba(211, 224, 211, 0.58)';
           ctx.lineWidth = Math.max(1, r * 0.085);
           ctx.stroke();
-
-          if (fuel > 0.002) {
-            const coreRadius = r * Math.sqrt(fuel) * 0.67;
-            traceBubbleShape(bubble, coreRadius, 3.6);
-            ctx.fillStyle = filling
-              ? 'rgba(234, 151, 73, 0.72)'
-              : 'rgba(201, 111, 50, 0.62)';
-            ctx.fill();
-          }
           ctx.restore();
         }
 
-        function traceBubbleShape(bubble, radius, phaseOffset) {
-          const points = [];
-          const count = 9;
-          for (let i = 0; i < count; i += 1) {
-            const angle = (i / count) * TAU;
-            const pulse =
-              Math.sin(bubble.phase + phaseOffset + i * 2.17 + bubble.age * 0.52) * 0.075 +
-              Math.sin(bubble.phase * 1.7 - i * 1.31 + bubble.age * 0.24) * 0.045;
-            const stretch = 1 + Math.cos(angle) * 0.055;
-            points.push([
-              Math.cos(angle) * radius * (1 + pulse) * stretch,
-              Math.sin(angle) * radius * (1 + pulse) / stretch
-            ]);
-          }
-
-          const last = points[points.length - 1];
-          const first = points[0];
+        function traceBubbleShape(radius) {
           ctx.beginPath();
-          ctx.moveTo((last[0] + first[0]) * 0.5, (last[1] + first[1]) * 0.5);
-          for (let i = 0; i < points.length; i += 1) {
-            const point = points[i];
-            const next = points[(i + 1) % points.length];
-            ctx.quadraticCurveTo(
-              point[0],
-              point[1],
-              (point[0] + next[0]) * 0.5,
-              (point[1] + next[1]) * 0.5
-            );
-          }
-          ctx.closePath();
+          ctx.arc(0, 0, radius, 0, TAU);
         }
 
         function drawStationPop(pop) {

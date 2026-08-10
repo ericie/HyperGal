@@ -4,6 +4,6 @@
   "date": "2026-07-22",
   "category": "games",
   "type": "interactive",
-  "thumbnail": "thumbnail.svg",
-  "description": "A two-body Pac-Man inversion on a fixed 17-by-11 course. When Pac sees a slow, floating Ghost as a threat, Pac turns and runs; its yellow silhouette compresses while a Ghost body and eyes emerge in motion. The pursuer never changes. The encounter leaves only ghosts."
+  "thumbnail": "thumbnail.jpg",
+  "description": "A two-body Pac-Man inversion on a fixed 17-by-11 course. A wavy eye-to-eye alarm sends Pac racing for one of four changing rooms, the only places where its yellow silhouette can fold into a Ghost. The pursuer never changes. The encounter leaves only ghosts."
 }

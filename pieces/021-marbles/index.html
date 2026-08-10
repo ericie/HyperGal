@@ -387,7 +387,7 @@
       aria-label="Marbles: four photographic procedural marble tiles mirrored across their horizontal and vertical joints while their turbulence flows in a seamless five-second cycle."
     ></canvas>
 
-    <aside class="marble-panel" aria-label="Marble controls">
+    <aside class="marble-panel is-collapsed" aria-label="Marble controls">
       <div class="panel-header">
         <div class="panel-heading">
           <h1>Marbles</h1>
@@ -400,10 +400,10 @@
             data-action="collapse"
             type="button"
             aria-controls="marble-controls"
-            aria-expanded="true"
-            aria-label="Collapse marble controls"
-            title="Collapse controls"
-          >−</button>
+            aria-expanded="false"
+            aria-label="Expand marble controls"
+            title="Expand controls"
+          >+</button>
           <button
             class="panel-button"
             id="reseed"
