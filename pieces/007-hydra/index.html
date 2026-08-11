@@ -71,6 +71,8 @@
       const DENSIFY_SPAN = 28;
       const DENSITY_RADIUS = 4;
       const DENSITY_REWARD = 30;
+      const FINAL_BODY_RESERVE = 0.06;
+      const MIN_DENSE_RESERVE = 8;
 
       // Mega Man underground: near-black navy, tile indigo, electric cobalt,
       // water cyan, mineral violet and the small amber energy pickup.
@@ -431,9 +433,9 @@
         // Requiring one free cell for every body segment imposes a permanent
         // 50% density ceiling. A mature snake instead follows its tail through
         // a much smaller reserve, letting it occupy most of the arena.
-        const bodyReserveScale = 1 - densify * 0.82;
-        const bufferScale = 1 - densify * 0.75;
-        const safeNeed = Math.max(10, Math.round(
+        const bodyReserveScale = 1 - densify * (1 - FINAL_BODY_RESERVE);
+        const bufferScale = 1 - densify * 0.9;
+        const safeNeed = Math.max(MIN_DENSE_RESERVE, Math.round(
           bodyNeed * bodyReserveScale + SAFE_BODY_BUFFER * intelligence * bufferScale
         ));
         const crampedPenalty = Math.max(0, safeNeed - area) * (55 + intelligence * 150);
