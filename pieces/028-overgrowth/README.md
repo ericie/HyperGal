@@ -4,9 +4,9 @@ A procedural botanical plate drawn entirely in Canvas 2D. Roses, peonies, poppie
 
 Nothing in the garden grows straight. Every stem, branch, and vine is built by the same curve walker, which accumulates a guaranteed net turn plus a sinusoidal sway along its length; leaf blades bow on a curved rib, tendrils are logarithmic spirals, and even the border rule is drawn with a hand's wobble.
 
-The engraved caption names the two species the plate happens to be richest in, above a plate number derived from the seed.
+The engraved caption names the two species the plate begins richest in, above a plate number derived from the seed. After that initial impression, fresh specimens visibly grow outward from their roots over several seconds, following strongly bowed and swaying stems before their leaves and blooms emerge. Finished plants are stamped over everything already on the canvas forever. The pixels accumulate, but completed plant descriptions do not, so the endless growth stays memory-bounded.
 
-There is no animation loop or manipulation interface. The plate renders once on opening and again only when the viewport changes or a new arrangement is requested.
+Resizing or requesting a new arrangement starts a fresh plate, which immediately begins filling up again.
 
 Click the drawing, or press `R`, Enter, or Space, to engrave a new plate.
 

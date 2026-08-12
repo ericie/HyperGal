@@ -1,14 +1,15 @@
 # Marbled Water
 
-A simulation of paper marbling on a floating bath. Every ink drop is stored as
-a smooth contour. As a new circle grows, its area displaces every older contour,
-so colors repel and wrap around one another rather than blending like ordinary
-paint.
+A simulation of paper marbling on a floating bath, centered on the visual logic
+of suminagashi. Colored ink arrives one drop at a time in a quick, irregular
+rhythm. Each drop lands and blooms into a contour whose growing area displaces
+every older color.
 
-The bath opens with twenty settled drops, so there is a marbled field on the
-first frame, then adds color gradually. Complexity rises with each new drop and
-comb pass. At the selected limit, a large paper-colored drop pushes the pattern
-apart and opens white space before accumulation resumes.
+The bath opens with several colored ring families. New drops usually land near
+one of those families, but vary from centered hits to broad offsets and entirely
+new starting points. Drop diameter and timing both vary substantially. There are
+no blank or clearing drops: a visible bath border contains every displaced
+contour and lets the pattern accumulate against the edge.
 
 The comb tools move a visible row of individual teeth through the bath. Each
 tooth lightly entrains the contour it crosses and pulls a narrow filament from

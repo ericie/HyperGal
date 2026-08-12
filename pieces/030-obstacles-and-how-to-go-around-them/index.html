@@ -10,12 +10,13 @@
     <title>Obstacles and How to Go Around Them · HyperGal</title>
     <style>
       :root {
-        color-scheme: dark;
-        --panel: #c7d4c8;
-        --panel-ink: #102426;
-        --panel-muted: #405959;
-        --panel-rule: #6e8580;
-        --focus: #fff3a6;
+        color-scheme: light;
+        --paper: #f1eedf;
+        --panel: rgba(246, 243, 226, 0.94);
+        --panel-ink: #2b1720;
+        --panel-muted: #66565a;
+        --panel-rule: #aaa28f;
+        --focus: #006a83;
       }
 
       * { box-sizing: border-box; }
@@ -26,7 +27,7 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: #092b3b;
+        background: var(--paper);
       }
 
       body {
@@ -40,7 +41,7 @@
         display: block;
         width: 100%;
         height: 100%;
-        background: #092b3b;
+        background: var(--paper);
         cursor: crosshair;
         touch-action: none;
       }
@@ -58,9 +59,10 @@
         width: min(292px, calc(100vw - 28px));
         max-height: calc(100vh - 28px);
         overflow: hidden;
-        border-radius: 3px;
+        border: 1px solid var(--panel-ink);
+        border-radius: 0;
         background: var(--panel);
-        box-shadow: 5px 5px 0 rgba(3, 17, 22, 0.68);
+        box-shadow: 4px 4px 0 rgba(43, 23, 32, 0.14);
         color: var(--panel-ink);
         font-size: 12px;
         line-height: 1.2;
@@ -85,9 +87,8 @@
       h1 {
         margin: 0;
         overflow: hidden;
-        font-size: 13px;
-        font-weight: 750;
-        letter-spacing: -0.015em;
+        font: 700 12px/1.05 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        letter-spacing: 0.025em;
         line-height: 1.05;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -97,6 +98,8 @@
         margin: 4px 0 0;
         color: var(--panel-muted);
         font: 9px/1.1 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
       }
 
       .panel-actions {
@@ -115,7 +118,7 @@
         padding: 0;
         place-items: center;
         border: 1px solid var(--panel-ink);
-        border-radius: 2px;
+        border-radius: 0;
         background: transparent;
         color: var(--panel-ink);
         font-size: 17px;
@@ -130,10 +133,10 @@
       }
 
       .panel-button:hover,
-      .map-button:hover { background: #edf4e6; }
+      .map-button:hover { background: #fffdf1; }
 
       .panel-button[data-action="reseed"]:hover {
-        background: #23575a;
+        background: #006a83;
         color: #fff;
       }
 
@@ -166,10 +169,12 @@
         min-height: 27px;
         padding: 4px 5px;
         border: 1px solid var(--panel-ink);
-        border-radius: 2px;
+        border-radius: 0;
         background: transparent;
         color: var(--panel-ink);
-        font-size: 10px;
+        font: 700 9px/1 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
         font-weight: 700;
         cursor: pointer;
       }
@@ -251,10 +256,11 @@
         display: block;
         height: 5px;
         margin-bottom: 4px;
-        background: linear-gradient(90deg, #6ba99b, #0b3650);
+        border: 1px solid rgba(31, 76, 90, 0.3);
+        background: linear-gradient(90deg, #f1eedf, #b9d5d2);
       }
 
-      .key-gradient.speed { background: linear-gradient(90deg, #38565c, #72d2bf, #e5bb78); }
+      .key-gradient.speed { background: linear-gradient(90deg, #dce8e3, #4c8995, #b14c68); }
 
       .panel-note {
         margin: 9px 0 0;
@@ -284,8 +290,8 @@
     <aside class="river-panel" aria-label="River controls">
       <header class="panel-header">
         <div class="panel-heading">
-          <h1>Obstacles and How to Go Around Them</h1>
-          <p>depth / velocity / surface</p>
+          <h1>OBSTACLES / GO AROUND</h1>
+          <p>flow-field study / plan 030</p>
         </div>
         <div class="panel-actions">
           <button class="panel-button" data-action="reseed" type="button" aria-label="New river" title="New river">&#8635;</button>
@@ -295,9 +301,9 @@
 
       <div class="panel-body">
         <div class="map-switcher" aria-label="Visible map layer">
-          <button class="map-button" type="button" data-map="surface" aria-pressed="true">Surface</button>
+          <button class="map-button" type="button" data-map="surface" aria-pressed="true">Field</button>
           <button class="map-button" type="button" data-map="depth" aria-pressed="false">Depth</button>
-          <button class="map-button" type="button" data-map="current" aria-pressed="false">Current</button>
+          <button class="map-button" type="button" data-map="current" aria-pressed="false">Flow</button>
         </div>
 
         <div class="range-row">
@@ -312,8 +318,8 @@
         </div>
         <div class="range-row">
           <label for="petal-count">Petals</label>
-          <output class="control-value" for="petal-count">96</output>
-          <input id="petal-count" type="range" min="18" max="140" step="1" value="96" />
+          <output class="control-value" for="petal-count">192</output>
+          <input id="petal-count" type="range" min="48" max="260" step="1" value="192" />
         </div>
         <div class="range-row">
           <label for="turbulence">Turbulence</label>
@@ -325,7 +331,7 @@
           <span><i class="key-gradient"></i>shoal → deep</span>
           <span><i class="key-gradient speed"></i>slow → fast</span>
         </div>
-        <p class="panel-note">Click water to make an eddy. R or the round arrow remaps the river.</p>
+        <p class="panel-note">Petal marks reveal the field. Click to introduce an eddy. R remaps the study.</p>
       </div>
     </aside>
 
@@ -351,19 +357,19 @@
         const TAU = Math.PI * 2;
         const MAP_SCALE = 5;
         const PETAL_COLORS = [
-          ['#ffd7c8', '#db765f'],
-          ['#fff0aa', '#d59646'],
-          ['#e7c7e8', '#9c5f9f'],
-          ['#f5efe1', '#c89475'],
-          ['#f2a9b5', '#b54f67'],
-          ['#d3e7ba', '#759b65'],
+          ['#d85d7d', '#7b2747'],
+          ['#ed8da5', '#9b3859'],
+          ['#f2b1bf', '#ae4b69'],
+          ['#d66a8d', '#7d3153'],
+          ['#ead9cf', '#a75d6d'],
+          ['#bd789b', '#71334f'],
         ];
         const ROCK_COLORS = [
-          ['#665e51', '#302f2c'],
-          ['#756c5e', '#3d3933'],
-          ['#585c58', '#292f30'],
-          ['#786b57', '#3d352e'],
-          ['#62685f', '#303831'],
+          ['#d8cfba', '#342a2d'],
+          ['#c8c1ad', '#342a2d'],
+          ['#ded8c7', '#342a2d'],
+          ['#cfc6b0', '#342a2d'],
+          ['#d6cfbd', '#342a2d'],
         ];
 
         let width = 1;
@@ -387,7 +393,7 @@
         const settings = {
           direction: 180,
           flow: 42,
-          petals: 96,
+          petals: 192,
           turbulence: 0.58,
         };
 
@@ -730,16 +736,16 @@
               const speed = clamp((flow.speed / Math.max(1, settings.flow) - 0.42) / 1.35, 0, 1);
               let color;
               if (mode === 'depth') {
-                color = colorMix([106, 169, 154], [8, 43, 65], depth);
+                color = colorMix([242, 239, 224], [184, 211, 207], depth);
                 const contour = Math.abs((depth * 8) % 1 - 0.5);
-                if (contour > 0.45) color = colorMix(color, [205, 229, 207], 0.16);
+                if (contour > 0.45) color = colorMix(color, [46, 91, 103], 0.16);
               } else if (mode === 'current') {
                 color = speed < 0.68
-                  ? colorMix([48, 74, 79], [91, 195, 178], speed / 0.68)
-                  : colorMix([91, 195, 178], [225, 182, 112], (speed - 0.68) / 0.32);
+                  ? colorMix([231, 235, 222], [111, 168, 170], speed / 0.68)
+                  : colorMix([111, 168, 170], [177, 76, 104], (speed - 0.68) / 0.32);
               } else {
-                const water = colorMix([91, 155, 147], [7, 39, 61], depth);
-                color = colorMix(water, [72, 174, 163], speed * 0.14);
+                const water = colorMix([244, 241, 226], [224, 234, 226], depth);
+                color = colorMix(water, [170, 204, 201], speed * 0.055);
               }
               const index = (y * mapWidth + x) * 4;
               pixels[index] = color[0];
@@ -767,13 +773,21 @@
             y: rand(0, height),
             vx: 0,
             vy: 0,
-            radius: rand(6.4, 10.8),
+            radius: rand(2.8, 5.4),
             z: rand(0, TAU),
-            spin: rand(-0.95, 0.95),
-            tiltX: rand(-0.55, 0.55),
-            tiltY: rand(-0.55, 0.55),
-            tiltVX: rand(-0.7, 0.7),
-            tiltVY: rand(-0.7, 0.7),
+            spin: rand(-0.07, 0.07),
+            turnBias: rand(-0.035, 0.035),
+            turnRate: rand(0.00012, 0.00034),
+            tiltX: rand(-0.28, 0.28),
+            tiltY: rand(-0.28, 0.28),
+            speedScale: rand(0.62, 1.28),
+            speedPulse: rand(0.04, 0.18),
+            follow: rand(0.55, 1.55),
+            lateralSlip: rand(-7.5, 7.5),
+            wanderStrength: rand(2.5, 10.5),
+            wanderRate: rand(0.0001, 0.00034),
+            sampleOffsetX: rand(-22, 22),
+            sampleOffsetY: rand(-22, 22),
             submerge: 0,
             submergeTarget: 0,
             submergeUntil: 0,
@@ -799,8 +813,8 @@
             petal.x = basis.dx > 0 ? -margin : width + margin;
             petal.y = rand(-margin, height + margin);
           }
-          petal.vx = basis.dx * settings.flow;
-          petal.vy = basis.dy * settings.flow;
+          petal.vx = basis.dx * settings.flow * petal.speedScale;
+          petal.vy = basis.dy * settings.flow * petal.speedScale;
           petal.submerge = 0;
           petal.submergeTarget = 0;
         }
@@ -820,23 +834,39 @@
         function updatePetals(dt, time) {
           const dtSeconds = dt / 1000;
           for (const petal of petals) {
-            const flow = sampleFlow(petal.x, petal.y, time);
-            const response = 1 - Math.exp(-dtSeconds * 3.1);
-            petal.vx = mix(petal.vx, flow.vx, response);
-            petal.vy = mix(petal.vy, flow.vy, response);
+            const flow = sampleFlow(
+              petal.x + petal.sampleOffsetX,
+              petal.y + petal.sampleOffsetY,
+              time
+            );
+            const basis = flowBasis();
+            const slowWander = Math.sin(time * petal.wanderRate + petal.phase) +
+              Math.sin(time * petal.wanderRate * 0.43 + petal.phase * 2.17) * 0.48;
+            const pace = 1 + Math.sin(time * petal.wanderRate * 0.31 + petal.phase * 1.37) * petal.speedPulse;
+            const lateral = petal.lateralSlip + slowWander * petal.wanderStrength;
+            const targetVx = flow.vx * petal.speedScale * pace + basis.px * lateral;
+            const targetVy = flow.vy * petal.speedScale * pace + basis.py * lateral;
+            const response = 1 - Math.exp(-dtSeconds * petal.follow);
+            petal.vx = mix(petal.vx, targetVx, response);
+            petal.vy = mix(petal.vy, targetVy, response);
 
             const agitation = flow.turbulence * settings.turbulence;
-            petal.vx += Math.sin(time * 0.006 + petal.phase) * agitation * 18 * dtSeconds;
-            petal.vy += Math.cos(time * 0.005 + petal.phase) * agitation * 18 * dtSeconds;
+            petal.vx += basis.px * Math.sin(time * 0.0011 + petal.phase) * agitation * 4.5 * dtSeconds;
+            petal.vy += basis.py * Math.sin(time * 0.0011 + petal.phase) * agitation * 4.5 * dtSeconds;
             petal.x += petal.vx * dtSeconds;
             petal.y += petal.vy * dtSeconds;
-            petal.z += (petal.spin + agitation * 4.4) * dtSeconds;
-            petal.tiltVX += Math.sin(time * 0.003 + petal.phase) * agitation * dtSeconds * 3;
-            petal.tiltVY += Math.cos(time * 0.0035 + petal.phase) * agitation * dtSeconds * 3;
-            petal.tiltVX *= Math.pow(0.84, dtSeconds);
-            petal.tiltVY *= Math.pow(0.84, dtSeconds);
-            petal.tiltX += petal.tiltVX * dtSeconds;
-            petal.tiltY += petal.tiltVY * dtSeconds;
+            const targetSpin = clamp(
+              petal.turnBias + Math.sin(time * petal.turnRate + petal.phase) * 0.055 +
+                slowWander * agitation * 0.018,
+              -0.16,
+              0.16
+            );
+            petal.spin = mix(petal.spin, targetSpin, 1 - Math.exp(-dtSeconds * 0.72));
+            petal.spin = clamp(petal.spin, -0.18, 0.18);
+            petal.z += petal.spin * dtSeconds;
+            const tiltEase = 1 - Math.exp(-dtSeconds * 0.34);
+            petal.tiltX = mix(petal.tiltX, Math.sin(time * petal.turnRate * 0.57 + petal.phase) * 0.32, tiltEase);
+            petal.tiltY = mix(petal.tiltY, Math.cos(time * petal.turnRate * 0.41 + petal.phase * 1.31) * 0.32, tiltEase);
 
             if (agitation > 0.36 && time > petal.submergeUntil && random() < agitation * dtSeconds * 0.42) {
               petal.submergeTarget = rand(0.55, 1);
@@ -864,10 +894,11 @@
               petal.y += info.ny * correction;
               const inward = petal.vx * info.nx + petal.vy * info.ny;
               if (inward < 0) {
-                petal.vx -= info.nx * inward * 1.35;
-                petal.vy -= info.ny * inward * 1.35;
+                petal.vx -= info.nx * inward * 1.08;
+                petal.vy -= info.ny * inward * 1.08;
               }
-              petal.spin += (info.nx * petal.vy - info.ny * petal.vx) * 0.012;
+              const tangent = info.nx * petal.vy - info.ny * petal.vx;
+              petal.spin = clamp(petal.spin + Math.sign(tangent || 1) * 0.018, -0.18, 0.18);
             }
           }
         }
@@ -899,8 +930,8 @@
                 b.vx += nx * impulse;
                 b.vy += ny * impulse;
               }
-              a.spin -= 0.22;
-              b.spin += 0.22;
+              a.spin = clamp(a.spin - 0.012, -0.18, 0.18);
+              b.spin = clamp(b.spin + 0.012, -0.18, 0.18);
             }
           }
         }
@@ -927,24 +958,77 @@
           ctx.save();
           ctx.imageSmoothingEnabled = true;
           ctx.drawImage(maps[mapMode] || maps.surface, 0, 0, width, height);
+          const minor = 36;
+          const major = minor * 5;
+          ctx.lineWidth = 0.55;
+          for (let x = minor; x < width; x += minor) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.strokeStyle = x % major === 0
+              ? 'rgba(43, 23, 32, 0.16)'
+              : 'rgba(43, 23, 32, 0.065)';
+            ctx.stroke();
+          }
+          for (let y = minor; y < height; y += minor) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.strokeStyle = y % major === 0
+              ? 'rgba(43, 23, 32, 0.16)'
+              : 'rgba(43, 23, 32, 0.065)';
+            ctx.stroke();
+          }
+          ctx.setLineDash([5, 8]);
+          ctx.strokeStyle = 'rgba(0, 88, 111, 0.17)';
+          ctx.lineWidth = 0.75;
+          ctx.beginPath();
+          ctx.moveTo(width * 0.5, 0);
+          ctx.lineTo(width * 0.5, height);
+          ctx.moveTo(0, height * 0.5);
+          ctx.lineTo(width, height * 0.5);
+          ctx.stroke();
           ctx.restore();
         }
 
         function drawThreads(time) {
           if (mapMode === 'depth') return;
           ctx.save();
-          ctx.globalCompositeOperation = mapMode === 'current' ? 'screen' : 'soft-light';
+          ctx.globalCompositeOperation = 'source-over';
           for (const thread of threads) {
-            const flow = sampleFlow(thread.x, thread.y, time);
-            const length = clamp(flow.speed * 0.34, 8, 38);
-            const magnitude = flow.speed || 1;
-            const alpha = Math.sin(thread.age * Math.PI) * (mapMode === 'current' ? 0.46 : 0.23);
+            let x = thread.x;
+            let y = thread.y;
+            const alpha = Math.sin(thread.age * Math.PI) * (mapMode === 'current' ? 0.72 : 0.42);
             ctx.beginPath();
-            ctx.moveTo(thread.x, thread.y);
-            ctx.lineTo(thread.x - flow.vx / magnitude * length, thread.y - flow.vy / magnitude * length);
-            ctx.strokeStyle = `rgba(210, 247, 228, ${alpha})`;
-            ctx.lineWidth = thread.width;
+            ctx.moveTo(x, y);
+            for (let step = 0; step < 16; step++) {
+              const flow = sampleFlow(x, y, time, false);
+              const magnitude = flow.speed || 1;
+              const spacing = mapMode === 'current' ? 5.2 : 4.4;
+              x -= flow.vx / magnitude * spacing;
+              y -= flow.vy / magnitude * spacing;
+              ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = `rgba(0, 82, 108, ${alpha})`;
+            ctx.lineWidth = mapMode === 'current' ? thread.width : Math.max(0.55, thread.width * 0.74);
             ctx.stroke();
+
+            if (thread.index % 5 === 0 && alpha > 0.12) {
+              const flow = sampleFlow(thread.x, thread.y, time, false);
+              const angle = Math.atan2(flow.vy, flow.vx);
+              ctx.beginPath();
+              ctx.moveTo(thread.x, thread.y);
+              ctx.lineTo(
+                thread.x - Math.cos(angle - 0.48) * 4.2,
+                thread.y - Math.sin(angle - 0.48) * 4.2
+              );
+              ctx.moveTo(thread.x, thread.y);
+              ctx.lineTo(
+                thread.x - Math.cos(angle + 0.48) * 4.2,
+                thread.y - Math.sin(angle + 0.48) * 4.2
+              );
+              ctx.stroke();
+            }
           }
           ctx.restore();
         }
@@ -964,41 +1048,52 @@
         function drawRocks() {
           for (const rock of rocks) {
             ctx.save();
-            ctx.translate(rock.x, rock.y + 4);
-            ctx.rotate(rock.rotation);
-            rockPath(rock);
-            ctx.fillStyle = 'rgba(2, 20, 25, 0.46)';
-            ctx.fill();
-            ctx.restore();
-
-            ctx.save();
             ctx.translate(rock.x, rock.y);
             ctx.rotate(rock.rotation);
-            const gradient = ctx.createLinearGradient(-rock.rx, -rock.ry, rock.rx * 0.75, rock.ry);
-            gradient.addColorStop(0, rock.colors[0]);
-            gradient.addColorStop(1, rock.colors[1]);
             rockPath(rock);
-            ctx.fillStyle = gradient;
+            ctx.fillStyle = rock.colors[0];
             ctx.fill();
-            ctx.strokeStyle = 'rgba(12, 26, 26, 0.72)';
-            ctx.lineWidth = 1.2;
+            ctx.strokeStyle = rock.colors[1];
+            ctx.lineWidth = 1.35;
             ctx.stroke();
 
             ctx.save();
             rockPath(rock);
             ctx.clip();
-            ctx.beginPath();
-            ctx.ellipse(-rock.rx * 0.18, -rock.ry * 0.28, rock.rx * 0.68, rock.ry * 0.42, -0.12, 0, TAU);
-            ctx.fillStyle = 'rgba(224, 228, 204, 0.1)';
-            ctx.fill();
             for (const fleck of rock.flecks) {
               ctx.beginPath();
-              ctx.arc(fleck.x * rock.rx, fleck.y * rock.ry, fleck.r, 0, TAU);
-              ctx.fillStyle = `rgba(231, 224, 192, ${fleck.alpha})`;
-              ctx.fill();
+              const x = fleck.x * rock.rx;
+              const y = fleck.y * rock.ry;
+              ctx.moveTo(x - fleck.r * 1.6, y + fleck.r * 0.45);
+              ctx.lineTo(x + fleck.r * 1.6, y - fleck.r * 0.45);
+              ctx.strokeStyle = `rgba(52, 42, 45, ${0.22 + fleck.alpha})`;
+              ctx.lineWidth = 0.55;
+              ctx.stroke();
             }
             ctx.restore();
+
+            for (const scale of [0.78, 0.56]) {
+              ctx.save();
+              ctx.scale(scale, scale);
+              rockPath(rock);
+              ctx.strokeStyle = scale > 0.7
+                ? 'rgba(52, 42, 45, 0.34)'
+                : 'rgba(52, 42, 45, 0.2)';
+              ctx.lineWidth = 0.7 / scale;
+              ctx.stroke();
+              ctx.restore();
+            }
             ctx.restore();
+
+            if (rock.radius > 47) {
+              ctx.save();
+              ctx.fillStyle = 'rgba(43, 23, 32, 0.7)';
+              ctx.font = '7px "SFMono-Regular", Consolas, monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(`R${String(rock.id + 1).padStart(2, '0')}`, rock.x, rock.y);
+              ctx.restore();
+            }
           }
         }
 
@@ -1015,22 +1110,21 @@
           ctx.translate(petal.x + petal.submerge * 3, petal.y + petal.submerge * 5);
           ctx.rotate(petal.z);
           ctx.scale(sx * scale, sy * scale);
-          ctx.globalAlpha = isUnder ? mix(0.62, 0.16, petal.submerge) : 0.96;
-          if (isUnder) ctx.globalCompositeOperation = 'screen';
+          ctx.globalAlpha = isUnder ? mix(0.44, 0.12, petal.submerge) : 0.88;
           ctx.beginPath();
           ctx.moveTo(0, -radius * 1.2);
           ctx.bezierCurveTo(radius * 1.05, -radius * 0.82, radius * 1.02, radius * 0.4, 0, radius * 1.25);
           ctx.bezierCurveTo(-radius * 1.02, radius * 0.4, -radius * 1.05, -radius * 0.82, 0, -radius * 1.2);
-          const gradient = ctx.createLinearGradient(0, -radius, 0, radius);
-          gradient.addColorStop(0, flip < 0 ? petal.palette[1] : petal.palette[0]);
-          gradient.addColorStop(1, flip < 0 ? petal.palette[0] : petal.palette[1]);
-          ctx.fillStyle = gradient;
+          ctx.fillStyle = isUnder ? '#759ba0' : (flip < 0 ? petal.palette[1] : petal.palette[0]);
           ctx.fill();
+          ctx.strokeStyle = isUnder ? 'rgba(0,82,108,0.44)' : petal.palette[1];
+          ctx.lineWidth = 0.55;
+          ctx.stroke();
           ctx.beginPath();
           ctx.moveTo(0, -radius * 0.86);
           ctx.quadraticCurveTo(radius * 0.1, 0, 0, radius * 0.96);
-          ctx.strokeStyle = isUnder ? 'rgba(210,245,236,0.3)' : 'rgba(104,66,59,0.36)';
-          ctx.lineWidth = 0.7;
+          ctx.strokeStyle = isUnder ? 'rgba(241,238,223,0.45)' : 'rgba(246,234,221,0.68)';
+          ctx.lineWidth = 0.45;
           ctx.stroke();
           ctx.restore();
         }
@@ -1041,12 +1135,55 @@
             const age = (time - eddy.born) / eddy.life;
             if (age < 0 || age >= 1) continue;
             const radius = mix(8, eddy.radius, smooth(age));
-            ctx.beginPath();
-            ctx.arc(eddy.x, eddy.y, radius, 0.2 + age * 3, Math.PI * 1.6 + age * 4.5);
-            ctx.strokeStyle = `rgba(197, 235, 221, ${(1 - age) * 0.34})`;
-            ctx.lineWidth = 1.1;
-            ctx.stroke();
+            for (let ring = 0; ring < 3; ring++) {
+              ctx.beginPath();
+              ctx.arc(
+                eddy.x,
+                eddy.y,
+                radius * (0.5 + ring * 0.24),
+                0.2 + age * 3 + ring * 0.4,
+                Math.PI * 1.58 + age * 4.5 + ring * 0.4
+              );
+              ctx.strokeStyle = `rgba(0, 82, 108, ${(1 - age) * (0.36 - ring * 0.07)})`;
+              ctx.lineWidth = 0.8;
+              ctx.stroke();
+            }
           }
+          ctx.restore();
+        }
+
+        function drawDirectionGlyph() {
+          const basis = flowBasis();
+          const x = width - 46;
+          const y = height - 48;
+          const length = 25;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.strokeStyle = 'rgba(43, 23, 32, 0.72)';
+          ctx.fillStyle = 'rgba(43, 23, 32, 0.72)';
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.arc(0, 0, 17, 0, TAU);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(-basis.dx * length * 0.5, -basis.dy * length * 0.5);
+          ctx.lineTo(basis.dx * length * 0.5, basis.dy * length * 0.5);
+          ctx.stroke();
+          ctx.translate(basis.dx * length * 0.5, basis.dy * length * 0.5);
+          ctx.rotate(Math.atan2(basis.dy, basis.dx));
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(-5, -2.8);
+          ctx.lineTo(-5, 2.8);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+
+          ctx.save();
+          ctx.fillStyle = 'rgba(43, 23, 32, 0.72)';
+          ctx.font = '8px "SFMono-Regular", Consolas, monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(`${String(settings.direction).padStart(3, '0')}°`, x, y + 31);
           ctx.restore();
         }
 
@@ -1062,11 +1199,13 @@
             drawEddies(time);
           }
 
+          drawDirectionGlyph();
+
           if (mapMode !== 'surface') {
             ctx.save();
-            ctx.fillStyle = 'rgba(219, 235, 219, 0.72)';
+            ctx.fillStyle = 'rgba(43, 23, 32, 0.72)';
             ctx.font = '10px "SFMono-Regular", Consolas, monospace';
-            ctx.fillText(mapMode === 'depth' ? 'DEPTH MAP' : 'CURRENT SPEED', 17, height - 19);
+            ctx.fillText(mapMode === 'depth' ? 'DEPTH FIELD / ISO 08' : 'FLOW MAGNITUDE / VECTOR', 17, height - 19);
             ctx.restore();
           }
         }

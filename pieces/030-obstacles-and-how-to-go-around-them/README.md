@@ -4,20 +4,25 @@ A river-field companion to **Obstacles and How to Avoid Them**.
 
 The rock composition inherits the earlier piece's mixture of proximity groups,
 implied lines, partial closure, off-page forms, and deliberately varied scale.
-Every rectangular and circular obstacle has become an irregular, rotated river
-rock with a shaded top and submerged footprint.
+Every obstacle is drawn in plan as an irregular survey footprint: flat paper
+tone, nested contour lines, sparse hatch marks, and a specimen number. There is
+no scenic perspective, volume lighting, or faux-stone rendering.
 
-The river is evaluated in three layers. A depth field measures open water around
-the rocks and colors shallow shelves separately from deeper pools. A velocity
-field begins by flowing north-to-south, diverts upstream of every rock,
-accelerates where opposing banks create a tight run, and sheds oscillating wakes
-downstream. The Surface view combines those maps and releases petals into the
-resulting current.
+The river is evaluated in three layers over a quiet datum grid. A depth field
+measures open water around the rocks and plots shallow shelves separately from
+deeper pools. A velocity field begins by flowing north-to-south, diverts upstream
+of every rock, accelerates where opposing banks create a tight run, and sheds
+oscillating wakes downstream. The Field view combines those maps with thin
+vector traces and releases small blossom-pink petal marks into the current.
 
 Petals have horizontal position, velocity, surface depth, Z rotation, and X/Y
-tilt. Floating petals collide with one another and the rock boundaries. Strong
-wakes and user-made eddies can pull them under the surface, where they dim,
-shrink, pass beneath floating petals, and eventually rise again.
+tilt. Each carries distinct drag, pace, lateral slip, and a slowly changing
+heading, so neighboring petals spread across the field rather than tracing one
+shared streamline. Floating petals collide with one another and the rock
+boundaries, but contacts resolve as slow liquid turns with tightly capped
+angular velocity. Strong wakes and user-made eddies can pull them under the
+surface, where they dim, shrink, pass beneath floating petals, and eventually
+rise again.
 
 Use the control panel to inspect Depth or Current independently, change the flow
 direction and base rate, adjust petal count and turbulence, or reseed the entire
