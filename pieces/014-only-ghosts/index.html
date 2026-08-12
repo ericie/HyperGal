@@ -5,42 +5,135 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Only Ghosts - HyperGal</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #05040a; overflow: hidden; }
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: #030309; overflow: hidden; }
+      body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
       canvas { display: block; width: 100%; height: 100%; }
-      .caption {
+      .masthead {
         position: fixed;
-        left: 50%;
-        bottom: 1rem;
-        transform: translateX(-50%);
-        color: rgba(245, 247, 255, .62);
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: .8rem;
-        letter-spacing: .04em;
-        text-align: center;
+        z-index: 2;
+        top: clamp(18px, 3.8vh, 42px);
+        left: clamp(16px, 4vw, 60px);
+        right: clamp(16px, 4vw, 60px);
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 2rem;
         pointer-events: none;
-        text-shadow: 0 1px 0 #000;
-        white-space: nowrap;
+      }
+      .eyebrow {
+        margin: 0 0 .42rem;
+        color: #ff75cf;
+        font-size: clamp(.62rem, 1.1vw, .78rem);
+        font-weight: 700;
+        letter-spacing: .2em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 0;
+        color: #f8f6ff;
+        font-family: Arial Black, Arial, sans-serif;
+        font-size: clamp(2.3rem, 6.8vw, 6.6rem);
+        font-weight: 900;
+        letter-spacing: -.075em;
+        line-height: .78;
+        text-transform: uppercase;
+      }
+      .rule {
+        max-width: 30rem;
+        margin: .72rem 0 0 .12rem;
+        color: rgba(242, 240, 255, .62);
+        font-size: clamp(.68rem, 1vw, .82rem);
+        letter-spacing: .02em;
+        line-height: 1.45;
+      }
+      .reseed {
+        flex: 0 0 auto;
+        margin-top: .1rem;
+        border: 1px solid rgba(137, 158, 255, .5);
+        border-radius: 999px;
+        padding: .7rem .95rem;
+        background: rgba(10, 11, 31, .72);
+        color: rgba(246, 245, 255, .82);
+        font: 700 .68rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        cursor: pointer;
+        pointer-events: auto;
+        backdrop-filter: blur(10px);
+      }
+      .reseed:hover, .reseed:focus-visible {
+        border-color: #ff75cf;
+        color: #fff;
+        outline: none;
+      }
+      .footer {
+        position: fixed;
+        z-index: 2;
+        left: clamp(16px, 4vw, 60px);
+        right: clamp(16px, 4vw, 60px);
+        bottom: clamp(14px, 2.8vh, 28px);
+        display: flex;
+        justify-content: space-between;
+        gap: 1.5rem;
+        color: rgba(242, 240, 255, .44);
+        font-size: clamp(.58rem, .9vw, .7rem);
+        letter-spacing: .1em;
+        line-height: 1.4;
+        text-transform: uppercase;
+        pointer-events: none;
+      }
+      .footer span:last-child { text-align: right; }
+      .debug {
+        z-index: 4;
+        padding: .55rem .65rem;
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 6px;
+        background: rgba(3, 3, 9, .86);
       }
       .debug {
         position: fixed;
-        left: .8rem;
-        top: .7rem;
+        right: .8rem;
+        bottom: 3.8rem;
         margin: 0;
         color: rgba(245, 247, 255, .74);
         font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         pointer-events: none;
         white-space: pre;
       }
+      @media (max-aspect-ratio: 4/5) {
+        .masthead { display: block; text-align: center; }
+        .eyebrow { margin-bottom: .65rem; }
+        h1 { font-size: clamp(3rem, 17vw, 5.4rem); }
+        .rule { max-width: 22rem; margin: .9rem auto 0; padding: 0 1rem; }
+        .reseed { margin-top: 1rem; }
+        .footer { display: block; text-align: center; }
+        .footer span { display: block; }
+        .footer span + span { margin-top: .38rem; text-align: center; }
+      }
     </style>
   </head>
   <body>
-    <canvas id="stage"></canvas>
-    <div class="caption">Only Ghosts - 2026 - click to reseed</div>
+    <canvas id="stage" aria-label="An autonomous Pac-Man inversion where Pac escapes a ghost by changing into one."></canvas>
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">HyperGal 014 / autonomous chase</p>
+        <h1>Only Ghosts</h1>
+        <p class="rule">When Pac sees a Ghost, it runs to a changing room and survives by becoming the threat.</p>
+      </div>
+      <button id="reseed" class="reseed" type="button" aria-label="Start a new run">New run&nbsp; R</button>
+    </header>
+    <footer class="footer">
+      <span>Yellow seeks / red hunts / pink changes</span>
+      <span>2026 &nbsp;·&nbsp; Space or R to reseed</span>
+    </footer>
     <pre id="debug" class="debug" hidden></pre>
     <script>
       const canvas = document.getElementById('stage');
       const ctx = canvas.getContext('2d');
       const debugEl = document.getElementById('debug');
+      const reseedButton = document.getElementById('reseed');
       const TAU = Math.PI * 2;
 
       const BASE_MAZE = [
@@ -64,17 +157,17 @@
       }
 
       const COLORS = {
-        bg: '#05040a',
-        void: '#090813',
-        wall: '#101a55',
-        wallEdge: '#244dff',
-        wallEdgeSoft: 'rgba(69, 103, 255, .28)',
+        bg: '#030309',
+        void: '#080812',
+        wall: '#111747',
+        wallEdge: '#5c72ff',
+        wallEdgeSoft: 'rgba(88, 110, 255, .34)',
         gate: 'rgba(255, 153, 218, .82)',
-        changeFloor: '#23122f',
-        changeFloorHot: '#371748',
-        changeEdge: '#ff72d0',
-        changeInk: '#ffd6f2',
-        pellet: '#ffdf82',
+        changeFloor: '#241126',
+        changeFloorHot: '#2d1231',
+        changeEdge: '#ff68c9',
+        changeInk: '#ffd8f1',
+        pellet: '#ffe1a0',
         fruit: '#ff3b7d',
         fruitStem: '#4dff9f',
         pac: '#ffe94a',
@@ -102,6 +195,7 @@
       const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
       let W = 0, H = 0, dpr = 1, cell = 20, cellX = 20, cellY = 20, ox = 0, oy = 0;
+      let boardTop = 0, boardBottom = 0;
       let now = 0, lastT = 0, raf = 0;
       let rng = Math.random;
       let seed = params.get('seed') || randomSeed();
@@ -194,11 +288,19 @@
         canvas.style.width = W + 'px';
         canvas.style.height = H + 'px';
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        cellX = W / COLS;
-        cellY = H / ROWS;
-        cell = Math.max(8, Math.min(cellX, cellY));
-        ox = 0;
-        oy = 0;
+        const portrait = H > W * 1.18;
+        const sidePad = clamp(W * .04, 14, 60);
+        const header = portrait ? clamp(H * .29, 190, 258) : clamp(H * .22, 180, 230);
+        const footer = portrait ? clamp(H * .19, 130, 178) : clamp(H * .105, 74, 105);
+        const availableW = Math.max(1, W - sidePad * 2);
+        const availableH = Math.max(1, H - header - footer);
+        cell = Math.max(8, Math.min(availableW / COLS, availableH / ROWS));
+        cellX = cell;
+        cellY = cell;
+        ox = Math.round((W - COLS * cell) * .5);
+        oy = Math.round(header + (availableH - ROWS * cell) * .5);
+        boardTop = oy;
+        boardBottom = oy + ROWS * cell;
       }
 
       function generateMaze() {
@@ -908,38 +1010,35 @@
       function drawBackdrop() {
         const cx = W / 2;
         const cy = H / 2;
-        const g = ctx.createRadialGradient(cx, cy, Math.min(W, H) * .08, cx, cy, Math.max(W, H) * .62);
-        g.addColorStop(0, '#101039');
-        g.addColorStop(.62, '#070613');
-        g.addColorStop(1, '#030207');
+        const g = ctx.createRadialGradient(cx, (boardTop + boardBottom) * .5, Math.min(W, H) * .06, cx, cy, Math.max(W, H) * .72);
+        g.addColorStop(0, '#121335');
+        g.addColorStop(.5, '#080817');
+        g.addColorStop(1, '#020207');
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, W, H);
 
         ctx.save();
         ctx.globalAlpha = .18;
-        ctx.strokeStyle = '#243169';
+        ctx.strokeStyle = '#3f4c9a';
         ctx.lineWidth = 1;
-        const gap = Math.max(28, cell * 2);
-        for (let x = (ox % gap) - gap; x < W + gap; x += gap) {
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, H);
-          ctx.stroke();
-        }
-        for (let y = (oy % gap) - gap; y < H + gap; y += gap) {
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(W, y);
-          ctx.stroke();
-        }
+        ctx.beginPath();
+        ctx.arc(cx, (boardTop + boardBottom) * .5, Math.max(W, H) * .46, -.72, .72);
+        ctx.stroke();
+        ctx.globalAlpha = .08;
+        ctx.beginPath();
+        ctx.arc(cx, (boardTop + boardBottom) * .5, Math.max(W, H) * .38, Math.PI - .72, Math.PI + .72);
+        ctx.stroke();
         ctx.restore();
       }
 
       function drawMaze() {
         ctx.save();
         ctx.translate(ox, oy);
+        ctx.shadowColor = 'rgba(0, 0, 0, .72)';
+        ctx.shadowBlur = Math.max(12, cell * .6);
         ctx.fillStyle = COLORS.void;
         ctx.fillRect(0, 0, COLS * cellX, ROWS * cellY);
+        ctx.shadowBlur = 0;
         drawChangingRooms();
 
         ctx.fillStyle = COLORS.wall;
@@ -994,7 +1093,7 @@
         }
         ctx.stroke();
 
-        ctx.strokeStyle = 'rgba(255,255,255,.12)';
+        ctx.strokeStyle = 'rgba(159,170,255,.2)';
         ctx.lineWidth = 1;
         ctx.strokeRect(.5, .5, COLS * cellX - 1, ROWS * cellY - 1);
         ctx.restore();
@@ -1007,7 +1106,7 @@
             const x = p.c * cellX;
             const y = p.r * cellY;
             ctx.fillStyle = (p.c + p.r) % 2 ? COLORS.changeFloor : COLORS.changeFloorHot;
-            ctx.globalAlpha = .82 + pulse * .12;
+            ctx.globalAlpha = .76 + pulse * .1;
             ctx.fillRect(x, y, cellX, cellY);
 
             ctx.strokeStyle = COLORS.changeEdge;
@@ -1021,12 +1120,14 @@
 
           const centerX = (room.minC + room.maxC + 1) * cellX * .5;
           const centerY = (room.minR + room.maxR + 1) * cellY * .5;
-          ctx.globalAlpha = .62 + pulse * .25;
+          ctx.globalAlpha = .72 + pulse * .22;
           ctx.fillStyle = COLORS.changeInk;
-          ctx.font = `700 ${Math.max(7, Math.floor(cell * .23))}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+          ctx.font = `700 ${Math.max(7, Math.floor(cell * .2))}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('CHANGE', centerX, centerY);
+          ctx.fillText('CHANGE', centerX, centerY + cell * .2);
+          ctx.font = `400 ${Math.max(11, Math.floor(cell * .5))}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+          ctx.fillText('↻', centerX, centerY - cell * .25);
         }
         ctx.globalAlpha = 1;
       }
@@ -1351,18 +1452,43 @@
       }
 
       function drawFrameText() {
-        if (cell < 13) return;
+        if (cell < 10) return;
         ctx.save();
-        ctx.fillStyle = COLORS.text;
-        ctx.font = `${Math.max(10, Math.floor(cell * .45))}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
-        ctx.textBaseline = 'top';
+        const fontSize = clamp(Math.floor(cell * .28), 9, 13);
+        const statY = Math.max(12, boardTop - Math.max(18, cell * .46));
+        ctx.font = `700 ${fontSize}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+        ctx.textBaseline = 'middle';
         const pacs = agents.filter((a) => a.state === 'pac').length;
         const ghosts = agents.filter((a) => a.state === 'ghost').length;
-        const label = `PAC ${pacs}  GHOST ${ghosts}  CHANGES ${transformations}`;
-        ctx.globalAlpha = .42;
-        ctx.fillText(label, ox, Math.max(8, oy - cell * .85));
+        ctx.globalAlpha = .72;
+        ctx.fillStyle = COLORS.pac;
+        ctx.fillText(`PAC ${pacs}`, ox, statY);
+        const pacWidth = ctx.measureText(`PAC ${pacs}`).width;
+        ctx.fillStyle = 'rgba(242, 240, 255, .5)';
+        ctx.fillText(`  /  GHOSTS ${ghosts}  /  CHANGES ${transformations}`, ox + pacWidth, statY);
         ctx.textAlign = 'right';
-        ctx.fillText(`DOTS ${pelletCount}`, ox + COLS * cellX, Math.max(8, oy - cell * .85));
+        ctx.fillStyle = COLORS.pellet;
+        ctx.fillText(`DOTS ${pelletCount}`, ox + COLS * cellX, statY);
+
+        const originalPac = agents[0];
+        let beat = 'PAC IS SEARCHING';
+        let beatColor = 'rgba(242, 240, 255, .56)';
+        if (originalPac.state === 'pac' && originalPac.threatId !== null) {
+          beat = 'EYE CONTACT  /  RUN FOR PINK';
+          beatColor = COLORS.alarm;
+        } else if (originalPac.state === 'ghost' && isReturningToPac(originalPac)) {
+          beat = 'DISGUISE FADING  /  RETURN TO PINK';
+          beatColor = COLORS.changeInk;
+        } else if (originalPac.state === 'ghost') {
+          beat = 'ONLY GHOSTS';
+          beatColor = originalPac.color;
+        }
+        ctx.textAlign = 'center';
+        ctx.font = `700 ${Math.max(9, fontSize - 1)}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+        ctx.letterSpacing = '1px';
+        ctx.globalAlpha = .84;
+        ctx.fillStyle = beatColor;
+        ctx.fillText(beat, W * .5, Math.min(H - 44, boardBottom + Math.max(20, cell * .48)));
         ctx.restore();
       }
 
@@ -1581,16 +1707,17 @@
         resizeCanvas();
       });
 
-      addEventListener('click', () => {
+      function startNewRun() {
         warmSeconds = 0;
         reset(randomSeed());
-      });
+      }
+
+      reseedButton.addEventListener('click', startNewRun);
 
       addEventListener('keydown', (e) => {
         if (e.key === 'r' || e.key === 'R' || e.key === ' ') {
           e.preventDefault();
-          warmSeconds = 0;
-          reset(randomSeed());
+          startNewRun();
         }
       });
 

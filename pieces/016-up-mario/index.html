@@ -11,7 +11,6 @@
         --ink: #2E5FA1;
         --muted: #7BA1D0;
         --hot: #4B77B5;
-        --hud-height: 58px;
       }
 
       html,
@@ -45,107 +44,10 @@
         outline-offset: -9px;
       }
 
-      .hud {
-        position: fixed;
-        inset: auto 0 0;
-        min-height: var(--hud-height);
-        display: grid;
-        grid-template-columns: minmax(132px, 0.9fr) minmax(0, 2.1fr);
-        align-items: stretch;
-        pointer-events: none;
-        color: #2E5FA1;
-        background: #ffffff;
-        border-top: 2px solid #C7DAF1;
-        font-size: 11px;
-        line-height: 1.05;
-        z-index: 2;
-      }
-
-      .hud__title {
-        display: grid;
-        align-content: center;
-        padding: 5px clamp(10px, 2.4vw, 18px) 6px;
-        border-right: 2px solid #C7DAF1;
-      }
-
-      .hud__title strong {
-        font-family: Geneva, "Lucida Grande", ui-sans-serif, system-ui, sans-serif;
-        font-size: clamp(17px, 2.3vw, 25px);
-        line-height: 0.9;
-        font-weight: 900;
-        letter-spacing: 0.04em;
-      }
-
-      .hud__title span {
-        margin-top: 4px;
-        color: #7BA1D0;
-        font-size: 9px;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-      }
-
-      .hud__stats {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        align-items: center;
-      }
-
-      .hud__stat {
-        min-width: 0;
-        height: 100%;
-        display: grid;
-        align-content: center;
-        gap: 4px;
-        padding: 4px clamp(8px, 2vw, 16px);
-        border-right: 1px solid #DEEAF8;
-        font-size: 9px;
-        font-weight: 800;
-        overflow: hidden;
-      }
-
-      .hud__stat:last-child {
-        border-right: 0;
-      }
-
-      .hud__stat b {
-        display: block;
-        overflow: hidden;
-        font-size: clamp(12px, 1.8vw, 16px);
-        font-weight: 900;
-        font-variant-numeric: tabular-nums;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .hud__meter {
-        width: 100%;
-        height: 6px;
-        border-radius: 3px;
-        background: #DEEAF8;
-        overflow: hidden;
-      }
-
-      .hud__meter::before {
-        content: "";
-        display: block;
-        width: 68%;
-        height: 100%;
-        border-radius: 3px;
-        background: #7BA1D0;
-      }
-
-      .hud span {
-        font-variant-numeric: tabular-nums;
-      }
-
-      .hud [hidden] {
-        display: none;
-      }
-
       .debug {
         position: fixed;
         left: 0.85rem;
-        bottom: calc(var(--hud-height) + 0.75rem);
+        bottom: 0.75rem;
         margin: 0;
         padding: 5px 7px;
         color: #fff;
@@ -155,33 +57,6 @@
         pointer-events: none;
         white-space: pre;
         z-index: 3;
-      }
-
-      @media (max-width: 520px) {
-        :root {
-          --hud-height: 64px;
-        }
-
-        .hud {
-          grid-template-columns: 124px minmax(0, 1fr);
-        }
-
-        .hud__title {
-          padding-inline: 9px;
-        }
-
-        .hud__title strong {
-          font-size: 16px;
-        }
-
-        .hud__stat {
-          padding-inline: 6px;
-          font-size: 8px;
-        }
-
-        .hud__stat b {
-          font-size: 11px;
-        }
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -196,38 +71,14 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Up Mario: a small round climber in a cap runs across fluffy, flat-bottomed rain clouds that disappear after traversal jumps, climbing vertical ladders through an endless sky drawn flat in a single blue."
+      aria-label="Up Mario: a small round climber in a cap jumps onto dark, angry, fluffy clouds that rain and turn white before bursting into puffs as he leaps away."
     ></canvas>
-    <div class="hud" aria-hidden="true">
-      <div class="hud__title">
-        <strong>UP MARIO</strong>
-        <span>THE ENDLESS SKY</span>
-      </div>
-      <div class="hud__stats">
-        <span class="hud__stat">
-          HEIGHT
-          <b id="heightReadout">0000 M</b>
-        </span>
-        <span class="hud__stat">
-          BOXES
-          <b id="coinReadout">? 00</b>
-        </span>
-        <span class="hud__stat">
-          GRIP
-          <i class="hud__meter"></i>
-          <b id="seedReadout" hidden>seed</b>
-        </span>
-      </div>
-    </div>
     <pre id="debug" class="debug" hidden></pre>
 
     <script>
       (() => {
         const canvas = document.getElementById('stage');
         const ctx = canvas.getContext('2d', { alpha: false });
-        const heightReadout = document.getElementById('heightReadout');
-        const coinReadout = document.getElementById('coinReadout');
-        const seedReadout = document.getElementById('seedReadout');
         const debugEl = document.getElementById('debug');
         const params = new URLSearchParams(location.search);
         const reduceQuery =
@@ -258,6 +109,7 @@
           stairs: 148,
         };
         const CLOUD_VANISH_SECONDS = 0.46;
+        const CLOUD_CLEANSE_SECONDS = 0.32;
         const RAIN_STEP_SECONDS = 0.055;
 
         /* -- SOFT MONOTONE RAMP --
@@ -457,9 +309,9 @@
             blinkEndsAt: 0,
             blinkCount: 0,
           };
+          activateCloud(lastPlatform);
           lastProgressAt = 0;
           lastProgressHeight = 0;
-          seedReadout.textContent = seed;
           const warmSeconds = Math.max(0, Number(params.get('warm') || 0) || 0);
           if (warmSeconds > 0) {
             const steps = Math.min(2400, Math.floor(warmSeconds * 60));
@@ -836,6 +688,7 @@
           clearRouteAttempt();
           platform.visited = true;
           platform.pulseUntil = simTime + 0.18;
+          activateCloud(platform);
           if (dir > 0 && hero.revisitPlatformId === platform.id) hero.revisitPlatformId = null;
           spawnDust(hero.x, hero.y, 8, COLORS.smoke);
         }
@@ -1001,6 +854,7 @@
           hero.lastGroundedAt = simTime;
           if (isNewLanding) {
             markRouteAttemptResult(landed);
+            activateCloud(landed);
             hero.landedAt = simTime;
             hero.groundedSince = simTime;
             hero.autoTargetId = null;
@@ -1086,6 +940,7 @@
             hero.lastGroundedAt = simTime;
             hero.landedAt = simTime;
             hero.groundedSince = simTime;
+            activateCloud(landing);
             hero.autoTargetId = null;
             hero.autoLaunchX = null;
             hero.autoLandingX = null;
@@ -1192,9 +1047,9 @@
         }
 
         function updateCloudRain() {
-          if (!hero.grounded || Math.abs(hero.vx) < 48) return;
+          if (!hero.grounded) return;
           const platform = platformById(hero.groundId);
-          if (!platform || platform.vanishStartedAt != null) return;
+          if (!platform || platform.cleansedAt == null || platform.vanishStartedAt != null) return;
           if (
             platform.nextRainAt == null ||
             simTime - platform.nextRainAt > RAIN_STEP_SECONDS * 3
@@ -1205,6 +1060,15 @@
             spawnCloudRain(platform);
             platform.nextRainAt += prefersReducedMotion ? RAIN_STEP_SECONDS * 2 : RAIN_STEP_SECONDS;
           }
+        }
+
+        function activateCloud(platform) {
+          if (!platform || platform.cleansedAt != null) return;
+          platform.cleansedAt = simTime;
+          platform.pulseUntil = simTime + CLOUD_CLEANSE_SECONDS;
+          platform.nextRainAt = simTime;
+          const burstCount = prefersReducedMotion ? 2 : 5;
+          for (let i = 0; i < burstCount; i += 1) spawnCloudRain(platform);
         }
 
         function spawnCloudRain(platform) {
@@ -1232,9 +1096,31 @@
           const platform = platformById(platformId);
           if (!platform || platform.vanishStartedAt != null) return;
           platform.vanishStartedAt = simTime;
+          spawnCloudExplosion(platform);
           boxes = boxes.filter((box) => box.platformId !== platformId);
           barrels = barrels.filter((barrel) => barrel.platformId !== platformId);
           links = links.filter((link) => link.lowerId !== platformId && link.upperId !== platformId);
+        }
+
+        function spawnCloudExplosion(platform) {
+          const left = platformLeft(platform);
+          const count = prefersReducedMotion ? 7 : clamp(Math.round(platform.w / 9), 12, 24);
+          for (let i = 0; i < count; i += 1) {
+            const n = platform.id * 1877 + i * 277;
+            const angle = -Math.PI * 0.08 + hash01(n + 11) * Math.PI * 1.16;
+            const speed = 72 + hash01(n + 23) * 150;
+            particles.push({
+              kind: 'cloudBurst',
+              x: left + platform.w * (0.08 + hash01(n + 37) * 0.84),
+              y: platform.y - 8 + (hash01(n + 41) - 0.5) * 30,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed + 45,
+              r: 5 + hash01(n + 53) * 9,
+              age: 0,
+              life: 0.42 + hash01(n + 67) * 0.34,
+              color: i % 4 === 0 ? C.mist : C.white,
+            });
+          }
         }
 
         function updateVanishingClouds() {
@@ -1428,7 +1314,7 @@
             x: center - w * 0.5,
             y,
             w,
-            h: type === 'girder' ? 16 : 18,
+            h: 38,
             type,
             moving,
             travel,
@@ -1437,6 +1323,7 @@
             visited: false,
             pulseUntil: 0,
             spring: false,
+            cleansedAt: null,
             vanishStartedAt: null,
             nextRainAt: null,
             rainCount: 0,
@@ -1610,8 +1497,6 @@
         }
 
         function updateHud() {
-          heightReadout.textContent = `${String(Math.floor(bestHeight / 10)).padStart(4, '0')} M`;
-          coinReadout.textContent = `? ${String(boxesHit).padStart(2, '0')}`;
           if (DEBUG) {
             debugEl.textContent = [
               `seed ${seed}`,
@@ -1654,7 +1539,6 @@
           drawBarrels();
           drawParticles();
           drawHero();
-          drawFrame();
         }
 
         /* -- SHAPE HELPERS -- */
@@ -1862,14 +1746,8 @@
           ctx.restore();
         }
 
-        function drawFrame() {
-          const playHeight = height - hudHeight();
-          ctx.fillStyle = C.pale;
-          ctx.fillRect(0, playHeight - 2, width, 2);
-        }
-
         function hudHeight() {
-          return width <= 520 ? 64 : 58;
+          return 0;
         }
 
         /* -- CLOUD PLATFORMS -- */
@@ -1879,7 +1757,7 @@
             const sy = screenY(platform.y);
             if (sy < -90 || sy > height + 90) continue;
             const sx = worldLeft + platformLeft(platform);
-            const pulse = Math.max(0, 1 - (simTime - platform.pulseUntil + 0.24) / 0.24);
+            const pulse = clamp(1 - (simTime - platform.pulseUntil + 0.24) / 0.24, 0, 1);
             drawCloudPlatform(platform, sx, sy, pulse);
             if (platform.spring) drawSpring(sx + platform.w * 0.5, sy - 2);
             if (platform.id === targetPlatformId && !manualActive()) drawTargetTick(sx + platform.w * 0.5, sy - 34);
@@ -1890,8 +1768,12 @@
           const w = platform.w;
           const cx = sx + w * 0.5;
           const seed = platform.id | 0;
-          const drowsy = hash01(seed * 31 + 7) > 0.82 && w > 150;
-          const body = pulse > 0 ? C.mist : C.white;
+          const cleanse =
+            platform.cleansedAt == null
+              ? 0
+              : clamp((simTime - platform.cleansedAt) / CLOUD_CLEANSE_SECONDS, 0, 1);
+          const body = mixColor(C.deep, C.white, cleanse);
+          const underside = mixColor(C.night, C.mist, cleanse);
           const vanish =
             platform.vanishStartedAt == null
               ? 0
@@ -1903,14 +1785,21 @@
                 );
 
           ctx.save();
+          if (pulse > 0 && vanish === 0) {
+            ctx.translate(cx, sy + 8);
+            ctx.scale(1 + pulse * 0.035, 1 - pulse * 0.055);
+            ctx.translate(-cx, -(sy + 8));
+          }
           if (vanish > 0) {
-            ctx.globalAlpha = 1 - vanish;
-            ctx.translate(cx, sy + 29);
-            ctx.scale(1 - vanish * 0.18, 1 - vanish * 0.76);
-            ctx.translate(-cx, -(sy + 29));
+            const blast = Math.sin(vanish * Math.PI);
+            ctx.globalAlpha = 1 - Math.pow(vanish, 0.62);
+            ctx.translate(cx, sy + 10);
+            ctx.rotate((hash01(seed * 97) - 0.5) * vanish * 0.16);
+            ctx.scale(1 + blast * 0.24, 1 + blast * 0.15);
+            ctx.translate(-cx, -(sy + 10));
           }
 
-          cloudPath(cx + 3, sy + 11, w * 0.97, 0.94);
+          cloudPath(cx + 3, sy + 12, w * 0.97, 0.94);
           ctx.fillStyle = SHADOW;
           ctx.fill();
 
@@ -1919,38 +1808,37 @@
           ctx.clip();
           ctx.fillStyle = body;
           ctx.fillRect(cx - w, sy - 60, w * 3, 200);
-          ctx.fillStyle = pulse > 0 ? C.pale : C.mist;
-          ctx.fillRect(cx - w, sy + 19, w * 3, 120);
+          ctx.fillStyle = underside;
+          ctx.fillRect(cx - w, sy + 11, w * 3, 120);
           ctx.restore();
 
-          if (drowsy) drawCloudFace(cx, sy + 16, seed);
+          if (cleanse < 1) drawAngryCloudFace(cx, sy + 12, seed, 1 - cleanse);
           ctx.restore();
         }
 
-        /* One connected, extra-puffy silhouette. Its underside closes with a
-           single horizontal edge, giving every cloud a crisp, flat bottom. */
+        /* One connected silhouette with generous puffs along both edges. */
         function cloudPath(cx, topY, w, scale) {
           const hw = w * 0.5;
           const left = cx - hw;
           const right = cx + hw;
-          const bottomY = topY + 30 * scale;
-          const shoulderY = topY + 7 * scale;
+          const topShoulderY = topY + 7 * scale;
+          const bottomShoulderY = topY + 17 * scale;
           const bumps = clamp(Math.round(w / 43), 3, 8);
           const step = w / bumps;
-          const baseLift = clamp(step * 0.52, 14 * scale, 21 * scale);
+          const topLift = clamp(step * 0.52, 14 * scale, 21 * scale);
+          const bottomLift = clamp(step * 0.4, 11 * scale, 17 * scale);
 
           ctx.beginPath();
-          ctx.moveTo(left, bottomY);
-          ctx.lineTo(left, shoulderY);
+          ctx.moveTo(left, topShoulderY);
           for (let i = 0; i < bumps; i += 1) {
             const x0 = left + i * step;
             const x1 = x0 + step;
             const middle = (x0 + x1) * 0.5;
             const centerWeight = Math.sin(Math.PI * ((i + 0.5) / bumps));
-            const lift = baseLift * (0.88 + centerWeight * 0.32 + (i % 2) * 0.06);
+            const lift = topLift * (0.88 + centerWeight * 0.32 + (i % 2) * 0.06);
             ctx.bezierCurveTo(
               x0 + step * 0.06,
-              shoulderY - lift * 0.62,
+              topShoulderY - lift * 0.62,
               middle - step * 0.3,
               topY - lift,
               middle,
@@ -1960,31 +1848,77 @@
               middle + step * 0.3,
               topY - lift,
               x1 - step * 0.06,
-              shoulderY - lift * 0.62,
+              topShoulderY - lift * 0.62,
               x1,
-              shoulderY,
+              topShoulderY,
             );
           }
-          ctx.lineTo(right, bottomY);
-          ctx.lineTo(left, bottomY);
+          ctx.bezierCurveTo(
+            right + 8 * scale,
+            topShoulderY + 3 * scale,
+            right + 8 * scale,
+            bottomShoulderY - 3 * scale,
+            right,
+            bottomShoulderY,
+          );
+          for (let i = bumps - 1; i >= 0; i -= 1) {
+            const x0 = left + i * step;
+            const x1 = x0 + step;
+            const middle = (x0 + x1) * 0.5;
+            const centerWeight = Math.sin(Math.PI * ((i + 0.5) / bumps));
+            const lift = bottomLift * (0.9 + centerWeight * 0.2 + ((i + 1) % 2) * 0.08);
+            ctx.bezierCurveTo(
+              x1 - step * 0.06,
+              bottomShoulderY + lift * 0.58,
+              middle + step * 0.3,
+              bottomShoulderY + lift,
+              middle,
+              bottomShoulderY + lift,
+            );
+            ctx.bezierCurveTo(
+              middle - step * 0.3,
+              bottomShoulderY + lift,
+              x0 + step * 0.06,
+              bottomShoulderY + lift * 0.58,
+              x0,
+              bottomShoulderY,
+            );
+          }
+          ctx.bezierCurveTo(
+            left - 8 * scale,
+            bottomShoulderY - 3 * scale,
+            left - 8 * scale,
+            topShoulderY + 3 * scale,
+            left,
+            topShoulderY,
+          );
           ctx.closePath();
         }
 
-        /* A few of the bigger clouds are asleep. */
-        function drawCloudFace(cx, cy, seed) {
+        function drawAngryCloudFace(cx, cy, seed, alpha) {
           const gap = 13;
-          const drift = Math.sin(simTime * 1.4 + seed) * 0.7;
-          ctx.strokeStyle = C.pale;
-          ctx.lineWidth = 2.6;
+          const glare = Math.sin(simTime * 2.2 + seed) * 0.45;
+          ctx.save();
+          ctx.globalAlpha *= alpha;
+          fillOval(cx - gap, cy, 4.6, 5.5, C.white);
+          fillOval(cx + gap, cy, 4.6, 5.5, C.white);
+          fillCircle(cx - gap + 1.5, cy + 0.8, 1.8, C.night);
+          fillCircle(cx + gap - 1.5, cy + 0.8, 1.8, C.night);
+
+          ctx.strokeStyle = C.white;
+          ctx.lineWidth = 2.8;
           ctx.lineCap = 'round';
-          for (const side of [-1, 1]) {
-            ctx.beginPath();
-            ctx.arc(cx + side * gap, cy + drift, 5, Math.PI * 0.15, Math.PI * 0.85);
-            ctx.stroke();
-          }
-          fillOval(cx, cy + 9.5 + drift, 2, 1.6, C.pale);
-          fillOval(cx - gap * 1.9, cy + 5 + drift, 3.4, 2.2, C.mist);
-          fillOval(cx + gap * 1.9, cy + 5 + drift, 3.4, 2.2, C.mist);
+          ctx.beginPath();
+          ctx.moveTo(cx - gap - 6, cy - 8 - glare);
+          ctx.lineTo(cx - gap + 5, cy - 4 + glare);
+          ctx.moveTo(cx + gap + 6, cy - 8 + glare);
+          ctx.lineTo(cx + gap - 5, cy - 4 - glare);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(cx, cy + 13, 6, Math.PI * 1.15, Math.PI * 1.85);
+          ctx.stroke();
+          ctx.restore();
         }
 
         function drawSpring(cx, sy) {
@@ -2178,6 +2112,11 @@
             if (particle.kind === 'rain') {
               const length = 5 + Math.min(7, Math.abs(particle.vy) * 0.018);
               capsule(sx, sy - length * 0.5, sx, sy + length * 0.5, particle.r * 1.5, particle.color || C.mid);
+            } else if (particle.kind === 'cloudBurst') {
+              const puff = particle.r * (0.82 + age * 0.5);
+              fillCircle(sx, sy, puff, particle.color || C.white);
+              fillCircle(sx - puff * 0.6, sy + puff * 0.15, puff * 0.55, particle.color || C.white);
+              fillCircle(sx + puff * 0.58, sy + puff * 0.12, puff * 0.62, particle.color || C.white);
             } else {
               fillCircle(sx, sy, Math.max(1, particle.r * (1 - age * 0.5)), particle.color || C.pale);
             }

@@ -920,15 +920,17 @@
             const tip = curveAt(curve, 1);
             const leaves = [];
             if (r() > 0.28) {
+              const leafT = lerp(0.3, 0.55, r());
               leaves.push(
                 makeLeaf(r, spec.leaf, {
-                  at: curveAt(curve, lerp(0.3, 0.55, r())),
+                  at: curveAt(curve, leafT),
                   side: -side,
-                  t,
+                  t: leafT,
                 })
               );
             }
             branches.push({
+              stemT: t,
               curve,
               tip,
               leaves,
@@ -948,7 +950,8 @@
           if (spec.key !== 'none') {
             const baseSize = flowerSize(spec.key);
             for (let i = 0; i < bloomCount; i += 1) {
-              const at = i === 0 ? curveAt(stem, 1) : branches[(i * 2 - 1) % branches.length].tip;
+              const branchIndex = i === 0 ? -1 : (i * 2 - 1) % branches.length;
+              const at = branchIndex < 0 ? curveAt(stem, 1) : branches[branchIndex].tip;
               blooms.push({
                 x: at.x,
                 y: at.y,
@@ -956,6 +959,7 @@
                 rotation: at.angle + Math.PI / 2 + lerp(-0.3, 0.3, r()),
                 phase: r() * TAU,
                 variant: r(),
+                branchIndex,
               });
             }
           } else {
@@ -966,7 +970,7 @@
             );
           }
 
-          const plant = {
+          return {
             id: nextId++,
             x,
             y,
@@ -983,23 +987,6 @@
             blooms,
             seed: localSeed,
           };
-          plant.reach = measurePlantReach(plant);
-          return plant;
-        }
-
-        function measurePlantReach(plant) {
-          let reach = 12;
-          const includePoint = (point, extra) => {
-            reach = Math.max(reach, Math.hypot(point.x, point.y) + (extra || 0));
-          };
-          for (const point of plant.stem.pts) includePoint(point, plant.stemWidth);
-          for (const branch of plant.branches) {
-            for (const point of branch.curve.pts) includePoint(point, branch.tendril ? branch.tendrilSize : 4);
-            for (const leaf of branch.leaves) includePoint(leaf, leaf.length * 1.15);
-          }
-          for (const leaf of plant.stemLeaves) includePoint(leaf, leaf.length * 1.15);
-          for (const bloom of plant.blooms) includePoint(bloom, bloom.r * 1.5);
-          return reach + 8;
         }
 
         function makeLeaf(r, kind, o) {
@@ -1017,6 +1004,7 @@
             // The curl is clamped away from zero: a leaf blade always bows.
             curl: (o.side > 0 ? 1 : -1) * lerp(0.16, 0.42, r()),
             shade: r(),
+            anchorT: o.t || 0,
             turnover: r() > 0.86 && conf.size[1] > 22,
             fold: lerp(0.68, 0.84, r()),
             foldTilt: lerp(-0.2, 0.2, r()),
@@ -1055,44 +1043,94 @@
           ctx.rotate(plant.rotation);
           ctx.scale(plant.scale, plant.scale);
 
-          if (growthProgress !== undefined && growthProgress < 1) {
-            // A soft acceleration reads as organic extension rather than a
-            // mechanical wipe. The root-centred reveal follows the plant's
-            // curved reach, exposing nearby leaves before distant blooms.
-            const reveal = 1 - Math.pow(1 - growthProgress, 2.2);
-            ctx.beginPath();
-            ctx.arc(0, 0, Math.max(1, plant.reach * reveal), 0, TAU);
-            ctx.clip();
-          }
+          const growing = growthProgress !== undefined && growthProgress < 1;
+          const p = growing ? clamp(growthProgress, 0, 1) : 1;
+          const stemProgress = growing ? smoothstep(clamp(p / 0.62, 0, 1)) : 1;
+          const visibleStem = partialCurve(plant.stem, stemProgress);
 
-          drawStemRibbon(plant.stem, plant.stemWidth, plant.stemWidth * 0.3, plant.stemColor);
-          if (plant.thorns) drawThorns(plant.stem, plant.stemWidth, plant.seed);
+          drawStemRibbon(visibleStem, plant.stemWidth, plant.stemWidth * 0.3, plant.stemColor);
+          if (plant.thorns) drawThorns(visibleStem, plant.stemWidth, plant.seed);
 
+          const branchProgresses = [];
           for (const branch of plant.branches) {
-            drawStemRibbon(branch.curve, branch.width, branch.width * 0.34, P.stemDeep);
-            if (branch.tendril) {
-              drawTendril(branch.tip, branch.tendrilSize, branch.tendrilDir);
+            const branchStart = stemArrival(branch.stemT);
+            const branchProgress = growing
+              ? smoothstep(clamp((p - branchStart) / 0.22, 0, 1))
+              : 1;
+            branchProgresses.push(branchProgress);
+            if (branchProgress <= 0) continue;
+            drawStemRibbon(partialCurve(branch.curve, branchProgress), branch.width, branch.width * 0.34, P.stemDeep);
+            if (branch.tendril && branchProgress > 0.72) {
+              drawTendril(
+                branch.tip,
+                branch.tendrilSize * smoothstep((branchProgress - 0.72) / 0.28),
+                branch.tendrilDir
+              );
             }
           }
 
-          for (const leaf of plant.stemLeaves) drawLeaf(leaf);
-          for (const branch of plant.branches) {
-            for (const leaf of branch.leaves) drawLeaf(leaf);
+          for (const leaf of plant.stemLeaves) {
+            const leafStart = stemArrival(leaf.anchorT);
+            const leafProgress = growing
+              ? smoothstep(clamp((p - leafStart) / 0.2, 0, 1))
+              : 1;
+            if (leafProgress > 0) drawLeaf(leaf, leafProgress);
+          }
+          for (let i = 0; i < plant.branches.length; i += 1) {
+            const branch = plant.branches[i];
+            const branchProgress = branchProgresses[i];
+            for (const leaf of branch.leaves) {
+              const leafStart = stemArrival(branch.stemT) + inverseSmoothstep(leaf.anchorT) * 0.22;
+              const leafProgress = growing
+                ? smoothstep(clamp((p - leafStart) / 0.18, 0, 1))
+                : 1;
+              if (leafProgress > 0) drawLeaf(leaf, leafProgress);
+            }
           }
 
-          for (const branch of plant.branches) {
-            if (branch.bud) drawBud(branch, plant.spec.key);
+          for (let i = 0; i < plant.branches.length; i += 1) {
+            const branch = plant.branches[i];
+            const budStart = stemArrival(branch.stemT) + 0.18;
+            const budProgress = growing ? smoothstep(clamp((p - budStart) / 0.14, 0, 1)) : 1;
+            if (branch.bud && budProgress > 0) drawBud(branch, plant.spec.key, budProgress);
           }
 
           for (const bloom of plant.blooms) {
+            const branch = bloom.branchIndex < 0 ? null : plant.branches[bloom.branchIndex];
+            const bloomStart = branch ? stemArrival(branch.stemT) + 0.18 : 0.58;
+            const bloomProgress = growing
+              ? smoothstep(clamp((p - bloomStart) / 0.28, 0, 1))
+              : 1;
+            if (bloomProgress <= 0) continue;
             ctx.save();
             ctx.translate(bloom.x, bloom.y);
             ctx.rotate(bloom.rotation);
-            drawFlower(plant.spec.key, bloom, plant.seed);
+            drawOpeningFlower(plant.spec.key, bloom, plant.seed, bloomProgress);
             ctx.restore();
           }
 
           ctx.restore();
+        }
+
+        function partialCurve(curve, progress) {
+          const p = clamp(progress, 0.001, 1);
+          if (p >= 1) return curve;
+          const end = p * (curve.pts.length - 1);
+          const whole = Math.floor(end);
+          const fraction = end - whole;
+          const pts = curve.pts.slice(0, whole + 1);
+          const angs = curve.angs.slice(0, whole + 1);
+          const next = Math.min(whole + 1, curve.pts.length - 1);
+          pts.push({
+            x: lerp(curve.pts[whole].x, curve.pts[next].x, fraction || 0.001),
+            y: lerp(curve.pts[whole].y, curve.pts[next].y, fraction || 0.001),
+          });
+          angs.push(lerp(curve.angs[whole], curve.angs[next], fraction || 0.001));
+          return { pts, angs, length: curve.length * p, dir: curve.dir };
+        }
+
+        function stemArrival(stemT) {
+          return inverseSmoothstep(stemT) * 0.62;
         }
 
         // Recurved prickles, which is what a rose actually has.
@@ -1194,10 +1232,14 @@
 
         // A leaf is an arrangement, not always a single blade: roses come in
         // threes on a petiole, honeysuckle in opposite pairs.
-        function drawLeaf(leaf) {
+        function drawLeaf(leaf, growth) {
+          const unfurl = growth === undefined ? 1 : clamp(growth, 0, 1);
           ctx.save();
           ctx.translate(leaf.x, leaf.y);
-          ctx.rotate(leaf.angle);
+          // The blade begins folded along its supporting stem, lengthens from
+          // the petiole, then opens to its final width and angle.
+          ctx.rotate(leaf.angle - Math.sign(leaf.curl || 1) * (1 - unfurl) * 0.7);
+          ctx.scale(0.08 + unfurl * 0.92, 0.12 + Math.pow(unfurl, 1.7) * 0.88);
 
           if (leaf.conf.pinnate) {
             drawPinnateLeaf(leaf);
@@ -1440,8 +1482,9 @@
           ctx.restore();
         }
 
-        function drawBud(branch, kind) {
+        function drawBud(branch, kind, growth) {
           const size = branch.budSize;
+          const emerge = growth === undefined ? 1 : clamp(growth, 0, 1);
           const angle = branch.tip.angle + Math.PI / 2;
           const petalColor =
             kind === 'lily' || kind === 'cosmos'
@@ -1457,6 +1500,7 @@
           ctx.save();
           ctx.translate(branch.tip.x, branch.tip.y);
           ctx.rotate(angle);
+          ctx.scale(0.18 + emerge * 0.82, 0.12 + emerge * 0.88);
 
           // Calyx sepals, curved outward.
           ctx.fillStyle = P.leafDark;
@@ -1514,6 +1558,57 @@
             case 'honeysuckle': drawHoneysuckle(bloom, plantSeed); break;
             default: break;
           }
+        }
+
+        function drawOpeningFlower(kind, bloom, plantSeed, progress) {
+          const opening = clamp(progress, 0, 1);
+
+          // Before petals separate, the terminal is a tight coloured bud with
+          // two green sepals. It shrinks away as the flower opens.
+          if (opening < 0.52) {
+            const bud = 1 - smoothstep(opening / 0.52);
+            ctx.save();
+            ctx.scale(0.55 + bud * 0.3, 0.72 + bud * 0.28);
+            ctx.fillStyle = P.leafDark;
+            for (const side of [-1, 1]) {
+              ctx.save();
+              ctx.rotate(side * 0.48);
+              ctx.beginPath();
+              ctx.moveTo(0, bloom.r * 0.08);
+              ctx.quadraticCurveTo(side * bloom.r * 0.14, -bloom.r * 0.1, 0, -bloom.r * 0.46);
+              ctx.quadraticCurveTo(-side * bloom.r * 0.08, -bloom.r * 0.08, 0, bloom.r * 0.08);
+              ctx.fill();
+              ctx.restore();
+            }
+            ctx.fillStyle = flowerBudColor(kind);
+            ctx.strokeStyle = P.ink;
+            ctx.lineWidth = 0.65;
+            ctx.beginPath();
+            ctx.ellipse(0, -bloom.r * 0.2, bloom.r * 0.22, bloom.r * 0.34, 0, 0, TAU);
+            ctx.fill();
+            ctx.globalAlpha = 0.48;
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          if (opening > 0.2) {
+            const petals = smoothstep((opening - 0.2) / 0.8);
+            ctx.save();
+            ctx.rotate((1 - petals) * 0.22);
+            // Radial expansion separates the petals; extra width late in the
+            // motion reads as the corolla flattening toward the viewer.
+            ctx.scale(0.18 + petals * 0.82, 0.28 + Math.pow(petals, 0.72) * 0.72);
+            drawFlower(kind, bloom, plantSeed);
+            ctx.restore();
+          }
+        }
+
+        function flowerBudColor(kind) {
+          if (kind === 'lily' || kind === 'cosmos' || kind === 'honeysuckle') return P.ochre;
+          if (kind === 'daisy') return P.cream;
+          if (kind === 'anemone') return P.indigo;
+          if (kind === 'hydrangea') return P.woad;
+          return P.madder;
         }
 
         function petalPath(len, wid, shoulder, notch) {
@@ -2013,6 +2108,16 @@
 
         function clamp(value, min, max) {
           return Math.max(min, Math.min(max, value));
+        }
+
+        function smoothstep(value) {
+          const t = clamp(value, 0, 1);
+          return t * t * (3 - 2 * t);
+        }
+
+        function inverseSmoothstep(value) {
+          const t = clamp(value, 0, 1);
+          return 0.5 - Math.sin(Math.asin(1 - 2 * t) / 3);
         }
       })();
     </script>

@@ -165,6 +165,19 @@
         border-bottom: 1px solid var(--panel-rule);
       }
 
+      .control-section-label {
+        margin: 10px 0 1px;
+        color: var(--panel-muted);
+        font: 700 8px/1 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .control-section-label:not(:first-of-type) {
+        padding-top: 8px;
+        border-top: 1px solid var(--panel-rule);
+      }
+
       .map-button {
         min-height: 27px;
         padding: 4px 5px;
@@ -306,6 +319,29 @@
           <button class="map-button" type="button" data-map="current" aria-pressed="false">Flow</button>
         </div>
 
+        <p class="control-section-label">Obstacles</p>
+        <div class="range-row">
+          <label for="rock-count">Amount</label>
+          <output class="control-value" for="rock-count">18</output>
+          <input id="rock-count" type="range" min="6" max="26" step="1" value="18" />
+        </div>
+        <div class="range-row">
+          <label for="rock-scale">Size</label>
+          <output class="control-value" for="rock-scale">100%</output>
+          <input id="rock-scale" type="range" min="55" max="140" step="1" value="100" />
+        </div>
+        <div class="range-row">
+          <label for="rock-grouping">Grouping</label>
+          <output class="control-value" for="rock-grouping">56%</output>
+          <input id="rock-grouping" type="range" min="0" max="100" step="1" value="56" />
+        </div>
+        <div class="range-row">
+          <label for="rock-spacing">Spacing</label>
+          <output class="control-value" for="rock-spacing">100%</output>
+          <input id="rock-spacing" type="range" min="55" max="150" step="1" value="100" />
+        </div>
+
+        <p class="control-section-label">Current / petals</p>
         <div class="range-row">
           <label for="direction">Direction</label>
           <output class="control-value" for="direction">180° S</output>
@@ -350,6 +386,10 @@
         const flowInput = document.getElementById('flow');
         const petalInput = document.getElementById('petal-count');
         const turbulenceInput = document.getElementById('turbulence');
+        const rockCountInput = document.getElementById('rock-count');
+        const rockScaleInput = document.getElementById('rock-scale');
+        const rockGroupingInput = document.getElementById('rock-grouping');
+        const rockSpacingInput = document.getElementById('rock-spacing');
         const reducedMotion = typeof matchMedia === 'function'
           ? matchMedia('(prefers-reduced-motion: reduce)')
           : null;
@@ -389,12 +429,17 @@
         let panelDrag = null;
         let resizeTimer = 0;
         let mapTimer = 0;
+        let composeTimer = 0;
 
         const settings = {
           direction: 180,
           flow: 42,
           petals: 192,
           turbulence: 0.58,
+          rockCount: 18,
+          rockScale: 1,
+          rockGrouping: 0.56,
+          rockSpacing: 1,
         };
 
         function seedFromLocation() {
@@ -459,41 +504,50 @@
 
         function makeRocks() {
           const small = Math.min(width, height);
-          const areaFactor = clamp((width * height) / 70000, 0, 9);
-          const desired = Math.round(clamp(10 + areaFactor, 11, width < 520 ? 14 : 19));
+          const desired = settings.rockCount;
+          const grouping = settings.rockGrouping;
+          const proximityCount = Math.round(mix(1, desired * 0.36, grouping));
+          const closureCount = Math.round(mix(desired * 0.13, desired * 0.28, grouping));
+          const impliedCount = Math.round(mix(desired * 0.3, desired * 0.12, grouping));
+          const offpageCount = desired >= 10 ? 2 : 1;
+          const proximityEnd = proximityCount;
+          const closureEnd = proximityEnd + closureCount;
+          const impliedEnd = closureEnd + impliedCount;
+          const offpageEnd = impliedEnd + offpageCount;
           const center = { x: width * rand(0.43, 0.57), y: height * rand(0.44, 0.58) };
           const clusterA = { x: width * rand(0.22, 0.34), y: height * rand(0.27, 0.42) };
           const clusterB = { x: width * rand(0.66, 0.79), y: height * rand(0.58, 0.72) };
           const anchors = [];
 
-          for (let i = 0; i < desired * 3; i++) {
+          for (let i = 0; i < desired * 4; i++) {
             let mode = 'scatter';
             let x = width * rand(0.08, 0.92);
             let y = height * rand(0.08, 0.92);
             let scale = [0.58, 1.18, 0.78, 1.65, 0.48, 0.96, 1.38][i % 7];
 
-            if (i < 4) {
+            if (i < proximityEnd) {
               mode = 'proximity';
-              const a = i < 2 ? clusterA : clusterB;
+              const a = i % 2 ? clusterA : clusterB;
               const theta = rand(0, TAU);
-              const radius = small * rand(0.015, 0.09);
+              const radius = small * rand(mix(0.055, 0.012, grouping), mix(0.17, 0.065, grouping));
               x = a.x + Math.cos(theta) * radius;
               y = a.y + Math.sin(theta) * radius;
-            } else if (i < 9) {
+            } else if (i < closureEnd) {
               mode = 'closure';
-              const theta = -2.5 + (i - 4) * 0.82;
-              x = center.x + Math.cos(theta) * width * 0.22;
-              y = center.y + Math.sin(theta) * height * 0.19;
+              const closureIndex = i - proximityEnd;
+              const theta = -2.5 + closureIndex / Math.max(1, closureCount - 1) * 4.1;
+              x = center.x + Math.cos(theta) * width * mix(0.3, 0.2, grouping);
+              y = center.y + Math.sin(theta) * height * mix(0.27, 0.17, grouping);
               scale *= 0.82;
-            } else if (i < 13) {
+            } else if (i < impliedEnd) {
               mode = 'implied';
-              const t = (i - 8) / 5;
+              const t = (i - closureEnd + 1) / Math.max(2, impliedCount + 1);
               x = mix(width * 0.18, width * 0.82, t);
-              y = mix(height * 0.72, height * 0.3, t) + rand(-small * 0.025, small * 0.025);
+              y = mix(height * 0.72, height * 0.3, t) + rand(-small * 0.045, small * 0.045);
               scale *= 0.7;
-            } else if (i < 15) {
+            } else if (i < offpageEnd) {
               mode = 'offpage';
-              x = i === 13 ? -small * 0.015 : width + small * 0.015;
+              x = (i - impliedEnd) % 2 === 0 ? -small * 0.015 : width + small * 0.015;
               y = height * rand(0.24, 0.8);
               scale *= 1.5;
             }
@@ -504,14 +558,16 @@
           const placed = [];
           for (let i = 0; i < anchors.length && placed.length < desired; i++) {
             const anchor = anchors[i];
-            const base = clamp(small * 0.085, 30, 78);
-            const rx = clamp(base * anchor.scale * rand(0.82, 1.35), 19, small * 0.18);
-            const ry = clamp(base * Math.pow(anchor.scale, 0.7) * rand(0.46, 0.84), 14, small * 0.12);
+            const base = clamp(small * 0.085, 30, 78) * settings.rockScale;
+            const rx = clamp(base * anchor.scale * rand(0.82, 1.35), 11, small * 0.26);
+            const ry = clamp(base * Math.pow(anchor.scale, 0.7) * rand(0.46, 0.84), 8, small * 0.18);
             let found = null;
 
-            for (let attempt = 0; attempt < 80; attempt++) {
+            for (let attempt = 0; attempt < 120; attempt++) {
               const rotation = rand(-0.72, 0.72);
-              const jitter = anchor.mode === 'scatter' ? small * 0.11 : small * 0.035;
+              const jitter = anchor.mode === 'scatter'
+                ? small * mix(0.16, 0.08, grouping)
+                : small * mix(0.06, 0.025, grouping);
               const rock = {
                 id: placed.length,
                 x: anchor.x + rand(-jitter, jitter),
@@ -531,8 +587,9 @@
               let overlaps = false;
               for (const other of placed) {
                 const distance = Math.hypot(rock.x - other.x, rock.y - other.y);
-                const allowance = anchor.mode === 'proximity' ? 0.5 : 0.77;
-                if (distance < (rock.radius + other.radius) * allowance + 16) {
+                const baseAllowance = anchor.mode === 'proximity' ? 0.44 : 0.7;
+                const allowance = baseAllowance * settings.rockSpacing;
+                if (distance < (rock.radius + other.radius) * allowance + 12 * settings.rockSpacing) {
                   overlaps = true;
                   break;
                 }
@@ -710,16 +767,17 @@
         }
 
         function buildMaps() {
-          const mapWidth = Math.ceil(width / MAP_SCALE);
-          const mapHeight = Math.ceil(height / MAP_SCALE);
+          const mapScale = settings.rockCount > 23 ? 7 : settings.rockCount > 19 ? 6 : MAP_SCALE;
+          const mapWidth = Math.ceil(width / mapScale);
+          const mapHeight = Math.ceil(height / mapScale);
           maps = {
-            surface: makeMapCanvas(mapWidth, mapHeight, 'surface'),
-            depth: makeMapCanvas(mapWidth, mapHeight, 'depth'),
-            current: makeMapCanvas(mapWidth, mapHeight, 'current'),
+            surface: makeMapCanvas(mapWidth, mapHeight, 'surface', mapScale),
+            depth: makeMapCanvas(mapWidth, mapHeight, 'depth', mapScale),
+            current: makeMapCanvas(mapWidth, mapHeight, 'current', mapScale),
           };
         }
 
-        function makeMapCanvas(mapWidth, mapHeight, mode) {
+        function makeMapCanvas(mapWidth, mapHeight, mode, mapScale) {
           const layer = document.createElement('canvas');
           layer.width = mapWidth;
           layer.height = mapHeight;
@@ -729,8 +787,8 @@
 
           for (let y = 0; y < mapHeight; y++) {
             for (let x = 0; x < mapWidth; x++) {
-              const px = (x + 0.5) * MAP_SCALE;
-              const py = (y + 0.5) * MAP_SCALE;
+              const px = (x + 0.5) * mapScale;
+              const py = (y + 0.5) * mapScale;
               const depth = depthAt(px, py);
               const flow = sampleFlow(px, py, 0, false);
               const speed = clamp((flow.speed / Math.max(1, settings.flow) - 0.42) / 1.35, 0, 1);
@@ -1232,6 +1290,11 @@
           mapTimer = setTimeout(buildMaps, 90);
         }
 
+        function scheduleCompose() {
+          clearTimeout(composeTimer);
+          composeTimer = setTimeout(compose, 130);
+        }
+
         function bindRange(input, onInput, format) {
           const row = input.closest('.range-row');
           const output = row.querySelector('output');
@@ -1261,6 +1324,22 @@
         }, value => String(value));
         bindRange(turbulenceInput, value => {
           settings.turbulence = value / 100;
+        }, value => `${value}%`);
+        bindRange(rockCountInput, value => {
+          settings.rockCount = value;
+          scheduleCompose();
+        }, value => String(value));
+        bindRange(rockScaleInput, value => {
+          settings.rockScale = value / 100;
+          scheduleCompose();
+        }, value => `${value}%`);
+        bindRange(rockGroupingInput, value => {
+          settings.rockGrouping = value / 100;
+          scheduleCompose();
+        }, value => `${value}%`);
+        bindRange(rockSpacingInput, value => {
+          settings.rockSpacing = value / 100;
+          scheduleCompose();
         }, value => `${value}%`);
 
         mapButtons.forEach(button => {

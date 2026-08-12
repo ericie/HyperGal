@@ -46,5 +46,5 @@ graphic event.
 - `?warm=<seconds>` - open it already in motion.
 - `?debug` - show identity, behavior mode, transformations, and pellet counters.
 
-Click, press Space, or press `r` to reseed. Open `index.html` directly in any
-browser.
+Use the **New run** button, press Space, or press `r` to reseed. Open
+`index.html` directly in any browser.

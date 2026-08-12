@@ -69,7 +69,7 @@
         const ROAD_TRANSITION_METERS = 88;
         const HERO_YELLOW = '#ffd21f';
         const TRAFFIC_GRAYS = ['#545b65', '#656d78', '#777f8a', '#8a929d', '#9da4ae'];
-        const FIELD_COLORS = ['#233a27', '#4a3820', '#2f4828', '#342c45'];
+        const FIELD_COLORS = ['#173b27', '#244d31', '#315b36', '#3d622f'];
         const COLORS = {
           sky: '#070910',
           asphalt: '#1a1f28',
@@ -1243,22 +1243,35 @@
         function drawExits() {
           for (const exit of exits) {
             const ramp = exitRampGeometry(exit.s);
-            if (ramp.startY < -130 || ramp.startY > height + 160) continue;
+            if (ramp.startY < -180 || ramp.endY > height + 180) continue;
 
-            drawDiagonalStrip(ramp, ramp.half + ramp.shoulder, '#263544');
-            drawDiagonalStrip(ramp, ramp.half, COLORS.asphalt);
+            const rampPath = exitRampPath(ramp);
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(ramp.roadRight - 1, 0, width - ramp.roadRight + 1, height);
+            ctx.clip();
+            ctx.strokeStyle = '#263544';
+            ctx.lineWidth = (ramp.half + ramp.shoulder) * 2;
+            ctx.lineCap = 'butt';
+            ctx.lineJoin = 'round';
+            ctx.stroke(rampPath);
+            ctx.restore();
+
+            ctx.strokeStyle = COLORS.asphalt;
+            ctx.lineWidth = ramp.half * 2;
+            ctx.lineCap = 'butt';
+            ctx.lineJoin = 'round';
+            ctx.stroke(rampPath);
 
             ctx.strokeStyle = '#f9f2a4';
             ctx.lineWidth = 3;
             ctx.setLineDash([14, 12]);
-            ctx.beginPath();
-            ctx.moveTo(ramp.startX + 8, ramp.startY);
-            ctx.lineTo(ramp.endX - 12, ramp.endY);
-            ctx.stroke();
+            ctx.stroke(exitRampPath(ramp, true));
             ctx.setLineDash([]);
 
             const signW = Math.min(78, laneWidth * 0.92);
-            const signX = Math.min(width - signW - 8, ramp.startX + laneWidth * 0.45);
+            const signX = Math.min(width - signW - 8, ramp.roadRight + laneWidth * 0.18);
             const signY = ramp.startY - laneWidth * 0.95;
             if (signY > -40 && signY < height + 10) {
               rect(signX, signY, signW, 28, '#0f7c45');
@@ -1374,13 +1387,23 @@
 
         function drawVehicle(vehicle, y, t) {
           const box = vehicleBox(vehicle);
-          const x = box.x;
+          let x = box.x;
           const w = box.w;
           const h = box.h;
           const blinkOn =
             vehicle.signal &&
             (prefersReducedMotion || Math.floor(t * (vehicle.isHero ? 5.2 : 4.4)) % 2 === 0);
           const fill = vehicle.isHero ? HERO_YELLOW : vehicle.color;
+
+          ctx.save();
+          if (vehicle.exiting) {
+            const position = exitVehiclePosition(vehicle);
+            ctx.translate(x, y);
+            ctx.rotate(position.angle);
+            x = 0;
+            y = 0;
+          }
+
           drawCarShape(
             x,
             y,
@@ -1397,6 +1420,7 @@
           if (vehicle.stoppedForObstacle && !vehicle.isHero) {
             rect(x - w * 0.48, y + h * 0.54, w * 0.96, 4, '#cdd3db');
           }
+          ctx.restore();
         }
 
         function drawCarShape(x, y, w, h, fill, signal, blinkOn, isHero, flash = 0, kind = 'car') {
@@ -1515,40 +1539,109 @@
 
         function exitRampGeometry(s) {
           const lane = rightmostLaneAt(s);
-          const startX = laneCenter(lane) + laneWidth * 0.38;
+          const bounds = roadBoundsAt(s);
+          const startX = laneCenter(lane);
           const startY = worldToY(s);
           return {
             startX,
             startY,
+            roadRight: bounds.right,
+            curveX: bounds.right + laneWidth * 0.72,
+            curveY: startY - laneWidth * 1.05,
             endX: width + Math.max(laneWidth * 1.45, 120),
             endY: startY - Math.max(laneWidth * 1.85, 128),
-            half: Math.max(laneWidth * 0.42, 26),
-            shoulder: Math.max(14, laneWidth * 0.18),
+            half: clamp(laneWidth * 0.38, 18, 52),
+            shoulder: clamp(laneWidth * 0.1, 6, 16),
           };
         }
 
-        function drawDiagonalStrip(line, halfWidth, fill) {
-          const dx = line.endX - line.startX;
-          const dy = line.endY - line.startY;
-          const length = Math.max(1, Math.hypot(dx, dy));
-          const nx = -dy / length;
-          const ny = dx / length;
-          ctx.fillStyle = fill;
-          ctx.beginPath();
-          ctx.moveTo(line.startX + nx * halfWidth, line.startY + ny * halfWidth);
-          ctx.lineTo(line.endX + nx * halfWidth, line.endY + ny * halfWidth);
-          ctx.lineTo(line.endX - nx * halfWidth, line.endY - ny * halfWidth);
-          ctx.lineTo(line.startX - nx * halfWidth, line.startY - ny * halfWidth);
-          ctx.closePath();
-          ctx.fill();
+        function exitRampPath(ramp, fromCurve = false) {
+          const path = new Path2D();
+          if (!fromCurve) {
+            path.moveTo(ramp.startX, ramp.startY);
+            path.bezierCurveTo(
+              ramp.startX,
+              ramp.startY - laneWidth * 0.44,
+              ramp.roadRight - laneWidth * 0.1,
+              ramp.startY - laneWidth * 0.8,
+              ramp.curveX,
+              ramp.curveY
+            );
+          } else {
+            path.moveTo(ramp.curveX, ramp.curveY);
+          }
+          path.bezierCurveTo(
+            ramp.roadRight + laneWidth * 1.5,
+            ramp.startY - laneWidth * 1.34,
+            ramp.endX - laneWidth * 0.65,
+            ramp.endY + laneWidth * 0.14,
+            ramp.endX,
+            ramp.endY
+          );
+          return path;
         }
 
         function exitVehiclePosition(vehicle) {
           const ramp = exitRampGeometry(vehicle.exitTarget ?? vehicle.s);
           const amount = smoothstep(clamp(vehicle.exitProgress / 1.08, 0, 1));
+          const split = 0.46;
+          let point;
+          let tangent;
+
+          if (amount < split) {
+            const t = amount / split;
+            const p0 = { x: ramp.startX, y: ramp.startY };
+            const p1 = { x: ramp.startX, y: ramp.startY - laneWidth * 0.44 };
+            const p2 = { x: ramp.roadRight - laneWidth * 0.1, y: ramp.startY - laneWidth * 0.8 };
+            const p3 = { x: ramp.curveX, y: ramp.curveY };
+            point = cubicBezierPoint(p0, p1, p2, p3, t);
+            tangent = cubicBezierTangent(p0, p1, p2, p3, t);
+          } else {
+            const t = (amount - split) / (1 - split);
+            const p0 = { x: ramp.curveX, y: ramp.curveY };
+            const p1 = {
+              x: ramp.roadRight + laneWidth * 1.5,
+              y: ramp.startY - laneWidth * 1.34,
+            };
+            const p2 = {
+              x: ramp.endX - laneWidth * 0.65,
+              y: ramp.endY + laneWidth * 0.14,
+            };
+            const p3 = { x: ramp.endX, y: ramp.endY };
+            point = cubicBezierPoint(p0, p1, p2, p3, t);
+            tangent = cubicBezierTangent(p0, p1, p2, p3, t);
+          }
+
           return {
-            x: ramp.startX + (ramp.endX - ramp.startX) * amount,
-            y: ramp.startY + (ramp.endY - ramp.startY) * amount,
+            x: point.x,
+            y: point.y,
+            angle: Math.atan2(tangent.y, tangent.x) + Math.PI / 2,
+          };
+        }
+
+        function cubicBezierPoint(p0, p1, p2, p3, t) {
+          const oneMinusT = 1 - t;
+          const a = oneMinusT * oneMinusT * oneMinusT;
+          const b = 3 * oneMinusT * oneMinusT * t;
+          const c = 3 * oneMinusT * t * t;
+          const d = t * t * t;
+          return {
+            x: p0.x * a + p1.x * b + p2.x * c + p3.x * d,
+            y: p0.y * a + p1.y * b + p2.y * c + p3.y * d,
+          };
+        }
+
+        function cubicBezierTangent(p0, p1, p2, p3, t) {
+          const oneMinusT = 1 - t;
+          return {
+            x:
+              3 * oneMinusT * oneMinusT * (p1.x - p0.x) +
+              6 * oneMinusT * t * (p2.x - p1.x) +
+              3 * t * t * (p3.x - p2.x),
+            y:
+              3 * oneMinusT * oneMinusT * (p1.y - p0.y) +
+              6 * oneMinusT * t * (p2.y - p1.y) +
+              3 * t * t * (p3.y - p2.y),
           };
         }
 

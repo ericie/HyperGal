@@ -11,8 +11,9 @@ The piece plays itself by default. He chooses a local intention: hit a nearby
 question mark box from below, climb a ladder, cross a stair, jump to a
 reachable cloud, or occasionally descend to revisit one with a missed box.
 Ladders are always strictly vertical; ladders and stairs can be used in either
-direction. Clouds rain while he runs across them, then collapse and disappear
-behind traversal jumps. Short hops made to hit a box keep their cloud intact.
+direction. Clouds begin as dark, angry-faced puffballs. Landing on one makes
+it rain and brighten to white; jumping away bursts it into a spray of smaller
+cloud puffs. Short hops made to hit a box keep their cloud intact.
 
 The player can interrupt with left/right/jump input, but the work always
 returns to its own climb after a short pause. There is no death screen. If he
@@ -37,12 +38,12 @@ tones from a single blue ramp of eight steps, from near-white paper to a deep
 navy. The one warm note in the piece is the blush on his cheeks; set `blush`
 to `C.pale` in the palette and the whole thing goes strictly monotone.
 
-Clouds use one connected outline of oversized alternating puffs over a flat
-bottom, with a hard-edged band of the next tone down along the underside.
-Their crests sit just above the surface he stands on, so he settles into the
-fluff. Side walls are a drifting bank of cloud, and the shaft edge is scalloped
-rather than ruled. A few of the larger clouds are asleep, and opened boxes are
-content about it.
+Clouds use one connected outline of oversized alternating puffs along both the
+top and bottom, with a hard-edged darker underside. Their crests sit just above
+the surface he stands on, so he settles into the fluff. Side walls are a
+drifting bank of cloud, and the shaft edge is scalloped rather than ruled.
+Untouched clouds glare at him until a landing washes the anger and darkness out
+of them.
 
 The climber is drawn from a skeleton rather than a fixed set of poses, so his
 arms and legs actually swing, reach, tuck and splay: a run cycle with

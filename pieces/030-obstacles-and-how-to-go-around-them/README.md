@@ -24,10 +24,12 @@ angular velocity. Strong wakes and user-made eddies can pull them under the
 surface, where they dim, shrink, pass beneath floating petals, and eventually
 rise again.
 
-Use the control panel to inspect Depth or Current independently, change the flow
-direction and base rate, adjust petal count and turbulence, or reseed the entire
-rock field. Click or tap the water to make a temporary eddy. Press `R` for a new
-river. Add `?seed=<value>` to the URL for a repeatable starting composition.
+Use the control panel to inspect Depth or Current independently; set obstacle
+amount, overall rock size, grouping, and spacing; change the flow direction and
+base rate; or adjust petal count and turbulence. Layout controls deterministically
+rebuild the field from the active seed, while the round arrow or `R` creates a
+new seed. Click or tap the water to make a temporary eddy. Add `?seed=<value>`
+to the URL for a repeatable starting composition.
 
 Open `index.html` directly in any modern browser. The piece has no external
 dependencies.
