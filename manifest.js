@@ -154,14 +154,15 @@ window.HYPERGAL_MANIFEST = {
     },
     {
       "slug": "016-up-mario",
-      "title": "Up Mario",
+      "title": "Many Mario",
       "year": 2026,
       "date": "2026-07-24",
       "category": "games",
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A vertical platformer drawn as flat kawaii illustration in one blue. A small round climber runs across fluffy, flat-bottomed clouds that rain underfoot and vanish behind traversal jumps, hitting question boxes and climbing strictly vertical ladders."
+      "description": "A family of tiny chibi Marios races upward through a pastel candy sky, making horizontal leaps between smiling clouds and falling with any cloud that crumbles beneath them.",
+      "updated": "2026-08-13"
     },
     {
       "slug": "017-knot-work",

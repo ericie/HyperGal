@@ -1,9 +1,10 @@
-# Up Mario
+# Many Mario
 
 A self-playing vertical platformer in a pastel kawaii sticker world.
 
-A tiny chibi Mario climbs forever through a blue candy sky shared with several
-other Marios. The cast rides plump, asymmetrical cloud characters with grape
+A family of tiny chibi Marios climbs forever through a blue candy sky. Every
+Mario seeks a higher cloud, with frequent sideways leaps across the screen.
+The cast rides plump, asymmetrical cloud characters with grape
 outlines, bright eyes, rosy cheeks, little smiles, and occasional sparkles.
 Question boxes are lemon yellow, ladders are mint and lavender, and a cropped
 pastel rainbow floats at the edge of the scene.
@@ -11,7 +12,9 @@ pastel rainbow floats at the edge of the scene.
 The piece plays itself by default. The lead Mario chooses a local intention:
 hit a nearby question box from below, climb a ladder, cross a stair, jump to a
 reachable cloud, or occasionally descend to revisit a missed box. The player
-can interrupt with left/right/jump input, after which the climb resumes.
+can interrupt with left/right/jump input, after which the climb resumes. The
+other Marios independently choose reachable clouds, line up compact little
+jumps, land, and immediately look for the next step upward.
 
 ## Cloud physics
 

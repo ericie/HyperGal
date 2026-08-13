@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Up Mario · HyperGal</title>
+    <title>Many Mario · HyperGal</title>
     <style>
       :root {
         color-scheme: light;
@@ -71,7 +71,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Up Mario: a family of tiny chibi Marios climbs through a pastel sky on smiling rosy-cheeked clouds. When a cloud crumbles, every Mario still riding it falls with the fluff."
+      aria-label="Many Mario: a family of tiny chibi Marios climbs through a pastel sky on smiling rosy-cheeked clouds. Every Mario jumps toward higher clouds, and anyone still riding a crumbling cloud falls with the fluff."
     ></canvas>
     <pre id="debug" class="debug" hidden></pre>
 
@@ -111,6 +111,8 @@
         const CLOUD_VANISH_SECONDS = 0.64;
         const CLOUD_CLEANSE_SECONDS = 0.32;
         const RAIN_STEP_SECONDS = 0.055;
+        const BUDDY_JUMP_SPEED = 690;
+        const BUDDY_AIR_SPEED = 225;
 
         /* A candy-shop palette: blue-sky paper, strawberry pink, lemon,
            mint and a soft grape outline. The cloud characters stay mostly
@@ -1079,7 +1081,13 @@
             vx: 0,
             vy: 0,
             spin: 0,
+            grounded: true,
             falling: false,
+            targetId: null,
+            previousY: platform.y,
+            jumpAt: simTime + 0.45 + hash01(platform.id * 911 + variant * 43) * 1.2,
+            facing: hash01(platform.id * 991) < 0.5 ? -1 : 1,
+            landedAt: simTime,
             phase: hash01(platform.id * 883 + variant * 67) * TAU,
             pose: variant % 3,
           });
@@ -1087,27 +1095,103 @@
 
         function updateMarioBuddies(dt) {
           for (const buddy of buddies) {
-            if (!buddy.falling) {
+            buddy.previousY = buddy.y;
+            if (buddy.grounded) {
               const platform = platformById(buddy.platformId);
               if (!platform || platform.vanishStartedAt != null) {
                 dropMarioBuddy(buddy);
               } else {
                 buddy.x = platformLeft(platform) + clamp(buddy.localX, 18, platform.w - 18);
                 buddy.y = platform.y;
+                if (simTime >= buddy.jumpAt) launchMarioBuddy(buddy, platform);
               }
             } else {
-              buddy.vy += GRAVITY * 0.72 * dt;
+              buddy.vy += GRAVITY * dt;
               buddy.x += buddy.vx * dt;
               buddy.y += buddy.vy * dt;
-              buddy.spin += buddy.vx * dt * 0.006;
+              if (buddy.falling) buddy.spin += buddy.vx * dt * 0.003;
+              else steerMarioBuddy(buddy, dt);
+              collideMarioBuddy(buddy);
               if (buddy.y < cameraY - 220) respawnMarioBuddy(buddy);
             }
           }
         }
 
+        function chooseMarioBuddyTarget(current, buddy) {
+          const candidates = [];
+          for (const platform of platforms) {
+            if (platform.id === current.id || platform.vanishStartedAt != null) continue;
+            const route = routeToPlatform(current, platform, BUDDY_JUMP_SPEED);
+            if (!route) continue;
+            if (route.gap < 58 || route.gap > 148) continue;
+            const sideways = Math.abs(platformCenter(platform) - platformCenter(current));
+            const occupied = buddies.filter((other) => other !== buddy && other.platformId === platform.id).length;
+            route.score = Math.abs(route.gap - 102) * 0.55 - Math.min(180, sideways) * 0.7 + occupied * 34;
+            candidates.push(route);
+          }
+          candidates.sort((a, b) => a.score - b.score);
+          return candidates[0] || null;
+        }
+
+        function launchMarioBuddy(buddy, current) {
+          const route = chooseMarioBuddyTarget(current, buddy);
+          if (!route) {
+            buddy.jumpAt = simTime + 0.55;
+            return;
+          }
+          const landingX = safeLandingX(route.target, route.landingX);
+          buddy.platformId = null;
+          buddy.targetId = route.target.id;
+          buddy.grounded = false;
+          buddy.falling = false;
+          buddy.vy = BUDDY_JUMP_SPEED;
+          buddy.vx = clamp((landingX - buddy.x) / Math.max(0.4, route.flightTime), -BUDDY_AIR_SPEED, BUDDY_AIR_SPEED);
+          buddy.facing = buddy.vx < 0 ? -1 : 1;
+          spawnDust(buddy.x, buddy.y, 6, C.lemon);
+        }
+
+        function steerMarioBuddy(buddy, dt) {
+          const target = platformById(buddy.targetId);
+          if (!target || target.vanishStartedAt != null) {
+            buddy.targetId = null;
+            buddy.falling = true;
+            return;
+          }
+          const landingX = safeLandingX(target, platformCenter(target));
+          const desired = clamp((landingX - buddy.x) * 3.4, -BUDDY_AIR_SPEED, BUDDY_AIR_SPEED);
+          buddy.vx += (desired - buddy.vx) * (1 - Math.exp(-4.2 * dt));
+          if (Math.abs(buddy.vx) > 8) buddy.facing = buddy.vx < 0 ? -1 : 1;
+        }
+
+        function collideMarioBuddy(buddy) {
+          if (buddy.falling || buddy.vy > 0) return;
+          const candidates = platforms
+            .filter((platform) => platform.vanishStartedAt == null)
+            .filter((platform) => buddy.x > platformLeft(platform) + 10 && buddy.x < platformLeft(platform) + platform.w - 10)
+            .filter((platform) => buddy.previousY >= platform.y && buddy.y <= platform.y + 2)
+            .sort((a, b) => b.y - a.y);
+          const landed = candidates[0];
+          if (!landed) return;
+          buddy.platformId = landed.id;
+          buddy.targetId = null;
+          buddy.localX = buddy.x - platformLeft(landed);
+          buddy.y = landed.y;
+          buddy.vx = 0;
+          buddy.vy = 0;
+          buddy.spin = 0;
+          buddy.grounded = true;
+          buddy.falling = false;
+          buddy.landedAt = simTime;
+          buddy.jumpAt = simTime + 0.35 + hash01(buddy.id * 1301 + landed.id * 17) * 0.7;
+          activateCloud(landed);
+          spawnDust(buddy.x, buddy.y, 5, C.mint);
+        }
+
         function dropMarioBuddy(buddy) {
           if (buddy.falling) return;
           buddy.platformId = null;
+          buddy.targetId = null;
+          buddy.grounded = false;
           buddy.falling = true;
           buddy.vx = (hash01(buddy.id * 613) - 0.5) * 72;
           buddy.vy = -55 - hash01(buddy.id * 977) * 55;
@@ -1126,9 +1210,13 @@
           buddy.x = platformLeft(platform) + buddy.localX;
           buddy.y = platform.y + 64;
           buddy.vx = 0;
-          buddy.vy = -80;
+          buddy.vy = 0;
           buddy.spin = 0;
+          buddy.grounded = true;
           buddy.falling = false;
+          buddy.targetId = null;
+          buddy.landedAt = simTime;
+          buddy.jumpAt = simTime + 0.45;
           spawnDust(buddy.x, buddy.y, 10, C.lemon);
         }
 
@@ -1257,17 +1345,19 @@
 
         function addPlatform() {
           const previous = lastPlatform;
-          const gap = rand(height < 620 ? 112 : 118, height < 620 ? 138 : 150);
+          const gap = rand(height < 620 ? 86 : 92, height < 620 ? 116 : 126);
           const y = previous.y + gap;
-          const minW = clamp(worldWidth * 0.24, 92, 128);
-          const maxW = clamp(worldWidth * 0.4, 148, 220);
+          const minW = clamp(worldWidth * 0.2, 82, 118);
+          const maxW = clamp(worldWidth * 0.34, 132, 196);
           const w = rand(minW, maxW) * (rng() < 0.12 ? 1.14 : 1);
-          const maxShift = clamp(gap * 0.92 + (previous.w + w) * 0.26, 112, Math.min(188, worldWidth * 0.36));
+          const maxShift = clamp(gap * 0.9 + (previous.w + w) * 0.22, 128, Math.min(220, worldWidth * 0.46));
           const previousCenter = platformLeft(previous) + previous.w * 0.5;
           let center = previousCenter;
           let foundReachable = false;
+          const preferredSide = platformCount % 2 === 0 ? 1 : -1;
           for (let attempt = 0; attempt < 28; attempt += 1) {
-            const candidateCenter = clamp(previousCenter + rand(-maxShift, maxShift), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+            const side = attempt < 18 ? preferredSide : rng() < 0.5 ? -1 : 1;
+            const candidateCenter = clamp(previousCenter + side * rand(maxShift * 0.44, maxShift), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
             const candidate = { x: candidateCenter - w * 0.5, y, w, h: 18, moving: false, travel: 0 };
             center = candidateCenter;
             if (routeToPlatform(previous, candidate) && canPlacePlatform(candidate)) {
@@ -1341,14 +1431,14 @@
 
         function addBranchPlatforms(previous, trunk) {
           const roll = rng();
-          const branchCount = roll < 0.34 ? 1 : 0;
+          const branchCount = roll < 0.54 ? 1 : 0;
           for (let i = 0; i < branchCount; i += 1) {
             const base = trunk;
             const baseCenter = platformCenter(base);
             const side = baseCenter < worldWidth * 0.5 ? 1 : -1;
             let chosen = null;
             for (let attempt = 0; attempt < 14; attempt += 1) {
-              const gap = rand(98, MAX_TARGET_GAP - 8);
+              const gap = rand(78, 124);
               const y = base.y + gap;
               const w = rand(clamp(worldWidth * 0.18, 78, 112), clamp(worldWidth * 0.29, 118, 166));
               const center = clamp(baseCenter + side * rand(96, Math.min(198, worldWidth * 0.34)), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
@@ -1373,8 +1463,8 @@
           const gap = upper.y - lower.y;
           if (gap < 46 || gap > 236) return;
           const roll = rng();
-          if (!forcedKind && roll > 0.42) return;
-          const kind = forcedKind || (roll < 0.21 ? 'stairs' : 'ladder');
+          if (!forcedKind && roll > 0.2) return;
+          const kind = forcedKind || (roll < 0.1 ? 'stairs' : 'ladder');
           const lowerLeft = platformLeft(lower);
           const lowerRight = lowerLeft + lower.w;
           const upperLeft = platformLeft(upper);
@@ -2278,19 +2368,21 @@
             if (sy < -90 || sy > height + 120) continue;
             const wave = Math.sin(simTime * 3.2 + buddy.phase);
             const panic = buddy.falling;
+            const airborne = !buddy.grounded && !panic;
 
-            if (!panic) fillOval(sx, sy + 2, 11, 3.2, SHADOW_SOFT);
+            if (buddy.grounded) fillOval(sx, sy + 2, 11, 3.2, SHADOW_SOFT);
             ctx.save();
-            ctx.translate(sx, sy - Math.abs(wave) * (panic ? 0 : 1.2));
-            ctx.rotate(panic ? buddy.spin + Math.sin(simTime * 9 + buddy.phase) * 0.13 : 0);
+            ctx.translate(sx, sy - (buddy.grounded ? Math.abs(wave) * 0.7 : 0));
+            ctx.rotate(panic ? buddy.spin : airborne ? clamp(buddy.vx / BUDDY_AIR_SPEED, -1, 1) * 0.08 : 0);
             ctx.scale(0.88, 0.88);
 
-            /* Legs and cocoa shoes. */
-            const kick = panic ? 4 : wave * 1.8;
-            capsule(-4, -12, -6 - kick, -1, 6, C.denim);
-            capsule(4, -12, 6 + kick, -1, 6, C.denim);
-            fillOval(-7 - kick, 0, 5.2, 2.8, C.cocoa);
-            fillOval(7 + kick, 0, 5.2, 2.8, C.cocoa);
+            /* Short tucked limbs keep the silhouette toy-like and sweet. */
+            const step = buddy.grounded ? wave * 1.1 : 0;
+            const footLift = airborne ? -5 : panic ? -3 : 0;
+            capsule(-4, -12, -5 - step, -1 + footLift, 6, C.denim);
+            capsule(4, -12, 5 + step, -1 + footLift - (airborne ? 2 : 0), 6, C.denim);
+            fillOval(-5.8 - step, footLift, 4.8, 2.8, C.cocoa);
+            fillOval(5.8 + step, footLift - (airborne ? 2 : 0), 4.8, 2.8, C.cocoa);
 
             /* Round overalls body with sunny buttons. */
             fillRound(-9, -28, 18, 18, 8, C.red);
@@ -2300,13 +2392,13 @@
             fillCircle(-4.2, -20, 1.5, C.lemon);
             fillCircle(4.2, -20, 1.5, C.lemon);
 
-            /* Arms either wave hello or fling upward with the cloud fall. */
-            const handY = panic ? -40 : -29 - Math.max(0, wave) * 7;
-            const handX = panic ? 15 : 13;
-            limb(-7, -25, -handX, handY, -2, 5, C.red);
-            limb(7, -25, handX, handY + (buddy.pose === 1 ? 5 : 0), 2, 5, C.red);
-            fillCircle(-handX, handY, 3.3, C.white);
-            fillCircle(handX, handY + (buddy.pose === 1 ? 5 : 0), 3.3, C.white);
+            /* Compact reaching pose—hands stay near the cheeks, even in air. */
+            const handY = airborne ? -34 : panic ? -32 : -27 - Math.max(0, wave) * 2;
+            const handX = airborne ? 11 : 10.5;
+            limb(-7, -25, -handX, handY + (airborne ? 2 : 0), -1, 5, C.red);
+            limb(7, -25, handX, handY, 1, 5, C.red);
+            fillCircle(-handX, handY + (airborne ? 2 : 0), 3.3, C.white);
+            fillCircle(handX, handY, 3.3, C.white);
 
             /* Peach face, red cap, M badge and two-bean moustache. */
             fillCircle(0, -36, 10.5, C.skin);
@@ -2405,36 +2497,34 @@
           let footA;
           let footB;
           if (grounded) {
-            const swing = 9.5 * gait;
-            const lift = 7 * gait;
+            const swing = 6 * gait;
+            const lift = 4.5 * gait;
             footA = [Math.cos(phase) * swing + 1, FOOT_Y - Math.max(0, Math.sin(phase)) * lift];
             footB = [Math.cos(phase + Math.PI) * swing + 1, FOOT_Y - Math.max(0, Math.sin(phase + Math.PI)) * lift];
           } else if (air > 0.1) {
-            footA = [-4, FOOT_Y - 5 - air * 6];
-            footB = [7, FOOT_Y - 2 - air * 4];
+            footA = [-4, FOOT_Y - 4 - air * 3];
+            footB = [5, FOOT_Y - 6 - air * 2];
           } else {
             const fall = clamp(-air, 0, 1);
-            footA = [-7 - fall * 4, FOOT_Y - fall * 1];
-            footB = [8 + fall * 4, FOOT_Y - 1];
+            footA = [-5, FOOT_Y - 2 - fall * 2];
+            footB = [5, FOOT_Y - 4 + fall];
           }
 
           /* Hands counter-swing against the legs. */
           let handA;
           let handB;
           if (grounded) {
-            /* Hands stay outboard of the torso through the whole swing, or
-               they read as a button stitched to his front. */
-            const swing = 6.5 * gait;
-            const droop = SHOULDER_Y + 12 + breathe * 0.9;
-            handA = [-11 - Math.cos(phase) * swing, droop - Math.abs(Math.sin(phase)) * 3.5 * gait];
-            handB = [11.5 - Math.cos(phase + Math.PI) * swing, droop - Math.abs(Math.sin(phase + Math.PI)) * 3.5 * gait];
+            const swing = 3 * gait;
+            const droop = SHOULDER_Y + 10 + breathe * 0.5;
+            handA = [-10.5 - Math.cos(phase) * swing, droop - Math.abs(Math.sin(phase)) * 2 * gait];
+            handB = [10.5 - Math.cos(phase + Math.PI) * swing, droop - Math.abs(Math.sin(phase + Math.PI)) * 2 * gait];
           } else if (air > 0.1) {
-            handA = [-11, SHOULDER_Y - 5 - air * 9];
-            handB = [12, SHOULDER_Y - 8 - air * 9];
+            handA = [-9.5, SHOULDER_Y - 2 - air * 4];
+            handB = [10, SHOULDER_Y - 5 - air * 3];
           } else {
             const fall = clamp(-air, 0, 1);
-            handA = [-14 - fall * 2, SHOULDER_Y - 1 - fall * 7];
-            handB = [14 + fall * 2, SHOULDER_Y - 3 - fall * 8];
+            handA = [-10, SHOULDER_Y - 1 - fall * 2];
+            handB = [10, SHOULDER_Y - 4 - fall * 2];
           }
 
           /* Back limbs a tone lighter, so the pose reads in depth. */
@@ -2459,26 +2549,25 @@
           const c = hero.climbT * 7;
           const s = Math.sin(c);
           ctx.save();
-          ctx.translate(0, -Math.abs(s) * 1.4);
+          ctx.translate(0, -Math.abs(s) * 0.8);
 
-          const handAY = SHOULDER_Y - 14 - s * 7;
-          const handBY = SHOULDER_Y - 14 + s * 7;
-          const footAY = FOOT_Y - Math.max(0, -s) * 7;
-          const footBY = FOOT_Y - Math.max(0, s) * 7;
+          const handAY = SHOULDER_Y - 9 - s * 4;
+          const handBY = SHOULDER_Y - 9 + s * 4;
+          const footAY = FOOT_Y - Math.max(0, -s) * 4;
+          const footBY = FOOT_Y - Math.max(0, s) * 4;
 
-          limb(-4, HIP_Y, -6.5, footAY, 3, 8, SKIN.back);
-          fillOval(-6.5, footAY + 0.5, 5, 3, SKIN.back);
-          limb(4, HIP_Y, 6.5, footBY, -3, 8.5, SKIN.leg);
-          fillOval(6.5, footBY + 0.5, 5.4, 3.2, SKIN.boot);
+          limb(-4, HIP_Y, -5, footAY, 2, 8, SKIN.back);
+          fillOval(-5, footAY + 0.5, 5, 3, SKIN.back);
+          limb(4, HIP_Y, 5, footBY, -2, 8.5, SKIN.leg);
+          fillOval(5, footBY + 0.5, 5.4, 3.2, SKIN.boot);
 
           drawTorso(0, 0);
           drawHead(0, 0, 0, true);
 
-          /* Arms last and wide of the head, or the head hides the reach. */
-          limb(-6.5, SHOULDER_Y + 2, -15, handAY, -4, 7, SKIN.arm);
-          fillCircle(-15, handAY, 4, SKIN.arm);
-          limb(6.5, SHOULDER_Y + 2, 15, handBY, 4, 7, SKIN.arm);
-          fillCircle(15, handBY, 4, SKIN.arm);
+          limb(-6.5, SHOULDER_Y + 2, -11.5, handAY, -2, 6.2, SKIN.arm);
+          fillCircle(-11.5, handAY, 3.7, SKIN.arm);
+          limb(6.5, SHOULDER_Y + 2, 11.5, handBY, 2, 6.2, SKIN.arm);
+          fillCircle(11.5, handBY, 3.7, SKIN.arm);
 
           ctx.restore();
         }
