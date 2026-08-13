@@ -7,10 +7,10 @@
     <style>
       :root {
         color-scheme: light;
-        --bg: #EFF5FD;
-        --ink: #2E5FA1;
-        --muted: #7BA1D0;
-        --hot: #4B77B5;
+        --bg: #a9e4ff;
+        --ink: #49385f;
+        --muted: #7d6a96;
+        --hot: #f06f8f;
       }
 
       html,
@@ -23,7 +23,7 @@
       }
 
       body {
-        font-family: Geneva, "Lucida Grande", ui-sans-serif, system-ui, sans-serif;
+        font-family: "Arial Rounded MT Bold", "Trebuchet MS", ui-rounded, system-ui, sans-serif;
         overscroll-behavior: none;
       }
 
@@ -51,7 +51,7 @@
         margin: 0;
         padding: 5px 7px;
         color: #fff;
-        background: #1D3D6D;
+        background: #49385f;
         border-radius: 6px;
         font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         pointer-events: none;
@@ -71,7 +71,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Up Mario: a small round climber in a cap jumps onto dark, angry, fluffy clouds that rain and turn white before bursting into puffs as he leaps away."
+      aria-label="Up Mario: a family of tiny chibi Marios climbs through a pastel sky on smiling rosy-cheeked clouds. When a cloud crumbles, every Mario still riding it falls with the fluff."
     ></canvas>
     <pre id="debug" class="debug" hidden></pre>
 
@@ -108,30 +108,36 @@
           ladder: 112,
           stairs: 148,
         };
-        const CLOUD_VANISH_SECONDS = 0.46;
+        const CLOUD_VANISH_SECONDS = 0.64;
         const CLOUD_CLEANSE_SECONDS = 0.32;
         const RAIN_STEP_SECONDS = 0.055;
 
-        /* -- SOFT MONOTONE RAMP --
-           One hue, eight steps. Flat fills only: depth comes from tone,
-           never from gradients. `blush` is the single warm whisper, used
-           at cheek scale only -- set it to C.pale for a pure monotone. */
+        /* A candy-shop palette: blue-sky paper, strawberry pink, lemon,
+           mint and a soft grape outline. The cloud characters stay mostly
+           white so their tiny faces remain the star. */
         const C = {
-          white: '#FFFFFF',
-          sky: '#EFF5FD',
-          haze: '#E7F0FB',
-          skyDeep: '#DEEAF8',
-          mist: '#C7DAF1',
-          pale: '#A6C3E6',
-          mid: '#7BA1D0',
-          deep: '#4B77B5',
-          ink: '#2E5FA1',
-          night: '#1D3D6D',
-          blush: '#DFA9AE',
+          white: '#FFFDFC',
+          sky: '#A9E4FF',
+          haze: '#DDF6FF',
+          skyDeep: '#7FD2F5',
+          mist: '#E9DFFF',
+          pale: '#CBB9F0',
+          mid: '#F3A6C1',
+          deep: '#EF6F8F',
+          ink: '#66507D',
+          night: '#49385F',
+          blush: '#F7A8BF',
+          lemon: '#FFD96A',
+          mint: '#8EDCC9',
+          peach: '#FFB886',
+          red: '#ED6670',
+          denim: '#6D9FD2',
+          skin: '#FFD2AD',
+          cocoa: '#7D4C45',
         };
 
-        const SHADOW = 'rgba(29, 61, 109, 0.10)';
-        const SHADOW_SOFT = 'rgba(29, 61, 109, 0.06)';
+        const SHADOW = 'rgba(73, 56, 95, 0.13)';
+        const SHADOW_SOFT = 'rgba(73, 56, 95, 0.07)';
 
         /* Dust tints, kept as names so the simulation calls read clearly. */
         const COLORS = {
@@ -161,6 +167,8 @@
         let boxes = [];
         let links = [];
         let particles = [];
+        let buddies = [];
+        let buddyCount = 0;
         let keys = {
           left: false,
           right: false,
@@ -254,6 +262,7 @@
           barrelCount = 0;
           boxCount = 0;
           linkCount = 0;
+          buddyCount = 0;
           rescueCount = 0;
           downTrips = 0;
           ladderTrips = 0;
@@ -268,11 +277,13 @@
           boxes = [];
           links = [];
           particles = [];
+          buddies = [];
           lastPlatform = makePlatform(worldWidth * 0.5, 88, Math.min(230, worldWidth * 0.74), 'brick', false);
           platforms.push(lastPlatform);
           addQuestionBoxesForPlatform(lastPlatform);
           highestPlatformY = lastPlatform.y;
           while (highestPlatformY < height * 1.75) addPlatform();
+          seedMarioBuddies();
           hero = {
             x: lastPlatform.x + lastPlatform.w * 0.5,
             y: lastPlatform.y,
@@ -330,7 +341,7 @@
           canvas.style.height = `${height}px`;
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           ctx.imageSmoothingEnabled = true;
-          worldWidth = Math.round(clamp(width * (width < 560 ? 0.94 : 0.74), 300, 820));
+          worldWidth = Math.round(clamp(width * (width < 560 ? 0.96 : 0.86), 300, 920));
           worldLeft = Math.round((width - worldWidth) / 2);
         }
 
@@ -353,6 +364,7 @@
           updateVanishingClouds();
           updateBarrels(dt);
           updateQuestionBoxes();
+          updateMarioBuddies(dt);
           updateParticles(dt);
           updateCamera(dt);
           rescueIfNeeded();
@@ -802,7 +814,7 @@
           const fromId = hero.groundId;
           const isTraversalJump = Boolean(route && route.target.id !== fromId);
           const isManualJump = manualActive();
-          if (fromId && (isTraversalJump || isManualJump)) startCloudVanish(fromId);
+          if (fromId && (isTraversalJump || isManualJump)) startCloudVanish(fromId, true);
           hero.grounded = false;
           hero.groundId = null;
           hero.autoTargetId = route ? route.target.id : null;
@@ -1046,6 +1058,80 @@
           particles = particles.filter((particle) => particle.age < particle.life);
         }
 
+        function seedMarioBuddies() {
+          const ordered = [...platforms]
+            .filter((platform) => platform.vanishStartedAt == null)
+            .sort((a, b) => a.y - b.y);
+          const picks = [ordered[0], ordered[2], ordered[4], ordered[6]].filter(Boolean);
+          for (let i = 0; i < picks.length; i += 1) addMarioBuddy(picks[i], i);
+        }
+
+        function addMarioBuddy(platform, variant = buddyCount) {
+          if (!platform || buddies.some((buddy) => buddy.platformId === platform.id)) return;
+          const edge = Math.min(28, platform.w * 0.24);
+          const localX = edge + hash01(platform.id * 719 + variant * 31) * Math.max(1, platform.w - edge * 2);
+          buddies.push({
+            id: ++buddyCount,
+            platformId: platform.id,
+            localX,
+            x: platformLeft(platform) + localX,
+            y: platform.y,
+            vx: 0,
+            vy: 0,
+            spin: 0,
+            falling: false,
+            phase: hash01(platform.id * 883 + variant * 67) * TAU,
+            pose: variant % 3,
+          });
+        }
+
+        function updateMarioBuddies(dt) {
+          for (const buddy of buddies) {
+            if (!buddy.falling) {
+              const platform = platformById(buddy.platformId);
+              if (!platform || platform.vanishStartedAt != null) {
+                dropMarioBuddy(buddy);
+              } else {
+                buddy.x = platformLeft(platform) + clamp(buddy.localX, 18, platform.w - 18);
+                buddy.y = platform.y;
+              }
+            } else {
+              buddy.vy += GRAVITY * 0.72 * dt;
+              buddy.x += buddy.vx * dt;
+              buddy.y += buddy.vy * dt;
+              buddy.spin += buddy.vx * dt * 0.006;
+              if (buddy.y < cameraY - 220) respawnMarioBuddy(buddy);
+            }
+          }
+        }
+
+        function dropMarioBuddy(buddy) {
+          if (buddy.falling) return;
+          buddy.platformId = null;
+          buddy.falling = true;
+          buddy.vx = (hash01(buddy.id * 613) - 0.5) * 72;
+          buddy.vy = -55 - hash01(buddy.id * 977) * 55;
+          buddy.spin = 0;
+        }
+
+        function respawnMarioBuddy(buddy) {
+          const candidates = platforms
+            .filter((platform) => platform.vanishStartedAt == null)
+            .filter((platform) => platform.y > cameraY + height * 0.35 && platform.y < cameraY + height * 0.9)
+            .filter((platform) => !buddies.some((other) => other !== buddy && other.platformId === platform.id));
+          const platform = candidates[Math.floor(hash01(buddy.id * 1597 + Math.floor(simTime)) * candidates.length)];
+          if (!platform) return;
+          buddy.platformId = platform.id;
+          buddy.localX = clamp(platform.w * (0.28 + hash01(buddy.id * 2081) * 0.44), 20, platform.w - 20);
+          buddy.x = platformLeft(platform) + buddy.localX;
+          buddy.y = platform.y + 64;
+          buddy.vx = 0;
+          buddy.vy = -80;
+          buddy.spin = 0;
+          buddy.falling = false;
+          spawnDust(buddy.x, buddy.y, 10, C.lemon);
+        }
+
         function updateCloudRain() {
           if (!hero.grounded) return;
           const platform = platformById(hero.groundId);
@@ -1067,6 +1153,7 @@
           platform.cleansedAt = simTime;
           platform.pulseUntil = simTime + CLOUD_CLEANSE_SECONDS;
           platform.nextRainAt = simTime;
+          platform.crumbleAt = simTime + 2.6 + hash01(platform.id * 1237) * 1.2;
           const burstCount = prefersReducedMotion ? 2 : 5;
           for (let i = 0; i < burstCount; i += 1) spawnCloudRain(platform);
         }
@@ -1092,10 +1179,20 @@
           }
         }
 
-        function startCloudVanish(platformId) {
+        function startCloudVanish(platformId, leadMarioHasLaunched = false) {
           const platform = platformById(platformId);
           if (!platform || platform.vanishStartedAt != null) return;
           platform.vanishStartedAt = simTime;
+          for (const buddy of buddies) {
+            if (buddy.platformId === platformId) dropMarioBuddy(buddy);
+          }
+          if (!leadMarioHasLaunched && hero.grounded && hero.groundId === platformId) {
+            hero.grounded = false;
+            hero.groundId = null;
+            hero.vy = -85;
+            hero.stumbleUntil = simTime + 0.5;
+            clearRouteAttempt();
+          }
           spawnCloudExplosion(platform);
           boxes = boxes.filter((box) => box.platformId !== platformId);
           barrels = barrels.filter((barrel) => barrel.platformId !== platformId);
@@ -1107,14 +1204,13 @@
           const count = prefersReducedMotion ? 7 : clamp(Math.round(platform.w / 9), 12, 24);
           for (let i = 0; i < count; i += 1) {
             const n = platform.id * 1877 + i * 277;
-            const angle = -Math.PI * 0.08 + hash01(n + 11) * Math.PI * 1.16;
-            const speed = 72 + hash01(n + 23) * 150;
+            const speed = 38 + hash01(n + 23) * 82;
             particles.push({
               kind: 'cloudBurst',
               x: left + platform.w * (0.08 + hash01(n + 37) * 0.84),
               y: platform.y - 8 + (hash01(n + 41) - 0.5) * 30,
-              vx: Math.cos(angle) * speed,
-              vy: Math.sin(angle) * speed + 45,
+              vx: (hash01(n + 11) - 0.5) * speed,
+              vy: -35 - hash01(n + 23) * 115,
               r: 5 + hash01(n + 53) * 9,
               age: 0,
               life: 0.42 + hash01(n + 67) * 0.34,
@@ -1124,6 +1220,11 @@
         }
 
         function updateVanishingClouds() {
+          for (const platform of platforms) {
+            if (platform.vanishStartedAt == null && platform.crumbleAt != null && simTime >= platform.crumbleAt) {
+              startCloudVanish(platform.id, false);
+            }
+          }
           const expiredIds = new Set(
             platforms
               .filter(
@@ -1151,6 +1252,7 @@
           });
           boxes = boxes.filter((box) => box.y > cutoff);
           links = links.filter((link) => link.y2 > cutoff && platformById(link.lowerId) && platformById(link.upperId));
+          buddies = buddies.filter((buddy) => buddy.falling || buddy.y > cutoff - 220);
         }
 
         function addPlatform() {
@@ -1327,6 +1429,7 @@
             vanishStartedAt: null,
             nextRainAt: null,
             rainCount: 0,
+            crumbleAt: null,
           };
         }
 
@@ -1504,6 +1607,8 @@
               `platforms ${platforms.length}`,
               `links ${links.length}`,
               `barrels ${barrels.length}`,
+              `marios ${buddies.length + 1}`,
+              `falling ${buddies.filter((buddy) => buddy.falling).length + (!hero.grounded && hero.vy < 0 ? 1 : 0)}`,
               `boxes ${boxes.length}`,
               `hit ${boxesHit}`,
               `target ${targetPlatformId || '-'}`,
@@ -1525,10 +1630,10 @@
         }
 
         /* ====================================================
-           RENDER -- flat kawaii illustration, one hue, eight tones
-           No gradients anywhere: every shape is a flat fill, and depth is
-           made by stacking tones from the ramp. Rounded joints, rounded
-           caps, no hairlines.
+           RENDER -- pastel kawaii sticker world
+           White cloud characters and tiny red-capped figures stay readable
+           against a saturated blue sky; grape outlines bind the candy
+           palette together.
            ==================================================== */
 
         function render() {
@@ -1538,6 +1643,7 @@
           drawQuestionBoxes();
           drawBarrels();
           drawParticles();
+          drawMarioBuddies();
           drawHero();
         }
 
@@ -1635,20 +1741,69 @@
 
         function drawBackground() {
           const playHeight = height - hudHeight();
-          const shaftPad = Math.max(12, Math.min(28, width * 0.035));
-          const left = worldLeft - shaftPad;
-          const right = worldLeft + worldWidth + shaftPad;
-
-          ctx.fillStyle = C.mist;
+          const sky = ctx.createLinearGradient(0, 0, 0, playHeight);
+          sky.addColorStop(0, '#8EDBFA');
+          sky.addColorStop(0.56, C.sky);
+          sky.addColorStop(1, '#C9F0FF');
+          ctx.fillStyle = sky;
           ctx.fillRect(0, 0, width, height);
 
-          drawGutters(left, right, playHeight);
+          /* A cropped candy rainbow is the visual anchor. It is deliberately
+             oversized, like a sticker peeking in from the page edge. */
+          ctx.save();
+          ctx.globalAlpha = 0.48;
+          ctx.lineCap = 'round';
+          const rainbowX = width < 560 ? width + 62 : width + 80;
+          const rainbowY = 116;
+          const rainbowR = Math.min(210, width * 0.24 + 80);
+          const rainbow = [C.deep, C.lemon, C.mint, C.pale];
+          for (let i = 0; i < rainbow.length; i += 1) {
+            ctx.strokeStyle = rainbow[i];
+            ctx.lineWidth = 18;
+            ctx.beginPath();
+            ctx.arc(rainbowX, rainbowY, rainbowR - i * 21, Math.PI * 0.72, Math.PI * 1.36);
+            ctx.stroke();
+          }
+          ctx.restore();
 
-          ctx.fillStyle = C.sky;
-          ctx.fillRect(left, 0, right - left, playHeight);
+          const drift = cameraY * 0.28;
+          const band = 118;
+          const first = Math.floor((drift - height) / band);
+          const last = Math.ceil((drift + height) / band);
+          for (let i = first; i <= last; i += 1) {
+            const n = i + 900;
+            const x = width * (0.04 + hash01(n * 17) * 0.92);
+            const y = playHeight - (i * band + hash01(n * 29) * band - drift);
+            if (y < -30 || y > playHeight + 30) continue;
+            const size = 2.5 + hash01(n * 43) * 4.5;
+            const color = [C.white, C.lemon, C.mint, C.mid][Math.floor(hash01(n * 61) * 4)];
+            ctx.save();
+            ctx.globalAlpha = 0.56;
+            if (i % 3 === 0) {
+              fillCircle(x - size * 0.55, y, size * 0.72, color);
+              fillCircle(x + size * 0.55, y, size * 0.72, color);
+              fillCircle(x, y + size * 0.58, size * 0.72, color);
+            } else {
+              sparkle(x, y, size, color);
+            }
+            ctx.restore();
+          }
 
-          drawScallops(left, right, playHeight);
-          drawFarScenery(left, right, playHeight);
+          /* Distant milk-white cloudlets soften the empty parts of the sky
+             without creating the old tunnel walls. */
+          ctx.save();
+          ctx.globalAlpha = 0.28;
+          const cloudDrift = cameraY * 0.16;
+          for (let i = -2; i < 7; i += 1) {
+            const n = i + Math.floor(cloudDrift / 310) * 7;
+            const x = hash01(n * 83 + 9) * width;
+            const y = mod(i * 190 + hash01(n * 107) * 90 + cloudDrift, playHeight + 220) - 110;
+            const w = 90 + hash01(n * 131) * 100;
+            cloudPath(x, y, w, 0.72);
+            ctx.fillStyle = C.white;
+            ctx.fill();
+          }
+          ctx.restore();
         }
 
         /* Two parallax layers of soft shapes so the shaft has air in it. */
@@ -1772,8 +1927,8 @@
             platform.cleansedAt == null
               ? 0
               : clamp((simTime - platform.cleansedAt) / CLOUD_CLEANSE_SECONDS, 0, 1);
-          const body = mixColor(C.deep, C.white, cleanse);
-          const underside = mixColor(C.night, C.mist, cleanse);
+          const body = mixColor('#F6F0FF', C.white, cleanse);
+          const underside = mixColor('#DACBF3', '#EEDFFF', cleanse);
           const vanish =
             platform.vanishStartedAt == null
               ? 0
@@ -1799,8 +1954,8 @@
             ctx.translate(-cx, -(sy + 10));
           }
 
-          cloudPath(cx + 3, sy + 12, w * 0.97, 0.94);
-          ctx.fillStyle = SHADOW;
+          cloudPath(cx + 4, sy + 9, w * 0.97, 0.94);
+          ctx.fillStyle = 'rgba(92, 66, 124, 0.15)';
           ctx.fill();
 
           cloudPath(cx, sy, w, 1);
@@ -1809,115 +1964,78 @@
           ctx.fillStyle = body;
           ctx.fillRect(cx - w, sy - 60, w * 3, 200);
           ctx.fillStyle = underside;
-          ctx.fillRect(cx - w, sy + 11, w * 3, 120);
+          ctx.fillRect(cx - w, sy + 17, w * 3, 120);
+          ctx.globalAlpha = 0.5;
+          fillOval(cx - w * 0.18, sy - 8, w * 0.23, 7, C.white);
           ctx.restore();
 
-          if (cleanse < 1) drawAngryCloudFace(cx, sy + 12, seed, 1 - cleanse);
+          cloudPath(cx, sy, w, 1);
+          ctx.strokeStyle = C.ink;
+          ctx.lineWidth = Math.max(2.4, Math.min(4, w / 45));
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+
+          drawKawaiiCloudFace(cx, sy + 3, seed, cleanse, vanish);
           ctx.restore();
         }
 
-        /* One connected silhouette with generous puffs along both edges. */
+        /* One plump storybook silhouette: a big center dome, two shoulders,
+           and a softly scalloped belly. Avoiding equal repeated bumps is
+           what keeps it reading as a cloud instead of a caterpillar. */
         function cloudPath(cx, topY, w, scale) {
-          const hw = w * 0.5;
-          const left = cx - hw;
-          const right = cx + hw;
-          const topShoulderY = topY + 7 * scale;
-          const bottomShoulderY = topY + 17 * scale;
-          const bumps = clamp(Math.round(w / 43), 3, 8);
-          const step = w / bumps;
-          const topLift = clamp(step * 0.52, 14 * scale, 21 * scale);
-          const bottomLift = clamp(step * 0.4, 11 * scale, 17 * scale);
-
+          const h = clamp(w * 0.29, 36, 56) * scale;
+          const left = cx - w * 0.5;
+          const right = cx + w * 0.5;
           ctx.beginPath();
-          ctx.moveTo(left, topShoulderY);
-          for (let i = 0; i < bumps; i += 1) {
-            const x0 = left + i * step;
-            const x1 = x0 + step;
-            const middle = (x0 + x1) * 0.5;
-            const centerWeight = Math.sin(Math.PI * ((i + 0.5) / bumps));
-            const lift = topLift * (0.88 + centerWeight * 0.32 + (i % 2) * 0.06);
-            ctx.bezierCurveTo(
-              x0 + step * 0.06,
-              topShoulderY - lift * 0.62,
-              middle - step * 0.3,
-              topY - lift,
-              middle,
-              topY - lift,
-            );
-            ctx.bezierCurveTo(
-              middle + step * 0.3,
-              topY - lift,
-              x1 - step * 0.06,
-              topShoulderY - lift * 0.62,
-              x1,
-              topShoulderY,
-            );
-          }
-          ctx.bezierCurveTo(
-            right + 8 * scale,
-            topShoulderY + 3 * scale,
-            right + 8 * scale,
-            bottomShoulderY - 3 * scale,
-            right,
-            bottomShoulderY,
-          );
-          for (let i = bumps - 1; i >= 0; i -= 1) {
-            const x0 = left + i * step;
-            const x1 = x0 + step;
-            const middle = (x0 + x1) * 0.5;
-            const centerWeight = Math.sin(Math.PI * ((i + 0.5) / bumps));
-            const lift = bottomLift * (0.9 + centerWeight * 0.2 + ((i + 1) % 2) * 0.08);
-            ctx.bezierCurveTo(
-              x1 - step * 0.06,
-              bottomShoulderY + lift * 0.58,
-              middle + step * 0.3,
-              bottomShoulderY + lift,
-              middle,
-              bottomShoulderY + lift,
-            );
-            ctx.bezierCurveTo(
-              middle - step * 0.3,
-              bottomShoulderY + lift,
-              x0 + step * 0.06,
-              bottomShoulderY + lift * 0.58,
-              x0,
-              bottomShoulderY,
-            );
-          }
-          ctx.bezierCurveTo(
-            left - 8 * scale,
-            bottomShoulderY - 3 * scale,
-            left - 8 * scale,
-            topShoulderY + 3 * scale,
-            left,
-            topShoulderY,
-          );
+          ctx.moveTo(left + w * 0.08, topY + h * 0.08);
+          ctx.bezierCurveTo(left - w * 0.02, topY, left, topY - h * 0.30, left + w * 0.10, topY - h * 0.38);
+          ctx.bezierCurveTo(left + w * 0.12, topY - h * 0.69, left + w * 0.29, topY - h * 0.76, left + w * 0.36, topY - h * 0.55);
+          ctx.bezierCurveTo(left + w * 0.41, topY - h, left + w * 0.61, topY - h * 1.08, left + w * 0.67, topY - h * 0.62);
+          ctx.bezierCurveTo(left + w * 0.79, topY - h * 0.78, left + w * 0.91, topY - h * 0.55, left + w * 0.91, topY - h * 0.30);
+          ctx.bezierCurveTo(right + w * 0.03, topY - h * 0.28, right + w * 0.04, topY + h * 0.08, right - w * 0.04, topY + h * 0.18);
+          ctx.bezierCurveTo(right - w * 0.06, topY + h * 0.43, right - w * 0.25, topY + h * 0.52, right - w * 0.34, topY + h * 0.37);
+          ctx.bezierCurveTo(cx + w * 0.10, topY + h * 0.59, cx - w * 0.05, topY + h * 0.58, cx - w * 0.14, topY + h * 0.40);
+          ctx.bezierCurveTo(left + w * 0.29, topY + h * 0.58, left + w * 0.15, topY + h * 0.48, left + w * 0.16, topY + h * 0.29);
+          ctx.bezierCurveTo(left + w * 0.06, topY + h * 0.35, left - w * 0.01, topY + h * 0.22, left + w * 0.08, topY + h * 0.08);
           ctx.closePath();
         }
 
-        function drawAngryCloudFace(cx, cy, seed, alpha) {
-          const gap = 13;
-          const glare = Math.sin(simTime * 2.2 + seed) * 0.45;
+        function drawKawaiiCloudFace(cx, cy, seed, awake, vanish) {
+          const gap = 13 + Math.min(4, awake * 3);
+          const blink = mod(simTime + seed * 0.73, 4.6) < 0.12;
           ctx.save();
-          ctx.globalAlpha *= alpha;
-          fillOval(cx - gap, cy, 4.6, 5.5, C.white);
-          fillOval(cx + gap, cy, 4.6, 5.5, C.white);
-          fillCircle(cx - gap + 1.5, cy + 0.8, 1.8, C.night);
-          fillCircle(cx + gap - 1.5, cy + 0.8, 1.8, C.night);
+          ctx.globalAlpha *= 1 - vanish * 0.5;
+          fillOval(cx - gap - 8, cy + 6, 5.5, 3.4, C.blush);
+          fillOval(cx + gap + 8, cy + 6, 5.5, 3.4, C.blush);
 
-          ctx.strokeStyle = C.white;
-          ctx.lineWidth = 2.8;
+          ctx.strokeStyle = C.night;
+          ctx.lineWidth = 2.2;
           ctx.lineCap = 'round';
-          ctx.beginPath();
-          ctx.moveTo(cx - gap - 6, cy - 8 - glare);
-          ctx.lineTo(cx - gap + 5, cy - 4 + glare);
-          ctx.moveTo(cx + gap + 6, cy - 8 + glare);
-          ctx.lineTo(cx + gap - 5, cy - 4 - glare);
-          ctx.stroke();
+          if (blink) {
+            for (const side of [-1, 1]) {
+              ctx.beginPath();
+              ctx.arc(cx + side * gap, cy, 3.1, Math.PI * 0.08, Math.PI * 0.92);
+              ctx.stroke();
+            }
+          } else {
+            for (const side of [-1, 1]) {
+              fillOval(cx + side * gap, cy, 4, 4.8, C.night);
+              fillCircle(cx + side * gap + 1.2, cy - 1.5, 1.3, C.white);
+            }
+          }
 
           ctx.beginPath();
-          ctx.arc(cx, cy + 13, 6, Math.PI * 1.15, Math.PI * 1.85);
+          if (vanish > 0.15) {
+            ctx.arc(cx, cy + 10, 4.4, 0, TAU);
+          } else {
+            ctx.arc(cx, cy + 5, 6.4, Math.PI * 0.12, Math.PI * 0.88);
+          }
           ctx.stroke();
+
+          if (awake > 0.1 && vanish === 0) {
+            const twinkle = 2.2 + Math.sin(simTime * 3 + seed) * 0.6;
+            sparkle(cx + gap + 18, cy - 12, twinkle, C.lemon);
+          }
           ctx.restore();
         }
 
@@ -1968,7 +2086,7 @@
         }
 
         function linkTones(active) {
-          return active ? { rail: C.mid, step: C.deep } : { rail: C.pale, step: C.mid };
+          return active ? { rail: C.deep, step: C.lemon } : { rail: C.pale, step: C.mint };
         }
 
         function drawLadder(x1, y1, x2, y2, active) {
@@ -2022,7 +2140,7 @@
             fillRound(1.5, 4, s, s, 8, SHADOW);
 
             if (box.hit) {
-              fillRound(0, 0, s, s, 8, C.pale);
+              fillRound(0, 0, s, s, 8, C.mint);
               /* Opened: a contented little face. */
               ctx.strokeStyle = C.white;
               ctx.lineWidth = 2.4;
@@ -2036,10 +2154,15 @@
               ctx.arc(s * 0.5, s * 0.6, 2.6, Math.PI * 0.15, Math.PI * 0.85);
               ctx.stroke();
             } else {
-              fillRound(0, 0, s, s, 8, C.ink);
-              fillRound(4, 4, s - 8, 5, 2.5, C.deep);
-              ctx.fillStyle = C.white;
-              ctx.font = '900 17px Geneva, "Lucida Grande", system-ui, sans-serif';
+              fillRound(0, 0, s, s, 8, C.lemon);
+              fillRound(4, 4, s - 8, 5, 2.5, '#FFF2A9');
+              ctx.strokeStyle = C.ink;
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              roundRectPath(0, 0, s, s, 8);
+              ctx.stroke();
+              ctx.fillStyle = C.deep;
+              ctx.font = '900 17px "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText('?', s * 0.5, s * 0.58);
@@ -2081,8 +2204,8 @@
             ctx.scale(1 / squash, squash);
             ctx.rotate(Math.sin(barrel.roll) * 0.16);
 
-            fillCircle(0, 0, r, C.deep);
-            fillOval(0, r * 0.42, r * 0.72, r * 0.4, C.ink);
+            fillCircle(0, 0, r, C.peach);
+            fillOval(0, r * 0.42, r * 0.72, r * 0.4, C.deep);
 
             const face = barrel.dir;
             fillOval(-r * 0.34 + face * 1.5, -r * 0.16, r * 0.19, r * 0.26, C.white);
@@ -2139,14 +2262,96 @@
 
         /* Stepped back-to-front so no two touching shapes share a tone. */
         const SKIN = {
-          back: C.mid,
-          shirt: C.ink,
-          arm: C.deep,
-          bib: C.night,
-          leg: C.deep,
-          boot: C.night,
-          cap: C.ink,
+          back: '#C95D68',
+          shirt: C.red,
+          arm: C.red,
+          bib: C.denim,
+          leg: '#5687B9',
+          boot: C.cocoa,
+          cap: C.red,
         };
+
+        function drawMarioBuddies() {
+          for (const buddy of buddies) {
+            const sx = worldLeft + buddy.x;
+            const sy = screenY(buddy.y);
+            if (sy < -90 || sy > height + 120) continue;
+            const wave = Math.sin(simTime * 3.2 + buddy.phase);
+            const panic = buddy.falling;
+
+            if (!panic) fillOval(sx, sy + 2, 11, 3.2, SHADOW_SOFT);
+            ctx.save();
+            ctx.translate(sx, sy - Math.abs(wave) * (panic ? 0 : 1.2));
+            ctx.rotate(panic ? buddy.spin + Math.sin(simTime * 9 + buddy.phase) * 0.13 : 0);
+            ctx.scale(0.88, 0.88);
+
+            /* Legs and cocoa shoes. */
+            const kick = panic ? 4 : wave * 1.8;
+            capsule(-4, -12, -6 - kick, -1, 6, C.denim);
+            capsule(4, -12, 6 + kick, -1, 6, C.denim);
+            fillOval(-7 - kick, 0, 5.2, 2.8, C.cocoa);
+            fillOval(7 + kick, 0, 5.2, 2.8, C.cocoa);
+
+            /* Round overalls body with sunny buttons. */
+            fillRound(-9, -28, 18, 18, 8, C.red);
+            fillRound(-8.5, -23, 17, 14, 7, C.denim);
+            capsule(-5, -26, -4, -19, 2.5, C.denim);
+            capsule(5, -26, 4, -19, 2.5, C.denim);
+            fillCircle(-4.2, -20, 1.5, C.lemon);
+            fillCircle(4.2, -20, 1.5, C.lemon);
+
+            /* Arms either wave hello or fling upward with the cloud fall. */
+            const handY = panic ? -40 : -29 - Math.max(0, wave) * 7;
+            const handX = panic ? 15 : 13;
+            limb(-7, -25, -handX, handY, -2, 5, C.red);
+            limb(7, -25, handX, handY + (buddy.pose === 1 ? 5 : 0), 2, 5, C.red);
+            fillCircle(-handX, handY, 3.3, C.white);
+            fillCircle(handX, handY + (buddy.pose === 1 ? 5 : 0), 3.3, C.white);
+
+            /* Peach face, red cap, M badge and two-bean moustache. */
+            fillCircle(0, -36, 10.5, C.skin);
+            fillCircle(-9.2, -35, 2.7, C.skin);
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(0, -36, 10.5, 0, TAU);
+            ctx.clip();
+            ctx.fillStyle = C.red;
+            ctx.fillRect(-13, -50, 26, 10);
+            ctx.restore();
+            fillRound(-10.5, -42, 21, 4.7, 2.4, C.red);
+            fillCircle(0, -45, 3.1, C.white);
+            ctx.fillStyle = C.red;
+            ctx.font = '900 4.4px "Arial Rounded MT Bold", system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('M', 0, -44.7);
+
+            if (panic) {
+              ctx.strokeStyle = C.night;
+              ctx.lineWidth = 1.5;
+              for (const side of [-1, 1]) {
+                ctx.beginPath();
+                ctx.moveTo(side * 4.8 - 1.5, -35.5);
+                ctx.lineTo(side * 4.8 + 1.5, -32.5);
+                ctx.moveTo(side * 4.8 + 1.5, -35.5);
+                ctx.lineTo(side * 4.8 - 1.5, -32.5);
+                ctx.stroke();
+              }
+              fillOval(0, -27.6, 2.3, 3.1, C.night);
+            } else {
+              fillOval(-4.5, -34, 1.9, 2.7, C.night);
+              fillOval(4.5, -34, 1.9, 2.7, C.night);
+              fillCircle(-3.9, -34.8, 0.7, C.white);
+              fillCircle(5.1, -34.8, 0.7, C.white);
+            }
+            fillOval(-3, -29.8, 3.3, 1.9, C.cocoa);
+            fillOval(3, -29.8, 3.3, 1.9, C.cocoa);
+            fillOval(-8, -30, 2.5, 1.4, C.blush);
+            fillOval(8, -30, 2.5, 1.4, C.blush);
+
+            ctx.restore();
+          }
+        }
 
         function drawHero() {
           const sx = worldLeft + hero.x;
@@ -2289,7 +2494,7 @@
           fillRound(-9.5, SHOULDER_Y + 5, 19, h + 1, 7, SKIN.bib);
           capsule(-4.5, SHOULDER_Y, -4.5, SHOULDER_Y + 7, 2.8, SKIN.bib);
           capsule(4.5, SHOULDER_Y, 4.5, SHOULDER_Y + 7, 2.8, SKIN.bib);
-          fillCircle(0, SHOULDER_Y + 8.5, 2, C.mid);
+          fillCircle(0, SHOULDER_Y + 8.5, 2, C.lemon);
 
           ctx.restore();
         }
@@ -2300,9 +2505,9 @@
           ctx.translate(offsetX * 0.55, HEAD_Y + nod);
 
           /* Face */
-          fillCircle(0, 0, HEAD_R, C.white);
+          fillCircle(0, 0, HEAD_R, C.skin);
           /* Far ear, one tone back so it sits behind the face. */
-          if (!frontOn) fillCircle(-HEAD_R + 1, 1.5, 2.8, C.mist);
+          if (!frontOn) fillCircle(-HEAD_R + 1, 1.5, 2.8, C.skin);
 
           /* Cap: clipped to the head so the silhouette stays clean, plus a
              brim that points the way he is going. */
@@ -2315,7 +2520,12 @@
           ctx.restore();
           if (frontOn) fillRound(-10.5, -5.4, 21, 4.6, 2.3, SKIN.cap);
           else fillRound(-4.5, -5.6, 16, 4.8, 2.4, SKIN.cap);
-          fillCircle(0, -HEAD_R - 0.5, 2.8, C.mid);
+          fillCircle(0, -HEAD_R - 0.5, 3.2, C.white);
+          ctx.fillStyle = C.red;
+          ctx.font = '900 4.5px "Arial Rounded MT Bold", system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('M', 0, -HEAD_R - 0.2);
 
           drawFace(frontOn ? 0 : 2, air, frontOn);
           ctx.restore();
@@ -2362,15 +2572,20 @@
           fillOval(look - gap - 3.2, eyeY + 3.8, 2.3, 1.5, C.blush);
           fillOval(look + gap + 3.2, eyeY + 3.8, 2.3, 1.5, C.blush);
 
+          /* The button moustache and red cap make the tiny silhouette read as
+             Mario even before the viewer notices the little M badge. */
+          fillOval(look - 2.8, eyeY + 4.4, 3.2, 1.9, C.cocoa);
+          fillOval(look + 2.8, eyeY + 4.4, 3.2, 1.9, C.cocoa);
+
           /* Mouth: an open O in the air, a small smile on the ground. */
           if (air > 0.25) {
-            fillOval(look, eyeY + 5.4, 1.8, 2.2, C.night);
+            fillOval(look, eyeY + 7.1, 1.5, 1.9, C.night);
           } else {
             ctx.strokeStyle = C.night;
             ctx.lineWidth = 1.5;
             ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.arc(look, eyeY + 4, 2.2, Math.PI * 0.12, Math.PI * 0.88);
+            ctx.arc(look, eyeY + 6.2, 2.1, Math.PI * 0.12, Math.PI * 0.88);
             ctx.stroke();
           }
         }
