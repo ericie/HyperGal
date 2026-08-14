@@ -446,6 +446,195 @@
         .traveling .elevator,
         .traveling .status-light { animation: none; }
       }
+
+      /*
+        The elevator is a photograph. The canvas and moving door crops are
+        registered to its exact 1122 × 1402 geometry; all earlier CSS metal
+        treatments are deliberately suppressed here.
+      */
+      .elevator {
+        width: min(100vw, calc(100dvh * .80029), 1122px);
+        height: auto;
+        min-height: 0;
+        aspect-ratio: 1122 / 1402;
+        overflow: hidden;
+        border: 0;
+        background: #171817 url("./elevator-front.jpg") center / 100% 100% no-repeat;
+        box-shadow: 0 10px 30px rgba(0,0,0,.72);
+      }
+
+      .elevator::before,
+      .ceiling,
+      .wall-panel.left,
+      .service-label,
+      .permit,
+      .status-light,
+      .speaker-grille,
+      .inspection-card,
+      .utilities { display: none; }
+
+      .indicator-shell {
+        top: 3.72%;
+        left: 32.65%;
+        right: 35.2%;
+        height: 2.78%;
+        padding: 0;
+        background: #070808;
+        box-shadow: inset 0 0 3px #000;
+      }
+
+      .indicator {
+        gap: 1.1%;
+        padding: 0 23%;
+        background: linear-gradient(#090a09, #121310 50%, #050606);
+        box-shadow: none;
+      }
+
+      #floor-display {
+        font-size: clamp(10px, 2.25vw, 29px);
+        letter-spacing: .03em;
+        text-shadow: 0 0 3px #ff7818;
+      }
+
+      .arrow.up {
+        border-left-width: clamp(3px, .62vw, 8px);
+        border-right-width: clamp(3px, .62vw, 8px);
+        border-bottom-width: clamp(5px, 1vw, 13px);
+      }
+
+      .arrow.down {
+        border-left-width: clamp(3px, .62vw, 8px);
+        border-right-width: clamp(3px, .62vw, 8px);
+        border-top-width: clamp(5px, 1vw, 13px);
+      }
+
+      .floor-zone {
+        top: 11.06%;
+        bottom: 6.56%;
+        left: 16.76%;
+        right: 19.79%;
+        background: #020303;
+        box-shadow: inset 0 0 12px rgba(0,0,0,.78);
+      }
+
+      .floor-zone::after {
+        box-shadow: inset 0 0 22px 4px rgba(0,0,0,.42);
+      }
+
+      .threshold { display: none; }
+
+      .door {
+        top: 0;
+        bottom: 0;
+        width: 50.05%;
+        border: 0;
+        background: none;
+        box-shadow: none;
+      }
+
+      .door::before,
+      .door::after { content: none; }
+
+      .door.left,
+      .door.right {
+        border: 0;
+        box-shadow: none;
+      }
+
+      .door-photo {
+        position: absolute;
+        top: -13.42%;
+        width: 315.2%;
+        height: 121.39%;
+        max-width: none;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .door.left .door-photo { left: -52.8%; }
+      .door.right .door-photo { left: -152.8%; }
+
+      .doors-open .door.left { transform: translateX(-100%); }
+      .doors-open .door.right { transform: translateX(100%); }
+
+      .wall-panel.right {
+        display: block;
+        z-index: 12;
+        inset: 0;
+        width: auto;
+        min-width: 0;
+        pointer-events: none;
+      }
+
+      .control {
+        position: static;
+        width: auto;
+        transform: none;
+        padding: 0;
+        background: none;
+        box-shadow: none;
+      }
+
+      .buttons {
+        position: absolute;
+        top: 37.55%;
+        left: 85.75%;
+        width: 4.45%;
+        height: 14.4%;
+        display: grid;
+        grid-template-columns: 1fr;
+        grid-template-rows: repeat(5, 1fr);
+        gap: 3.5%;
+        pointer-events: auto;
+      }
+
+      .floor-button,
+      .floor-button:hover {
+        width: 100%;
+        aspect-ratio: auto;
+        border: 0;
+        border-radius: 2px;
+        color: transparent;
+        background: transparent;
+        box-shadow: none;
+        text-shadow: none;
+      }
+
+      .floor-button::after { content: none; }
+
+      .floor-button.lit {
+        color: transparent;
+        background: rgba(207,42,22,.32);
+        box-shadow: 0 0 5px rgba(255,61,27,.7), inset 0 0 0 1px rgba(255,180,150,.34);
+        text-shadow: none;
+      }
+
+      .floor-button:focus-visible {
+        outline: 2px solid #ff9d26;
+        outline-offset: 1px;
+      }
+
+      @media (max-width: 540px) {
+        .elevator {
+          width: min(100vw, calc(100dvh * .80029));
+          min-height: 0;
+        }
+
+        .indicator-shell,
+        .floor-zone,
+        .wall-panel.right { /* retain photographic registration */ }
+
+        .buttons {
+          grid-template-columns: 1fr;
+          gap: 3.5%;
+        }
+
+        .buttons .floor-button:nth-child(even) { display: grid; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .door { transition-duration: 650ms; }
+      }
     </style>
   </head>
   <body>
@@ -455,15 +644,15 @@
       <div class="indicator-shell" aria-hidden="true">
         <div class="indicator">
           <span class="arrow up"></span>
-          <span id="floor-display">B4</span>
+          <span id="floor-display">1</span>
           <span class="arrow down"></span>
         </div>
       </div>
 
       <section class="floor-zone" aria-label="View through the elevator doors">
         <canvas id="world" role="img" aria-label="An impossible place beyond the elevator doors"></canvas>
-        <div class="door left" aria-hidden="true"></div>
-        <div class="door right" aria-hidden="true"></div>
+        <div class="door left" aria-hidden="true"><img class="door-photo" src="./elevator-front.jpg" alt="" /></div>
+        <div class="door right" aria-hidden="true"><img class="door-photo" src="./elevator-front.jpg" alt="" /></div>
         <div class="threshold" aria-hidden="true"></div>
       </section>
 
@@ -507,13 +696,13 @@
         const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
         const stops = [
-          { id: 'B4', name: 'the tide library', scene: 'library', direction: 'down' },
-          { id: '7', name: 'the weather department', scene: 'weather', direction: 'up' },
-          { id: '13', name: 'the orchard after midnight', scene: 'orchard', direction: 'up' },
-          { id: '21', name: 'the room above the sky', scene: 'skyroom', direction: 'up' },
-          { id: '∞', name: 'the last stop', scene: 'last', direction: 'up' },
+          { id: '1', name: 'the tide library', scene: 'library', direction: 'down' },
+          { id: '3', name: 'the weather department', scene: 'weather', direction: 'up' },
+          { id: '5', name: 'the orchard after midnight', scene: 'orchard', direction: 'up' },
+          { id: '7', name: 'the room above the sky', scene: 'skyroom', direction: 'up' },
+          { id: '9', name: 'the last stop', scene: 'last', direction: 'up' },
         ];
-        const panelLabels = ['∞', '21', '13', '7', '0', 'B4'];
+        const panelLabels = ['9', '7', '5', '3', '1'];
         const sceneNames = Object.fromEntries(stops.map(stop => [stop.id, stop.name]));
         const timing = () => reducedMotion.matches
           ? { close: 700, travel: 500, open: 750, view: 6000 }
@@ -602,7 +791,7 @@
 
         function animateIndicator(destination, duration) {
           clearInterval(displayTimer);
-          const values = ['B4', 'B2', '0', '2', '4', '7', '9', '13', '17', '21', '38', '88', '—', '∞'];
+          const values = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
           let cursor = Math.floor(Math.random() * values.length);
           displayTimer = setInterval(() => {
             cursor = activeStop.direction === 'down'
