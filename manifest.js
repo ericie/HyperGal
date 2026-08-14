@@ -344,7 +344,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "A perfectly ordinary elevator makes its rounds through five increasingly impossible floors. The doors open, wait, close, and carry on as though nothing unusual happened."
+      "description": "A perfectly ordinary elevator makes its rounds through five still, fantastical office rooms: flooded desks, indoor weather, a midnight orchard, a sky boardroom, and records without end."
     }
   ]
 };
