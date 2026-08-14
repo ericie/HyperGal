@@ -4,12 +4,29 @@
 // long after npm packages rot. Folders starting with "_" or "." are skipped.
 
 import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const piecesDir = join(root, 'pieces');
+const execFileAsync = promisify(execFile);
+
+async function lastCommitDate(path) {
+  try {
+    const { stdout } = await execFileAsync(
+      'git',
+      ['log', '-1', '--format=%cs', '--', path],
+      { cwd: root }
+    );
+    return stdout.trim();
+  } catch (err) {
+    console.warn(`Could not read Git history for ${path}: ${err.message}`);
+    return '';
+  }
+}
 
 const entries = await readdir(piecesDir, { withFileTypes: true });
 const pieces = [];
@@ -21,7 +38,8 @@ for (const entry of entries) {
   const metaPath = join(piecesDir, entry.name, 'meta.json');
   try {
     const meta = JSON.parse(await readFile(metaPath, 'utf8'));
-    pieces.push({ slug: entry.name, ...meta });
+    const updated = await lastCommitDate(`pieces/${entry.name}`);
+    pieces.push({ slug: entry.name, ...meta, ...(updated && { updated }) });
   } catch (err) {
     console.warn(`Skipping ${entry.name}: ${err.message}`);
   }

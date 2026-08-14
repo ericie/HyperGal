@@ -73,6 +73,9 @@
       const DENSITY_REWARD = 30;
       const FINAL_BODY_RESERVE = 0.06;
       const MIN_DENSE_RESERVE = 8;
+      const PACKING_CYCLE_AT_RATIO = 0.14;
+      const PACKING_CYCLE_SPAN_RATIO = 0.06;
+      const PACKING_CYCLE_REWARD = 2200;
 
       // Mega Man underground: near-black navy, tile indigo, electric cobalt,
       // water cyan, mineral violet and the small amber energy pickup.
@@ -97,6 +100,7 @@
       // ---- state ----------------------------------------------------------
       let W = 0, H = 0, dpr = 1, CELL = 18, GW = 0, GH = 0, OX = 0, OY = 0;
       let snakes = [], mouse = null, pools = [], lastEater = null;
+      let packingCycle = [], packingRank = new Map();
       let last = 0, frame = 0, colorCursor = 0;
 
       const DIRS = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
@@ -121,6 +125,12 @@
       const effectiveAggression = (s) => Math.min(AGGRESSION_CAP, s.aggression + Math.max(0, s.body.length - START_LEN_MIN) * AGGRESSION_PER_SEG);
       const leaderIntelligence = (s) => Math.min(1, Math.max(0, (s.body.length - LEADER_SMART_AT) / LEADER_SMART_SPAN) + (s.eatStreak || 0) * 0.12);
       const densifyDrive = (s) => Math.min(1, Math.max(0, (s.body.length - DENSIFY_AT) / DENSIFY_SPAN));
+      const packingCycleDrive = (s) => {
+        const arena = Math.max(1, packingCycle.length || GW * GH);
+        const start = arena * PACKING_CYCLE_AT_RATIO;
+        const span = Math.max(1, arena * PACKING_CYCLE_SPAN_RATIO);
+        return Math.min(1, Math.max(0, (s.body.length - start) / span));
+      };
       const moveInterval = (s) => Math.max(MIN_STEP, STEP - Math.max(0, s.body.length - START_LEN_MIN) * SPEEDUP_PER_SEG - Math.min(0.032, (s.eatStreak || 0) * STREAK_SPEEDUP));
       const occupiedBySnakes = (x, y, list = snakes) => list.some(s => s.body.some(p => p.x === x && p.y === y));
 
@@ -134,8 +144,38 @@
         CELL = Math.max(13, Math.round(Math.min(W, H) / 34));
         GW = Math.max(12, Math.floor((W - CELL * 3) / CELL));
         GH = Math.max(12, Math.floor((H - CELL * 4) / CELL));
+        // Odd-by-odd grids cannot contain a Hamiltonian cycle. Trim one column
+        // so a mature snake always has a route through every arena cell.
+        if (GW % 2 === 1 && GH % 2 === 1) GW--;
         OX = Math.round((W - GW * CELL) / 2);
         OY = Math.round((H - GH * CELL) / 2);
+        buildPackingCycle();
+      }
+
+      function buildPackingCycle() {
+        packingCycle = [{ x: 0, y: 0 }];
+        if (GH % 2 === 0) {
+          // Sweep every row except the first column, then return up that column.
+          for (let y = 0; y < GH; y++) {
+            if (y % 2 === 0) {
+              for (let x = 1; x < GW; x++) packingCycle.push({ x, y });
+            } else {
+              for (let x = GW - 1; x >= 1; x--) packingCycle.push({ x, y });
+            }
+          }
+          for (let y = GH - 1; y >= 1; y--) packingCycle.push({ x: 0, y });
+        } else {
+          // Transposed form for an even-width, odd-height arena.
+          for (let x = 0; x < GW; x++) {
+            if (x % 2 === 0) {
+              for (let y = 1; y < GH; y++) packingCycle.push({ x, y });
+            } else {
+              for (let y = GH - 1; y >= 1; y--) packingCycle.push({ x, y });
+            }
+          }
+          for (let x = GW - 1; x >= 1; x--) packingCycle.push({ x, y: 0 });
+        }
+        packingRank = new Map(packingCycle.map((p, i) => [key(p), i]));
       }
 
       // ---- seeding --------------------------------------------------------
@@ -219,6 +259,7 @@
       function chooseDir(s) {
         const h = s.body[0];
         const opts = DIRS.filter(d => !(d.x === -s.dir.x && d.y === -s.dir.y));
+        choosePackingDirection(s);
         let best = opts[0], bestScore = -Infinity, straightScore = -Infinity;
         for (const d of opts) {
           const score = scoreMove(s, d);
@@ -227,6 +268,38 @@
         }
         if (!sameDir(best, s.dir) && straightScore > -90000 && straightScore >= bestScore - turnMarginFor(s)) best = s.dir;
         s.dir = best;
+      }
+
+      function choosePackingDirection(s) {
+        if (packingCycleDrive(s) <= 0 || s.packingDirection === 1 || s.packingDirection === -1) return;
+        const count = packingCycle.length;
+        const headRank = packingRank.get(key(s.body[0]));
+        if (headRank === undefined || !count) return;
+
+        const forward = { x: s.body[0].x + s.dir.x, y: s.body[0].y + s.dir.y };
+        const forwardRank = packingRank.get(key(forward));
+        if (forwardRank === (headRank + 1) % count) s.packingDirection = 1;
+        else if (forwardRank === (headRank - 1 + count) % count) s.packingDirection = -1;
+        else {
+          // Enter the cycle in the direction that reaches the current mouse
+          // first; once selected, direction stays stable so the body aligns.
+          const mouseRank = mouse ? packingRank.get(key(mouse)) : undefined;
+          const clockwise = mouseRank === undefined ? 0 : (mouseRank - headRank + count) % count;
+          const counter = mouseRank === undefined ? 0 : (headRank - mouseRank + count) % count;
+          s.packingDirection = clockwise <= counter ? 1 : -1;
+        }
+      }
+
+      function packingCycleScore(s, p) {
+        const drive = packingCycleDrive(s);
+        if (drive <= 0 || !s.packingDirection || !packingCycle.length) return 0;
+        const headRank = packingRank.get(key(s.body[0]));
+        const nextRank = packingRank.get(key(p));
+        if (headRank === undefined || nextRank === undefined) return 0;
+        const desired = (headRank + s.packingDirection + packingCycle.length) % packingCycle.length;
+        return nextRank === desired
+          ? drive * PACKING_CYCLE_REWARD
+          : -drive * PACKING_CYCLE_REWARD * 0.65;
       }
 
       function turnMarginFor(s) {
@@ -459,6 +532,7 @@
           - headRisk * (0.7 + intelligence * 1.8)
           - crampedPenalty;
         const densityScore = densify * olderBodyDensity(future, nx) * DENSITY_REWARD;
+        const cycleScore = packingCycleScore(s, nx);
         const huntScore = pathScore + (ate ? FOOD_CAPTURE_BONUS + eatGrowth * 45 : 0);
         const trapScore = boxingScore(s, nx, future);
         const edgePressure = Math.max(0, 2 - borderDistance(h));
@@ -468,7 +542,7 @@
         // Aggression must remain a real tradeoff. Leader intelligence still
         // rejects sealed traps, but no longer overwhelms every step toward food.
         const survivalWeight = 0.14 + (1 - aggression) * 0.7 + intelligence * 0.55;
-        return huntScore * aggression + dangerScore * survivalWeight + densityScore
+        return huntScore * aggression + dangerScore * survivalWeight + densityScore + cycleScore
           + trapScore * (0.12 + aggression * 0.1) + edgeScore + Math.random() * 0.01;
       }
 

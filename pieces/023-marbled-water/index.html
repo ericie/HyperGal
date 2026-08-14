@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="A quick, irregular stream of colored ink drops builds shifting suminagashi rings inside a bounded floating bath."
+      content="Large, wandering ink drops alternate with open water to build shifting suminagashi rings inside a bounded floating bath."
     />
     <title>Marbled Water · HyperGal</title>
     <style>
@@ -324,7 +324,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Marbled Water: individual colored ink drops arrive at varied times and sizes, expanding into offset suminagashi rings held inside a visible bath border. Use the panel to adjust the drops or disturb the pattern."
+      aria-label="Marbled Water: large colored ink drops alternate with open-water spaces, expanding into wandering suminagashi rings held inside a visible bath border. Use the panel to adjust the drops or disturb the pattern."
     ></canvas>
 
     <aside class="water-panel is-collapsed" aria-label="Marbled water controls">
@@ -378,8 +378,8 @@
 
           <div class="range-row">
             <label for="drop-size">Drop size</label>
-            <output class="control-value" for="drop-size">4.5%</output>
-            <input id="drop-size" type="range" min="15" max="100" value="45" />
+            <output class="control-value" for="drop-size">6.4%</output>
+            <input id="drop-size" type="range" min="15" max="100" value="64" />
           </div>
 
           <div class="range-row">
@@ -449,6 +449,7 @@
         const POINT_COUNT = 144;
         const INITIAL_RING_COUNT = 5;
         const MAX_SHAPES = 220;
+        const SUMINAGASHI_PALETTE = 1;
         const TAU = Math.PI * 2;
 
         const PALETTES = [
@@ -529,40 +530,52 @@
 
         function seedInitialBath() {
           const base = Math.min(width, height) * Number(controls.dropSize.value) / 1000;
+          const openingBase = base * (usesSuminagashiSpacing() ? 1.32 : 1.16);
           const variation = Number(controls.sizeVariation.value) / 100;
-          const marginX = Math.min(width * 0.12, base * 2.4);
-          const marginY = Math.min(height * 0.12, base * 2.4);
-          const poolCount = clamp(Math.round(Math.sqrt(width / Math.max(1, height)) * 4), 4, 7);
+          const marginX = Math.min(width * 0.12, openingBase * 2.4);
+          const marginY = Math.min(height * 0.12, openingBase * 2.4);
+          const poolCount = usesSuminagashiSpacing()
+            ? clamp(Math.round(Math.sqrt(width / Math.max(1, height)) * 3), 3, 5)
+            : clamp(Math.round(Math.sqrt(width / Math.max(1, height)) * 4), 4, 7);
           const pools = createInkStations(poolCount, marginX, marginY);
 
           for (const pool of pools) {
+            let cursorX = pool.x;
+            let cursorY = pool.y;
+            let currentAngle = random() * TAU;
+
             for (let ring = 0; ring < INITIAL_RING_COUNT; ring++) {
-              const driftAngle = random() * TAU;
-              const drift = base * (0.018 + random() * 0.105);
-              const sizeJitter = 1 + (random() * 2 - 1) *
-                (0.08 + variation * 0.24);
-              const radius = base * 0.68 * sizeJitter;
-              const x = clamp(
-                pool.x + Math.cos(driftAngle) * drift,
+              currentAngle += (random() * 2 - 1) * 0.72;
+              const drift = openingBase * (ring === 0
+                ? random() * 0.035
+                : 0.055 + random() * 0.22);
+              cursorX = clamp(
+                cursorX + Math.cos(currentAngle) * drift,
                 marginX,
                 width - marginX
               );
-              const y = clamp(
-                pool.y + Math.sin(driftAngle) * drift,
+              cursorY = clamp(
+                cursorY + Math.sin(currentAngle) * drift,
                 marginY,
                 height - marginY
               );
+              const sizeJitter = 1 + (random() * 2 - 1) *
+                (0.08 + variation * 0.24);
+              const radius = openingBase * 0.82 * sizeJitter;
               placeSettledInk(
-                x,
-                y,
+                cursorX,
+                cursorY,
                 Math.max(4, radius),
                 nextInkColor()
               );
+              if (usesSuminagashiSpacing()) {
+                placeSuminagashiSpacer(cursorX, cursorY, radius);
+              }
             }
             colorIndex++;
           }
 
-          settleInitialField(pools, base);
+          settleInitialField(pools, openingBase);
           inkStations = pools.map((pool) => ({
             x: pool.x,
             y: pool.y
@@ -595,11 +608,11 @@
           return stations;
         }
 
-        function placeSettledInk(x, y, radius, color) {
+        function placeSettledInk(x, y, radius, color, clearing = false) {
           const form = createDropForm();
           const shape = {
             color,
-            clearing: false,
+            clearing,
             form,
             points: circlePoints(x, y, 0.01, form)
           };
@@ -610,6 +623,21 @@
             y,
             currentRadius: 0.01
           }, radius);
+        }
+
+        function placeSuminagashiSpacer(x, y, inkRadius) {
+          const spacer = createSuminagashiSpacer(x, y, inkRadius);
+          placeSettledInk(spacer.x, spacer.y, spacer.radius, PAPER, true);
+        }
+
+        function createSuminagashiSpacer(x, y, inkRadius) {
+          const angle = random() * TAU;
+          const offset = inkRadius * random() * 0.055;
+          return {
+            x: x + Math.cos(angle) * offset,
+            y: y + Math.sin(angle) * offset,
+            radius: inkRadius * (0.5 + random() * 0.19)
+          };
         }
 
         function settleInitialField(pools, base) {
@@ -734,7 +762,8 @@
             start: time,
             impactDuration,
             expansionDuration,
-            duration: impactDuration + expansionDuration
+            duration: impactDuration + expansionDuration,
+            reservePaper: usesSuminagashiSpacing()
           };
 
           nextDropAt = time + nextDropDelay();
@@ -770,13 +799,51 @@
           }
 
           applyDropExpansion(drop, radius);
-          if (elapsed >= drop.duration) activeDrop = null;
+          if (elapsed >= drop.duration) {
+            activeDrop = null;
+            if (drop.reservePaper) startSuminagashiSpacer(drop, time);
+          }
         }
 
         function completeActiveDrop() {
           if (!activeDrop) return;
-          applyDropExpansion(activeDrop, activeDrop.targetRadius);
+          const drop = activeDrop;
+          applyDropExpansion(drop, drop.targetRadius);
           activeDrop = null;
+          if (drop.reservePaper) {
+            placeSuminagashiSpacer(drop.x, drop.y, drop.targetRadius);
+          }
+        }
+
+        function startSuminagashiSpacer(inkDrop, time) {
+          const spacer = createSuminagashiSpacer(
+            inkDrop.x,
+            inkDrop.y,
+            inkDrop.targetRadius
+          );
+          const form = createDropForm();
+          const shape = {
+            color: PAPER,
+            clearing: true,
+            form,
+            points: circlePoints(spacer.x, spacer.y, 0.01, form)
+          };
+          const duration = 175 + random() * 115;
+
+          shapes.push(shape);
+          activeDrop = {
+            shape,
+            x: spacer.x,
+            y: spacer.y,
+            targetRadius: spacer.radius,
+            impactRadius: 0.01,
+            currentRadius: 0.01,
+            start: time,
+            impactDuration: 0,
+            expansionDuration: duration,
+            duration,
+            reservePaper: false
+          };
         }
 
         function applyDropExpansion(drop, radius) {
@@ -1075,11 +1142,12 @@
         }
 
         function createDropForm() {
+          const looseness = usesSuminagashiSpacing() ? 1.35 : 1;
           return {
             stretch: 0.94 + random() * 0.12,
             rotation: random() * TAU,
-            broadWobble: 0.018 + random() * 0.026,
-            fineWobble: 0.006 + random() * 0.014,
+            broadWobble: (0.018 + random() * 0.026) * looseness,
+            fineWobble: (0.006 + random() * 0.014) * looseness,
             broadPhase: random() * TAU,
             finePhase: random() * TAU
           };
@@ -1115,6 +1183,10 @@
           const color = palette[colorIndex % palette.length];
           colorIndex++;
           return color;
+        }
+
+        function usesSuminagashiSpacing() {
+          return Number(paletteSelect.value) === SUMINAGASHI_PALETTE;
         }
 
         function dropInterval() {

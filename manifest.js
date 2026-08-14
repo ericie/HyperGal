@@ -10,7 +10,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A field of slowly drifting points on a low-contrast ground. Generative, runs forever."
+      "description": "A field of slowly drifting points on a low-contrast ground. Generative, runs forever.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "002-all-wall",
@@ -20,7 +21,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "A patterned wall of falling bricks. One color pair and one high-contrast textile tile seed each run; staggered rows scroll downward while new faux-3D bricks tumble in from above, flatten, and join the wall. Click to reshuffle."
+      "description": "A patterned wall of falling bricks. One color pair and one high-contrast textile tile seed each run; staggered rows scroll downward while new faux-3D bricks tumble in from above, flatten, and join the wall. Click to reshuffle.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "003-unbreakable",
@@ -30,7 +32,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "Breakout in reverse. An infallible paddle sends one ball on a clean arc to the nearest low column of a level Renaissance-colored wall. Each underside hit reserves one new brick, and only that completed cell creeps the aligned lattice upward. No player, no losing. Click to rebuild."
+      "description": "Breakout in reverse. An infallible paddle sends one ball on a clean arc to the nearest low column of a level Renaissance-colored wall. Each underside hit reserves one new brick, and only that completed cell creeps the aligned lattice upward. No player, no losing. Click to rebuild.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "004-hunt-prey-paint",
@@ -40,7 +43,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "An abstract ecosystem that paints itself in watercolour and cartographic linework, then wipes the painting clean forever. Over a pale NES-bright pixel terrain, blocky prey graze, grow into spiny square emblems that age toward white, and flee hunters with their own alertness and sprint speed. Spiny prey trundle toward richer plant patches and, when they die, burst into clean eraser blasts that wipe stains, foliage, food, and husks instead of fertilizing the ground. Compact black arcade hunters run prey down, fatten, and breed only by splitting in half. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats."
+      "description": "An abstract ecosystem that paints itself in watercolour and cartographic linework, then wipes the painting clean forever. Over a pale NES-bright pixel terrain, blocky prey graze, grow into spiny square emblems that age toward white, and flee hunters with their own alertness and sprint speed. Spiny prey trundle toward richer plant patches and, when they die, burst into clean eraser blasts that wipe stains, foliage, food, and husks instead of fertilizing the ground. Compact black arcade hunters run prey down, fatten, and breed only by splitting in half. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "005-only-invaders",
@@ -50,7 +54,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "Space Invaders after the invaders have vanished. Four defenders spend finite ammunition to attack and intercept only the bullets aimed at their own territory. When one reaches its last round, it deploys a suicide nuke whose shockwave destroys every cannon, including itself."
+      "description": "Space Invaders after the invaders have vanished. Four defenders spend finite ammunition to attack and intercept only the bullets aimed at their own territory. When one reaches its last round, it deploys a suicide nuke whose shockwave destroys every cannon, including itself.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "006-only-centipede",
@@ -60,7 +65,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "A Centipede riff with small defenders at the top and bottom, one straight bullet each, and fast, hard-edged centipedes that enter from offscreen once the field is nearly cleared. Head shots remove the head and promote the next segment; body shots split the chain. Every hit segment becomes a three-shot mushroom that dents and deforms in the centipede's color."
+      "description": "A Centipede riff with small defenders at the top and bottom, one straight bullet each, and fast, hard-edged centipedes that enter from offscreen once the field is nearly cleared. Head shots remove the head and promote the next segment; body shots split the chain. Every hit segment becomes a three-shot mushroom that dents and deforms in the centipede's color.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "007-hydra",
@@ -70,7 +76,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "Five autonomous snakes hunt one mouse in an 8-bit underground Mega Man palette. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Continuous rounded bodies cross a cavern-dark field; dead snakes remain as translucent watercolor gestures that bloom and blend into a shared mural. Click to reseed."
+      "description": "Five autonomous snakes hunt one mouse in an 8-bit underground Mega Man palette. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Continuous rounded bodies cross a cavern-dark field; dead snakes remain as translucent watercolor gestures that bloom and blend into a shared mural. Click to reseed.",
+      "updated": "2026-08-11"
     },
     {
       "slug": "008-vectrex-asteroids",
@@ -80,7 +87,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "A black-and-white Vectrex-style Asteroids variant. The ship tries to park with visible retrograde burns, predicts asteroid paths, and fires tight two- or three-shot bursts one bullet at a time until a player takes over, thrusting mainly to dodge and keeping only three shots alive at once. Bullets split asteroids into deeper generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Heavier fragments accelerate slowly, drift together under stronger gravity, bump instead of passing through, settle before they glom, and weld into rough integrated asteroid outlines that animate from their joined pieces. Any asteroid can kill the ship on contact."
+      "description": "A black-and-white Vectrex-style Asteroids variant. The ship tries to park with visible retrograde burns, predicts asteroid paths, and fires tight two- or three-shot bursts one bullet at a time until a player takes over, thrusting mainly to dodge and keeping only three shots alive at once. Bullets split asteroids into deeper generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Heavier fragments accelerate slowly, drift together under stronger gravity, bump instead of passing through, settle before they glom, and weld into rough integrated asteroid outlines that animate from their joined pieces. Any asteroid can kill the ship on contact.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "009-mutual-command",
@@ -90,7 +98,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "A two-sided Missile Command riff. A north row and south row of pixel towns and batteries launch paired attacks while their defenses try to erase incoming missiles at roughly the same rate. Each side starts at 1000 points and loses score as cities, batteries, and ground are destroyed; when a side reaches zero, the ruined row is cleared and a fresh set of towns slides in from the side."
+      "description": "A two-sided Missile Command riff. A north row and south row of pixel towns and batteries launch paired attacks while their defenses try to erase incoming missiles at roughly the same rate. Each side starts at 1000 points and loses score as cities, batteries, and ground are destroyed; when a side reaches zero, the ruined row is cleared and a fresh set of towns slides in from the side.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "010-obstacles-and-how-to-avoid-them",
@@ -100,7 +109,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "A full-window drawing of borderless Hokusai-toned walls, squares, and circles composed by adjustable gestalt forces. Boids sense each obstacle at individual distances, turn through distinct bounded lanes, and leave fine trails that slowly fan back out."
+      "description": "A full-window drawing of borderless Hokusai-toned walls, squares, and circles composed by adjustable gestalt forces. Boids sense each obstacle at individual distances, turn through distinct bounded lanes, and leave fine trails that slowly fan back out.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "011-switch-stack",
@@ -110,7 +120,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "An edge-to-edge masonry of black-and-white labels and utilitarian light-switch diagrams. Each box flips between ON and OFF in a discrete ten-frame transition as its center crosses a hot-pink midpoint line."
+      "description": "An edge-to-edge masonry of black-and-white labels and utilitarian light-switch diagrams. Each box flips between ON and OFF in a discrete ten-frame transition as its center crosses a hot-pink midpoint line.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "012-happiness-hunter",
@@ -120,7 +131,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "One yellow arcade car hunts for the fastest lane through compact gray traffic, buses, and semi trucks, signaling, speeding up, surging, or backing off to make openings, but never exits. Other gray vehicles have wider speed personalities, from aggressive squeezers to conservative gap-waiters, and try to pass too. Slow traffic packs tighter while fast traffic leaves more room. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray vehicles can take diagonal ramps offscreen and leave the highway. Every vehicle claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car scores +1 for every pass, loses 1 when most vehicles pass it, and loses 5 when a semi passes it."
+      "description": "One yellow arcade car hunts for the fastest lane through compact gray traffic, buses, and semi trucks, signaling, speeding up, surging, or backing off to make openings, but never exits. Other gray vehicles have wider speed personalities, from aggressive squeezers to conservative gap-waiters, and try to pass too. Slow traffic packs tighter while fast traffic leaves more room. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray vehicles can take diagonal ramps offscreen and leave the highway. Every vehicle claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car scores +1 for every pass, loses 1 when most vehicles pass it, and loses 5 when a semi passes it.",
+      "updated": "2026-08-12"
     },
     {
       "slug": "013-paddle",
@@ -130,7 +142,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "One-player Pong folded into a cylinder. A single paddle stands where the net used to be; the ball leaves one edge and returns from the other, so every save comes back around and the only way to be rid of the ball is to miss. The two counters tally edge crossings, left and right, and exactly one crossing happens per lap — a catch sends the ball back out the edge behind it, a miss lets it through to the far one, so the paddle decides which side a point lands on but never whether one lands. It catches eight of every ten, striking off-centre on purpose to keep the rally alive, and each miss burns a permanent bar into the centre line, which slowly becomes a histogram of where this paddle fails."
+      "description": "One-player Pong folded into a cylinder. A single paddle stands where the net used to be; the ball leaves one edge and returns from the other, so every save comes back around and the only way to be rid of the ball is to miss. The two counters tally edge crossings, left and right, and exactly one crossing happens per lap — a catch sends the ball back out the edge behind it, a miss lets it through to the far one, so the paddle decides which side a point lands on but never whether one lands. It catches eight of every ten, striking off-centre on purpose to keep the rally alive, and each miss burns a permanent bar into the centre line, which slowly becomes a histogram of where this paddle fails.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "014-only-ghosts",
@@ -140,7 +153,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "A two-body Pac-Man inversion on a fixed 17-by-11 course. A wavy eye-to-eye alarm sends Pac racing for one of four changing rooms, the only places where its yellow silhouette can fold into a Ghost. The pursuer never changes. The encounter leaves only ghosts."
+      "description": "A two-body Pac-Man inversion on a fixed 17-by-11 course. A wavy eye-to-eye alarm sends Pac racing for one of four changing rooms, the only places where its yellow silhouette can fold into a Ghost. The pursuer never changes. The encounter leaves only ghosts.",
+      "updated": "2026-08-12"
     },
     {
       "slug": "015-growth-rings",
@@ -150,7 +164,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "A trunk cross-section that grows toward 200 years one ring at a time. Latitude, solar angle, wind exposure, temperature, rainfall, and ground slope push the cambium out of symmetry; heavy rain years bloom into wider uneven rings while severity-scaled fire and pest incidents suppress 1-5 years of growth without cutting into older wood."
+      "description": "A trunk cross-section that grows toward 200 years one ring at a time. Latitude, solar angle, wind exposure, temperature, rainfall, and ground slope push the cambium out of symmetry; heavy rain years bloom into wider uneven rings while severity-scaled fire and pest incidents suppress 1-5 years of growth without cutting into older wood.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "016-up-mario",
@@ -172,7 +187,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
-      "description": "An edge-to-edge field of loose Celtic interlace printed in dark brown on worn paper. Continuous rounded cords pass through a Truchet-like knot grid, alternating over and under at crossings and running beyond every side of the browser. Click or press Enter/Space to reseed."
+      "description": "An edge-to-edge field of loose Celtic interlace printed in dark brown on worn paper. Continuous rounded cords pass through a Truchet-like knot grid, alternating over and under at crossings and running beyond every side of the browser. Click or press Enter/Space to reseed.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "018-life-checkers",
@@ -183,7 +199,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "generative",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "Conway's Game of Life played across a shifting four-color checkerboard. At reset, the dead checkerboard changes from top to bottom before the new live cells fade in through ten quick batches."
+      "description": "Conway's Game of Life played across a shifting four-color checkerboard. At reset, the dead checkerboard changes from top to bottom before the new live cells fade in through ten quick batches.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "019-city-of-signs",
@@ -194,7 +211,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "illustration",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A precise black-and-white geometric city reconstructed from circles, rectangles, polygons, and filled arcs. Seven joined towers carry flags, circular domes, arches, rosettes, diamonds, and a dense center gate above a continuous ornamental belt and shared arcade."
+      "description": "A precise black-and-white geometric city reconstructed from circles, rectangles, polygons, and filled arcs. Seven joined towers carry flags, circular domes, arches, rosettes, diamonds, and a dense center gate above a continuous ornamental belt and shared arcade.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "020-soft-collapse",
@@ -205,7 +223,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "generative",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A field of black-and-white geometric cells where sixteen small frames merge into four-by-four forms, split apart again, and slide motifs through fixed crops. Click to change a block; press Space to pause and R to recompose."
+      "description": "A field of black-and-white geometric cells where sixteen small frames merge into four-by-four forms, split apart again, and slide motifs through fixed crops. Click to change a block; press Space to pause and R to recompose.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "021-marbles",
@@ -215,7 +234,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
-      "description": "Four bookmatched marble tiles cut from one procedural slab. Each seed selects a Life Checkers palette and randomized marble settings for a photographic surface whose turbulence flows through a seamless five-second loop."
+      "description": "Four bookmatched marble tiles cut from one procedural slab. Each seed selects a Life Checkers palette and randomized marble settings for a photographic surface whose turbulence flows through a seamless five-second loop.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "022-hyper-lichen",
@@ -225,7 +245,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
-      "description": "Crustose lichen colonies continuously recolonize an entire dark stone surface in full-coverage radial waves of mint, sage, cream, and pale pink. Each completed layer immediately gives way to the next."
+      "description": "Crustose lichen colonies continuously recolonize an entire dark stone surface in full-coverage radial waves of mint, sage, cream, and pale pink. Each completed layer immediately gives way to the next.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "023-marbled-water",
@@ -235,7 +256,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "Ink drops expand across a floating water bath, repelling older colors into a growing marbled-paper pattern. Automatic clearing drops restore open space, while adjustable combs rake the accumulated contours in either direction."
+      "description": "Large colored ink drops alternate with open-water spaces, building wandering suminagashi rings inside a bounded floating bath. Adjustable disturbances pull the accumulated contours into new patterns.",
+      "updated": "2026-08-12"
     },
     {
       "slug": "024-fuel-seekers",
@@ -245,7 +267,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
-      "description": "Sixty large abstract bubbles cross a low-contrast marbled oil field between ten five-sided stations. Refilling erases each station's vein; an exhausted station bursts and reappears over untouched resources, while bubbles that run dry are replaced from beyond the edge."
+      "description": "Sixty large abstract bubbles cross a low-contrast marbled oil field between ten five-sided stations. Refilling erases each station's vein; an exhausted station bursts and reappears over untouched resources, while bubbles that run dry are replaced from beyond the edge.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "025-cloudcutter",
@@ -255,7 +278,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "A black-and-white vector Asteroids variant flown against weather instead of rock. Rounds explosively punch broad chunks out of wide, scalloped cumulus, so the only way through a body is to bore a tunnel and fly down it. The ship never targets anything. It holds a wandering course with the guns held down, and where the sky is thick it grinds to a crawl until its own fire has opened the way — an icebreaker, not a hunter. Its hull reams out what the guns began, so it can never wedge itself in a bore too narrow to fly. Sparse cloudscapes pan endlessly left while the ship works up and down through them; the camera follows, keeping it in frame. Bites heal slowly like liquid, and a bore that reaches all the way through leaves the exact same cloud outline divided into two halves."
+      "description": "A black-and-white vector Asteroids variant flown against weather instead of rock. Rounds explosively punch broad chunks out of wide, scalloped cumulus, so the only way through a body is to bore a tunnel and fly down it. The ship never targets anything. It holds a wandering course with the guns held down, and where the sky is thick it grinds to a crawl until its own fire has opened the way — an icebreaker, not a hunter. Its hull reams out what the guns began, so it can never wedge itself in a bore too narrow to fly. Sparse cloudscapes pan endlessly left while the ship works up and down through them; the camera follows, keeping it in frame. Bites heal slowly like liquid, and a bore that reaches all the way through leaves the exact same cloud outline divided into two halves.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "026-top-of-the-heap",
@@ -265,7 +289,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
-      "description": "A bright ball character defends a twenty-storey cube pyramid from waves of wide spring-snakes that reserve individual squares, hunting whichever coil is closest to the summit. ON wins by lighting every cube; OFF wins by taking the top."
+      "description": "A bright ball character defends a twenty-storey cube pyramid from waves of wide spring-snakes that reserve individual squares, hunting whichever coil is closest to the summit. ON wins by lighting every cube; OFF wins by taking the top.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "027-camouflage",
@@ -275,7 +300,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "Nine still, finely pixelated fields include zebra, leopard, ocelot, tiger, giraffe, fawn, Gaboon viper, woodland, and desert camouflage. Palette shifts lead into hard-edged distance-field morphs that split, merge, expand, and contract each region into the next pattern."
+      "description": "Nine still, finely pixelated fields include zebra, leopard, ocelot, tiger, giraffe, fawn, Gaboon viper, woodland, and desert camouflage. Palette shifts lead into hard-edged distance-field morphs that split, merge, expand, and contract each region into the next pattern.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "028-overgrowth",
@@ -285,7 +311,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
-      "description": "A procedural botanical plate on aged rag paper. Roses, peonies, poppies, lilies, daisies, anemones, hydrangeas, honeysuckle, and acanthus are engraved in madder, weld, and woad on sinuous stems that never run straight, inside a ruled border the growth escapes."
+      "description": "A directionless botanical wallpaper on aged rag paper. Roses, peonies, poppies, lilies, daisies, anemones, lacecap hydrangeas, honeysuckle, and acanthus unfold through hand-drawn growth stages on sinuous stems that turn in every direction.",
+      "updated": "2026-08-12"
     },
     {
       "slug": "029-eyes-open",
@@ -295,7 +322,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.svg",
-      "description": "A black field populated by bright graphic eyes. Ten to twenty are open at once on a phone, each arriving independently, holding its gaze, blinking shut, and vanishing before another appears elsewhere."
+      "description": "A black field populated by bright graphic eyes. Ten to twenty are open at once on a phone, each arriving independently, holding its gaze, blinking shut, and vanishing before another appears elsewhere.",
+      "updated": "2026-08-10"
     },
     {
       "slug": "030-obstacles-and-how-to-go-around-them",
@@ -305,7 +333,18 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "Organic rocks reshape a continuous river field into shoals, deep pools, quick channels, and turbulent wakes. Petals collide on the surface, turn in three axes, and are occasionally pulled below by eddies."
+      "description": "A top-down field study plots how blossom-pink petals move around flat, contour-drawn rock obstacles through shoals, quick channels, and turbulent wakes.",
+      "updated": "2026-08-12"
+    },
+    {
+      "slug": "031-elevator",
+      "title": "Elevator",
+      "year": 2026,
+      "date": "2026-08-13",
+      "category": "generative",
+      "type": "interactive",
+      "thumbnail": "thumbnail.jpg",
+      "description": "A perfectly ordinary elevator makes its rounds through five increasingly impossible floors. The doors open, wait, close, and carry on as though nothing unusual happened."
     }
   ]
 };

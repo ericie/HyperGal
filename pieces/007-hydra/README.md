@@ -16,10 +16,13 @@ has enough escape room, a very long snake folds into tight parallel lanes and
 actively fills holes inside its own coil instead of preserving open ground. Its
 free-space reserve shrinks as it matures, so the body can occupy most of the
 arena—leaving only a narrow working channel—while still maintaining a route
-toward its moving tail.
-Large snakes still hunt and
-box opponents, but will abandon the shortest route to the mouse when it could
-close a trap around themselves. The rule set stays small:
+toward its moving tail. Rather than only tightening wherever its head happens
+to be, it begins adopting a looping one-cell-wide packing route after occupying
+14% of the arena, reaching full commitment at 20%. That route visits every
+arena cell, so an enormous body settles into continuous lanes instead of
+leaving arbitrary holes. Large snakes still hunt and box opponents, but will
+abandon the shortest route to the mouse when it could close a trap around
+themselves. The rule set stays small:
 
 - touching the **mouse** grows the snake and creates a new mouse,
 - consecutive catches by the **same snake** grow it by 2, 4, 7, 11, ... segments,

@@ -8,7 +8,7 @@
     />
     <meta
       name="description"
-      content="A procedural botanical plate — hand-inked stems, turnover leaves, and dye-pot colour on aged rag paper."
+      content="A directionless botanical wallpaper — hand-inked stems, unfolding leaves, and dye-pot flowers on aged rag paper."
     />
     <title>Overgrowth · HyperGal</title>
     <style>
@@ -64,7 +64,7 @@
       id="garden"
       tabindex="0"
       role="img"
-      aria-label="Overgrowth. A procedural botanical plate on aged rag paper that continually fills with new hand-inked plants. Roses, peonies, poppies, lilies, daisies, anemones, hydrangeas, honeysuckle, and acanthus grow on sinuous curving stems, with each new specimen drawn over the growth already there. Click or press R to begin a new plate."
+      aria-label="Overgrowth. A directionless botanical wallpaper on aged rag paper that continually fills with new hand-inked plants. Roses, peonies, poppies, lilies, daisies, anemones, lacecap hydrangeas, honeysuckle, and acanthus grow in every direction on sinuous curving stems. Click or press R to begin a new arrangement."
     ></canvas>
     <canvas id="new-growth" aria-hidden="true"></canvas>
     <p id="status" class="sr-only" aria-live="polite"></p>
@@ -80,6 +80,8 @@
         const status = document.getElementById('status');
         const TAU = Math.PI * 2;
         const GOLDEN = 0.61803398875;
+        const DEVELOPMENT_FRAMES = 10;
+        const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
         // `ctx` is swapped to an offscreen surface while the faded underprint
         // layer is drawn, so every draw routine reads this binding.
@@ -196,14 +198,14 @@
           canvas.addEventListener('pointerdown', () => {
             seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
             regrow();
-            announce('A new plate was drawn');
+            announce('A new arrangement was drawn');
           });
           canvas.addEventListener('keydown', (event) => {
             if (event.key === 'r' || event.key === 'R' || event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
               seed = (seed + 0x9e3779b9) >>> 0;
               regrow();
-              announce('A new plate was drawn');
+              announce('A new arrangement was drawn');
             }
           });
         }
@@ -252,7 +254,7 @@
           for (let i = 0; i < ghostCount; i += 1) {
             const plant = createPlant(
               random() * width,
-              lerp(height * 0.18, height * 1.16, random()),
+              random() * height,
               i % SPECIES.length,
               unit,
               { census: false }
@@ -261,7 +263,7 @@
             ghostPlants.push(plant);
           }
 
-          // The main growth, on a jittered grid so the plate stays even.
+          // The main growth, on a jittered grid so the repeat stays even.
           const count = clamp(Math.round(area / 18000), 26, 70);
           const cols = Math.max(4, Math.round(Math.sqrt((count * width) / height)));
           const rows = Math.ceil(count / cols);
@@ -272,7 +274,7 @@
             const col = i % cols;
             const row = Math.floor(i / cols);
             const x = (col + 0.2 + random() * 0.66) * cellW;
-            const y = (row + 0.82 + random() * 0.5) * cellH;
+            const y = (row + 0.2 + random() * 0.66) * cellH;
             const forced = i < SPECIES.length ? i : null;
             const plant = createPlant(x, y, forced, unit);
             plant.depth = i + random();
@@ -288,7 +290,7 @@
               if (random() > 0.72) continue;
               const plant = createPlant(
                 (col + 0.72 + lerp(-0.22, 0.22, random())) * cellW,
-                (row + 1.34 + lerp(-0.26, 0.26, random())) * cellH,
+                (row + 0.56 + lerp(-0.22, 0.22, random())) * cellH,
                 fillTypes[fillIndex++ % fillTypes.length],
                 unit
               );
@@ -303,15 +305,16 @@
           const vineIndex = SPECIES.findIndex((s) => s.vine);
           const vines = Math.round(clamp(area / 155000, 4, 9));
           for (let i = 0; i < vines; i += 1) {
-            const fromLeft = i % 2 === 0;
+            const edge = i % 4;
+            const origin = edgePlantOrigin(edge, width * 0.06 + random() * 40, random);
             const plant = createPlant(
-              fromLeft ? -width * 0.05 - random() * 40 : width * 1.05 + random() * 40,
-              lerp(height * 0.1, height * 1.1, random()),
+              origin.x,
+              origin.y,
               vineIndex,
-              unit
+              unit,
+              { rotation: origin.rotation }
             );
             plant.scale *= lerp(1.2, 1.65, random());
-            plant.rotation += fromLeft ? lerp(0.5, 1.15, random()) : lerp(-1.15, -0.5, random());
             plant.depth = -40 + i;
             plants.push(plant);
           }
@@ -320,11 +323,11 @@
           // from something larger.
           for (let i = 0; i < 7; i += 1) {
             const edge = i % 4;
-            const x = edge === 0 ? -14 : edge === 1 ? width + 14 : random() * width;
-            const y = edge === 2 ? 24 : edge === 3 ? height + 70 : random() * height;
-            const plant = createPlant(x, y, i % SPECIES.length, unit);
+            const origin = edgePlantOrigin(edge, edge === 3 ? 70 : 14, random);
+            const plant = createPlant(origin.x, origin.y, i % SPECIES.length, unit, {
+              rotation: origin.rotation,
+            });
             plant.scale *= 1.1;
-            plant.rotation += edge === 0 ? 0.7 : edge === 1 ? -0.7 : edge === 2 ? Math.PI * (random() > 0.5 ? 0.9 : 1.1) : 0;
             plant.depth = i % 2 ? -20 + i : count + i;
             plants.push(plant);
           }
@@ -338,7 +341,7 @@
           for (let i = 0; i < anchors; i += 1) {
             const plant = createPlant(
               ((i + 0.1 + random() * 0.8) / anchors) * width,
-              lerp(height * 0.46, height * 1.3, random()),
+              lerp(height * 0.08, height * 0.92, random()),
               anchorTypes[i % anchorTypes.length],
               unit
             );
@@ -352,6 +355,19 @@
           growthCount = 0;
           lastGrowthPaint = 0;
           nextGrowthAt = performance.now() + 900;
+        }
+
+        // An edge specimen points into the sheet, but every edge is treated
+        // equally. The local stem begins at -π/2, so the added quarter-turn
+        // converts a world-space heading into the plant's rotation.
+        function edgePlantOrigin(edge, pad, r) {
+          const side = ((edge % 4) + 4) % 4;
+          const inward = [0, Math.PI, Math.PI / 2, -Math.PI / 2][side];
+          return {
+            x: side === 0 ? -pad : side === 1 ? width + pad : r() * width,
+            y: side === 2 ? -pad : side === 3 ? height + pad : r() * height,
+            rotation: inward + Math.PI / 2 + lerp(-0.42, 0.42, r()),
+          };
         }
 
         // The plate never reaches a finished state. New specimens are stamped
@@ -377,22 +393,29 @@
         function beginNextPlant(now) {
           const unit = clamp(Math.min(width, height) / 560, 0.95, 1.75);
           const isVine = growthCount % 11 === 10;
-          const x = isVine
-            ? (growthCount % 2 === 0 ? -width * 0.04 : width * 1.04)
-            : lerp(-width * 0.04, width * 1.04, random());
-          const y = lerp(height * 0.16, height * 1.22, random());
           const species = isVine ? SPECIES.findIndex((spec) => spec.vine) : null;
-          const plant = createPlant(x, y, species, unit, { census: false });
+          const origin = isVine
+            ? edgePlantOrigin(growthCount % 4, width * 0.04, random)
+            : {
+                x: lerp(-width * 0.04, width * 1.04, random()),
+                y: lerp(-height * 0.04, height * 1.04, random()),
+                rotation: random() * TAU,
+              };
+          const plant = createPlant(origin.x, origin.y, species, unit, {
+            census: false,
+            rotation: origin.rotation,
+          });
 
           plant.scale *= isVine ? lerp(1.05, 1.45, random()) : lerp(0.58, 1.28, random());
-          if (isVine) {
-            plant.rotation += x < 0 ? lerp(0.55, 1.05, random()) : lerp(-1.05, -0.55, random());
-          }
 
           growingPlants.push({
             plant,
             startedAt: now,
-            duration: isVine ? lerp(6200, 8200, random()) : lerp(4200, 6200, random()),
+            duration: reducedMotion.matches
+              ? 1
+              : isVine
+                ? lerp(6200, 8200, random())
+                : lerp(4200, 6200, random()),
           });
           growthCount += 1;
         }
@@ -435,7 +458,6 @@
 
           for (const plant of anchorPlants) drawPlant(plant);
 
-          drawInscription();
           drawFoxing();
         }
 
@@ -977,7 +999,10 @@
             depth: plants.length,
             spec,
             scale,
-            rotation: lerp(-0.3, 0.3, r()),
+            rotation:
+              opts && opts.rotation !== undefined
+                ? opts.rotation
+                : r() * TAU,
             stem,
             stemWidth: lerp(2.4, 4.4, r()),
             stemColor: [P.stem, P.stemDeep, '#6e7440', '#7b6c3e', P.leafMid][Math.floor(r() * 5)],
@@ -1233,44 +1258,86 @@
         // A leaf is an arrangement, not always a single blade: roses come in
         // threes on a petiole, honeysuckle in opposite pairs.
         function drawLeaf(leaf, growth) {
-          const unfurl = growth === undefined ? 1 : clamp(growth, 0, 1);
+          const unfurl = developmentProgress(growth === undefined ? 1 : growth);
+          if (unfurl <= 0) return;
+          const open = smoothstep(clamp((unfurl - 0.12) / 0.88, 0, 1));
           ctx.save();
           ctx.translate(leaf.x, leaf.y);
-          // The blade begins folded along its supporting stem, lengthens from
-          // the petiole, then opens to its final width and angle.
-          ctx.rotate(leaf.angle - Math.sign(leaf.curl || 1) * (1 - unfurl) * 0.7);
-          ctx.scale(0.08 + unfurl * 0.92, 0.12 + Math.pow(unfurl, 1.7) * 0.88);
+          // Ten drawn poses replace the old whole-leaf squash. The rib grows
+          // first; the blade then broadens, bends and fans away from the stem.
+          ctx.rotate(leaf.angle - Math.sign(leaf.curl || 1) * (1 - open) * 0.72);
 
           if (leaf.conf.pinnate) {
-            drawPinnateLeaf(leaf);
+            drawPinnateLeaf(developLeaf(leaf, unfurl));
           } else if (leaf.conf.trio) {
-            const stalk = leaf.length * 0.34;
+            const stalk = leaf.length * 0.34 * smoothstep(clamp(unfurl / 0.56, 0, 1));
             drawPetiole(stalk, leaf.curl);
             const tip = { x: stalk, y: -stalk * leaf.curl * 0.9 };
-            for (const s of [1, -1]) {
+            for (let i = 0; i < 2; i += 1) {
+              const s = i === 0 ? 1 : -1;
+              const bladeGrowth = stagedGrowth(unfurl, 0.16 + i * 0.08);
+              if (bladeGrowth <= 0) continue;
               ctx.save();
               ctx.translate(tip.x * 0.42, tip.y * 0.42);
-              ctx.rotate(s * 0.8);
-              drawBlade(variant(leaf, leaf.length * 0.66, s * Math.abs(leaf.curl)));
+              ctx.rotate(s * 0.8 * smoothstep(bladeGrowth));
+              drawBlade(
+                developLeaf(
+                  variant(leaf, leaf.length * 0.66, s * Math.abs(leaf.curl)),
+                  bladeGrowth
+                )
+              );
               ctx.restore();
             }
+            const tipGrowth = stagedGrowth(unfurl, 0.3);
             ctx.save();
             ctx.translate(tip.x, tip.y);
-            drawBlade(variant(leaf, leaf.length * 0.88, leaf.curl, leaf.turnover));
+            if (tipGrowth > 0) {
+              drawBlade(
+                developLeaf(
+                  variant(leaf, leaf.length * 0.88, leaf.curl, leaf.turnover),
+                  tipGrowth
+                )
+              );
+            }
             ctx.restore();
           } else if (leaf.conf.pair) {
-            for (const s of [1, -1]) {
+            for (let i = 0; i < 2; i += 1) {
+              const s = i === 0 ? 1 : -1;
+              const bladeGrowth = stagedGrowth(unfurl, i * 0.1);
+              if (bladeGrowth <= 0) continue;
               ctx.save();
-              ctx.rotate(s * 0.52);
+              ctx.rotate(s * 0.52 * smoothstep(bladeGrowth));
               drawBlade(
-                variant(leaf, leaf.length * (s > 0 ? 1 : 0.86), s * Math.abs(leaf.curl), s > 0 && leaf.turnover)
+                developLeaf(
+                  variant(
+                    leaf,
+                    leaf.length * (s > 0 ? 1 : 0.86),
+                    s * Math.abs(leaf.curl),
+                    s > 0 && leaf.turnover
+                  ),
+                  bladeGrowth
+                )
               );
               ctx.restore();
             }
           } else {
-            drawBlade(leaf);
+            drawBlade(developLeaf(leaf, unfurl));
           }
           ctx.restore();
+        }
+
+        function developLeaf(leaf, progress) {
+          const t = developmentProgress(progress);
+          const length = smoothstep(clamp(t / 0.72, 0, 1));
+          const width = smoothstep(clamp((t - 0.12) / 0.88, 0, 1));
+          return {
+            ...leaf,
+            length: leaf.length * (0.12 + length * 0.88),
+            width: leaf.width * (0.06 + width * 0.94),
+            curl: leaf.curl * (0.18 + width * 0.82),
+            turnover: leaf.turnover && t >= 8 / 9,
+            development: t,
+          };
         }
 
         function variant(leaf, length, curl, turnover) {
@@ -1454,11 +1521,14 @@
           const pairs = 3;
           const fill = leafFill(leaf);
           for (let i = 1; i <= pairs + 1; i += 1) {
+            const leafletGrowth = stagedGrowth(leaf.development || 1, (i - 1) * 0.12);
+            if (leafletGrowth <= 0) continue;
             const t = Math.min(1, i / (pairs + 0.6));
             const p = leafRib(leaf, t);
             const q = leafRib(leaf, Math.min(1, t + 0.02));
             const base = Math.atan2(q.y - p.y, q.x - p.x);
-            const len = leaf.length * 0.5 * (1 - t * 0.4);
+            const len = leaf.length * 0.5 * (1 - t * 0.4) * (0.16 + leafletGrowth * 0.84);
+            const halfWidth = len * (0.04 + smoothstep(leafletGrowth) * 0.3);
             const sides = i > pairs ? [0] : [1, -1];
             for (const s of sides) {
               ctx.save();
@@ -1466,8 +1536,8 @@
               ctx.rotate(base + s * 0.78);
               ctx.beginPath();
               ctx.moveTo(0, 0);
-              ctx.bezierCurveTo(len * 0.34, -len * 0.34, len * 0.8, -len * 0.3, len, -len * 0.04);
-              ctx.bezierCurveTo(len * 0.72, len * 0.2, len * 0.3, len * 0.16, 0, 0);
+              ctx.bezierCurveTo(len * 0.34, -halfWidth, len * 0.8, -halfWidth, len, -len * 0.04);
+              ctx.bezierCurveTo(len * 0.72, halfWidth * 0.68, len * 0.3, halfWidth * 0.54, 0, 0);
               ctx.closePath();
               ctx.fillStyle = fill;
               ctx.fill();
@@ -1483,8 +1553,9 @@
         }
 
         function drawBud(branch, kind, growth) {
-          const size = branch.budSize;
-          const emerge = growth === undefined ? 1 : clamp(growth, 0, 1);
+          const emerge = developmentProgress(growth === undefined ? 1 : growth);
+          if (emerge <= 0) return;
+          const size = branch.budSize * (0.2 + smoothstep(emerge) * 0.8);
           const angle = branch.tip.angle + Math.PI / 2;
           const petalColor =
             kind === 'lily' || kind === 'cosmos'
@@ -1500,7 +1571,6 @@
           ctx.save();
           ctx.translate(branch.tip.x, branch.tip.y);
           ctx.rotate(angle);
-          ctx.scale(0.18 + emerge * 0.82, 0.12 + emerge * 0.88);
 
           // Calyx sepals, curved outward.
           ctx.fillStyle = P.leafDark;
@@ -1508,7 +1578,7 @@
           ctx.lineWidth = 0.5;
           for (let i = -1; i <= 1; i += 1) {
             ctx.save();
-            ctx.rotate(i * 0.5);
+            ctx.rotate(i * 0.5 * smoothstep(emerge));
             ctx.beginPath();
             ctx.moveTo(0, 2);
             ctx.quadraticCurveTo(-size * 0.44, -size * 0.3, -size * 0.1, -size * 0.98);
@@ -1545,37 +1615,44 @@
         // Flowers — flat dye colour, contour line, engraved base hatching.
         // ---------------------------------------------------------------
 
-        function drawFlower(kind, bloom, plantSeed) {
+        function drawFlower(kind, bloom, plantSeed, opening) {
           switch (kind) {
-            case 'rose': drawRose(bloom, plantSeed); break;
-            case 'peony': drawPeony(bloom, plantSeed); break;
-            case 'cosmos': drawCosmos(bloom); break;
-            case 'poppy': drawPoppy(bloom); break;
-            case 'daisy': drawDaisy(bloom); break;
-            case 'lily': drawLily(bloom); break;
-            case 'hydrangea': drawHydrangea(bloom, plantSeed); break;
-            case 'anemone': drawAnemone(bloom); break;
-            case 'honeysuckle': drawHoneysuckle(bloom, plantSeed); break;
+            case 'rose': drawRose(bloom, plantSeed, opening); break;
+            case 'peony': drawPeony(bloom, plantSeed, opening); break;
+            case 'cosmos': drawCosmos(bloom, opening); break;
+            case 'poppy': drawPoppy(bloom, opening); break;
+            case 'daisy': drawDaisy(bloom, opening); break;
+            case 'lily': drawLily(bloom, opening); break;
+            case 'hydrangea': drawHydrangea(bloom, plantSeed, opening); break;
+            case 'anemone': drawAnemone(bloom, opening); break;
+            case 'honeysuckle': drawHoneysuckle(bloom, plantSeed, opening); break;
             default: break;
           }
         }
 
         function drawOpeningFlower(kind, bloom, plantSeed, progress) {
-          const opening = clamp(progress, 0, 1);
+          const opening = developmentProgress(progress);
 
-          // Before petals separate, the terminal is a tight coloured bud with
-          // two green sepals. It shrinks away as the flower opens.
-          if (opening < 0.52) {
-            const bud = 1 - smoothstep(opening / 0.52);
+          // The bud and the open corolla overlap for several drawn frames.
+          // Sepals hinge away while individual petals lengthen and rotate;
+          // there is no single final-flower squash transform anymore.
+          if (opening < 0.78) {
+            const bud = 1 - smoothstep(opening / 0.78);
+            const sepalOpen = smoothstep(clamp(opening / 0.64, 0, 1));
             ctx.save();
-            ctx.scale(0.55 + bud * 0.3, 0.72 + bud * 0.28);
+            ctx.globalAlpha = clamp(bud * 1.5, 0, 1);
             ctx.fillStyle = P.leafDark;
             for (const side of [-1, 1]) {
               ctx.save();
-              ctx.rotate(side * 0.48);
+              ctx.rotate(side * lerp(0.24, 0.9, sepalOpen));
               ctx.beginPath();
               ctx.moveTo(0, bloom.r * 0.08);
-              ctx.quadraticCurveTo(side * bloom.r * 0.14, -bloom.r * 0.1, 0, -bloom.r * 0.46);
+              ctx.quadraticCurveTo(
+                side * bloom.r * lerp(0.08, 0.22, sepalOpen),
+                -bloom.r * 0.1,
+                0,
+                -bloom.r * lerp(0.34, 0.5, sepalOpen)
+              );
               ctx.quadraticCurveTo(-side * bloom.r * 0.08, -bloom.r * 0.08, 0, bloom.r * 0.08);
               ctx.fill();
               ctx.restore();
@@ -1584,23 +1661,49 @@
             ctx.strokeStyle = P.ink;
             ctx.lineWidth = 0.65;
             ctx.beginPath();
-            ctx.ellipse(0, -bloom.r * 0.2, bloom.r * 0.22, bloom.r * 0.34, 0, 0, TAU);
+            ctx.ellipse(
+              0,
+              -bloom.r * lerp(0.18, 0.08, sepalOpen),
+              bloom.r * lerp(0.2, 0.34, sepalOpen),
+              bloom.r * lerp(0.34, 0.18, sepalOpen),
+              0,
+              0,
+              TAU
+            );
             ctx.fill();
             ctx.globalAlpha = 0.48;
             ctx.stroke();
             ctx.restore();
           }
 
-          if (opening > 0.2) {
-            const petals = smoothstep((opening - 0.2) / 0.8);
-            ctx.save();
-            ctx.rotate((1 - petals) * 0.22);
-            // Radial expansion separates the petals; extra width late in the
-            // motion reads as the corolla flattening toward the viewer.
-            ctx.scale(0.18 + petals * 0.82, 0.28 + Math.pow(petals, 0.72) * 0.72);
-            drawFlower(kind, bloom, plantSeed);
-            ctx.restore();
+          if (opening >= 1 / 9) {
+            drawFlower(kind, bloom, plantSeed, stagedGrowth(opening, 0.08));
           }
+        }
+
+        function posePetal(finalAngle, radius, opening, delay) {
+          const t = stagedGrowth(opening, delay || 0);
+          const angle = normalizeAngle(finalAngle);
+          ctx.rotate(angle * smoothstep(t));
+          ctx.translate(0, -radius * (0.12 + smoothstep(t) * 0.88));
+          return t;
+        }
+
+        function petalLength(length, opening) {
+          return length * (0.42 + smoothstep(opening) * 0.58);
+        }
+
+        function petalWidth(width, opening) {
+          return width * (0.12 + Math.pow(smoothstep(opening), 1.35) * 0.88);
+        }
+
+        function drawFlowerCenter(opening, draw) {
+          const reveal = smoothstep(clamp((opening - 0.52) / 0.48, 0, 1));
+          if (reveal <= 0) return;
+          ctx.save();
+          ctx.globalAlpha *= reveal;
+          draw();
+          ctx.restore();
         }
 
         function flowerBudColor(kind) {
@@ -1673,7 +1776,7 @@
 
         // The gallica rose of a plate is semi-double: two loose rows of broad
         // petals opening onto a boss of stamens, not a rolled florist's bud.
-        function drawRose(bloom, plantSeed) {
+        function drawRose(bloom, plantSeed, opening) {
           const r = bloom.r;
           const rng = mulberry32((plantSeed + Math.floor(bloom.phase * 10000)) >>> 0);
           const deep = bloom.variant > 0.6;
@@ -1687,11 +1790,15 @@
             const radius = r * (row === 0 ? 1 : 0.74);
             for (let i = 0; i < count; i += 1) {
               ctx.save();
-              ctx.rotate((i / count) * TAU + row * 0.58 + lerp(-0.14, 0.14, rng()));
-              ctx.translate(0, -radius * 0.4);
+              const pose = posePetal(
+                (i / count) * TAU + row * 0.58 + lerp(-0.14, 0.14, rng()),
+                radius * 0.4,
+                opening,
+                row * 0.12 + i * 0.012
+              );
               inkPetal(
-                radius * lerp(0.8, 1.0, rng()),
-                radius * lerp(0.5, 0.64, rng()),
+                petalLength(radius * lerp(0.8, 1.0, rng()), pose),
+                petalWidth(radius * lerp(0.5, 0.64, rng()), pose),
                 0.82,
                 row === 0 ? outer : inner,
                 { notch: true, veins: true }
@@ -1701,16 +1808,21 @@
           }
           for (let i = 0; i < 4; i += 1) {
             ctx.save();
-            ctx.rotate((i / 4) * TAU + 0.42);
-            ctx.translate(0, -r * 0.22);
-            inkPetal(r * 0.46, r * 0.3, 0.86, pale, { notch: true, inkAlpha: 0.36 });
+            const pose = posePetal((i / 4) * TAU + 0.42, r * 0.22, opening, 0.28 + i * 0.018);
+            inkPetal(
+              petalLength(r * 0.46, pose),
+              petalWidth(r * 0.3, pose),
+              0.86,
+              pale,
+              { notch: true, inkAlpha: 0.36 }
+            );
             ctx.restore();
           }
-          stamenBoss(rng, r * 0.19, 22, P.olive);
+          drawFlowerCenter(opening, () => stamenBoss(rng, r * 0.19, 22, P.olive));
           ctx.restore();
         }
 
-        function drawPeony(bloom, plantSeed) {
+        function drawPeony(bloom, plantSeed, opening) {
           const r = bloom.r;
           const rng = mulberry32((plantSeed ^ Math.floor(bloom.phase * 30000)) >>> 0);
           const pale = bloom.variant > 0.5;
@@ -1719,36 +1831,34 @@
           const innerPale = pale ? P.cream : P.rose;
 
           ctx.save();
-          for (let i = 0; i < 7; i += 1) {
-            ctx.save();
-            ctx.rotate((i / 7) * TAU + lerp(-0.2, 0.2, rng()));
-            ctx.translate(0, -r * 0.44);
-            inkPetal(r * lerp(0.86, 1.06, rng()), r * lerp(0.46, 0.62, rng()), 0.88, guard, {
-              notch: true,
-              veins: true,
-              inkAlpha: 0.55,
-              inkWidth: 0.7,
-            });
-            ctx.restore();
+          // Three coherent whorls create a recognizable bowl-shaped peony;
+          // the previous loose scatter read as a container of detached petals.
+          const rows = [
+            { count: 7, radius: 0.44, length: 0.96, width: 0.56, delay: 0, fill: guard },
+            { count: 8, radius: 0.3, length: 0.7, width: 0.4, delay: 0.14, fill: inner },
+            { count: 6, radius: 0.16, length: 0.48, width: 0.26, delay: 0.3, fill: innerPale },
+          ];
+          for (let row = 0; row < rows.length; row += 1) {
+            const conf = rows[row];
+            for (let i = 0; i < conf.count; i += 1) {
+              ctx.save();
+              const pose = posePetal(
+                (i / conf.count) * TAU + row * 0.44 + lerp(-0.12, 0.12, rng()),
+                r * conf.radius,
+                opening,
+                conf.delay + i * 0.009
+              );
+              inkPetal(
+                petalLength(r * conf.length * lerp(0.9, 1.06, rng()), pose),
+                petalWidth(r * conf.width * lerp(0.9, 1.08, rng()), pose),
+                0.88,
+                conf.fill,
+                { notch: true, veins: row === 0, inkAlpha: 0.46, hatchAlpha: 0.12 }
+              );
+              ctx.restore();
+            }
           }
-
-          // The crowded heart of a peony is a shaggy scatter, never a ring.
-          const florets = 30;
-          for (let i = 0; i < florets; i += 1) {
-            const angle = i * GOLDEN * TAU;
-            const dist = Math.sqrt((i + 0.7) / florets) * r * 0.52;
-            ctx.save();
-            ctx.translate(Math.cos(angle) * dist, Math.sin(angle) * dist * 0.9);
-            ctx.rotate(angle + Math.PI / 2 + lerp(-0.55, 0.55, rng()));
-            inkPetal(
-              r * lerp(0.3, 0.52, rng()),
-              r * lerp(0.12, 0.21, rng()),
-              0.92,
-              rng() > 0.45 ? inner : innerPale,
-              { notch: true, inkAlpha: 0.34, hatchAlpha: 0.1 }
-            );
-            ctx.restore();
-          }
+          drawFlowerCenter(opening, () => stamenBoss(rng, r * 0.12, 16, P.olive));
           ctx.restore();
         }
 
@@ -1796,28 +1906,38 @@
           ctx.restore();
         }
 
-        function drawCosmos(bloom) {
+        function drawCosmos(bloom, opening) {
           const r = bloom.r;
           const palette = bloom.variant > 0.5 ? [P.ochre, P.weld] : [P.madder, P.rose];
           for (let i = 0; i < 8; i += 1) {
             ctx.save();
-            ctx.rotate((i * TAU) / 8 + 0.1);
-            ctx.translate(0, -r * 0.42);
-            inkPetal(r * 0.84, r * 0.34, 0.34, palette[i % 2], { notch: true, veins: true });
+            const pose = posePetal((i * TAU) / 8 + 0.1, r * 0.42, opening, i * 0.014);
+            inkPetal(
+              petalLength(r * 0.84, pose),
+              petalWidth(r * 0.34, pose),
+              0.34,
+              palette[i % 2],
+              { notch: true, veins: true }
+            );
             ctx.restore();
           }
-          discCenter(r * 0.26, P.umber, P.gold, 16);
+          drawFlowerCenter(opening, () => discCenter(r * 0.26, P.umber, P.gold, 16));
         }
 
-        function drawPoppy(bloom) {
+        function drawPoppy(bloom, opening) {
           const r = bloom.r;
           const palette = bloom.variant > 0.5 ? [P.madder, '#c04a32'] : [P.madderDeep, P.wine];
           ctx.save();
           for (let i = 0; i < 5; i += 1) {
             ctx.save();
-            ctx.rotate((i * TAU) / 5 + 0.14);
-            ctx.translate(0, -r * 0.3);
-            inkPetal(r * 1.0, r * 0.6, 0.72, palette[i % 2], { veins: true, hatchAlpha: 0.2 });
+            const pose = posePetal((i * TAU) / 5 + 0.14, r * 0.3, opening, i * 0.025);
+            inkPetal(
+              petalLength(r, pose),
+              petalWidth(r * 0.6, pose),
+              0.72,
+              palette[i % 2],
+              { veins: true, hatchAlpha: 0.2 }
+            );
             // The dark basal blotch of a field poppy.
             ctx.globalAlpha = 0.8;
             ctx.fillStyle = P.ink;
@@ -1829,73 +1949,85 @@
           ctx.restore();
 
           // Stamen ring, then the capsule.
-          ctx.save();
-          ctx.strokeStyle = P.ink;
-          ctx.globalAlpha = 0.7;
-          ctx.lineWidth = 0.6;
-          for (let i = 0; i < 22; i += 1) {
-            const a = (i / 22) * TAU;
-            ctx.beginPath();
-            ctx.moveTo(Math.cos(a) * r * 0.16, Math.sin(a) * r * 0.16);
-            ctx.lineTo(Math.cos(a) * r * 0.4, Math.sin(a) * r * 0.4);
-            ctx.stroke();
-          }
-          ctx.globalAlpha = 1;
-          ctx.restore();
-          discCenter(r * 0.2, '#3b4029', P.leafPale, 8);
+          drawFlowerCenter(opening, () => {
+            ctx.save();
+            ctx.strokeStyle = P.ink;
+            ctx.globalAlpha = 0.7;
+            ctx.lineWidth = 0.6;
+            for (let i = 0; i < 22; i += 1) {
+              const a = (i / 22) * TAU;
+              ctx.beginPath();
+              ctx.moveTo(Math.cos(a) * r * 0.16, Math.sin(a) * r * 0.16);
+              ctx.lineTo(Math.cos(a) * r * 0.4, Math.sin(a) * r * 0.4);
+              ctx.stroke();
+            }
+            ctx.restore();
+            discCenter(r * 0.2, '#3b4029', P.leafPale, 8);
+          });
         }
 
-        function drawDaisy(bloom) {
+        function drawDaisy(bloom, opening) {
           const r = bloom.r;
           const count = 15;
           for (let i = 0; i < count; i += 1) {
             ctx.save();
-            ctx.rotate((i * TAU) / count);
-            ctx.translate(0, -r * 0.46);
-            inkPetal(r * 0.9, r * 0.2, 0.3, i % 3 ? P.white : P.cream, {
+            const pose = posePetal((i * TAU) / count, r * 0.46, opening, i * 0.008);
+            inkPetal(petalLength(r * 0.9, pose), petalWidth(r * 0.2, pose), 0.3, i % 3 ? P.white : P.cream, {
               notch: true,
               inkAlpha: 0.4,
               hatchAlpha: 0.1,
             });
             ctx.restore();
           }
-          discCenter(r * 0.3, '#b98a24', P.gold, 20);
+          drawFlowerCenter(opening, () => discCenter(r * 0.3, '#b98a24', P.gold, 20));
         }
 
-        function drawAnemone(bloom) {
+        function drawAnemone(bloom, opening) {
           const r = bloom.r;
           const palette = bloom.variant > 0.5 ? [P.indigo, P.woad] : [P.indigoDeep, P.indigo];
           for (let i = 0; i < 9; i += 1) {
             ctx.save();
-            ctx.rotate((i * TAU) / 9);
-            ctx.translate(0, -r * 0.36);
-            inkPetal(r * 0.8, r * 0.36, 0.48, palette[i % 2], { veins: true });
+            const pose = posePetal((i * TAU) / 9, r * 0.36, opening, i * 0.012);
+            inkPetal(
+              petalLength(r * 0.8, pose),
+              petalWidth(r * 0.36, pose),
+              0.48,
+              palette[i % 2],
+              { veins: true }
+            );
             ctx.restore();
           }
-          ctx.save();
-          ctx.strokeStyle = P.ink;
-          ctx.globalAlpha = 0.65;
-          ctx.lineWidth = 0.55;
-          for (let i = 0; i < 18; i += 1) {
-            const a = (i / 18) * TAU;
-            ctx.beginPath();
-            ctx.moveTo(Math.cos(a) * r * 0.18, Math.sin(a) * r * 0.18);
-            ctx.lineTo(Math.cos(a) * r * 0.38, Math.sin(a) * r * 0.38);
-            ctx.stroke();
-          }
-          ctx.restore();
-          discCenter(r * 0.22, P.indigoDeep, '#7f9bab', 10);
+          drawFlowerCenter(opening, () => {
+            ctx.save();
+            ctx.strokeStyle = P.ink;
+            ctx.globalAlpha = 0.65;
+            ctx.lineWidth = 0.55;
+            for (let i = 0; i < 18; i += 1) {
+              const a = (i / 18) * TAU;
+              ctx.beginPath();
+              ctx.moveTo(Math.cos(a) * r * 0.18, Math.sin(a) * r * 0.18);
+              ctx.lineTo(Math.cos(a) * r * 0.38, Math.sin(a) * r * 0.38);
+              ctx.stroke();
+            }
+            ctx.restore();
+            discCenter(r * 0.22, P.indigoDeep, '#7f9bab', 10);
+          });
         }
 
-        function drawLily(bloom) {
+        function drawLily(bloom, opening) {
           const r = bloom.r;
           const warm = bloom.variant > 0.45;
           for (let i = 0; i < 6; i += 1) {
             ctx.save();
-            ctx.rotate((i * TAU) / 6 + 0.12);
-            ctx.translate(0, -r * 0.2);
+            const pose = posePetal((i * TAU) / 6 + 0.12, r * 0.2, opening, i * 0.024);
             const fill = warm ? (i % 2 ? P.ochre : '#c9702c') : (i % 2 ? P.madder : P.rose);
-            inkPetal(r * 1.1, r * 0.3, 0.2, fill, { veins: true, inkAlpha: 0.5 });
+            inkPetal(
+              petalLength(r * 1.1, pose),
+              petalWidth(r * 0.3, pose),
+              0.2,
+              fill,
+              { veins: true, inkAlpha: 0.5 }
+            );
             // Tiger spots.
             ctx.globalAlpha = 0.85;
             ctx.fillStyle = P.madderDeep;
@@ -1914,46 +2046,65 @@
             }
             ctx.restore();
           }
-          ctx.save();
-          ctx.strokeStyle = P.umber;
-          ctx.fillStyle = P.umber;
-          ctx.lineWidth = 0.85;
-          ctx.lineCap = 'round';
-          for (let i = 0; i < 6; i += 1) {
-            const angle = -0.85 + i * 0.34;
-            const tipX = Math.sin(angle) * r * 0.6;
-            const tipY = -r * 0.62 - Math.cos(angle) * r * 0.05;
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.quadraticCurveTo(Math.sin(angle) * r * 0.42, -r * 0.24, tipX, tipY);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.ellipse(tipX, tipY, 1.5, 3.4, angle, 0, TAU);
-            ctx.fill();
-          }
-          ctx.restore();
+          drawFlowerCenter(opening, () => {
+            ctx.save();
+            ctx.strokeStyle = P.umber;
+            ctx.fillStyle = P.umber;
+            ctx.lineWidth = 0.85;
+            ctx.lineCap = 'round';
+            for (let i = 0; i < 6; i += 1) {
+              const angle = -0.85 + i * 0.34;
+              const tipX = Math.sin(angle) * r * 0.6;
+              const tipY = -r * 0.62 - Math.cos(angle) * r * 0.05;
+              ctx.beginPath();
+              ctx.moveTo(0, 0);
+              ctx.quadraticCurveTo(Math.sin(angle) * r * 0.42, -r * 0.24, tipX, tipY);
+              ctx.stroke();
+              ctx.beginPath();
+              ctx.ellipse(tipX, tipY, 1.5, 3.4, angle, 0, TAU);
+              ctx.fill();
+            }
+            ctx.restore();
+          });
         }
 
-        function drawHydrangea(bloom, plantSeed) {
+        function drawHydrangea(bloom, plantSeed, opening) {
           const r = bloom.r;
           const rng = mulberry32((plantSeed + Math.floor(bloom.variant * 99999)) >>> 0);
           const palette =
             bloom.variant > 0.55
               ? [P.woad, '#7b9aa8', '#a8bec6']
               : [P.rose, P.rosePale, '#e6c3ab'];
-          const florets = 20;
+          const florets = 7;
+
+          // A lacecap head: a readable ring of sterile florets around a
+          // fertile centre. This keeps the hydrangea botanical instead of
+          // looking like a bucket of disconnected blossom confetti.
           for (let i = 0; i < florets; i += 1) {
-            const angle = i * GOLDEN * TAU;
-            const dist = Math.sqrt(i / florets) * r * 0.82;
-            const sr = r * lerp(0.15, 0.23, rng());
+            const angle = (i / florets) * TAU + lerp(-0.12, 0.12, rng());
+            const floretOpen = stagedGrowth(opening, i * 0.018);
+            const dist = r * 0.57 * (0.2 + smoothstep(floretOpen) * 0.8);
+            const sr = r * lerp(0.22, 0.28, rng());
             ctx.save();
-            ctx.translate(Math.cos(angle) * dist, Math.sin(angle) * dist * 0.88);
-            ctx.rotate(angle);
+            ctx.translate(Math.cos(angle) * dist, Math.sin(angle) * dist * 0.82);
+            ctx.rotate(angle * 0.24);
+            ctx.fillStyle = P.leafMid;
+            ctx.globalAlpha = 0.72;
+            for (let s = 0; s < 4; s += 1) {
+              ctx.save();
+              ctx.rotate((s * Math.PI) / 2);
+              ctx.beginPath();
+              ctx.moveTo(0, 0);
+              ctx.quadraticCurveTo(-sr * 0.18, -sr * 0.2, 0, -sr * 0.54);
+              ctx.quadraticCurveTo(sr * 0.18, -sr * 0.2, 0, 0);
+              ctx.fill();
+              ctx.restore();
+            }
+            ctx.globalAlpha = 1;
             for (let p = 0; p < 4; p += 1) {
               ctx.save();
-              ctx.rotate((p * Math.PI) / 2 + 0.2);
-              ctx.translate(0, -sr * 0.46);
-              inkPetal(sr, sr * 0.56, 0.56, palette[(i + p) % palette.length], {
+              const pose = posePetal((p * Math.PI) / 2 + 0.2, sr * 0.42, floretOpen, p * 0.025);
+              inkPetal(petalLength(sr, pose), petalWidth(sr * 0.5, pose), 0.56, palette[(i + p) % palette.length], {
                 inkAlpha: 0.34,
                 inkWidth: 0.4,
               });
@@ -1961,13 +2112,37 @@
             }
             ctx.fillStyle = P.weld;
             ctx.beginPath();
-            ctx.arc(0, 0, sr * 0.17, 0, TAU);
+            ctx.arc(0, 0, sr * 0.14, 0, TAU);
             ctx.fill();
             ctx.restore();
           }
+
+          drawFlowerCenter(opening, () => {
+            ctx.fillStyle = bloom.variant > 0.55 ? P.indigoDeep : P.madderDeep;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, r * 0.38, r * 0.31, 0, 0, TAU);
+            ctx.fill();
+            ctx.strokeStyle = P.umber;
+            ctx.globalAlpha = 0.68;
+            ctx.lineWidth = 0.45;
+            for (let i = 0; i < 24; i += 1) {
+              const angle = i * GOLDEN * TAU;
+              const d = Math.sqrt((i + 0.5) / 24) * r * 0.32;
+              const x = Math.cos(angle) * d;
+              const y = Math.sin(angle) * d * 0.8;
+              ctx.beginPath();
+              ctx.moveTo(x, y);
+              ctx.lineTo(x + Math.cos(angle) * r * 0.07, y + Math.sin(angle) * r * 0.07);
+              ctx.stroke();
+              ctx.fillStyle = i % 3 ? P.gold : P.leafPale;
+              ctx.beginPath();
+              ctx.arc(x, y, Math.max(0.65, r * 0.025), 0, TAU);
+              ctx.fill();
+            }
+          });
         }
 
-        function drawHoneysuckle(bloom, plantSeed) {
+        function drawHoneysuckle(bloom, plantSeed, opening) {
           const r = bloom.r;
           const rng = mulberry32((plantSeed ^ Math.floor(bloom.variant * 54321)) >>> 0);
           const count = 5;
@@ -1977,9 +2152,10 @@
 
           for (let i = 0; i < count; i += 1) {
             const a = (i / count) * TAU + lerp(-0.16, 0.16, rng());
-            const len = r * lerp(0.74, 0.96, rng());
+            const floretOpen = stagedGrowth(opening, i * 0.045);
+            const len = r * lerp(0.74, 0.96, rng()) * (0.28 + floretOpen * 0.72);
             ctx.save();
-            ctx.rotate(a);
+            ctx.rotate(normalizeAngle(a) * smoothstep(floretOpen));
 
             // Each floret is a curved tube — never a straight one.
             const bend = lerp(0.26, 0.55, rng()) * (i % 2 ? 1 : -1);
@@ -2002,11 +2178,16 @@
             ctx.rotate(Math.atan2(-bend * len * 0.4, -len * 0.4));
             for (let k = -1; k <= 1; k += 1) {
               ctx.save();
-              ctx.rotate(k * 0.68);
+              ctx.rotate(k * 0.68 * smoothstep(floretOpen));
               ctx.beginPath();
               ctx.moveTo(0, 0);
-              ctx.quadraticCurveTo(-r * 0.26, -r * 0.24, -r * 0.48, -r * 0.06);
-              ctx.quadraticCurveTo(-r * 0.26, r * 0.11, 0, 0);
+              ctx.quadraticCurveTo(
+                -r * 0.26 * floretOpen,
+                -r * 0.24 * floretOpen,
+                -r * 0.48 * floretOpen,
+                -r * 0.06
+              );
+              ctx.quadraticCurveTo(-r * 0.26 * floretOpen, r * 0.11 * floretOpen, 0, 0);
               ctx.closePath();
               ctx.fillStyle = lip;
               ctx.fill();
@@ -2030,10 +2211,12 @@
             ctx.restore();
             ctx.restore();
           }
-          ctx.fillStyle = P.leafMid;
-          ctx.beginPath();
-          ctx.arc(0, 0, r * 0.13, 0, TAU);
-          ctx.fill();
+          drawFlowerCenter(opening, () => {
+            ctx.fillStyle = P.leafMid;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.13, 0, TAU);
+            ctx.fill();
+          });
         }
 
         function discCenter(radius, base, dot, count) {
@@ -2061,6 +2244,20 @@
         // ---------------------------------------------------------------
         // Utilities
         // ---------------------------------------------------------------
+
+        function developmentProgress(value) {
+          const t = clamp(value, 0, 1);
+          const frame = Math.min(DEVELOPMENT_FRAMES - 1, Math.floor(t * DEVELOPMENT_FRAMES));
+          return frame / (DEVELOPMENT_FRAMES - 1);
+        }
+
+        function stagedGrowth(value, delay) {
+          return developmentProgress(clamp((value - delay) / Math.max(0.001, 1 - delay), 0, 1));
+        }
+
+        function normalizeAngle(angle) {
+          return Math.atan2(Math.sin(angle), Math.cos(angle));
+        }
 
         function sortPlants() {
           plants.sort((a, b) => a.depth - b.depth || a.id - b.id);

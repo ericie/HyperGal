@@ -13,11 +13,12 @@ is present, the ball finds the shortest route to an unlit cube instead. Every
 cube has only two states: off and on. A landing turns an off cube on and never
 advances it to a third color.
 
-Wide, coiled spring-snakes attack in waves. Three to five arrive in a compact
-burst, share a related hue, and choose their own random routes upward. A long
-lull separates each group, and no more than eight snakes may occupy the board at
-once. This gives the hunter time to resume lighting cubes between attacks while
-leaving enough simultaneous routes for one snake to break through. Every snake reserves
+Wide, coiled spring-snakes attack in waves. One or two arrive in a compact
+burst, share a related hue, and choose their own random routes upward. A sixteen-
+to-twenty-two-second lull separates each group, and no more than three snakes may
+occupy the board at once. This gives the hunter time to resume lighting cubes
+between attacks while leaving enough simultaneous routes for one snake to break
+through. Every snake reserves
 both its current cube and its destination. No two snakes can occupy or move
 through the same square; a blocked snake bounces in place until one of its two
 upward routes opens. The ON side scores only by lighting every cube in the

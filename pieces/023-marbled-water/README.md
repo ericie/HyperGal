@@ -1,15 +1,18 @@
 # Marbled Water
 
 A simulation of paper marbling on a floating bath, centered on the visual logic
-of suminagashi. Colored ink arrives one drop at a time in a quick, irregular
-rhythm. Each drop lands and blooms into a contour whose growing area displaces
-every older color.
+of suminagashi. Large colored ink drops arrive one at a time in a quick,
+irregular rhythm. In the Suminagashi palette, each ink drop is followed by a
+smaller open-water drop that reserves a pale interval before the next band.
+Every bloom displaces the older colors and open spaces together.
 
-The bath opens with several colored ring families. New drops usually land near
-one of those families, but vary from centered hits to broad offsets and entirely
-new starting points. Drop diameter and timing both vary substantially. There are
-no blank or clearing drops: a visible bath border contains every displaced
-contour and lets the pattern accumulate against the edge.
+The bath opens with a few large, wandering ring families rather than a field of
+small targets. New drops usually land near one of those families, but vary from
+centered hits to broad offsets and entirely new starting points. Drop diameter,
+gap width, and timing all vary substantially. Other palettes remain continuous;
+the Suminagashi palette alone preserves paper-colored water between ink bands.
+A visible bath border contains every displaced contour and lets the pattern
+accumulate against the edge.
 
 The comb tools move a visible row of individual teeth through the bath. Each
 tooth lightly entrains the contour it crosses and pulls a narrow filament from

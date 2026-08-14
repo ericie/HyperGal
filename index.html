@@ -137,7 +137,15 @@
         text-decoration-thickness: 1px;
       }
       .work:visited .cap .t { color: var(--visited); }
-      .cap .yr { display: block; margin-top: .12rem; color: #555; font-style: italic; }
+      .dates {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .1rem 1ch;
+        color: #555;
+        font-style: italic;
+      }
+      .cap .dates { margin-top: .18rem; font-size: .88em; }
+      .date-label { color: #767676; }
 
       .work:hover .cap .t { text-decoration-thickness: 2px; }
       .work:focus-visible { outline: none; }
@@ -171,6 +179,12 @@
         font-style: italic;
         white-space: nowrap;
       }
+      .row .dates {
+        flex: 0 0 auto;
+        justify-content: flex-end;
+        font-size: .84em;
+        line-height: 1.45;
+      }
       .row:hover .t { text-decoration-thickness: 2px; }
       .row:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
       .row:focus-visible .t { text-decoration-thickness: 2px; }
@@ -189,6 +203,15 @@
         color: #555;
       }
       footer a { color: var(--blue); }
+
+      @media (max-width: 42rem) {
+        .row { flex-wrap: wrap; gap: .2rem 1rem; }
+        .row .dates {
+          width: 100%;
+          margin-left: 0;
+          justify-content: flex-start;
+        }
+      }
 
       @media (prefers-reduced-motion: reduce) {
         .skip-link { transition: none; }
@@ -297,8 +320,7 @@
           if (p.thumbnail) thumb.append(thumbImg(p));
           const cap = el('div', 'cap');
           cap.append(el('span', 't', title(p)));
-          const meta = metaText(p);
-          if (meta) cap.append(el('span', 'yr', meta));
+          cap.append(dateMeta(p));
           a.append(thumb, cap);
           return a;
         }
@@ -306,14 +328,25 @@
         function listRow(p) {
           const a = link(p, 'row');
           a.append(el('span', 't', title(p)));
-          const meta = metaText(p);
-          if (meta) a.append(el('span', 'meta', meta));
+          a.append(dateMeta(p));
           return a;
         }
 
-        function metaText(p) {
-          const d = fmtDate(p.date) || (p.year ? String(p.year) : '');
-          return [d, p.wip ? 'in progress' : ''].filter(Boolean).join(' · ');
+        function dateMeta(p) {
+          const dates = el('span', 'dates');
+          dates.append(dateItem('Published', p.date || (p.year ? String(p.year) : '')));
+          dates.append(dateItem('Updated', p.updated));
+          if (p.wip) dates.append(el('span', '', 'In progress'));
+          return dates;
+        }
+
+        function dateItem(label, iso) {
+          const item = document.createElement('span');
+          item.append(el('span', 'date-label', `${label} `));
+          const time = el('time', '', fmtDate(iso));
+          if (iso) time.dateTime = iso;
+          item.append(time);
+          return item;
         }
 
         function link(p, cls) {
@@ -321,7 +354,9 @@
           a.className = cls;
           a.href = `./pieces/${p.slug}/index.html`;
           a.setAttribute('aria-label',
-            `${title(p)}${p.date ? ', ' + fmtDate(p.date) : ''}${p.wip ? ', in progress' : ''}`);
+            `${title(p)}${p.date ? ', published ' + fmtDate(p.date) : ''}` +
+            `${p.updated ? ', updated ' + fmtDate(p.updated) : ''}` +
+            `${p.wip ? ', in progress' : ''}`);
           return a;
         }
 
@@ -354,7 +389,7 @@
 
         function fmtDate(iso) {
           const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
-          return m ? `${MONTHS[+m[2] - 1]} ${m[1]}` : '';
+          return m ? `${MONTHS[+m[2] - 1]} ${+m[3]}, ${m[1]}` : (iso || '—');
         }
 
         function el(tag, cls, text) {

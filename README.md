@@ -14,7 +14,7 @@ from now, with zero external dependencies.
 - `manifest.js` — generated list of pieces, loaded by `index.html` as a plain
   script tag so the gallery works on `file://` (no server required).
 - `scripts/build-manifest.mjs` — Node script (stdlib only) that scans
-  `pieces/` and writes `manifest.js`.
+  `pieces/`, reads each piece's latest Git commit date, and writes `manifest.js`.
 
 ## Adding a piece
 
@@ -22,8 +22,10 @@ from now, with zero external dependencies.
 2. Build the piece in `index.html`. Drop every asset it needs — images,
    scripts, vendored libraries, fonts — into the same folder. **No CDNs, no
    external links.**
-3. Edit `meta.json` (title, year, type, thumbnail filename, description).
-4. Run `node scripts/build-manifest.mjs` to regenerate the gallery index.
+3. Edit `meta.json` (title, publication `date`, year, type, thumbnail filename,
+   and description).
+4. Commit the piece, then run `node scripts/build-manifest.mjs` to regenerate
+   the gallery index with its latest committed update date.
 
 ## Viewing
 

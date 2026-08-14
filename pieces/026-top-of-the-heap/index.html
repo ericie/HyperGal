@@ -298,7 +298,7 @@
         }
 
         function spawnSnake() {
-          if (players.length >= 8 || phase !== 'play') return false;
+          if (players.length >= 3 || phase !== 'play') return false;
           const openColumns = [];
           for (let column = 0; column < rows; column += 1) {
             if (!snakeClaimsSquare(rows - 1, column, null)) openColumns.push(column);
@@ -332,7 +332,7 @@
         function beginWave() {
           waveIndex += 1;
           waveHue = 98 + random() * 38;
-          waveRemaining = 3 + Math.floor(random() * 3);
+          waveRemaining = 1 + Math.floor(random() * 2);
           nextSpawnAt = matchTime;
           status.textContent = `Spring wave ${waveIndex}: ${waveRemaining} snakes.`;
         }
@@ -373,9 +373,9 @@
           if (waveRemaining > 0 && matchTime >= nextSpawnAt) {
             if (spawnSnake()) {
               waveRemaining -= 1;
-              nextSpawnAt = matchTime + 0.26 + random() * 0.18;
+              nextSpawnAt = matchTime + 0.34 + random() * 0.2;
               if (waveRemaining === 0) {
-                nextWaveAt = matchTime + 6.5 + random() * 2.5;
+                nextWaveAt = matchTime + 16 + random() * 6;
               }
             } else {
               nextSpawnAt = matchTime + 0.5;

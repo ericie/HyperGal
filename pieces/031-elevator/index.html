@@ -1,0 +1,1036 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#090a0a" />
+    <title>Elevator · HyperGal</title>
+    <style>
+      * { box-sizing: border-box; }
+
+      :root {
+        --steel-0: #151817;
+        --steel-1: #353a38;
+        --steel-2: #626965;
+        --steel-3: #969c98;
+        --steel-4: #c7cbc7;
+        --amber: #ff9d26;
+        --red: #dc421d;
+        --travel: 3400ms;
+        --doors: 2300ms;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #090a0a;
+        color: #d5d8d5;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        padding:
+          env(safe-area-inset-top)
+          env(safe-area-inset-right)
+          env(safe-area-inset-bottom)
+          env(safe-area-inset-left);
+      }
+
+      .elevator {
+        position: relative;
+        width: min(100vw, 960px);
+        height: min(100dvh, 820px);
+        min-height: 480px;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 50% 18%, rgba(255,255,255,.13), transparent 35%),
+          linear-gradient(103deg, #252927 0%, #5d625f 21%, #303532 43%, #7b817d 72%, #242826 100%);
+        border-top: 1px solid #979d99;
+        box-shadow: inset 0 0 70px #050606, 0 12px 34px rgba(0,0,0,.7);
+        isolation: isolate;
+      }
+
+      .elevator::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 7;
+        pointer-events: none;
+        opacity: .24;
+        background-image:
+          radial-gradient(circle, #0d0f0e 0 1px, transparent 1.35px),
+          radial-gradient(circle, rgba(255,255,255,.8) 0 .6px, transparent .9px);
+        background-position: 0 0, 2px 2px;
+        background-size: 4px 4px;
+        mix-blend-mode: multiply;
+      }
+
+      .ceiling {
+        position: absolute;
+        inset: 0 0 auto;
+        height: 3.3%;
+        z-index: 8;
+        background: linear-gradient(#111312, #626764 52%, #181b19);
+        box-shadow: 0 3px 8px #050606;
+      }
+
+      .indicator-shell {
+        position: absolute;
+        z-index: 9;
+        top: 6.2%;
+        left: 22.5%;
+        right: 22.5%;
+        height: 12%;
+        padding: clamp(6px, 1.1vh, 10px);
+        background: linear-gradient(110deg, #303432, #9a9f9c 27%, #3b403d 67%, #b2b6b3);
+        box-shadow: 0 2px 7px #070807, inset 0 0 0 1px #b4b8b5;
+      }
+
+      .indicator {
+        height: 100%;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: clamp(8px, 2vw, 24px);
+        padding: 0 clamp(12px, 2vw, 28px);
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 24% 38%, rgba(255,157,38,.12), transparent 2px),
+          linear-gradient(#080908, #171a18 45%, #050606);
+        box-shadow: inset 0 0 16px #000;
+      }
+
+      #floor-display {
+        min-width: 2ch;
+        color: var(--amber);
+        font-family: "Courier New", monospace;
+        font-size: clamp(24px, 5vh, 45px);
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: .06em;
+        text-align: center;
+        text-shadow: 0 0 4px #ff7818, 0 0 13px rgba(255,103,0,.48);
+      }
+
+      .arrow {
+        width: 0;
+        height: 0;
+        opacity: .18;
+        filter: drop-shadow(0 0 5px #ff7822);
+        transition: opacity 180ms linear;
+      }
+
+      .arrow.up {
+        justify-self: end;
+        border-left: clamp(7px, 1.4vw, 13px) solid transparent;
+        border-right: clamp(7px, 1.4vw, 13px) solid transparent;
+        border-bottom: clamp(11px, 2.2vw, 21px) solid var(--amber);
+      }
+
+      .arrow.down {
+        justify-self: start;
+        border-left: clamp(7px, 1.4vw, 13px) solid transparent;
+        border-right: clamp(7px, 1.4vw, 13px) solid transparent;
+        border-top: clamp(11px, 2.2vw, 21px) solid var(--amber);
+      }
+
+      .elevator[data-direction="up"] .arrow.up,
+      .elevator[data-direction="down"] .arrow.down { opacity: 1; }
+
+      .floor-zone {
+        position: absolute;
+        z-index: 3;
+        top: 21.5%;
+        bottom: 5.5%;
+        left: 19%;
+        right: 19%;
+        overflow: hidden;
+        background: #030404;
+        box-shadow:
+          0 0 0 clamp(5px, 1vw, 10px) #242826,
+          0 0 0 clamp(7px, 1.4vw, 14px) #777d79,
+          0 8px 18px #050606;
+      }
+
+      .floor-zone::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+        box-shadow: inset 0 0 35px 8px rgba(0,0,0,.58);
+      }
+
+      #world {
+        position: absolute;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #020303;
+      }
+
+      .threshold {
+        position: absolute;
+        z-index: 5;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 2.2%;
+        background: linear-gradient(#d4d7d4, #4c514e 36%, #101311 78%, #8b918d);
+        box-shadow: 0 -2px 5px rgba(0,0,0,.7);
+      }
+
+      .door {
+        position: absolute;
+        z-index: 4;
+        top: 0;
+        bottom: 1.4%;
+        width: 50.5%;
+        overflow: hidden;
+        background:
+          radial-gradient(ellipse at 50% 14%, rgba(255,255,255,.15), transparent 43%),
+          linear-gradient(91deg, #303532 0%, #858b87 17%, #3d423f 42%, #9ba09c 70%, #343936 100%);
+        transition: transform var(--doors) cubic-bezier(.76, 0, .24, 1);
+        will-change: transform;
+      }
+
+      .door::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        opacity: .38;
+        background-image:
+          radial-gradient(circle, #0b0d0c 0 1px, transparent 1.25px),
+          radial-gradient(circle, rgba(255,255,255,.72) 0 .55px, transparent .8px);
+        background-position: 0 0, 2px 2px;
+        background-size: 4px 4px;
+      }
+
+      .door::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, rgba(0,0,0,.38), transparent 15%, rgba(255,255,255,.09) 52%, transparent 83%, rgba(0,0,0,.28));
+      }
+
+      .door.left {
+        left: 0;
+        border-right: 3px solid #151816;
+        box-shadow: inset -7px 0 7px rgba(0,0,0,.44);
+        transform-origin: left center;
+      }
+
+      .door.right {
+        right: 0;
+        border-left: 3px solid #121413;
+        box-shadow: inset 7px 0 7px rgba(0,0,0,.44);
+        transform-origin: right center;
+      }
+
+      .doors-open .door.left { transform: translateX(-97%); }
+      .doors-open .door.right { transform: translateX(97%); }
+
+      .wall-panel {
+        position: absolute;
+        z-index: 5;
+        top: 21.5%;
+        bottom: 5.5%;
+        width: 13.5%;
+        min-width: 54px;
+      }
+
+      .wall-panel.left { left: 2.7%; }
+      .wall-panel.right { right: 2.7%; }
+
+      .control {
+        position: absolute;
+        left: 50%;
+        top: 22%;
+        width: min(78%, 82px);
+        transform: translateX(-50%);
+        padding: clamp(5px, .9vw, 9px) clamp(4px, .7vw, 7px) clamp(8px, 1.2vw, 12px);
+        background: linear-gradient(100deg, #111412, #444a46 45%, #111312 100%);
+        box-shadow: 1px 2px 6px #090a09, inset 0 0 0 1px #6d736f;
+      }
+
+      .permit {
+        margin: 0 0 clamp(8px, 1.2vh, 12px);
+        padding: 5px 2px;
+        color: #181b19;
+        background: #b7b9ad;
+        font-size: clamp(4px, .6vw, 7px);
+        line-height: 1.3;
+        text-align: center;
+        box-shadow: 0 1px 2px #000;
+      }
+
+      .buttons {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: clamp(4px, .7vw, 7px);
+      }
+
+      button {
+        -webkit-tap-highlight-color: transparent;
+        font: inherit;
+      }
+
+      .floor-button,
+      .utility-button {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 100%;
+        aspect-ratio: 1;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        color: #dddeda;
+        background: radial-gradient(circle at 38% 31%, #6d726f, #252a27 43%, #080a09 70%);
+        box-shadow: inset 0 0 0 1px #929793, inset 0 -2px 3px #050606, 0 1px 2px #050606;
+        cursor: pointer;
+        font-size: clamp(7px, 1.25vw, 12px);
+        font-weight: 700;
+      }
+
+      .floor-button::after {
+        content: "";
+        position: absolute;
+        inset: -2px;
+        border: 1px solid #131614;
+        border-radius: 50%;
+      }
+
+      .floor-button:hover,
+      .floor-button:focus-visible { color: #fff; background: radial-gradient(circle at 38% 31%, #898e8b, #303532 47%, #0b0d0c 74%); }
+      .floor-button:focus-visible,
+      .utility-button:focus-visible { outline: 2px solid #ffd18b; outline-offset: 3px; }
+
+      .floor-button.lit {
+        color: #ffe3bf;
+        background: radial-gradient(circle, #d54f1e 0 18%, #7e1b09 25%, #2c160f 47%, #080a09 74%);
+        text-shadow: 0 0 4px #ffb47a;
+      }
+
+      .utilities {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: clamp(4px, .7vw, 7px);
+        margin-top: clamp(7px, 1.2vh, 12px);
+      }
+
+      .utility-button {
+        border-radius: 2px;
+        aspect-ratio: 1.2;
+        color: #abb0ac;
+        font-size: clamp(8px, 1.35vw, 13px);
+      }
+
+      #sound[aria-pressed="true"] { color: var(--amber); text-shadow: 0 0 5px #ff8c21; }
+
+      .inspection-card {
+        position: absolute;
+        left: 8%;
+        right: 8%;
+        bottom: 5%;
+        min-height: 9%;
+        padding: 7px;
+        color: #262a27;
+        background: #babcb3;
+        font-size: clamp(4px, .58vw, 7px);
+        line-height: 1.4;
+        transform: rotate(-.5deg);
+        box-shadow: 0 2px 4px #0a0b0a;
+      }
+
+      .speaker-grille {
+        position: absolute;
+        top: 12%;
+        left: 19%;
+        right: 19%;
+        height: 6%;
+        opacity: .7;
+        background-image: radial-gradient(circle, #090b0a 0 1.2px, transparent 1.6px);
+        background-size: 7px 7px;
+      }
+
+      .status-light {
+        position: absolute;
+        top: 5%;
+        left: 50%;
+        width: clamp(7px, 1vw, 10px);
+        aspect-ratio: 1;
+        transform: translateX(-50%);
+        border-radius: 50%;
+        background: #26150c;
+        box-shadow: inset 0 0 2px #000;
+      }
+
+      .traveling .status-light {
+        background: var(--red);
+        box-shadow: 0 0 7px #f34d25;
+        animation: blink .82s steps(1, end) infinite;
+      }
+
+      .service-label {
+        position: absolute;
+        z-index: 9;
+        left: 50%;
+        bottom: 1.3%;
+        transform: translateX(-50%);
+        color: rgba(214,218,214,.5);
+        font-size: clamp(6px, .75vw, 9px);
+        letter-spacing: .11em;
+        white-space: nowrap;
+        text-shadow: 0 1px 1px #080908;
+      }
+
+      .traveling .elevator {
+        animation: carriage var(--travel) linear both;
+      }
+
+      .traveling .floor-zone {
+        box-shadow:
+          0 0 0 clamp(5px, 1vw, 10px) #242826,
+          0 0 0 clamp(7px, 1.4vw, 14px) #777d79,
+          0 8px 18px #050606,
+          inset 0 0 0 100vmax rgba(255,255,255,.012);
+      }
+
+      @keyframes carriage {
+        0%, 100% { transform: translateY(0); filter: brightness(1); }
+        8% { transform: translateY(1px); }
+        9% { transform: translateY(-1px); }
+        18% { transform: translateY(.5px); filter: brightness(.96); }
+        42% { transform: translateY(-.6px); }
+        67% { transform: translateY(.7px); filter: brightness(1.03); }
+        91% { transform: translateY(-1px); }
+      }
+
+      @keyframes blink { 50% { opacity: .28; } }
+
+      .screen-reader-status {
+        position: fixed;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      @media (max-width: 540px) {
+        .elevator { min-height: 100dvh; }
+        .indicator-shell { left: 18%; right: 18%; }
+        .floor-zone { left: 16%; right: 16%; top: 20.5%; bottom: 4.8%; }
+        .wall-panel { width: 12.4%; top: 20.5%; bottom: 4.8%; }
+        .wall-panel.left { left: 1.2%; }
+        .wall-panel.right { right: 1.2%; }
+        .control { width: 92%; top: 25%; padding-inline: 3px; }
+        .permit { display: none; }
+        .buttons { grid-template-columns: 1fr; gap: 8px; }
+        .buttons .floor-button:nth-child(even) { display: none; }
+        .utilities { grid-template-columns: 1fr; }
+        .utilities .utility-button:last-child { display: none; }
+        .inspection-card { display: none; }
+        .speaker-grille { left: 10%; right: 10%; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        :root { --travel: 250ms; --doors: 650ms; }
+        .traveling .elevator,
+        .traveling .status-light { animation: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="elevator" id="elevator" data-direction="up" aria-label="An elevator traveling to impossible floors">
+      <div class="ceiling" aria-hidden="true"></div>
+
+      <div class="indicator-shell" aria-hidden="true">
+        <div class="indicator">
+          <span class="arrow up"></span>
+          <span id="floor-display">B4</span>
+          <span class="arrow down"></span>
+        </div>
+      </div>
+
+      <section class="floor-zone" aria-label="View through the elevator doors">
+        <canvas id="world" role="img" aria-label="An impossible place beyond the elevator doors"></canvas>
+        <div class="door left" aria-hidden="true"></div>
+        <div class="door right" aria-hidden="true"></div>
+        <div class="threshold" aria-hidden="true"></div>
+      </section>
+
+      <aside class="wall-panel left" aria-hidden="true">
+        <div class="speaker-grille"></div>
+        <div class="inspection-card">
+          CERTIFICATE OF OPERATION<br />
+          CAPACITY 12 PERSONS<br />
+          LAST EXAMINATION: SATISFACTORY
+        </div>
+      </aside>
+
+      <aside class="wall-panel right" aria-label="Elevator controls">
+        <div class="status-light" aria-hidden="true"></div>
+        <div class="control">
+          <p class="permit">PASSENGER LIFT<br />C-4<br />1200 kg</p>
+          <div class="buttons" id="buttons"></div>
+          <div class="utilities">
+            <button class="utility-button" id="sound" type="button" aria-label="Enable elevator sounds" aria-pressed="false">◖))</button>
+            <button class="utility-button" id="close" type="button" aria-label="Close doors">│›‹│</button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="service-label" aria-hidden="true">AUTOMATIC PASSENGER SERVICE · CAR 4</div>
+      <p class="screen-reader-status" id="status" aria-live="polite"></p>
+    </main>
+
+    <script>
+      (() => {
+        'use strict';
+
+        const elevator = document.getElementById('elevator');
+        const canvas = document.getElementById('world');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const display = document.getElementById('floor-display');
+        const status = document.getElementById('status');
+        const buttons = document.getElementById('buttons');
+        const soundButton = document.getElementById('sound');
+        const closeButton = document.getElementById('close');
+        const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+        const stops = [
+          { id: 'B4', name: 'the tide library', scene: 'library', direction: 'down' },
+          { id: '7', name: 'the weather department', scene: 'weather', direction: 'up' },
+          { id: '13', name: 'the orchard after midnight', scene: 'orchard', direction: 'up' },
+          { id: '21', name: 'the room above the sky', scene: 'skyroom', direction: 'up' },
+          { id: '∞', name: 'the last stop', scene: 'last', direction: 'up' },
+        ];
+        const panelLabels = ['∞', '21', '13', '7', '0', 'B4'];
+        const sceneNames = Object.fromEntries(stops.map(stop => [stop.id, stop.name]));
+        const timing = () => reducedMotion.matches
+          ? { close: 700, travel: 500, open: 750, view: 6000 }
+          : { close: 2500, travel: 3500, open: 2400, view: 7600 };
+
+        let width = 0;
+        let height = 0;
+        let ratio = 1;
+        let currentIndex = stops.length - 1;
+        let activeStop = stops[0];
+        let requestedId = null;
+        let phase = 'closed';
+        let phaseTimer = 0;
+        let displayTimer = 0;
+        let audio = null;
+        let soundEnabled = false;
+        let animationFrame = 0;
+        let sceneStarted = performance.now();
+
+        const rand = seed => {
+          const x = Math.sin(seed * 91.731) * 43758.5453;
+          return x - Math.floor(x);
+        };
+        const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+        const lerp = (a, b, t) => a + (b - a) * t;
+        const TAU = Math.PI * 2;
+
+        function makeButtons() {
+          panelLabels.forEach(label => {
+            const button = document.createElement('button');
+            button.className = 'floor-button';
+            button.type = 'button';
+            button.textContent = label;
+            button.dataset.floor = label;
+            button.setAttribute('aria-label', sceneNames[label] ? `Go to floor ${label}, ${sceneNames[label]}` : `Go to floor ${label}`);
+            button.addEventListener('click', () => requestFloor(label));
+            buttons.append(button);
+          });
+        }
+
+        function requestFloor(id) {
+          if (!sceneNames[id]) {
+            beep(86, .12, 'square', .035);
+            const button = buttons.querySelector(`[data-floor="${id}"]`);
+            button.classList.add('lit');
+            setTimeout(() => button.classList.remove('lit'), 420);
+            return;
+          }
+          requestedId = id;
+          lightButton(id);
+          if (phase === 'viewing') closeDoors(260);
+        }
+
+        function lightButton(id) {
+          buttons.querySelectorAll('.floor-button').forEach(button => {
+            button.classList.toggle('lit', button.dataset.floor === id);
+          });
+        }
+
+        function nextStop() {
+          if (requestedId) {
+            const index = stops.findIndex(stop => stop.id === requestedId);
+            requestedId = null;
+            if (index >= 0) return { stop: stops[index], index };
+          }
+          const index = (currentIndex + 1) % stops.length;
+          return { stop: stops[index], index };
+        }
+
+        function startTrip() {
+          clearTimeout(phaseTimer);
+          const next = nextStop();
+          activeStop = next.stop;
+          currentIndex = next.index;
+          phase = 'traveling';
+          sceneStarted = performance.now();
+          elevator.classList.remove('doors-open');
+          elevator.parentElement.classList.add('traveling');
+          elevator.dataset.direction = activeStop.direction;
+          lightButton(activeStop.id);
+          status.textContent = `Traveling ${activeStop.direction} to floor ${activeStop.id}.`;
+          startMotor();
+          animateIndicator(activeStop.id, timing().travel);
+          phaseTimer = setTimeout(arrive, timing().travel);
+        }
+
+        function animateIndicator(destination, duration) {
+          clearInterval(displayTimer);
+          const values = ['B4', 'B2', '0', '2', '4', '7', '9', '13', '17', '21', '38', '88', '—', '∞'];
+          let cursor = Math.floor(Math.random() * values.length);
+          displayTimer = setInterval(() => {
+            cursor = activeStop.direction === 'down'
+              ? (cursor - 1 + values.length) % values.length
+              : (cursor + 1) % values.length;
+            display.textContent = values[cursor];
+            flicker();
+          }, reducedMotion.matches ? duration : 270);
+          setTimeout(() => {
+            clearInterval(displayTimer);
+            display.textContent = destination;
+          }, Math.max(0, duration - 120));
+        }
+
+        function arrive() {
+          elevator.parentElement.classList.remove('traveling');
+          phase = 'arrived';
+          display.textContent = activeStop.id;
+          stopMotor();
+          chime();
+          status.textContent = `Floor ${activeStop.id}, ${activeStop.name}.`;
+          phaseTimer = setTimeout(openDoors, reducedMotion.matches ? 250 : 760);
+        }
+
+        function openDoors() {
+          phase = 'opening';
+          elevator.classList.add('doors-open');
+          doorSound(true);
+          phaseTimer = setTimeout(() => {
+            phase = 'viewing';
+            status.textContent = `Doors open at ${activeStop.name}.`;
+            phaseTimer = setTimeout(closeDoors, timing().view);
+          }, timing().open);
+        }
+
+        function closeDoors(delay = 0) {
+          clearTimeout(phaseTimer);
+          phaseTimer = setTimeout(() => {
+            phase = 'closing';
+            elevator.classList.remove('doors-open');
+            doorSound(false);
+            status.textContent = 'Doors closing.';
+            phaseTimer = setTimeout(startTrip, timing().close);
+          }, delay);
+        }
+
+        function setupAudio() {
+          if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+          if (audio.state === 'suspended') audio.resume();
+        }
+
+        function beep(frequency, duration, type = 'sine', volume = .04, delay = 0) {
+          if (!soundEnabled || !audio) return;
+          const at = audio.currentTime + delay;
+          const oscillator = audio.createOscillator();
+          const gain = audio.createGain();
+          oscillator.type = type;
+          oscillator.frequency.setValueAtTime(frequency, at);
+          gain.gain.setValueAtTime(.0001, at);
+          gain.gain.exponentialRampToValueAtTime(volume, at + .02);
+          gain.gain.exponentialRampToValueAtTime(.0001, at + duration);
+          oscillator.connect(gain).connect(audio.destination);
+          oscillator.start(at);
+          oscillator.stop(at + duration + .04);
+        }
+
+        function chime() {
+          beep(784, .48, 'sine', .055);
+          beep(1046, .55, 'sine', .045, .18);
+        }
+
+        function doorSound(opening) {
+          if (!soundEnabled || !audio) return;
+          const at = audio.currentTime;
+          const oscillator = audio.createOscillator();
+          const gain = audio.createGain();
+          oscillator.type = 'sawtooth';
+          oscillator.frequency.setValueAtTime(opening ? 47 : 56, at);
+          oscillator.frequency.linearRampToValueAtTime(opening ? 68 : 41, at + 1.7);
+          gain.gain.setValueAtTime(.0001, at);
+          gain.gain.exponentialRampToValueAtTime(.018, at + .08);
+          gain.gain.exponentialRampToValueAtTime(.0001, at + 1.9);
+          oscillator.connect(gain).connect(audio.destination);
+          oscillator.start(at);
+          oscillator.stop(at + 2);
+        }
+
+        function startMotor() {
+          if (!soundEnabled || !audio) return;
+          stopMotor();
+          const oscillator = audio.createOscillator();
+          const gain = audio.createGain();
+          oscillator.type = 'triangle';
+          oscillator.frequency.setValueAtTime(34, audio.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(58, audio.currentTime + 1.2);
+          gain.gain.setValueAtTime(.0001, audio.currentTime);
+          gain.gain.exponentialRampToValueAtTime(.025, audio.currentTime + .3);
+          oscillator.connect(gain).connect(audio.destination);
+          oscillator.start();
+          audio.motor = { oscillator, gain };
+        }
+
+        function stopMotor() {
+          if (!audio || !audio.motor) return;
+          const { oscillator, gain } = audio.motor;
+          gain.gain.exponentialRampToValueAtTime(.0001, audio.currentTime + .28);
+          oscillator.stop(audio.currentTime + .32);
+          audio.motor = null;
+        }
+
+        function flicker() {
+          display.style.opacity = Math.random() > .91 ? '.38' : '1';
+          setTimeout(() => { display.style.opacity = '1'; }, 35);
+        }
+
+        soundButton.addEventListener('click', () => {
+          setupAudio();
+          soundEnabled = !soundEnabled;
+          soundButton.setAttribute('aria-pressed', String(soundEnabled));
+          soundButton.setAttribute('aria-label', soundEnabled ? 'Mute elevator sounds' : 'Enable elevator sounds');
+          if (soundEnabled) {
+            beep(523, .14, 'sine', .045);
+            setTimeout(() => beep(659, .18, 'sine', .04), 110);
+          } else {
+            stopMotor();
+          }
+        });
+
+        closeButton.addEventListener('click', () => {
+          if (phase === 'viewing' || phase === 'opening') closeDoors();
+          else beep(92, .12, 'square', .03);
+        });
+
+        function resize() {
+          const rect = canvas.getBoundingClientRect();
+          ratio = Math.min(devicePixelRatio || 1, 2);
+          width = Math.max(1, rect.width);
+          height = Math.max(1, rect.height);
+          canvas.width = Math.round(width * ratio);
+          canvas.height = Math.round(height * ratio);
+          ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        }
+
+        function fillGradient(top, bottom) {
+          const gradient = ctx.createLinearGradient(0, 0, 0, height);
+          gradient.addColorStop(0, top);
+          gradient.addColorStop(1, bottom);
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, width, height);
+        }
+
+        function softCircle(x, y, radius, color, glow = 0) {
+          ctx.save();
+          if (glow) { ctx.shadowColor = color; ctx.shadowBlur = glow; }
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, TAU);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        function drawLibrary(t) {
+          fillGradient('#052330', '#001015');
+          const glow = ctx.createRadialGradient(width * .55, height * .26, 0, width * .55, height * .26, width * .8);
+          glow.addColorStop(0, 'rgba(30,150,160,.35)');
+          glow.addColorStop(1, 'rgba(0,8,12,0)');
+          ctx.fillStyle = glow;
+          ctx.fillRect(0, 0, width, height);
+
+          // Ceiling water, deliberately where a ceiling should not be.
+          ctx.fillStyle = 'rgba(101,220,216,.13)';
+          ctx.beginPath();
+          for (let x = 0; x <= width; x += 8) {
+            const y = height * .13 + Math.sin(x * .025 + t * .9) * 5 + Math.sin(x * .06 - t) * 2;
+            x ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+          }
+          ctx.lineTo(width, 0); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill();
+
+          const shelfTop = height * .2;
+          for (let side = 0; side < 2; side++) {
+            ctx.save();
+            if (side) { ctx.translate(width, 0); ctx.scale(-1, 1); }
+            for (let row = 0; row < 5; row++) {
+              const y = shelfTop + row * height * .145;
+              const far = width * (.22 - row * .012);
+              ctx.fillStyle = row % 2 ? '#172a2c' : '#1d3435';
+              ctx.fillRect(0, y, far, height * .105);
+              ctx.fillStyle = '#0b1516';
+              ctx.fillRect(0, y + height * .098, far, 5);
+              for (let book = 0; book < 12; book++) {
+                const bw = far / 13;
+                const bh = height * (.052 + rand(row * 44 + book) * .037);
+                const colors = ['#48766e', '#a75b46', '#d3a654', '#455c70', '#7b4b57'];
+                ctx.fillStyle = colors[(row + book) % colors.length];
+                ctx.fillRect(book * bw + 2, y + height * .094 - bh, Math.max(2, bw - 2), bh);
+              }
+            }
+            ctx.restore();
+          }
+
+          // A slow ray beneath the library aisle.
+          const rayX = ((t * 28) % (width + 220)) - 110;
+          ctx.save();
+          ctx.translate(rayX, height * .47);
+          ctx.fillStyle = 'rgba(9,20,25,.72)';
+          ctx.beginPath();
+          ctx.moveTo(-78, 0); ctx.quadraticCurveTo(0, -31, 86, 0); ctx.quadraticCurveTo(0, 19, -78, 0); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(-65, -2); ctx.lineTo(-126, -36); ctx.lineTo(-103, 4); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(72, 0); ctx.quadraticCurveTo(103, -12, 122, -2); ctx.quadraticCurveTo(100, 5, 72, 0); ctx.fill();
+          softCircle(58, -5, 2, '#8ff7db', 7);
+          ctx.restore();
+
+          for (let i = 0; i < 34; i++) {
+            const x = rand(i + 21) * width;
+            const y = height - ((rand(i + 53) * height + t * (7 + rand(i) * 11)) % height);
+            softCircle(x, y, 1 + rand(i + 8) * 2.2, `rgba(140,235,225,${.18 + rand(i) * .35})`);
+          }
+
+          ctx.fillStyle = 'rgba(196,221,210,.72)';
+          ctx.font = `${Math.max(10, width * .028)}px Georgia, serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('QUIET PLEASE', width * .5, height * .82);
+        }
+
+        function drawWeather(t) {
+          fillGradient('#e87363', '#532761');
+          const sun = ctx.createRadialGradient(width * .72, height * .25, 0, width * .72, height * .25, width * .42);
+          sun.addColorStop(0, 'rgba(255,232,155,.85)');
+          sun.addColorStop(.25, 'rgba(255,178,120,.42)');
+          sun.addColorStop(1, 'rgba(70,20,70,0)');
+          ctx.fillStyle = sun; ctx.fillRect(0, 0, width, height);
+
+          // Department floor and ruled windows.
+          ctx.fillStyle = '#161e2f'; ctx.fillRect(0, height * .77, width, height * .23);
+          ctx.strokeStyle = 'rgba(255,223,193,.22)'; ctx.lineWidth = 1;
+          for (let x = 0; x < width; x += width / 8) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height * .76); ctx.stroke(); }
+          for (let y = 0; y < height * .76; y += height / 7) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
+
+          for (let i = 0; i < 11; i++) {
+            const drift = Math.sin(t * .17 + i) * 10;
+            const x = rand(i * 9 + 4) * width + drift;
+            const y = height * (.18 + rand(i * 7) * .47);
+            const scale = .55 + rand(i + 6) * .85;
+            ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
+            ctx.fillStyle = i % 3 === 0 ? '#f7d4c9' : '#c8c6e1';
+            softCircle(-20, 2, 24, ctx.fillStyle);
+            softCircle(8, -8, 32, ctx.fillStyle);
+            softCircle(36, 4, 22, ctx.fillStyle);
+            ctx.fillRect(-22, 2, 62, 24);
+            ctx.restore();
+
+            // Rain is stored in small rectangular drawers below each cloud.
+            if (i % 2 === 0) {
+              ctx.strokeStyle = 'rgba(100,210,255,.62)';
+              for (let drop = 0; drop < 5; drop++) {
+                const dx = x + (drop - 2) * 8;
+                const dy = y + 37 + ((t * 48 + drop * 19 + i * 7) % 62);
+                ctx.beginPath(); ctx.moveTo(dx, dy); ctx.lineTo(dx - 3, dy + 11); ctx.stroke();
+              }
+            }
+          }
+
+          ctx.fillStyle = '#e8b34f';
+          for (let i = 0; i < 4; i++) {
+            const x = width * (.14 + i * .24);
+            ctx.fillRect(x, height * .72, 5, height * .09);
+            ctx.beginPath(); ctx.moveTo(x + 2, height * .72); ctx.lineTo(x - 8, height * .69); ctx.lineTo(x + 12, height * .69); ctx.fill();
+          }
+          ctx.fillStyle = 'rgba(255,244,216,.82)';
+          ctx.font = `700 ${Math.max(9, width * .022)}px Arial, sans-serif`;
+          ctx.textAlign = 'left';
+          ctx.fillText('CLOUDS OUT  •  THUNDER IN', width * .06, height * .94);
+        }
+
+        function drawOrchard(t) {
+          fillGradient('#10082c', '#09191d');
+          const moon = ctx.createRadialGradient(width * .72, height * .21, 0, width * .72, height * .21, width * .27);
+          moon.addColorStop(0, '#ff829d'); moon.addColorStop(.24, '#da416f'); moon.addColorStop(1, 'rgba(90,15,70,0)');
+          ctx.fillStyle = moon; ctx.fillRect(0, 0, width, height);
+          softCircle(width * .72, height * .21, Math.min(width, height) * .11, '#ff8da4', 22);
+
+          for (let i = 0; i < 10; i++) {
+            const x = width * (.03 + i * .105);
+            const lean = (rand(i) - .5) * 40;
+            ctx.strokeStyle = i % 2 ? '#1e4960' : '#23415a';
+            ctx.lineWidth = 8 + rand(i) * 8;
+            ctx.beginPath(); ctx.moveTo(x, height); ctx.quadraticCurveTo(x + lean, height * .6, x + lean * .4, height * .23); ctx.stroke();
+            ctx.lineWidth *= .34;
+            for (let branch = 0; branch < 4; branch++) {
+              const by = height * (.36 + branch * .12);
+              ctx.beginPath(); ctx.moveTo(x + lean * (1 - by / height), by); ctx.lineTo(x + lean + (branch % 2 ? 45 : -50), by - 65); ctx.stroke();
+            }
+          }
+
+          for (let i = 0; i < 17; i++) {
+            const baseX = rand(i * 13 + 2) * width;
+            const baseY = height * (.24 + rand(i * 19) * .54);
+            const x = baseX + Math.sin(t * .42 + i) * (3 + rand(i) * 7);
+            const y = baseY + Math.cos(t * .29 + i) * 5;
+            const r = 7 + rand(i + 55) * 10;
+            ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(t * .3 + i) * .12);
+            ctx.fillStyle = i % 4 === 0 ? '#fff09a' : '#b6ff8b';
+            ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 18;
+            ctx.beginPath(); ctx.moveTo(0, -r); ctx.bezierCurveTo(r, -r * .7, r, r * .8, 0, r * 1.2); ctx.bezierCurveTo(-r, r * .8, -r, -r * .7, 0, -r); ctx.fill();
+            ctx.restore();
+          }
+
+          for (let i = 0; i < 13; i++) {
+            const x = (rand(i) * width + t * (6 + rand(i + 8) * 12)) % width;
+            const y = rand(i + 30) * height * .72;
+            ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(t + i) * .4);
+            ctx.fillStyle = 'rgba(200,226,255,.72)';
+            ctx.beginPath(); ctx.ellipse(-5, 0, 7, 3, -.4, 0, TAU); ctx.ellipse(5, 0, 7, 3, .4, 0, TAU); ctx.fill();
+            ctx.restore();
+          }
+
+          ctx.fillStyle = '#08100f'; ctx.fillRect(0, height * .91, width, height * .09);
+          ctx.fillStyle = 'rgba(207,255,197,.72)';
+          ctx.font = `${Math.max(9, width * .021)}px Arial, sans-serif`; ctx.textAlign = 'center';
+          ctx.fillText('DO NOT PICK THE LIGHT', width * .5, height * .965);
+        }
+
+        function drawSkyroom(t) {
+          fillGradient('#86d8ee', '#fff2c4');
+          const horizon = height * .68;
+          ctx.fillStyle = 'rgba(255,255,255,.74)';
+          for (let i = 0; i < 15; i++) {
+            const x = ((rand(i) * width + t * (2 + rand(i + 8) * 4)) % (width + 160)) - 80;
+            const y = height * (.13 + rand(i + 31) * .67);
+            const r = 28 + rand(i + 2) * 54;
+            softCircle(x, y, r, 'rgba(255,255,255,.44)');
+            softCircle(x + r * .65, y + 4, r * .72, 'rgba(255,255,255,.38)');
+          }
+
+          // The sun is below the floor; shadows point upward.
+          const under = ctx.createRadialGradient(width * .5, height * 1.08, 0, width * .5, height * 1.08, height * .52);
+          under.addColorStop(0, '#fff8c4'); under.addColorStop(.22, '#ffca71'); under.addColorStop(1, 'rgba(255,154,76,0)');
+          ctx.fillStyle = under; ctx.fillRect(0, horizon, width, height - horizon);
+
+          ctx.strokeStyle = 'rgba(70,83,101,.62)'; ctx.lineWidth = 4;
+          for (let i = 0; i < 5; i++) {
+            const baseX = width * (.13 + i * .19);
+            const offset = Math.sin(t * .12 + i) * 9;
+            ctx.beginPath();
+            ctx.moveTo(baseX + offset, height);
+            ctx.lineTo(baseX - 30 + offset, height * .72);
+            ctx.lineTo(baseX + 33 + offset, height * .56);
+            ctx.lineTo(baseX - 5 + offset, height * .4);
+            ctx.lineTo(baseX + 22 + offset, height * .24);
+            ctx.stroke();
+            for (let step = 0; step < 11; step++) {
+              const y = height - step * height * .067;
+              ctx.beginPath(); ctx.moveTo(baseX - 18 + offset, y); ctx.lineTo(baseX + 19 + offset, y - 11); ctx.stroke();
+            }
+          }
+
+          const birdY = height * .22;
+          for (let i = 0; i < 9; i++) {
+            const x = (t * 15 + i * width / 8) % (width + 50) - 25;
+            const y = birdY + Math.sin(t * .7 + i) * height * .08;
+            ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI);
+            ctx.strokeStyle = '#41536a'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.quadraticCurveTo(-7, -6, -14, 0); ctx.moveTo(0, 0); ctx.quadraticCurveTo(7, -6, 14, 0); ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        function drawLast(t) {
+          fillGradient('#020203', '#0a0614');
+          for (let i = 0; i < 130; i++) {
+            const pulse = .28 + .72 * Math.abs(Math.sin(t * (.18 + rand(i) * .7) + i));
+            softCircle(rand(i) * width, rand(i + 400) * height, .35 + rand(i + 90) * 1.3, `rgba(224,233,255,${pulse})`);
+          }
+
+          ctx.save();
+          ctx.translate(width * .5, height * .49);
+          ctx.rotate(t * .045);
+          const max = Math.min(width, height) * .46;
+          for (let ring = 0; ring < 18; ring++) {
+            const r = max * (ring + 1) / 18;
+            ctx.strokeStyle = `hsla(${270 + ring * 7}, 78%, ${55 + ring}%, ${.55 - ring * .018})`;
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            for (let a = 0; a <= TAU + .1; a += .08) {
+              const wobble = Math.sin(a * (3 + ring % 5) + t * .5 + ring) * (3 + ring * .35);
+              const x = Math.cos(a) * (r + wobble);
+              const y = Math.sin(a) * (r * .62 + wobble);
+              a ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          // One aggressively ordinary object at the center of infinity.
+          const x = width * .5;
+          const y = height * .49;
+          ctx.save(); ctx.translate(x, y);
+          ctx.fillStyle = '#e9e5d7'; ctx.fillRect(-25, -18, 50, 36);
+          ctx.fillStyle = '#cbc7ba'; ctx.fillRect(-20, -14, 40, 8);
+          ctx.strokeStyle = '#3e403f'; ctx.lineWidth = 2;
+          ctx.strokeRect(-25, -18, 50, 36);
+          ctx.fillStyle = '#c53326'; softCircle(0, 7, 4, '#c53326');
+          ctx.restore();
+
+          ctx.fillStyle = 'rgba(238,237,230,.78)';
+          ctx.font = `${Math.max(9, width * .021)}px Arial, sans-serif`; ctx.textAlign = 'center';
+          ctx.fillText('PLEASE TAKE A NUMBER', width * .5, height * .73);
+        }
+
+        function render(now) {
+          const t = (now - sceneStarted) / 1000;
+          ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+          if (activeStop.scene === 'library') drawLibrary(t);
+          else if (activeStop.scene === 'weather') drawWeather(t);
+          else if (activeStop.scene === 'orchard') drawOrchard(t);
+          else if (activeStop.scene === 'skyroom') drawSkyroom(t);
+          else drawLast(t);
+          animationFrame = requestAnimationFrame(render);
+        }
+
+        makeButtons();
+        resize();
+        addEventListener('resize', resize, { passive: true });
+        requestAnimationFrame(render);
+
+        // Begin with the doors closed and the car already on its rounds.
+        setTimeout(startTrip, 900);
+      })();
+    </script>
+  </body>
+</html>
