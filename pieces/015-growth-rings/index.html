@@ -403,7 +403,10 @@
             const a = angles[i];
             const detailT = ageIrregularityFor(year);
             regionalMemory[i] = clamp(regionalMemory[i] * 0.82 + regionalNoise[i] * 0.28, -0.72, 0.72);
-            deformationMemory[i] *= 0.9985;
+            // Wound geometry persists for decades without becoming a permanent
+            // annual growth penalty. This lets later rings gradually close over
+            // old fire and pest scars instead of deepening the same cleft forever.
+            deformationMemory[i] *= 0.982;
             const sunBias = forces.sunPower * (0.16 * Math.cos(a - forces.sunAngle) + 0.035 * Math.cos(2 * (a - forces.sunAngle)));
             const windBias =
               forces.windExposure *
@@ -445,7 +448,10 @@
           }
 
           boundary = smoothLoop(boundary, 2, lerp(0.86, 0.18, ageIrregularity));
-          const activeIncidents = damageEvents.filter((event) => year >= event.year && year < event.year + event.duration);
+          const activeIncidents = damageEvents.filter((event) => {
+            const influenceYears = event.duration + (event.kind === 'pest' ? event.healingYears : 0);
+            return year >= event.year && year < event.year + influenceYears;
+          });
           if (activeIncidents.length) {
             boundary = applyDamageIncidents(
               boundary,
@@ -594,8 +600,9 @@
           kind,
           year: Math.floor(lerp(13, TARGET_AGE - 13, random())),
           angle: random() * TAU,
-          width: fire ? lerp(0.24, 0.55, random()) : lerp(0.08, 0.34, random()),
+          width: fire ? lerp(0.2, 0.46, random()) : lerp(0.08, 0.34, random()),
           duration,
+          healingYears: fire ? 0 : Math.round(lerp(5, 11, severityT)),
           severity,
           seed: random() * 1000 + index * 17,
           lane: 0,
@@ -613,35 +620,56 @@
           for (const event of events) {
             const eventAge = year - event.year;
             const durationT = event.duration <= 1 ? 0 : eventAge / (event.duration - 1);
-            const timeFalloff = event.kind === 'fire' ? 1 - durationT * 0.5 : 0.72 + 0.28 * Math.sin((durationT + 0.15) * Math.PI);
+            const timeFalloff = event.kind === 'fire'
+              ? Math.exp(-eventAge / Math.max(1, event.duration * 0.7))
+              : 0.72 + 0.28 * Math.sin((durationT + 0.15) * Math.PI);
             const angular = angleDelta(a, event.angle);
             const angularFalloff = Math.exp(-(angular * angular) / (event.width * event.width));
             const irregular = 0.72 + 0.28 * Math.sin(event.seed + i * 2.17 + eventAge * 1.9);
 
             if (event.kind === 'fire') {
-              const heatPulse = eventAge === 0 ? 1.55 : 0.8;
-              bite += meanWidth * event.severity * 5.6 * heatPulse * timeFalloff * angularFalloff * irregular;
+              // Fire arrests the cambium locally, then eases into recovery. The
+              // old first-year heat spike made a mechanically flat notch several
+              // ring widths deep, which read as a cut rather than a burn scar.
+              const heatPulse = 1 + 0.22 * Math.exp(-eventAge * 1.6);
+              bite += meanWidth * event.severity * 3.1 * heatPulse * timeFalloff * angularFalloff * irregular;
               const edgeDistance = Math.abs(Math.abs(angular) - event.width * 1.05);
               const edgeWidth = Math.max(0.034, event.width * 0.26);
               const edgeFalloff = Math.exp(-(edgeDistance * edgeDistance) / (edgeWidth * edgeWidth));
-              callus += meanWidth * event.severity * 1.15 * smootherStep((eventAge + 1) / Math.max(2, event.duration)) * edgeFalloff;
-              memoryShift += -event.severity * 0.09 * heatPulse * angularFalloff + event.severity * 0.052 * edgeFalloff;
-            } else {
+              callus += meanWidth * event.severity * 0.95 * smootherStep((eventAge + 1) / Math.max(2, event.duration)) * edgeFalloff;
+              memoryShift += -event.severity * 0.045 * heatPulse * angularFalloff + event.severity * 0.038 * edgeFalloff;
+            } else if (eventAge < event.duration) {
               const migration = Math.sin(event.seed + eventAge * 1.4) * event.width * 0.22;
               const movingFalloff = Math.exp(-Math.pow(angleDelta(a, event.angle + migration), 2) / (event.width * event.width));
               const mottled = movingFalloff * (0.52 + 0.48 * Math.sin(a * 19 + event.seed + eventAge * 2.4));
               const outbreak = 0.7 + 0.3 * Math.sin((durationT + 0.08) * Math.PI);
-              bite += meanWidth * event.severity * 4.1 * outbreak * Math.max(0, mottled) * irregular;
-              callus += meanWidth * event.severity * 0.34 * movingFalloff * Math.max(0, Math.sin(a * 11 - event.seed + eventAge));
+              bite += meanWidth * event.severity * 3.7 * outbreak * Math.max(0, mottled) * irregular;
+              callus += meanWidth * event.severity * 0.48 * movingFalloff * Math.max(0, Math.sin(a * 11 - event.seed + eventAge));
               memoryShift +=
-                -event.severity * 0.07 * outbreak * Math.max(0, mottled) +
-                event.severity * 0.022 * movingFalloff * Math.max(0, Math.sin(a * 11 - event.seed + eventAge));
+                -event.severity * 0.05 * outbreak * Math.max(0, mottled) +
+                event.severity * 0.026 * movingFalloff * Math.max(0, Math.sin(a * 11 - event.seed + eventAge));
+            } else {
+              // After the infestation passes, two callus lips grow around the
+              // wound and meet over it. Their accumulated radial growth forms
+              // a rounded boil instead of leaving a perforated notch.
+              const healingT = clamp((eventAge - event.duration + 1) / event.healingYears, 0, 1);
+              const closure = smootherStep(healingT);
+              const lipOffset = event.width * lerp(0.78, 0.1, closure);
+              const lipWidth = Math.max(0.032, event.width * lerp(0.3, 0.48, closure));
+              const lipDistance = Math.abs(angular) - lipOffset;
+              const lips = Math.exp(-(lipDistance * lipDistance) / (lipWidth * lipWidth));
+              const domeWidth = Math.max(0.05, event.width * lerp(0.82, 1.28, closure));
+              const dome = Math.exp(-(angular * angular) / (domeWidth * domeWidth));
+              const healingPulse = lerp(1.45, 0.42, closure);
+              const wrappedGrowth = lips * (1 - closure * 0.28) + dome * closure * 0.72;
+              callus += meanWidth * event.severity * healingPulse * wrappedGrowth;
+              memoryShift += event.severity * 0.018 * wrappedGrowth * (1 - closure * 0.55);
             }
           }
 
           deformationMemory[i] = clamp(deformationMemory[i] + memoryShift * 2.35, -0.78, 0.68);
           const incidentCenter = bite > callus;
-          const minAdvance = meanWidth * (incidentCenter ? 0.035 : 0.08);
+          const minAdvance = meanWidth * (incidentCenter ? 0.09 : 0.12);
           out[i] = Math.max(previous[i] + minAdvance, out[i] - bite + callus);
         }
         return smoothLoop(out, 1, 0.36);
@@ -1116,9 +1144,12 @@
         ctx.save();
         for (const event of model.damageEvents) {
           const eventAge = age - event.year;
-          if (eventAge < 0 || eventAge > event.duration + 1.25) continue;
-          if (event.kind === 'fire') drawFireBarkDamage(radius, boundary, event, age);
-          else drawPestBarkDamage(radius, boundary, event, age);
+          if (eventAge < 0) continue;
+          if (event.kind === 'fire') {
+            if (eventAge <= event.duration + 1.25) drawFireBarkDamage(radius, boundary, event, age);
+          } else if (eventAge <= event.duration + event.healingYears + 3) {
+            drawPestBarkDamage(radius, boundary, event, age);
+          }
         }
         ctx.restore();
       }
@@ -1127,13 +1158,13 @@
         const eventAge = age - event.year;
         const maturity = smootherStep(eventAge / Math.max(1.2, event.duration * 0.58));
         const alpha = smootherStep(eventAge / 0.45) * (1 - smootherStep((eventAge - event.duration) / 1.25));
-        const arc = event.width * lerp(0.95, 1.45, maturity);
-        const points = 8;
+        const arc = event.width * lerp(0.88, 1.22, maturity);
+        const points = 12;
         ctx.save();
         ctx.globalAlpha *= clamp(alpha, 0, 1);
-        ctx.fillStyle = rgbaCss(COLORS.inkRgb, 0.72);
+        ctx.fillStyle = rgbaCss(COLORS.inkRgb, 0.52);
         ctx.strokeStyle = COLORS.fire;
-        ctx.lineWidth = clamp(radius * 0.0045, 0.8, 1.6);
+        ctx.lineWidth = clamp(radius * 0.0038, 0.75, 1.35);
         ctx.beginPath();
         for (let i = 0; i < points; i++) {
           const t = i / (points - 1);
@@ -1146,8 +1177,11 @@
         for (let i = points - 1; i >= 0; i--) {
           const t = i / (points - 1);
           const a = event.angle + (t - 0.5) * arc;
-          const jag = 0.72 + 0.28 * Math.sin(event.seed + i * 2.31 + age * 0.05);
-          const bite = clamp(radius * event.severity * 0.085 * jag, 8, 32);
+          const jag =
+            0.78 +
+            0.15 * Math.sin(event.seed + i * 2.31 + age * 0.05) +
+            0.07 * Math.sin(event.seed * 0.37 + i * 5.17);
+          const bite = clamp(radius * event.severity * 0.038 * jag, 3.5, 14);
           const r = boundaryRadiusAt(boundary, a) * radius - bite;
           const p = { x: Math.cos(a) * r, y: Math.sin(a) * r };
           ctx.lineTo(p.x, p.y);
@@ -1160,29 +1194,69 @@
 
       function drawPestBarkDamage(radius, boundary, event, age) {
         const eventAge = age - event.year;
-        const maturity = smootherStep(eventAge / Math.max(1.2, event.duration * 0.56));
-        const alpha = smootherStep(eventAge / 0.45) * (1 - smootherStep((eventAge - event.duration) / 1.25));
-        const holes = 4 + event.duration + Math.floor(event.severity * 11);
+        const activeT = clamp(eventAge / Math.max(1, event.duration), 0, 1);
+        const healingT = clamp((eventAge - event.duration) / event.healingYears, 0, 1);
+        const closure = smootherStep(healingT);
+        const fade = 1 - smootherStep((eventAge - event.duration - event.healingYears) / 3);
+        const woundAlpha = smootherStep(eventAge / 0.4) * (1 - closure);
+        const callusAlpha = smootherStep((eventAge - event.duration + 1) / 1.4) * fade;
+        const holes = 3 + event.duration + Math.floor(event.severity * 5);
+        const bore = clamp(radius * 0.0055 * (0.7 + event.severity), 1, 2.15);
         ctx.save();
-        ctx.globalAlpha *= clamp(alpha, 0, 1);
-        ctx.strokeStyle = rgbaCss(COLORS.inkRgb, 0.76);
-        ctx.fillStyle = COLORS.paper;
-        ctx.lineWidth = clamp(radius * 0.0035, 0.75, 1.25);
-        for (let i = 0; i < holes; i++) {
-          const offset =
-            (i / Math.max(1, holes - 1) - 0.5) * event.width * 1.6 +
-            Math.sin(event.seed + i * 4.7) * event.width * 0.16;
-          const a = event.angle + offset;
-          const r = boundaryRadiusAt(boundary, a) * radius - lerp(1, 8, maturity) * ((i % 3) / 2);
-          const p = { x: Math.cos(a) * r, y: Math.sin(a) * r };
-          const bore = clamp(radius * 0.006 * (0.7 + event.severity), 1.1, 2.3);
+        if (woundAlpha > 0.01) {
+          ctx.globalAlpha = woundAlpha;
+          ctx.strokeStyle = rgbaCss(COLORS.inkRgb, 0.76);
+          ctx.fillStyle = COLORS.paper;
+          ctx.lineWidth = clamp(radius * 0.0035, 0.75, 1.25);
+          for (let i = 0; i < holes; i++) {
+            const offset =
+              (i / Math.max(1, holes - 1) - 0.5) * event.width * 1.5 +
+              Math.sin(event.seed + i * 4.7) * event.width * 0.14;
+            const a = event.angle + offset;
+            const r = boundaryRadiusAt(boundary, a) * radius - lerp(1, 5.5, activeT) * ((i % 3) / 2);
+            const p = { x: Math.cos(a) * r, y: Math.sin(a) * r };
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, bore, 0, TAU);
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+
+        if (callusAlpha > 0.01) {
+          ctx.globalAlpha = callusAlpha;
+          ctx.strokeStyle = rgbaCss(COLORS.inkRgb, lerp(0.58, 0.34, closure));
+          ctx.lineWidth = clamp(radius * 0.0046, 0.9, 1.65);
+          const lipOffset = event.width * lerp(0.72, 0.08, closure);
+          const lipSpan = event.width * lerp(0.55, 0.82, closure);
+          for (const side of [-1, 1]) {
+            ctx.beginPath();
+            const points = 10;
+            for (let i = 0; i < points; i++) {
+              const t = i / (points - 1);
+              const a = event.angle + side * lipOffset + (t - 0.5) * lipSpan;
+              const fold = Math.sin(t * Math.PI) * radius * event.severity * lerp(0.008, 0.003, closure);
+              const r = boundaryRadiusAt(boundary, a) * radius - 2.2 - fold;
+              const p = { x: Math.cos(a) * r, y: Math.sin(a) * r };
+              if (i === 0) ctx.moveTo(p.x, p.y);
+              else ctx.lineTo(p.x, p.y);
+            }
+            ctx.stroke();
+          }
+
+          const seamSpan = event.width * lerp(1.05, 0.18, closure);
+          ctx.strokeStyle = rgbaCss(COLORS.pestRgb, lerp(0.7, 0.32, closure));
+          ctx.lineWidth = clamp(radius * 0.0032, 0.7, 1.2);
           ctx.beginPath();
-          ctx.arc(p.x, p.y, bore, 0, TAU);
-          ctx.fill();
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(p.x, p.y);
-          ctx.lineTo(p.x - Math.cos(a) * bore * 3.2, p.y - Math.sin(a) * bore * 3.2);
+          const seamPoints = 9;
+          for (let i = 0; i < seamPoints; i++) {
+            const t = i / (seamPoints - 1);
+            const a = event.angle + (t - 0.5) * seamSpan;
+            const inset = 1.4 + Math.sin(t * Math.PI) * radius * event.severity * 0.004;
+            const r = boundaryRadiusAt(boundary, a) * radius - inset;
+            const p = { x: Math.cos(a) * r, y: Math.sin(a) * r };
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          }
           ctx.stroke();
         }
         ctx.restore();

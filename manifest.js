@@ -54,7 +54,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "Space Invaders after the invaders have vanished. Four defenders spend finite ammunition to attack and intercept only the bullets aimed at their own territory. When one reaches its last round, it deploys a suicide nuke whose shockwave destroys every cannon, including itself.",
+      "description": "Space Invaders after the invaders have vanished. Four small inset cannons fire only at the opposite edge, while any armed non-shooter may volunteer to intercept. Their finite ammunition appears only as cartridge rows; the final round becomes the sole suicide nuke.",
       "updated": "2026-08-10"
     },
     {
@@ -153,8 +153,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "A two-body Pac-Man inversion on a fixed 17-by-11 course. A wavy eye-to-eye alarm sends Pac racing for one of four changing rooms, the only places where its yellow silhouette can fold into a Ghost. The pursuer never changes. The encounter leaves only ghosts.",
-      "updated": "2026-08-12"
+      "description": "Pac hunts every power pellet across a full-frame maze.",
+      "updated": "2026-08-14"
     },
     {
       "slug": "015-growth-rings",
@@ -267,7 +267,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
-      "description": "Sixty large abstract bubbles cross a low-contrast marbled oil field between ten five-sided stations. Refilling erases each station's vein; an exhausted station bursts and reappears over untouched resources, while bubbles that run dry are replaced from beyond the edge.",
+      "description": "Sixty fuel bubbles grow color-shifting vine trails as they travel between four-port diamond stations. Exhausted oil deposits burn out permanently, forcing replacement stations into untouched parts of the field.",
       "updated": "2026-08-10"
     },
     {
@@ -311,7 +311,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
-      "description": "A directionless botanical wallpaper on aged rag paper. Roses, peonies, poppies, lilies, daisies, anemones, lacecap hydrangeas, honeysuckle, and acanthus unfold through hand-drawn growth stages on sinuous stems that turn in every direction.",
+      "description": "A dense, directionless botanical wallpaper on aged rag paper. Dye-pot flowers and varied cream caladium, hosta, and arum leaves unfold through twenty hand-drawn growth stages in every direction.",
       "updated": "2026-08-12"
     },
     {

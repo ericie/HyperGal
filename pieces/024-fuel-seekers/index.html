@@ -8,7 +8,7 @@
     />
     <meta
       name="description"
-      content="Sixty bubbles spend their fuel moving among ten stations embedded in a marbled oil field."
+      content="Sixty bubbles spend their fuel moving among ten four-port diamond stations embedded in a marbled oil field."
     />
     <title>Fuel Seekers · HyperGal</title>
     <style>
@@ -67,7 +67,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Fuel Seekers: sixty round bubbles with vertical fuel levels travel among ten five-sided stations placed over a low-contrast marbled oil field. Full bubbles roam playfully and permanently mark their paths with cool-colored lines while bumping one another without overlapping. At one-quarter fuel they seek a station and draw permanent warm-colored lines. Filling a bubble erases the vein beneath its station. Empty stations burst and new stations emerge over untouched resources. Bubbles that run dry also pop, and replacements enter from beyond the edge. Press R to reseed the field."
+      aria-label="Fuel Seekers: sixty round bubbles with vertical fuel levels travel among ten diamond fuel stations placed over a low-contrast marbled oil field. Each station shows its own flat fuel level and has four corner attachment points, allowing as many as four bubbles to refill at once. Full bubbles travel toward the farthest station-free parts of the field, drawing fine vine-like ribbons that grow from dark brown to bright blue as they accelerate. At one-quarter fuel they take a direct path to an open station corner while their ribbons slowly shift from blue through orange to dark brown. Trails fade slowly, and a bubble that runs dry pops in a pale burst that erases nearby ribbons before its replacement enters from the edge. Filling a bubble burns away the vein beneath its station; exhausted deposits cannot host another station. Press R to reseed the field."
     ></canvas>
     <p id="status" class="status" aria-live="polite"></p>
 
@@ -86,13 +86,24 @@
         const params = new URLSearchParams(location.search);
 
         const TAU = Math.PI * 2;
+        const STATION_PORTS = [
+          { x: 0, y: -1 },
+          { x: 1, y: 0 },
+          { x: 0, y: 1 },
+          { x: -1, y: 0 }
+        ];
         const BUBBLE_COUNT = 60;
         const STATION_COUNT = 10;
         const REFUEL_THRESHOLD = 0.25;
         const COLLISION_GAP = 1.5;
         const COLLISION_PASSES = 6;
+        const TRAIL_FADE_SECONDS = 52;
+        const TRAIL_FADE_INTERVAL = 0.18;
         const FIELD_BASE = [31, 32, 30];
         const OIL_TINT = [25, 20, 8];
+        const TRAIL_BROWN = [70, 42, 27];
+        const TRAIL_BLUE = [55, 184, 231];
+        const TRAIL_ORANGE = [232, 118, 45];
 
         let width = 1;
         let height = 1;
@@ -111,6 +122,7 @@
         let nextStationId = 1;
         let popCount = 0;
         let raf = 0;
+        let trailFadeElapsed = 0;
         let noiseOffsetX = 0;
         let noiseOffsetY = 0;
         let fieldRotation = 0;
@@ -210,13 +222,13 @@
             bubble.target = station;
             bubble.fuel = 0.16 + random() * 0.72;
             bubble.fillRate = 0.25 + random() * 0.24;
-            bubble.dockSide = station.side;
+            bubble.dockPort = chooseOpenPort(station, bubble);
             const dock = bubbleDockPosition(bubble, station);
             bubble.x = dock.x;
             bubble.y = dock.y;
             bubble.vx = 0;
             bubble.vy = 0;
-            station.occupant = bubble;
+            station.occupants[bubble.dockPort] = bubble;
           }
 
           for (let i = STATION_COUNT; i < bubbles.length; i += 1) {
@@ -233,6 +245,7 @@
           trailCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
           trailCtx.lineCap = 'round';
           trailCtx.lineJoin = 'round';
+          trailFadeElapsed = 0;
         }
 
         function buildFieldTexture() {
@@ -331,7 +344,8 @@
             resourceCandidates.push({
               nx,
               ny,
-              value: sample.resource + stationRandom() * 0.018
+              value: sample.resource + stationRandom() * 0.018,
+              burned: false
             });
           }
 
@@ -352,6 +366,7 @@
 
           for (const relaxation of relaxations) {
             for (const candidate of resourceCandidates) {
+              if (candidate.burned) continue;
               const x = candidate.nx * width;
               const y = candidate.ny * height;
               const awayFromStations = occupied.every((other) => {
@@ -385,8 +400,7 @@
             ny: point.ny,
             resource: point.value,
             size,
-            side: random() < 0.5 ? -1 : 1,
-            occupant: null,
+            occupants: Array(STATION_PORTS.length).fill(null),
             phase: random() * TAU,
             capacity,
             remaining: capacity,
@@ -432,12 +446,25 @@
             target: null,
             retargetIn: 0,
             fillRate: 0.27 + random() * 0.21,
-            dockSide: 1,
+            dockPort: null,
             age: random() * 14,
             phase: random() * TAU,
             wobble: 0.7 + random() * 1.2,
             trailX: null,
             trailY: null,
+            trailNormalX: null,
+            trailNormalY: null,
+            trailWidth: null,
+            vineDistance: 0,
+            nextLeafAt: 54 + random() * 46,
+            leafSide: random() < 0.5 ? -1 : 1,
+            escapeX: null,
+            escapeY: null,
+            returning: false,
+            returnProgress: 0,
+            returnLegStart: 1,
+            returnLegBase: 0,
+            returnTargetId: null,
             dead: false
           };
 
@@ -470,7 +497,54 @@
           }
 
           bubble.phase += index * 0.11;
+          if (bubble.fuel > REFUEL_THRESHOLD) chooseEscapePoint(bubble);
           return bubble;
+        }
+
+        function chooseEscapePoint(bubble) {
+          const margin = bubble.radius + 24;
+          const candidates = [
+            { x: margin, y: margin },
+            { x: width - margin, y: margin },
+            { x: width - margin, y: height - margin },
+            { x: margin, y: height - margin }
+          ];
+
+          for (let i = 0; i < 24; i += 1) {
+            candidates.push({
+              x: margin + random() * Math.max(1, width - margin * 2),
+              y: margin + random() * Math.max(1, height - margin * 2)
+            });
+          }
+
+          let best = candidates[0];
+          let bestScore = -Infinity;
+          for (const candidate of candidates) {
+            const nearestStation = stations.length
+              ? Math.min(...stations.map((station) =>
+                  Math.hypot(candidate.x - station.x, candidate.y - station.y)
+                ))
+              : Math.hypot(candidate.x - width * 0.5, candidate.y - height * 0.5);
+            const travelDistance = Math.hypot(candidate.x - bubble.x, candidate.y - bubble.y);
+            const destinationSeparation = bubbles.length
+              ? Math.min(...bubbles
+                  .filter((other) => other !== bubble && other.escapeX !== null)
+                  .map((other) => Math.hypot(candidate.x - other.escapeX, candidate.y - other.escapeY))
+                  .concat(Math.min(width, height)))
+              : Math.min(width, height);
+            const score =
+              nearestStation +
+              travelDistance * 0.1 +
+              destinationSeparation * 0.16 +
+              random() * Math.min(width, height) * 0.025;
+            if (score > bestScore) {
+              best = candidate;
+              bestScore = score;
+            }
+          }
+
+          bubble.escapeX = best.x;
+          bubble.escapeY = best.y;
         }
 
         function chooseTarget(bubble, avoidCurrent) {
@@ -481,7 +555,7 @@
           }
 
           const available = stations.filter((station) =>
-            !station.occupant &&
+            stationHasOpenPort(station) &&
             station.remaining > 0 &&
             station.birth >= 0.68 &&
             (!avoidCurrent || station !== bubble.station)
@@ -543,10 +617,11 @@
           }
 
           resolveSceneCollisions(true, COLLISION_PASSES);
-          updateBubbleTrails();
+          updateBubbleTrails(dt);
 
           for (let i = pops.length - 1; i >= 0; i -= 1) {
             pops[i].age += dt;
+            eraseTrailsForPop(pops[i]);
             if (pops[i].age >= pops[i].duration) pops.splice(i, 1);
           }
 
@@ -556,35 +631,218 @@
           }
         }
 
-        function updateBubbleTrails() {
+        function updateBubbleTrails(dt) {
+          trailFadeElapsed += dt;
+          if (trailFadeElapsed >= TRAIL_FADE_INTERVAL) {
+            const fadeAlpha = 1 - Math.exp(-trailFadeElapsed / TRAIL_FADE_SECONDS);
+            trailCtx.save();
+            trailCtx.globalCompositeOperation = 'destination-out';
+            trailCtx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha})`;
+            trailCtx.fillRect(0, 0, width, height);
+            trailCtx.restore();
+            trailFadeElapsed = 0;
+          }
+
           for (const bubble of bubbles) {
             if (bubble.dead || bubble.state !== 'travel') {
               bubble.trailX = null;
               bubble.trailY = null;
+              bubble.trailNormalX = null;
+              bubble.trailNormalY = null;
+              bubble.trailWidth = null;
               continue;
             }
 
             if (bubble.trailX === null || bubble.trailY === null) {
               bubble.trailX = bubble.x;
               bubble.trailY = bubble.y;
+              bubble.trailNormalX = null;
+              bubble.trailNormalY = null;
+              bubble.trailWidth = null;
               continue;
             }
 
             const moved = Math.hypot(bubble.x - bubble.trailX, bubble.y - bubble.trailY);
             if (moved < 0.35) continue;
 
-            const seeking = bubble.fuel <= REFUEL_THRESHOLD;
-            trailCtx.strokeStyle = seeking
-              ? 'rgba(244, 145, 70, 0.58)'
-              : 'rgba(127, 203, 193, 0.42)';
-            trailCtx.lineWidth = Math.max(1.1, bubble.radius * 0.13);
-            trailCtx.beginPath();
-            trailCtx.moveTo(bubble.trailX, bubble.trailY);
-            trailCtx.lineTo(bubble.x, bubble.y);
-            trailCtx.stroke();
+            bubble.vineDistance += moved;
+            const growLeaf =
+              !bubble.returning &&
+              bubble.fuel > REFUEL_THRESHOLD &&
+              bubble.vineDistance >= bubble.nextLeafAt;
+            drawRibbonSegment(
+              bubble,
+              bubble.trailX,
+              bubble.trailY,
+              bubble.x,
+              bubble.y,
+              growLeaf
+            );
+            if (growLeaf) {
+              bubble.nextLeafAt += 62 + bubble.radius * 2.2 + random() * 34;
+              bubble.leafSide *= -1;
+            }
             bubble.trailX = bubble.x;
             bubble.trailY = bubble.y;
           }
+        }
+
+        function drawRibbonSegment(bubble, fromX, fromY, toX, toY, growLeaf) {
+          const dx = toX - fromX;
+          const dy = toY - fromY;
+          const length = Math.max(0.001, Math.hypot(dx, dy));
+          let normalX = -dy / length;
+          let normalY = dx / length;
+          let fromNormalX = bubble.trailNormalX ?? normalX;
+          let fromNormalY = bubble.trailNormalY ?? normalY;
+          if (normalX * fromNormalX + normalY * fromNormalY < 0) {
+            normalX *= -1;
+            normalY *= -1;
+          }
+          const normalBlend = 0.34;
+          normalX = fromNormalX * (1 - normalBlend) + normalX * normalBlend;
+          normalY = fromNormalY * (1 - normalBlend) + normalY * normalBlend;
+          const normalLength = Math.max(0.001, Math.hypot(normalX, normalY));
+          normalX /= normalLength;
+          normalY /= normalLength;
+          const seeking = bubble.returning || bubble.fuel <= REFUEL_THRESHOLD;
+          const breathing = 0.9 + Math.sin(bubble.phase + bubble.age * 0.48) * 0.1;
+          const baseHalfWidth = seeking
+            ? Math.max(0.38, bubble.radius * 0.025)
+            : Math.max(0.58, bubble.radius * 0.042);
+          const halfWidth = baseHalfWidth * breathing;
+          const fromHalfWidth = bubble.trailWidth ?? halfWidth;
+          const baseColor = trailColorForBubble(bubble);
+          const shadowColor = mixRgb(baseColor, [14, 17, 15], 0.34);
+          const lightColor = mixRgb(baseColor, [224, 238, 230], 0.3);
+          const gradient = trailCtx.createLinearGradient(
+            fromX - normalX * halfWidth,
+            fromY - normalY * halfWidth,
+            fromX + normalX * halfWidth,
+            fromY + normalY * halfWidth
+          );
+
+          gradient.addColorStop(0, colorStyle(shadowColor, seeking ? 0.32 : 0.38));
+          gradient.addColorStop(0.43, colorStyle(baseColor, seeking ? 0.58 : 0.64));
+          gradient.addColorStop(0.7, colorStyle(lightColor, seeking ? 0.4 : 0.5));
+          gradient.addColorStop(1, colorStyle(shadowColor, seeking ? 0.24 : 0.3));
+
+          trailCtx.fillStyle = gradient;
+          trailCtx.beginPath();
+          trailCtx.moveTo(
+            fromX - fromNormalX * fromHalfWidth,
+            fromY - fromNormalY * fromHalfWidth
+          );
+          trailCtx.lineTo(toX - normalX * halfWidth, toY - normalY * halfWidth);
+          trailCtx.lineTo(toX + normalX * halfWidth, toY + normalY * halfWidth);
+          trailCtx.lineTo(
+            fromX + fromNormalX * fromHalfWidth,
+            fromY + fromNormalY * fromHalfWidth
+          );
+          trailCtx.closePath();
+          trailCtx.fill();
+
+          trailCtx.strokeStyle = colorStyle(lightColor, seeking ? 0.26 : 0.34);
+          trailCtx.lineWidth = seeking ? 0.2 : 0.28;
+          trailCtx.beginPath();
+          trailCtx.moveTo(
+            fromX + fromNormalX * fromHalfWidth * 0.38,
+            fromY + fromNormalY * fromHalfWidth * 0.38
+          );
+          trailCtx.lineTo(
+            toX + normalX * halfWidth * 0.38,
+            toY + normalY * halfWidth * 0.38
+          );
+          trailCtx.stroke();
+
+          if (growLeaf) {
+            drawVineLeaf(
+              bubble,
+              (fromX + toX) * 0.5,
+              (fromY + toY) * 0.5,
+              Math.atan2(dy, dx),
+              normalX,
+              normalY,
+              baseColor
+            );
+          }
+
+          bubble.trailNormalX = normalX;
+          bubble.trailNormalY = normalY;
+          bubble.trailWidth = halfWidth;
+        }
+
+        function trailColorForBubble(bubble) {
+          if (bubble.returning || bubble.fuel <= REFUEL_THRESHOLD) {
+            const progress = smoothstep(0, 1, bubble.returnProgress);
+            if (progress < 0.56) {
+              return mixRgb(TRAIL_BLUE, TRAIL_ORANGE, progress / 0.56);
+            }
+            return mixRgb(TRAIL_ORANGE, TRAIL_BROWN, (progress - 0.56) / 0.44);
+          }
+
+          const speed = Math.hypot(bubble.vx, bubble.vy);
+          const speedProgress = smoothstep(0.18, 1, speed / (bubble.speed * 1.4));
+          return mixRgb(TRAIL_BROWN, TRAIL_BLUE, speedProgress);
+        }
+
+        function drawVineLeaf(bubble, x, y, heading, normalX, normalY, color) {
+          const side = bubble.leafSide;
+          const branchLength = 3.8 + bubble.radius * 0.1;
+          const tipX = x + normalX * branchLength * side;
+          const tipY = y + normalY * branchLength * side;
+
+          trailCtx.strokeStyle = colorStyle(color, 0.34);
+          trailCtx.lineWidth = 0.42;
+          trailCtx.beginPath();
+          trailCtx.moveTo(x, y);
+          trailCtx.lineTo(tipX, tipY);
+          trailCtx.stroke();
+
+          trailCtx.save();
+          trailCtx.translate(tipX, tipY);
+          trailCtx.rotate(heading + side * 0.72);
+          trailCtx.fillStyle = colorStyle(mixRgb(color, [184, 214, 183], 0.18), 0.42);
+          trailCtx.beginPath();
+          trailCtx.ellipse(1.2, 0, 2.7 + bubble.radius * 0.035, 1.15, 0, 0, TAU);
+          trailCtx.fill();
+          trailCtx.restore();
+        }
+
+        function mixRgb(first, second, amount) {
+          const progress = clamp(amount, 0, 1);
+          return first.map((channel, index) =>
+            Math.round(mix(channel, second[index], progress))
+          );
+        }
+
+        function colorStyle(color, alpha) {
+          return `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`;
+        }
+
+        function eraseTrailsForPop(pop) {
+          const progress = clamp(pop.age / pop.duration, 0, 1);
+          const ease = 1 - Math.pow(1 - progress, 3);
+          const radius = pop.radius * (0.9 + ease * 3.8);
+          const erase = trailCtx.createRadialGradient(
+            pop.x,
+            pop.y,
+            0,
+            pop.x,
+            pop.y,
+            radius
+          );
+          erase.addColorStop(0, 'rgba(0, 0, 0, 0.34)');
+          erase.addColorStop(0.46, 'rgba(0, 0, 0, 0.2)');
+          erase.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+          trailCtx.save();
+          trailCtx.globalCompositeOperation = 'destination-out';
+          trailCtx.fillStyle = erase;
+          trailCtx.beginPath();
+          trailCtx.arc(pop.x, pop.y, radius, 0, TAU);
+          trailCtx.fill();
+          trailCtx.restore();
         }
 
         function updateStations(dt) {
@@ -595,17 +853,27 @@
           for (let i = pendingStations.length - 1; i >= 0; i -= 1) {
             pendingStations[i] -= dt;
             if (pendingStations[i] > 0) continue;
-            const point = pickResourcePoint([], true) || pickResourcePoint([], false);
-            if (point) stations.push(createStation(point, true));
+            const point = pickResourcePoint([], true);
+            if (point) {
+              stations.push(createStation(point, true));
+            } else {
+              status.textContent = 'The remaining oil field has no untouched deposit large enough for a new station.';
+            }
             pendingStations.splice(i, 1);
           }
         }
 
         function updateFillingBubble(bubble, dt) {
           const station = bubble.station;
-          if (!station || station.occupant !== bubble) {
+          if (
+            !station ||
+            !stations.includes(station) ||
+            bubble.dockPort === null ||
+            station.occupants[bubble.dockPort] !== bubble
+          ) {
             bubble.state = 'travel';
             bubble.station = null;
+            bubble.dockPort = null;
             chooseTarget(bubble, false);
             return;
           }
@@ -622,22 +890,29 @@
           station.remaining = Math.max(0, station.remaining - transferred);
 
           if (station.remaining <= 0.0001) {
-            retireStation(station, bubble);
+            retireStation(station);
             return;
           }
 
           if (bubble.fuel >= 1) {
-            station.occupant = null;
+            const port = STATION_PORTS[bubble.dockPort];
+            station.occupants[bubble.dockPort] = null;
             bubble.state = 'travel';
             bubble.station = station;
             bubble.target = null;
-            bubble.vx = bubble.dockSide * bubble.speed * 0.42;
-            bubble.vy = -bubble.speed * 0.18;
+            bubble.dockPort = null;
+            bubble.vx = (port.x * 0.54 - port.y * 0.16) * bubble.speed;
+            bubble.vy = (port.y * 0.54 + port.x * 0.16) * bubble.speed;
             bubble.retargetIn = 0.5 + random() * 0.8;
+            bubble.returning = false;
+            bubble.returnProgress = 0;
+            bubble.returnLegBase = 0;
+            bubble.returnTargetId = null;
+            chooseEscapePoint(bubble);
           }
         }
 
-        function retireStation(station, interruptedBubble) {
+        function retireStation(station) {
           const depletion = 1 - station.remaining / station.capacity;
           const patch = {
             x: station.x,
@@ -648,6 +923,7 @@
             phase: station.phase
           };
           depletedPatches.push(patch);
+          burnResourceCandidates(patch);
           paintPermanentDepletion(patch);
 
           stationPops.push({
@@ -656,7 +932,6 @@
             age: 0,
             duration: 1.05,
             radius: currentStationSize(station),
-            side: station.side,
             phase: station.phase
           });
 
@@ -666,26 +941,53 @@
               bubble.target = null;
               bubble.retargetIn = 0;
             }
-            if (bubble.station === station && bubble !== interruptedBubble) {
-              bubble.station = null;
-            }
-          }
+            if (bubble.station !== station) continue;
 
-          if (interruptedBubble) {
-            interruptedBubble.state = 'travel';
-            interruptedBubble.station = station;
-            interruptedBubble.target = null;
-            interruptedBubble.vx = station.side * interruptedBubble.speed * 0.34;
-            interruptedBubble.vy = -interruptedBubble.speed * 0.16;
-            interruptedBubble.retargetIn = 0;
+            if (bubble.state === 'filling') {
+              const port = STATION_PORTS[bubble.dockPort] || { x: 0, y: -1 };
+              bubble.state = 'travel';
+              bubble.target = null;
+              bubble.vx = (port.x * 0.46 - port.y * 0.12) * bubble.speed;
+              bubble.vy = (port.y * 0.46 + port.x * 0.12) * bubble.speed;
+              bubble.retargetIn = 0;
+            }
+            bubble.station = null;
+            bubble.dockPort = null;
           }
+          station.occupants.fill(null);
 
           pendingStations.push(0.65 + random() * 0.85);
           status.textContent = 'A station exhausted its vein and moved to a new deposit.';
         }
 
+        function burnResourceCandidates(patch) {
+          const burnRadius = Math.max(
+            patch.radius * 1.45,
+            Math.min(width, height) * 0.075
+          );
+          for (const candidate of resourceCandidates) {
+            const distance = Math.hypot(
+              candidate.nx * width - patch.x,
+              candidate.ny * height - patch.y
+            );
+            if (distance <= burnRadius) candidate.burned = true;
+          }
+        }
+
         function updateTravelingBubble(bubble, dt) {
           const seekingFuel = bubble.fuel <= REFUEL_THRESHOLD;
+          if (seekingFuel && !bubble.returning) {
+            bubble.returning = true;
+            bubble.returnProgress = 0;
+            bubble.returnLegBase = 0;
+            bubble.returnTargetId = null;
+          } else if (!seekingFuel && bubble.returning) {
+            bubble.returning = false;
+            bubble.returnProgress = 0;
+            bubble.returnLegBase = 0;
+            bubble.returnTargetId = null;
+          }
+
           bubble.retargetIn -= dt;
           if (seekingFuel) {
             if (bubble.target && !stations.includes(bubble.target)) {
@@ -696,7 +998,7 @@
               chooseTarget(bubble, bubble.station !== null);
             }
 
-            if (bubble.target && bubble.target.occupant) {
+            if (bubble.target && !stationHasOpenPort(bubble.target)) {
               const distanceToBusyTarget = Math.hypot(
                 bubble.target.x - bubble.x,
                 bubble.target.y - bubble.y
@@ -707,6 +1009,14 @@
             }
           } else {
             bubble.target = null;
+            if (
+              bubble.escapeX === null ||
+              bubble.escapeY === null ||
+              Math.hypot(bubble.escapeX - bubble.x, bubble.escapeY - bubble.y) <
+                Math.max(34, bubble.radius * 2.8)
+            ) {
+              chooseEscapePoint(bubble);
+            }
           }
 
           let desiredX;
@@ -714,38 +1024,68 @@
           let distance = Infinity;
 
           if (seekingFuel && bubble.target) {
-            const dx = bubble.target.x - bubble.x;
-            const dy = bubble.target.y - bubble.y;
+            const approachPort = chooseOpenPort(bubble.target, bubble);
+            const port = STATION_PORTS[approachPort] || { x: 0, y: 0 };
+            const approachDistance = bubbleStationContactDistance(bubble, bubble.target);
+            const approachX = bubble.target.x + port.x * approachDistance;
+            const approachY = bubble.target.y + port.y * approachDistance;
+            const dx = approachX - bubble.x;
+            const dy = approachY - bubble.y;
             distance = Math.max(0.001, Math.hypot(dx, dy));
-            const curl = Math.sin(bubble.phase + bubble.age * bubble.wobble) * 0.23;
-            desiredX = dx / distance - (dy / distance) * curl;
-            desiredY = dy / distance + (dx / distance) * curl;
-          } else {
-            const dx = width * 0.5 - bubble.x;
-            const dy = height * 0.5 - bubble.y;
-            const centerDistance = Math.max(1, Math.hypot(dx, dy));
-            const velocity = Math.max(1, Math.hypot(bubble.vx, bubble.vy));
-            const forwardX = bubble.vx / velocity;
-            const forwardY = bubble.vy / velocity;
+            updateReturnProgress(bubble, bubble.target, distance);
+            const directX = dx / distance;
+            const directY = dy / distance;
+            const approachEase = clamp(distance / (bubble.target.size * 8), 0, 1);
+            const curl =
+              Math.sin(bubble.phase + bubble.age * bubble.wobble) *
+              0.012 *
+              approachEase;
+            desiredX = directX - directY * curl;
+            desiredY = directY + directX * curl;
+          } else if (!seekingFuel) {
+            const dx = bubble.escapeX - bubble.x;
+            const dy = bubble.escapeY - bubble.y;
+            const escapeDistance = Math.max(1, Math.hypot(dx, dy));
+            const directX = dx / escapeDistance;
+            const directY = dy / escapeDistance;
             const energy = clamp(
               (bubble.fuel - REFUEL_THRESHOLD) / (1 - REFUEL_THRESHOLD),
               0,
               1
             );
-            const turn =
-              Math.sin(bubble.phase + bubble.age * bubble.wobble * 1.45) *
-                (0.34 + energy * 0.52) +
-              Math.sin(bubble.phase * 1.8 - bubble.age * 0.57) * (0.12 + energy * 0.2);
+            const vineSway =
+              Math.sin(bubble.phase * 0.67 + bubble.age * (0.2 + bubble.wobble * 0.08)) *
+              (0.2 + energy * 0.2);
+            desiredX = directX - directY * vineSway;
+            desiredY = directY + directX * vineSway;
+
+            const stationInfluence = Math.min(width, height) * 0.3;
+            for (const station of stations) {
+              const awayX = bubble.x - station.x;
+              const awayY = bubble.y - station.y;
+              const awayDistance = Math.max(1, Math.hypot(awayX, awayY));
+              const repulsion = Math.pow(
+                clamp(1 - awayDistance / stationInfluence, 0, 1),
+                2
+              );
+              desiredX += awayX / awayDistance * repulsion * (0.7 + energy * 0.55);
+              desiredY += awayY / awayDistance * repulsion * (0.7 + energy * 0.55);
+            }
+          } else {
+            const velocity = Math.max(1, Math.hypot(bubble.vx, bubble.vy));
+            const edgeMargin = Math.max(70, Math.min(width, height) * 0.16);
+            const centerX = width * 0.5 - bubble.x;
+            const centerY = height * 0.5 - bubble.y;
+            const centerDistance = Math.max(1, Math.hypot(centerX, centerY));
             const edgeDistance = Math.min(
               bubble.x,
               width - bubble.x,
               bubble.y,
               height - bubble.y
             );
-            const edgeMargin = Math.max(70, Math.min(width, height) * 0.16);
-            const centerPull = 0.06 + clamp(1 - edgeDistance / edgeMargin, 0, 1) * 1.3;
-            desiredX = forwardX - forwardY * turn + dx / centerDistance * centerPull;
-            desiredY = forwardY + forwardX * turn + dy / centerDistance * centerPull;
+            const edgePull = clamp(1 - edgeDistance / edgeMargin, 0, 1) * 1.3;
+            desiredX = bubble.vx / velocity + centerX / centerDistance * edgePull;
+            desiredY = bubble.vy / velocity + centerY / centerDistance * edgePull;
           }
 
           const desiredLength = Math.max(0.001, Math.hypot(desiredX, desiredY));
@@ -754,8 +1094,8 @@
           const energy = seekingFuel
             ? 0
             : clamp((bubble.fuel - REFUEL_THRESHOLD) / (1 - REFUEL_THRESHOLD), 0, 1);
-          const cruiseSpeed = bubble.speed * (seekingFuel ? 1 : 0.92 + energy * 0.38);
-          const steering = 1 - Math.exp(-dt * (2.1 + energy * 0.8));
+          const cruiseSpeed = bubble.speed * (seekingFuel ? 1.08 : 0.9 + energy * 0.5);
+          const steering = 1 - Math.exp(-dt * (seekingFuel ? 6.2 : 1.35 + energy * 0.55));
           bubble.vx += (desiredX * cruiseSpeed - bubble.vx) * steering;
           bubble.vy += (desiredY * cruiseSpeed - bubble.vy) * steering;
 
@@ -772,7 +1112,7 @@
             Math.hypot(bubble.target.x - bubble.x, bubble.target.y - bubble.y) <=
               bubbleStationContactDistance(bubble, bubble.target)
           ) {
-            if (!bubble.target.occupant) dockBubble(bubble, bubble.target);
+            if (stationHasOpenPort(bubble.target)) dockBubble(bubble, bubble.target);
             else {
               bubble.target = null;
               bubble.retargetIn = 0;
@@ -782,27 +1122,65 @@
           if (bubble.fuel <= 0 && bubble.state !== 'filling') popBubble(bubble);
         }
 
+        function updateReturnProgress(bubble, station, distance) {
+          if (bubble.returnTargetId !== station.id) {
+            bubble.returnTargetId = station.id;
+            bubble.returnLegBase = bubble.returnProgress;
+            bubble.returnLegStart = Math.max(
+              distance,
+              bubbleStationContactDistance(bubble, station) * 1.5
+            );
+          }
+          const legProgress = clamp(1 - distance / bubble.returnLegStart, 0, 1);
+          bubble.returnProgress = bubble.returnLegBase +
+            (1 - bubble.returnLegBase) * legProgress;
+        }
+
         function dockBubble(bubble, station) {
-          if (!stations.includes(station) || station.remaining <= 0) {
+          const dockPort = chooseOpenPort(station, bubble);
+          if (!stations.includes(station) || station.remaining <= 0 || dockPort === null) {
             bubble.target = null;
             bubble.retargetIn = 0;
             return;
           }
-          station.occupant = bubble;
+          station.occupants[dockPort] = bubble;
           bubble.state = 'filling';
           bubble.station = station;
           bubble.target = station;
-          bubble.dockSide = station.side;
+          bubble.dockPort = dockPort;
           bubble.fillRate = 0.26 + random() * 0.22;
           bubble.vx = 0;
           bubble.vy = 0;
         }
 
+        function stationHasOpenPort(station) {
+          return station.occupants.some((occupant) => occupant === null);
+        }
+
+        function chooseOpenPort(station, bubble) {
+          let bestPort = null;
+          let bestDistance = Infinity;
+          const clearance = bubbleStationContactDistance(bubble, station);
+          for (let i = 0; i < STATION_PORTS.length; i += 1) {
+            if (station.occupants[i]) continue;
+            const port = STATION_PORTS[i];
+            const x = station.x + port.x * clearance;
+            const y = station.y + port.y * clearance;
+            const distance = Math.hypot(x - bubble.x, y - bubble.y);
+            if (distance < bestDistance) {
+              bestPort = i;
+              bestDistance = distance;
+            }
+          }
+          return bestPort;
+        }
+
         function bubbleDockPosition(bubble, station) {
           const clearance = bubbleStationContactDistance(bubble, station);
+          const port = STATION_PORTS[bubble.dockPort] || STATION_PORTS[0];
           return {
-            x: station.x + bubble.dockSide * clearance,
-            y: station.y
+            x: station.x + port.x * clearance,
+            y: station.y + port.y * clearance
           };
         }
 
@@ -934,8 +1312,12 @@
 
         function popBubble(bubble) {
           if (bubble.dead) return;
-          if (bubble.station && bubble.station.occupant === bubble) {
-            bubble.station.occupant = null;
+          if (
+            bubble.station &&
+            bubble.dockPort !== null &&
+            bubble.station.occupants[bubble.dockPort] === bubble
+          ) {
+            bubble.station.occupants[bubble.dockPort] = null;
           }
           bubble.dead = true;
           pops.push({
@@ -1042,7 +1424,7 @@
 
         function drawStation(station) {
           const { x, y } = station;
-          const occupied = Boolean(station.occupant);
+          const occupied = station.occupants.some(Boolean);
           const reserve = clamp(station.remaining / station.capacity, 0, 1);
           const s = currentStationSize(station);
           const born = 1 - Math.pow(1 - station.birth, 3);
@@ -1051,47 +1433,82 @@
           ctx.translate(x, y);
           ctx.scale(born, born);
 
+          for (let i = 0; i < STATION_PORTS.length; i += 1) {
+            const bubble = station.occupants[i];
+            if (!bubble) continue;
+            const port = STATION_PORTS[i];
+            ctx.strokeStyle = 'rgba(244, 183, 111, 0.38)';
+            ctx.lineWidth = Math.max(0.8, s * 0.055);
+            ctx.beginPath();
+            ctx.moveTo(port.x * s, port.y * s);
+            ctx.lineTo(bubble.x - x, bubble.y - y);
+            ctx.stroke();
+          }
+
           ctx.save();
-          ctx.translate(-station.side * s * 0.08, s * 0.18);
-          traceStationShape(s * 1.05, station.side);
+          ctx.translate(-s * 0.08, s * 0.18);
+          traceStationShape(s * 1.05);
           ctx.fillStyle = 'rgba(5, 6, 5, 0.44)';
           ctx.fill();
           ctx.restore();
 
-          traceStationShape(s, station.side);
-          ctx.fillStyle = `rgba(224, 147, 76, ${0.34 + reserve * 0.66})`;
+          traceStationShape(s);
+          ctx.fillStyle = 'rgba(24, 27, 24, 0.92)';
           ctx.fill();
+
+          if (reserve > 0.002) {
+            const fuelTop = s - reserve * s * 2;
+            ctx.save();
+            traceStationShape(s);
+            ctx.clip();
+            ctx.fillStyle = 'rgba(224, 147, 76, 0.9)';
+            ctx.fillRect(-s, fuelTop, s * 2, s * 2);
+            ctx.restore();
+
+            if (reserve < 0.998) {
+              const surfaceHalfWidth = Math.max(0, s - Math.abs(fuelTop));
+              ctx.beginPath();
+              ctx.moveTo(-surfaceHalfWidth, fuelTop);
+              ctx.lineTo(surfaceHalfWidth, fuelTop);
+              ctx.strokeStyle = 'rgba(255, 218, 159, 0.86)';
+              ctx.lineWidth = Math.max(0.8, s * 0.055);
+              ctx.stroke();
+            }
+          }
+
+          traceStationShape(s);
           ctx.strokeStyle = occupied
             ? 'rgba(255, 222, 171, 0.92)'
             : 'rgba(244, 178, 104, 0.78)';
           ctx.lineWidth = Math.max(1, s * 0.085);
           ctx.stroke();
 
-          if (occupied) {
-            const bubble = station.occupant;
-            ctx.strokeStyle = 'rgba(244, 183, 111, 0.38)';
-            ctx.lineWidth = Math.max(1, s * 0.06);
+          for (let i = 0; i < STATION_PORTS.length; i += 1) {
+            const port = STATION_PORTS[i];
+            const portOccupied = Boolean(station.occupants[i]);
             ctx.beginPath();
-            ctx.moveTo(station.side * s * 0.92, 0);
-            ctx.lineTo(bubble.x - x, bubble.y - y);
+            ctx.arc(port.x * s, port.y * s, Math.max(1.6, s * 0.12), 0, TAU);
+            ctx.fillStyle = portOccupied
+              ? 'rgba(255, 230, 186, 0.98)'
+              : 'rgba(56, 46, 34, 0.96)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(246, 184, 111, 0.9)';
+            ctx.lineWidth = Math.max(0.65, s * 0.045);
             ctx.stroke();
           }
           ctx.restore();
         }
 
         function currentStationSize(station) {
-          const reserve = clamp(station.remaining / station.capacity, 0, 1);
-          const reserveScale = 0.22 + Math.sqrt(reserve) * 0.78;
-          return station.size * reserveScale;
+          return station.size;
         }
 
-        function traceStationShape(size, side) {
+        function traceStationShape(size) {
           ctx.beginPath();
-          ctx.moveTo(-side * size * 0.58, -size * 0.62);
-          ctx.lineTo(side * size * 0.22, -size * 0.62);
-          ctx.lineTo(side * size, 0);
-          ctx.lineTo(side * size * 0.22, size * 0.62);
-          ctx.lineTo(-side * size * 0.58, size * 0.62);
+          ctx.moveTo(0, -size);
+          ctx.lineTo(size, 0);
+          ctx.lineTo(0, size);
+          ctx.lineTo(-size, 0);
           ctx.closePath();
         }
 
@@ -1162,13 +1579,13 @@
           ctx.translate(pop.x, pop.y);
           ctx.globalAlpha = 1 - progress;
 
-          traceStationShape(pop.radius * (1 + ease * 2.2), pop.side);
+          traceStationShape(pop.radius * (1 + ease * 2.2));
           ctx.strokeStyle = 'rgba(242, 168, 91, 0.74)';
           ctx.lineWidth = Math.max(1, pop.radius * 0.07 * (1 - progress));
           ctx.stroke();
 
-          for (let i = 0; i < 5; i += 1) {
-            const angle = pop.phase + (i / 5) * TAU;
+          for (let i = 0; i < STATION_PORTS.length; i += 1) {
+            const angle = -Math.PI / 2 + (i / STATION_PORTS.length) * TAU;
             const distance = pop.radius * (0.7 + ease * 3.6);
             ctx.save();
             ctx.translate(Math.cos(angle) * distance, Math.sin(angle) * distance);
@@ -1191,6 +1608,17 @@
           ctx.save();
           ctx.translate(pop.x, pop.y);
           ctx.globalAlpha = 1 - progress;
+
+          const burstRadius = pop.radius * (0.8 + ease * 3.6);
+          const burst = ctx.createRadialGradient(0, 0, 0, 0, 0, burstRadius);
+          burst.addColorStop(0, 'rgba(247, 246, 235, 0.5)');
+          burst.addColorStop(0.38, 'rgba(237, 241, 232, 0.2)');
+          burst.addColorStop(1, 'rgba(237, 241, 232, 0)');
+          ctx.fillStyle = burst;
+          ctx.beginPath();
+          ctx.arc(0, 0, burstRadius, 0, TAU);
+          ctx.fill();
+
           ctx.strokeStyle = 'rgba(236, 216, 181, 0.82)';
           ctx.lineWidth = 1;
           ctx.beginPath();

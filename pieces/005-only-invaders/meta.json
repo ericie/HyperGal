@@ -5,5 +5,5 @@
   "category": "games",
   "type": "interactive",
   "thumbnail": "thumbnail.jpg",
-  "description": "Space Invaders after the invaders have vanished. Four defenders spend finite ammunition to attack and intercept only the bullets aimed at their own territory. When one reaches its last round, it deploys a suicide nuke whose shockwave destroys every cannon, including itself."
+  "description": "Space Invaders after the invaders have vanished. Four small inset cannons fire only at the opposite edge, while any armed non-shooter may volunteer to intercept. Their finite ammunition appears only as cartridge rows; the final round becomes the sole suicide nuke."
 }

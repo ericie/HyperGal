@@ -2,7 +2,7 @@
 
 An autonomous game of traditional Snake, glowing like a flooded 8-bit cavern.
 
-There are five contenders and one mouse. New snakes enter from offscreen with
+There are twenty contenders and one mouse. New snakes enter from offscreen with
 random starting lengths and aggression values: higher aggression makes one chase
 the mouse harder, lower aggression makes it preserve more space around its own
 body and the other snakes. Success compounds quickly. A repeat winner gains
@@ -18,11 +18,13 @@ free-space reserve shrinks as it matures, so the body can occupy most of the
 arena—leaving only a narrow working channel—while still maintaining a route
 toward its moving tail. Rather than only tightening wherever its head happens
 to be, it begins adopting a looping one-cell-wide packing route after occupying
-14% of the arena, reaching full commitment at 20%. That route visits every
+8% of the arena, reaching full commitment at 12%. That route visits every
 arena cell, so an enormous body settles into continuous lanes instead of
-leaving arbitrary holes. Large snakes still hunt and box opponents, but will
-abandon the shortest route to the mouse when it could close a trap around
-themselves. The rule set stays small:
+leaving arbitrary holes. The packing route is only a guide: hunger strengthens
+as the snake grows, any legal mouse beside its head is bitten immediately, and
+a useful order-preserving shortcut toward food overrides the lane. Large snakes
+still avoid immediate collisions, but they never retire from the hunt. The rule
+set stays small:
 
 - touching the **mouse** grows the snake and creates a new mouse,
 - consecutive catches by the **same snake** grow it by 2, 4, 7, 11, ... segments,
@@ -32,8 +34,8 @@ themselves. The rule set stays small:
 - touching the **border** kills the snake,
 - touching its **own body** anywhere kills the snake,
 - touching **another snake** kills one snake,
-- when the snake dies, its body remains as a translucent watercolor stroke,
-- living snakes drag and feather those wet remains when they cross them,
+- death burns visibly from the snake's head to its tail,
+- the faded body settles into a muted skeleton that does not smear when crossed,
 - once only one survivor remains, new contenders enter from beyond the border.
 
 ## The look
@@ -41,9 +43,10 @@ themselves. The rule set stays small:
 An underground Mega Man palette: near-black cavern navy, tile indigo, electric
 cobalt, water cyan, mineral violet and pink, with one tiny amber energy pickup.
 Living snakes are continuous, rounded bands of light rather than linked boxes.
-Dead snakes accumulate underneath as broad wet-on-wet gestures: a blurred
-underwash, layered translucent pigment, soft edge blooms, and long bristle trails.
-Crossing marks brighten and mingle into a shared subterranean mural.
+On death, a bright sparking front travels down the body and extinguishes each
+segment in sequence. Dead snakes accumulate underneath as dim, desaturated
+spines with paired ribs, vertebrae, skulls, and jaws. They remain fixed when a
+living snake crosses them, turning the arena into a quiet subterranean ossuary.
 
 ## Interaction
 

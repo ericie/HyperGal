@@ -64,7 +64,7 @@
       id="garden"
       tabindex="0"
       role="img"
-      aria-label="Overgrowth. A directionless botanical wallpaper on aged rag paper that continually fills with new hand-inked plants. Roses, peonies, poppies, lilies, daisies, anemones, lacecap hydrangeas, honeysuckle, and acanthus grow in every direction on sinuous curving stems. Click or press R to begin a new arrangement."
+      aria-label="Overgrowth. A dense, directionless botanical wallpaper on aged rag paper that continually fills with new hand-inked plants. Roses, peonies, poppies, lilies, daisies, anemones, lacecap hydrangeas, honeysuckle, acanthus, and large cream caladium, hosta, and arum leaves grow in every direction on sinuous curving stems. Click or press R to begin a new arrangement."
     ></canvas>
     <canvas id="new-growth" aria-hidden="true"></canvas>
     <p id="status" class="sr-only" aria-live="polite"></p>
@@ -80,7 +80,8 @@
         const status = document.getElementById('status');
         const TAU = Math.PI * 2;
         const GOLDEN = 0.61803398875;
-        const DEVELOPMENT_FRAMES = 10;
+        const LEAF_DEVELOPMENT_FRAMES = 20;
+        const FLOWER_DEVELOPMENT_FRAMES = 20;
         const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
         // `ctx` is swapped to an offscreen surface while the faded underprint
@@ -106,6 +107,10 @@
           leafPale: '#cdcd9c',
           olive: '#8a8a42',
           sage: '#a9b287',
+          leafCreamShade: '#ded0ae',
+          leafCream: '#f1e7ce',
+          leafCreamLight: '#fbf6e6',
+          leafCreamVein: '#aa9c72',
 
           madder: '#a93c2c',
           madderDeep: '#7b2622',
@@ -138,6 +143,9 @@
           { key: 'anemone', latin: 'Anemone coronaria', leaf: 'small', blooms: [1, 4], scale: [0.66, 1.0], weight: 9, height: [120, 195] },
           { key: 'honeysuckle', latin: 'Lonicera periclymenum', leaf: 'ovate', blooms: [2, 4], scale: [0.72, 1.08], weight: 10, height: [260, 400], vine: true },
           { key: 'none', latin: 'Acanthus mollis', leaf: 'acanthus', blooms: [0, 0], scale: [0.88, 1.32], weight: 12, height: [110, 195], scroll: true },
+          { key: 'caladium', latin: 'Caladium bicolor', leaf: 'caladium', blooms: [0, 0], scale: [0.92, 1.28], weight: 2, height: [120, 200], branches: [3, 5], pale: true },
+          { key: 'hosta', latin: 'Hosta plantaginea', leaf: 'hosta', blooms: [0, 0], scale: [0.78, 1.12], weight: 2, height: [90, 155], branches: [4, 6], pale: true },
+          { key: 'arum', latin: 'Arum italicum', leaf: 'arum', blooms: [0, 0], scale: [0.88, 1.22], weight: 2, height: [145, 225], branches: [2, 4], pale: true },
         ];
 
         const LEAF_KIND = {
@@ -148,6 +156,9 @@
           ovate: { profile: 'ovate', size: [13, 23], width: [0.58, 0.76], teeth: 0, serr: 0, sharp: false, pair: true },
           fine: { profile: 'lance', size: [15, 26], width: [0.34, 0.5], teeth: 0, serr: 0, sharp: false, pinnate: true },
           acanthus: { profile: 'acanthus', size: [26, 48], width: [0.62, 0.86], teeth: 0, serr: 0, sharp: false },
+          caladium: { profile: 'round', size: [34, 58], width: [0.72, 0.96], teeth: 0, serr: 0, sharp: false },
+          hosta: { profile: 'ovate', size: [42, 70], width: [0.46, 0.64], teeth: 0, serr: 0, sharp: false },
+          arum: { profile: 'lance', size: [44, 76], width: [0.5, 0.7], teeth: 0, serr: 0, sharp: false },
         };
 
         const LEAF_PROFILE = {
@@ -250,7 +261,7 @@
 
           // A faded underprint: flat silhouettes that give the ground the
           // depth of a two-plate impression.
-          const ghostCount = Math.round(clamp(area / 78000, 7, 16));
+          const ghostCount = Math.round(clamp(area / 60000, 10, 24));
           for (let i = 0; i < ghostCount; i += 1) {
             const plant = createPlant(
               random() * width,
@@ -264,7 +275,7 @@
           }
 
           // The main growth, on a jittered grid so the repeat stays even.
-          const count = clamp(Math.round(area / 18000), 26, 70);
+          const count = clamp(Math.round(area / 13500), 38, 96);
           const cols = Math.max(4, Math.round(Math.sqrt((count * width) / height)));
           const rows = Math.ceil(count / cols);
           const cellW = width / cols;
@@ -276,23 +287,24 @@
             const x = (col + 0.2 + random() * 0.66) * cellW;
             const y = (row + 0.2 + random() * 0.66) * cellH;
             const forced = i < SPECIES.length ? i : null;
-            const plant = createPlant(x, y, forced, unit);
+            const plant = createPlant(x, y, forced, unit, { bloomBoost: 1 });
             plant.depth = i + random();
             plants.push(plant);
           }
 
           // Infill on the half-cell offset. A Morris repeat leaves no bare
           // ground: the gaps between specimens get small sprigs.
-          const fillTypes = [4, 7, 2, 8, 9, 4, 9, 7];
+          const fillTypes = [4, 7, 2, 6, 0, 4, 3, 7];
           let fillIndex = 0;
           for (let row = 0; row <= rows; row += 1) {
             for (let col = 0; col <= cols; col += 1) {
-              if (random() > 0.72) continue;
+              if (random() > 0.84) continue;
               const plant = createPlant(
                 (col + 0.72 + lerp(-0.22, 0.22, random())) * cellW,
                 (row + 0.56 + lerp(-0.22, 0.22, random())) * cellH,
                 fillTypes[fillIndex++ % fillTypes.length],
-                unit
+                unit,
+                { bloomBoost: 1 }
               );
               plant.scale *= lerp(0.48, 0.72, random());
               plant.depth = -6 + random();
@@ -303,7 +315,7 @@
           // Long twining stems that traverse the plate and tie it together,
           // the way a Morris repeat is carried by its meander.
           const vineIndex = SPECIES.findIndex((s) => s.vine);
-          const vines = Math.round(clamp(area / 155000, 4, 9));
+          const vines = Math.round(clamp(area / 125000, 5, 12));
           for (let i = 0; i < vines; i += 1) {
             const edge = i % 4;
             const origin = edgePlantOrigin(edge, width * 0.06 + random() * 40, random);
@@ -312,7 +324,7 @@
               origin.y,
               vineIndex,
               unit,
-              { rotation: origin.rotation }
+              { rotation: origin.rotation, bloomBoost: 1 }
             );
             plant.scale *= lerp(1.2, 1.65, random());
             plant.depth = -40 + i;
@@ -321,29 +333,50 @@
 
           // Stems entering from beyond the sheet, so the growth reads as cut
           // from something larger.
-          for (let i = 0; i < 7; i += 1) {
+          for (let i = 0; i < 10; i += 1) {
             const edge = i % 4;
             const origin = edgePlantOrigin(edge, edge === 3 ? 70 : 14, random);
             const plant = createPlant(origin.x, origin.y, i % SPECIES.length, unit, {
               rotation: origin.rotation,
+              bloomBoost: 1,
             });
             plant.scale *= 1.1;
             plant.depth = i % 2 ? -20 + i : count + i;
             plants.push(plant);
           }
 
+          // Broad cream leaves are printed late enough to cover busy seams.
+          // They behave as planted negative space rather than empty holes.
+          const creamSpecies = SPECIES.reduce((indices, spec, index) => {
+            if (spec.pale) indices.push(index);
+            return indices;
+          }, []);
+          const creamPlants = Math.round(clamp(area / 155000, 5, 9));
+          for (let i = 0; i < creamPlants; i += 1) {
+            const plant = createPlant(
+              lerp(width * 0.06, width * 0.94, random()),
+              lerp(height * 0.06, height * 0.94, random()),
+              creamSpecies[i % creamSpecies.length],
+              unit
+            );
+            plant.scale *= lerp(1.08, 1.44, random());
+            plant.depth = count + 24 + i;
+            plants.push(plant);
+          }
+
           sortPlants();
 
           // Foreground specimens drawn last, over the ruled border.
-          const anchorTypes = [0, 1, 3, 6, 5, 9, 0, 7, 3, 1];
-          const anchors = Math.round(clamp(area / 260000, 3, 6));
+          const anchorTypes = [0, 1, 3, 6, 5, 4, 0, 7, 3, 1];
+          const anchors = Math.round(clamp(area / 190000, 5, 9));
           const anchorPlants = [];
           for (let i = 0; i < anchors; i += 1) {
             const plant = createPlant(
               ((i + 0.1 + random() * 0.8) / anchors) * width,
               lerp(height * 0.08, height * 0.92, random()),
               anchorTypes[i % anchorTypes.length],
-              unit
+              unit,
+              { bloomBoost: 2 }
             );
             plant.scale *= lerp(1.5, 1.95, random());
             anchorPlants.push(plant);
@@ -354,7 +387,7 @@
           ghostPlants = [];
           growthCount = 0;
           lastGrowthPaint = 0;
-          nextGrowthAt = performance.now() + 900;
+          nextGrowthAt = performance.now() + 350;
         }
 
         // An edge specimen points into the sheet, but every edge is treated
@@ -381,7 +414,7 @@
         function growForever(now) {
           if (now >= nextGrowthAt) {
             beginNextPlant(now);
-            nextGrowthAt = now + lerp(1450, 2600, random());
+            nextGrowthAt = now + lerp(650, 1150, random());
           }
           if (growingPlants.length && now - lastGrowthPaint >= 1000 / 30) {
             drawGrowingPlants(now);
@@ -863,7 +896,7 @@
 
           // A single lit edge, the engraver's white line.
           ctx.globalAlpha = 0.24;
-          ctx.strokeStyle = P.leafPale;
+          ctx.strokeStyle = fill === P.leafCreamVein ? P.leafCreamLight : P.leafPale;
           ctx.lineWidth = Math.max(0.35, wBase * 0.2);
           ctx.beginPath();
           const lit = new Array(n);
@@ -917,8 +950,12 @@
                 bias: 1.28,
               });
 
-          const bloomCount = randInt(r, spec.blooms[0], spec.blooms[1]);
-          const branchCount = Math.max(bloomCount, randInt(r, 3, spec.key === 'none' ? 6 : 5));
+          const bloomBoost = opts && opts.bloomBoost ? opts.bloomBoost : 0;
+          const flowering = spec.blooms[1] > 0;
+          const bloomCount =
+            flowering ? randInt(r, spec.blooms[0], spec.blooms[1]) + bloomBoost : 0;
+          const branchRange = spec.branches || [3, flowering ? 5 : 6];
+          const branchCount = Math.max(bloomCount, randInt(r, branchRange[0], branchRange[1]));
           const branches = [];
           const stemLeaves = [];
 
@@ -948,6 +985,7 @@
                   at: curveAt(curve, leafT),
                   side: -side,
                   t: leafT,
+                  tone: spec.pale ? 'cream' : 'green',
                 })
               );
             }
@@ -957,19 +995,27 @@
               tip,
               leaves,
               width: lerp(1.7, 3.1, r()),
-              bud: spec.key !== 'none' && r() > 0.66,
+              bud: flowering && r() > 0.66,
               budSize: lerp(4.5, 9, r()),
-              tendril: (spec.vine && r() > 0.4) || r() > 0.9,
+              tendril: !spec.pale && ((spec.vine && r() > 0.4) || r() > 0.9),
               tendrilDir: side,
               tendrilSize: lerp(9, 20, r()),
             });
 
             const stemAt = curveAt(stem, clamp(t - 0.07, 0.06, 0.92));
-            stemLeaves.push(makeLeaf(r, spec.leaf, { at: stemAt, side, t, big: spec.key === 'none' }));
+            stemLeaves.push(
+              makeLeaf(r, spec.leaf, {
+                at: stemAt,
+                side,
+                t,
+                big: !flowering,
+                tone: spec.pale ? 'cream' : 'green',
+              })
+            );
           }
 
           const blooms = [];
-          if (spec.key !== 'none') {
+          if (flowering) {
             const baseSize = flowerSize(spec.key);
             for (let i = 0; i < bloomCount; i += 1) {
               const branchIndex = i === 0 ? -1 : (i * 2 - 1) % branches.length;
@@ -985,10 +1031,17 @@
               });
             }
           } else {
-            // The acanthus terminates in a volute rather than a flower.
+            // Non-flowering plants finish in one broad terminal leaf.
             const tip = curveAt(stem, 1);
             stemLeaves.push(
-              makeLeaf(r, 'acanthus', { at: tip, side: dir, t: 1, big: true, scaleUp: 1.25 })
+              makeLeaf(r, spec.leaf, {
+                at: tip,
+                side: dir,
+                t: 1,
+                big: true,
+                scaleUp: spec.pale ? 1.12 : 1.25,
+                tone: spec.pale ? 'cream' : 'green',
+              })
             );
           }
 
@@ -1005,7 +1058,10 @@
                 : r() * TAU,
             stem,
             stemWidth: lerp(2.4, 4.4, r()),
-            stemColor: [P.stem, P.stemDeep, '#6e7440', '#7b6c3e', P.leafMid][Math.floor(r() * 5)],
+            stemColor: spec.pale
+              ? P.leafCreamVein
+              : [P.stem, P.stemDeep, '#6e7440', '#7b6c3e', P.leafMid][Math.floor(r() * 5)],
+            branchColor: spec.pale ? P.leafCreamVein : P.stemDeep,
             thorns: spec.key === 'rose',
             branches,
             stemLeaves,
@@ -1029,6 +1085,7 @@
             // The curl is clamped away from zero: a leaf blade always bows.
             curl: (o.side > 0 ? 1 : -1) * lerp(0.16, 0.42, r()),
             shade: r(),
+            tone: o.tone || 'green',
             anchorT: o.t || 0,
             turnover: r() > 0.86 && conf.size[1] > 22,
             fold: lerp(0.68, 0.84, r()),
@@ -1084,7 +1141,12 @@
               : 1;
             branchProgresses.push(branchProgress);
             if (branchProgress <= 0) continue;
-            drawStemRibbon(partialCurve(branch.curve, branchProgress), branch.width, branch.width * 0.34, P.stemDeep);
+            drawStemRibbon(
+              partialCurve(branch.curve, branchProgress),
+              branch.width,
+              branch.width * 0.34,
+              plant.branchColor
+            );
             if (branch.tendril && branchProgress > 0.72) {
               drawTendril(
                 branch.tip,
@@ -1248,6 +1310,11 @@
         }
 
         function leafFill(leaf) {
+          if (leaf.tone === 'cream') {
+            if (leaf.shade < 0.28) return P.leafCreamShade;
+            if (leaf.shade < 0.78) return P.leafCream;
+            return P.leafCreamLight;
+          }
           if (leaf.shade < 0.16) return P.leafDark;
           if (leaf.shade < 0.42) return P.leaf;
           if (leaf.shade < 0.68) return P.leafMid;
@@ -1263,7 +1330,7 @@
           const open = smoothstep(clamp((unfurl - 0.12) / 0.88, 0, 1));
           ctx.save();
           ctx.translate(leaf.x, leaf.y);
-          // Ten drawn poses replace the old whole-leaf squash. The rib grows
+          // Twenty drawn poses replace the old whole-leaf squash. The rib grows
           // first; the blade then broadens, bends and fans away from the stem.
           ctx.rotate(leaf.angle - Math.sign(leaf.curl || 1) * (1 - open) * 0.72);
 
@@ -1335,7 +1402,9 @@
             length: leaf.length * (0.12 + length * 0.88),
             width: leaf.width * (0.06 + width * 0.94),
             curl: leaf.curl * (0.18 + width * 0.82),
-            turnover: leaf.turnover && t >= 8 / 9,
+            turnover:
+              leaf.turnover &&
+              t >= (LEAF_DEVELOPMENT_FRAMES - 2) / (LEAF_DEVELOPMENT_FRAMES - 1),
             development: t,
           };
         }
@@ -1347,6 +1416,7 @@
             curl,
             conf: leaf.conf,
             shade: leaf.shade,
+            tone: leaf.tone,
             turnover: !!turnover,
             fold: leaf.fold,
             foldTilt: leaf.foldTilt,
@@ -1367,6 +1437,7 @@
 
         function drawBlade(leaf) {
           ctx.save();
+          const isCream = leaf.tone === 'cream';
           const steps = leaf.conf.sharp ? 30 : 24;
           const { upper, lower } = leafOutline(leaf, steps);
           const fill = leafFill(leaf);
@@ -1388,8 +1459,8 @@
           if (leaf.length > 15) {
             ctx.save();
             ctx.clip();
-            ctx.globalAlpha = 0.12;
-            ctx.strokeStyle = P.ink;
+            ctx.globalAlpha = isCream ? 0.075 : 0.12;
+            ctx.strokeStyle = isCream ? P.leafCreamVein : P.ink;
             ctx.lineWidth = 0.5;
             const dirSign = leaf.curl >= 0 ? 1 : -1;
             for (let i = 1; i <= 7; i += 1) {
@@ -1409,22 +1480,22 @@
             ctx.restore();
           }
 
-          ctx.globalAlpha = 0.62;
-          ctx.strokeStyle = P.ink;
-          ctx.lineWidth = 0.85;
+          ctx.globalAlpha = isCream ? 0.42 : 0.62;
+          ctx.strokeStyle = isCream ? P.umber : P.ink;
+          ctx.lineWidth = isCream ? 0.75 : 0.85;
           ctx.stroke();
 
           // Midrib and side veins, all of them curved with the blade.
-          ctx.globalAlpha = 0.42;
-          ctx.strokeStyle = P.leafPale;
-          ctx.lineWidth = 0.7;
+          ctx.globalAlpha = isCream ? 0.5 : 0.42;
+          ctx.strokeStyle = isCream ? P.leafCreamVein : P.leafPale;
+          ctx.lineWidth = isCream ? 0.8 : 0.7;
           const rib = [];
           for (let i = 0; i <= 12; i += 1) rib.push(leafRib(leaf, i / 12));
           ctx.beginPath();
           traceSmooth(rib, true);
           ctx.stroke();
 
-          ctx.globalAlpha = 0.26;
+          ctx.globalAlpha = isCream ? 0.3 : 0.26;
           ctx.lineWidth = 0.5;
           for (let i = 1; i <= 5; i += 1) {
             const t = i / 6.4;
@@ -1470,7 +1541,12 @@
           ctx.beginPath();
           traceSmooth(flap, true);
           ctx.closePath();
-          ctx.fillStyle = leaf.shade > 0.6 ? P.leafPale : P.sage;
+          ctx.fillStyle =
+            leaf.tone === 'cream'
+              ? P.paperDeep
+              : leaf.shade > 0.6
+                ? P.leafPale
+                : P.sage;
           ctx.fill();
           ctx.globalAlpha = 0.55;
           ctx.strokeStyle = P.ink;
@@ -1478,7 +1554,7 @@
           ctx.stroke();
 
           ctx.globalAlpha = 0.3;
-          ctx.strokeStyle = P.leafDark;
+          ctx.strokeStyle = leaf.tone === 'cream' ? P.leafCreamVein : P.leafDark;
           ctx.lineWidth = 0.55;
           const ribFlap = [];
           for (let i = start; i <= steps; i += 1) {
@@ -1631,7 +1707,7 @@
         }
 
         function drawOpeningFlower(kind, bloom, plantSeed, progress) {
-          const opening = developmentProgress(progress);
+          const opening = flowerDevelopmentProgress(progress);
 
           // The bud and the open corolla overlap for several drawn frames.
           // Sepals hinge away while individual petals lengthen and rotate;
@@ -1676,13 +1752,13 @@
             ctx.restore();
           }
 
-          if (opening >= 1 / 9) {
-            drawFlower(kind, bloom, plantSeed, stagedGrowth(opening, 0.08));
+          if (opening >= 1 / (FLOWER_DEVELOPMENT_FRAMES - 1)) {
+            drawFlower(kind, bloom, plantSeed, flowerStagedGrowth(opening, 0.08));
           }
         }
 
         function posePetal(finalAngle, radius, opening, delay) {
-          const t = stagedGrowth(opening, delay || 0);
+          const t = flowerStagedGrowth(opening, delay || 0);
           const angle = normalizeAngle(finalAngle);
           ctx.rotate(angle * smoothstep(t));
           ctx.translate(0, -radius * (0.12 + smoothstep(t) * 0.88));
@@ -2082,7 +2158,7 @@
           // looking like a bucket of disconnected blossom confetti.
           for (let i = 0; i < florets; i += 1) {
             const angle = (i / florets) * TAU + lerp(-0.12, 0.12, rng());
-            const floretOpen = stagedGrowth(opening, i * 0.018);
+            const floretOpen = flowerStagedGrowth(opening, i * 0.018);
             const dist = r * 0.57 * (0.2 + smoothstep(floretOpen) * 0.8);
             const sr = r * lerp(0.22, 0.28, rng());
             ctx.save();
@@ -2152,7 +2228,7 @@
 
           for (let i = 0; i < count; i += 1) {
             const a = (i / count) * TAU + lerp(-0.16, 0.16, rng());
-            const floretOpen = stagedGrowth(opening, i * 0.045);
+            const floretOpen = flowerStagedGrowth(opening, i * 0.045);
             const len = r * lerp(0.74, 0.96, rng()) * (0.28 + floretOpen * 0.72);
             ctx.save();
             ctx.rotate(normalizeAngle(a) * smoothstep(floretOpen));
@@ -2245,14 +2321,26 @@
         // Utilities
         // ---------------------------------------------------------------
 
-        function developmentProgress(value) {
+        function developmentProgress(value, frameCount) {
           const t = clamp(value, 0, 1);
-          const frame = Math.min(DEVELOPMENT_FRAMES - 1, Math.floor(t * DEVELOPMENT_FRAMES));
-          return frame / (DEVELOPMENT_FRAMES - 1);
+          const frames = frameCount || LEAF_DEVELOPMENT_FRAMES;
+          const frame = Math.min(frames - 1, Math.floor(t * frames));
+          return frame / (frames - 1);
         }
 
-        function stagedGrowth(value, delay) {
-          return developmentProgress(clamp((value - delay) / Math.max(0.001, 1 - delay), 0, 1));
+        function stagedGrowth(value, delay, frameCount) {
+          return developmentProgress(
+            clamp((value - delay) / Math.max(0.001, 1 - delay), 0, 1),
+            frameCount
+          );
+        }
+
+        function flowerDevelopmentProgress(value) {
+          return developmentProgress(value, FLOWER_DEVELOPMENT_FRAMES);
+        }
+
+        function flowerStagedGrowth(value, delay) {
+          return stagedGrowth(value, delay, FLOWER_DEVELOPMENT_FRAMES);
         }
 
         function normalizeAngle(angle) {

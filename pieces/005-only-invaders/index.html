@@ -49,12 +49,11 @@
 
       const ATTACK_SPEED_MIN = 245;
       const ATTACK_SPEED_MAX = 320;
-      const SUPER_CHANCE = 0.045;
       const MAX_ATTACKS = 7;
-      const AMMO_CAPACITY = 30;
-      const MUZZLE_GAP = 17;
-      const DEFENDER_W = 58;
-      const DEFENDER_H = 24;
+      const AMMO_CAPACITY = 48;
+      const DEFENDER_W = 42;
+      const DEFENDER_H = 18;
+      const MUZZLE_LENGTH = 25;
       const SIDES = ['top', 'right', 'bottom', 'left'];
       const OPPOSITE = { top: 'bottom', right: 'left', bottom: 'top', left: 'right' };
       const BASE_ANGLE = { top: Math.PI, right: -Math.PI / 2, bottom: 0, left: Math.PI / 2 };
@@ -108,8 +107,6 @@
           aimY: 0,
           wobble: Math.random() * Math.PI * 2,
           muzzleGlow: 0,
-          chargeStart: -1,
-          chargeUntil: -1,
           ammo: AMMO_CAPACITY,
           alive: true,
         };
@@ -156,13 +153,15 @@
       }
 
       function configureDefenders() {
-        const padX = Math.max(58, W * 0.06);
-        const padY = Math.max(58, H * 0.09);
+        const insetX = clamp(W * 0.10, 78, 150);
+        const insetY = clamp(H * 0.13, 78, 120);
+        const railX = clamp(W * 0.16, 110, 240);
+        const railY = clamp(H * 0.18, 96, 150);
         const specs = {
-          top:    { baseX: W * 0.52, baseY: padY,     coord: W * 0.52, min: padX, max: W - padX },
-          right:  { baseX: W - padX, baseY: H * 0.48, coord: H * 0.48, min: padY, max: H - padY },
-          bottom: { baseX: W * 0.48, baseY: H - padY, coord: W * 0.48, min: padX, max: W - padX },
-          left:   { baseX: padX,     baseY: H * 0.52, coord: H * 0.52, min: padY, max: H - padY },
+          top:    { baseX: W * 0.52, baseY: insetY,     coord: W * 0.52, min: railX, max: W - railX },
+          right:  { baseX: W - insetX, baseY: H * 0.48, coord: H * 0.48, min: railY, max: H - railY },
+          bottom: { baseX: W * 0.48, baseY: H - insetY, coord: W * 0.48, min: railX, max: W - railX },
+          left:   { baseX: insetX,     baseY: H * 0.52, coord: H * 0.52, min: railY, max: H - railY },
         };
         for (const side of SIDES) {
           const def = defenders[side];
@@ -175,8 +174,6 @@
           def.railMax = spec.max;
           def.ammo = AMMO_CAPACITY;
           def.alive = true;
-          def.chargeStart = -1;
-          def.chargeUntil = -1;
           def.muzzleGlow = 0;
           def.aimX = W / 2;
           def.aimY = H / 2;
@@ -194,7 +191,7 @@
         if (!suicideNuke && now >= nextAttackAt && attacks.length + pendingAttacks.length < MAX_ATTACKS) {
           const volley = launchVolley(nextSide);
           nextSide = nextShooterSide(nextSide);
-          nextAttackAt = now + (volley.count === 0 ? 0.18 : volley.super ? rand(2.4, 3.8) : rand(0.82, 1.46));
+          nextAttackAt = now + (volley.count === 0 ? 0.18 : rand(0.82, 1.46));
         }
 
         updateDefenders(dt);
@@ -209,38 +206,29 @@
 
       function launchVolley(side) {
         const available = availableAmmo(side);
-        if (!defenders[side].alive || available <= 0) return { count: 0, super: false };
-        const superReady = !attacks.some((b) => b.super) && !pendingAttacks.some((b) => b.super);
-        const superShot = superReady && Math.random() < SUPER_CHANCE;
+        if (!defenders[side].alive || available <= 0) return { count: 0 };
         const mood = Math.random();
-        const requestedCount = superShot ? 1 : mood > 0.76 ? 3 : mood > 0.48 ? 2 : 1;
+        const requestedCount = mood > 0.76 ? 3 : mood > 0.48 ? 2 : 1;
         const count = Math.min(requestedCount, available);
-        const aggression = superShot ? 1 : count === 1 ? rand(0.15, 0.65) : rand(0.62, 1);
-        const cadence = superShot ? 0 : aggression > 0.75 ? rand(0.11, 0.18) : rand(0.18, 0.28);
-        const chargeDelay = superShot ? rand(0.68, 0.92) : 0;
+        const aggression = count === 1 ? rand(0.15, 0.65) : rand(0.62, 1);
+        const cadence = aggression > 0.75 ? rand(0.11, 0.18) : rand(0.18, 0.28);
         const shooter = defenders[side];
-        const targetSide = pickTargetSide(side);
+        const targetSide = OPPOSITE[side];
         const targetPoint = pickTargetPoint(targetSide, aggression);
-        setDefenderGoal(shooter, targetPoint.x, targetPoint.y, W * 0.08 * aggression);
-        if (superShot) {
-          shooter.aimX = targetPoint.x;
-          shooter.aimY = targetPoint.y;
-          shooter.chargeStart = now;
-          shooter.chargeUntil = now + chargeDelay;
-        }
+        const openingRange = (shooter.axis === 'x' ? W : H) * 0.045 * aggression;
+        setDefenderGoal(shooter, targetPoint.x, targetPoint.y, rand(-openingRange, openingRange));
         for (let i = 0; i < count; i++) {
           pendingAttacks.push({
             side,
-            fireAt: now + chargeDelay + i * cadence,
+            fireAt: now + i * cadence,
             aggression,
             targetSide,
             targetPoint,
             shotIndex: i,
             shotCount: count,
-            super: superShot,
           });
         }
-        return { count, super: superShot };
+        return { count };
       }
 
       function launchPendingAttacks() {
@@ -267,20 +255,19 @@
         const spread = (shot.shotIndex - (shot.shotCount - 1) / 2) * rand(30, 58);
         const px = -Math.sin(pathAngle);
         const py = Math.cos(pathAngle);
-        const lunge = rand(-1, 1) * W * (0.04 + shot.aggression * 0.10);
+        const railSpan = shooter.axis === 'x' ? W : H;
+        const lunge = rand(-1, 1) * railSpan * (0.025 + shot.aggression * 0.06);
         const target = constrainTargetToSide(
           shot.targetSide,
           shot.targetPoint.x + px * spread + rand(-18, 18),
           shot.targetPoint.y + py * spread + rand(-18, 18),
         );
-        const muzzle = muzzlePoint(shooter, target.x, target.y, shot.super ? 42 : 34);
+        const muzzle = muzzlePoint(shooter, target.x, target.y, MUZZLE_LENGTH);
         const startX = muzzle.x;
         const startY = muzzle.y;
-        const speed = shot.super
-          ? rand(185, 245)
-          : rand(ATTACK_SPEED_MIN, ATTACK_SPEED_MAX + shot.aggression * 120);
+        const speed = rand(ATTACK_SPEED_MIN, ATTACK_SPEED_MAX + shot.aggression * 120);
         const travel = Math.hypot(target.x - startX, target.y - startY);
-        const targetDelay = Math.max(shot.super ? 1.08 : 0.64, travel / speed);
+        const targetDelay = Math.max(0.64, travel / speed);
         const targetTime = now + targetDelay;
         const vx = (target.x - startX) / targetDelay;
         const vy = (target.y - startY) / targetDelay;
@@ -306,10 +293,9 @@
           targetX: target.x,
           targetY: target.y,
           targetTime,
-          r: shot.super ? 11 : 4,
-          color: shot.super ? COLORS.super : COLORS.attack,
+          r: 4,
+          color: COLORS.attack,
           aggression: shot.aggression,
-          super: shot.super,
           armed: true,
         };
         attacks.push(attack);
@@ -318,25 +304,21 @@
       }
 
       function planCounter(attack) {
-        const side = attack.targetSide;
+        const side = pickInterceptor(attack);
+        if (!side) return;
         const defender = defenders[side];
-        // A cannon may only answer a projectile physically headed for its own
-        // edge. Reserving the round here prevents late-game overspend.
-        if (!defender.alive || availableAmmo(side) <= 0) return;
-        const lateSave = attack.super ? true : Math.random() < 0.38;
-        const interceptProgress = attack.super
-          ? rand(0.82, 0.91)
-          : lateSave ? rand(0.80, 0.93) : rand(0.54, 0.76);
+        const lateSave = Math.random() < 0.38;
+        const interceptProgress = lateSave ? rand(0.80, 0.93) : rand(0.54, 0.76);
         const impactX = attack.startX + (attack.targetX - attack.startX) * interceptProgress;
         const impactY = attack.startY + (attack.targetY - attack.startY) * interceptProgress;
         const impactTime = now + (attack.targetTime - now) * interceptProgress;
         const timeToImpact = impactTime - now;
-        const safetyWindow = attack.super ? rand(0.16, 0.26) : lateSave ? rand(0.13, 0.23) : rand(0.34, 0.72);
+        const safetyWindow = lateSave ? rand(0.13, 0.23) : rand(0.34, 0.72);
         const reaction = lateSave
           ? Math.max(0.14, timeToImpact - safetyWindow)
           : clamp(rand(0.18, 0.46), 0.14, Math.max(0.14, timeToImpact - safetyWindow));
         const fireTime = now + reaction;
-        const danceOffset = lateSave ? rand(-46, 46) : rand(-118, 118);
+        const danceOffset = lateSave ? rand(-32, 32) : rand(-82, 82);
         setDefenderGoal(defender, impactX, impactY, danceOffset);
         defender.aimX = impactX;
         defender.aimY = impactY;
@@ -350,14 +332,13 @@
           py: defender.y,
           vx: 0,
           vy: 0,
-          r: attack.super ? 5.7 : lateSave ? 4.1 : 3.4,
+          r: lateSave ? 4.1 : 3.4,
           color: defender.color,
           fireTime,
           impactTime,
           impactX,
           impactY,
           lateSave,
-          targetSuper: attack.super,
           startX: defender.x,
           startY: defender.y,
           fired: false,
@@ -365,10 +346,14 @@
         });
       }
 
-      function pickTargetSide(side) {
-        if (Math.random() < 0.55) return OPPOSITE[side];
-        const choices = SIDES.filter((s) => s !== side && s !== OPPOSITE[side]);
-        return choices[(Math.random() * choices.length) | 0];
+      function pickInterceptor(attack) {
+        const eligible = SIDES.filter((side) => (
+          side !== attack.owner && defenders[side].alive && availableAmmo(side) > 0
+        ));
+        if (eligible.length === 0) return null;
+        const volunteers = eligible.filter(() => Math.random() < 0.62);
+        const pool = volunteers.length > 0 ? volunteers : eligible;
+        return pool[(Math.random() * pool.length) | 0];
       }
 
       function pickTargetPoint(targetSide, aggression) {
@@ -435,8 +420,6 @@
       function killDefender(defender, origin) {
         if (!defender.alive) return;
         defender.alive = false;
-        defender.chargeStart = -1;
-        defender.chargeUntil = -1;
         defender.muzzleGlow = 0;
         if (!origin) {
           burst(defender.x, defender.y, defender.color, COLORS.superCore);
@@ -481,8 +464,8 @@
       function updateDefenders(dt) {
         for (const def of Object.values(defenders)) {
           if (!def.alive) continue;
-          const drift = Math.sin(now * 1.4 + def.wobble + driftSeed) * 36;
-          const shimmer = Math.sin(now * 3.1 + def.wobble * 0.6) * 9;
+          const drift = Math.sin(now * 1.4 + def.wobble + driftSeed) * 24;
+          const shimmer = Math.sin(now * 3.1 + def.wobble * 0.6) * 6;
           const target = clamp(def.goalCoord + drift + shimmer, def.railMin, def.railMax);
           def.coord = ease(def.coord, target, Math.min(1, dt * 4.2));
           applyDefenderPosition(def, Math.sin(now * 2.2 + def.wobble) * 3);
@@ -523,11 +506,11 @@
       function fireCounter(counter) {
         const def = defenders[counter.owner];
         const attack = attacks.find((b) => b.id === counter.targetId && b.armed);
-        if (!attack || attack.targetSide !== counter.owner || !useAmmunition(def)) {
+        if (!attack || attack.owner === counter.owner || !useAmmunition(def)) {
           counter.done = true;
           return;
         }
-        const muzzle = muzzlePoint(def, counter.impactX, counter.impactY, counter.targetSuper ? 38 : 34);
+        const muzzle = muzzlePoint(def, counter.impactX, counter.impactY, MUZZLE_LENGTH);
         counter.x = muzzle.x;
         counter.y = muzzle.y;
         counter.px = counter.x;
@@ -552,13 +535,7 @@
           attack.x = counter.impactX;
           attack.y = counter.impactY;
           attack.armed = false;
-          if (attack.super) {
-            atomicBurst(counter.impactX, counter.impactY, defenders[counter.owner].color, attack.color);
-            clearBullets();
-            return true;
-          } else {
-            burst(counter.impactX, counter.impactY, defenders[counter.owner].color, attack.color);
-          }
+          burst(counter.impactX, counter.impactY, defenders[counter.owner].color, attack.color);
           shakeDefenders(counter.impactX, counter.impactY);
         }
         return false;
@@ -692,7 +669,7 @@
         }
         drawField();
         drawAimThreads();
-        for (const b of attacks) drawBullet(b, b.color, b.super ? 24 : 8);
+        for (const b of attacks) drawBullet(b, b.color, 8);
         for (const b of counters) if (b.fired) drawBullet(b, b.color, 6);
         drawSuicideNuke();
         drawSparks();
@@ -750,7 +727,7 @@
           ctx.strokeStyle = hexA(def.color, 0.34 * alpha);
           ctx.lineWidth = 1;
           ctx.beginPath();
-          const muzzle = muzzlePoint(def, c.impactX, c.impactY, c.targetSuper ? 38 : 34);
+          const muzzle = muzzlePoint(def, c.impactX, c.impactY, MUZZLE_LENGTH);
           ctx.moveTo(muzzle.x, muzzle.y);
           ctx.lineTo(c.impactX, c.impactY);
           ctx.stroke();
@@ -762,7 +739,7 @@
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         ctx.strokeStyle = color;
-        ctx.lineWidth = b.r * (b.super ? 1.55 : 1.2);
+        ctx.lineWidth = b.r * 1.2;
         ctx.lineCap = 'round';
         ctx.shadowColor = color;
         ctx.shadowBlur = glow;
@@ -770,22 +747,10 @@
         ctx.moveTo(b.px, b.py);
         ctx.lineTo(b.x, b.y);
         ctx.stroke();
-        if (b.super) {
-          ctx.fillStyle = hexA(color, 0.18);
-          ctx.beginPath();
-          ctx.arc(b.x, b.y, b.r * 3.1, 0, Math.PI * 2);
-          ctx.fill();
-        }
         ctx.fillStyle = color;
         ctx.beginPath();
         ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
         ctx.fill();
-        if (b.super) {
-          ctx.fillStyle = COLORS.superCore;
-          ctx.beginPath();
-          ctx.arc(b.x - b.r * 0.25, b.y - b.r * 0.25, b.r * 0.42, 0, Math.PI * 2);
-          ctx.fill();
-        }
         ctx.restore();
       }
 
@@ -839,23 +804,7 @@
         const x = def.x;
         const y = def.y;
         const angle = Math.atan2(def.aimY - y, def.aimX - x);
-        const barrelLen = 28 + def.muzzleGlow * 6;
-        const charging = def.chargeUntil > now;
-        if (charging) {
-          const p = clamp((now - def.chargeStart) / Math.max(0.001, def.chargeUntil - def.chargeStart), 0, 1);
-          ctx.save();
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.strokeStyle = `rgba(255,241,168,${0.26 + p * 0.36})`;
-          ctx.lineWidth = 2 + p * 3;
-          ctx.beginPath();
-          ctx.arc(x, y, 24 + Math.sin(now * 18) * 4 + p * 24, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.fillStyle = `rgba(255,241,168,${0.10 + p * 0.22})`;
-          ctx.beginPath();
-          ctx.arc(x, y, 18 + p * 28, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        }
+        const barrelLen = 20 + def.muzzleGlow * 4;
 
         ctx.save();
         ctx.translate(x, y);
@@ -863,27 +812,27 @@
 
         ctx.save();
         ctx.shadowColor = def.color;
-        ctx.shadowBlur = 18 + def.muzzleGlow * 14;
+        ctx.shadowBlur = 12 + def.muzzleGlow * 10;
         ctx.fillStyle = def.softColor;
-        ctx.fillRect(-DEFENDER_W / 2 - 10, -DEFENDER_H / 2 - 5, DEFENDER_W + 20, DEFENDER_H + 10);
+        ctx.fillRect(-DEFENDER_W / 2 - 7, -DEFENDER_H / 2 - 4, DEFENDER_W + 14, DEFENDER_H + 8);
         ctx.restore();
 
         ctx.fillStyle = def.color;
-        ctx.fillRect(-DEFENDER_W / 2, 5, DEFENDER_W, 10);
-        ctx.fillRect(-DEFENDER_W / 2 + 9, -4, DEFENDER_W - 18, 12);
-        ctx.fillRect(-11, -13, 22, 14);
+        ctx.fillRect(-DEFENDER_W / 2, 4, DEFENDER_W, 7);
+        ctx.fillRect(-DEFENDER_W / 2 + 7, -3, DEFENDER_W - 14, 9);
+        ctx.fillRect(-8, -10, 16, 11);
 
         ctx.fillStyle = 'rgba(255,255,255,0.76)';
-        ctx.fillRect(-DEFENDER_W / 2 + 4, 7, DEFENDER_W - 8, 2);
+        ctx.fillRect(-DEFENDER_W / 2 + 3, 6, DEFENDER_W - 6, 1.5);
         ctx.restore();
 
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(angle + Math.PI / 2);
         ctx.fillStyle = '#dfffee';
-        ctx.fillRect(-4, -barrelLen, 8, barrelLen);
+        ctx.fillRect(-3, -barrelLen, 6, barrelLen);
         ctx.fillStyle = def.color;
-        ctx.fillRect(-7, -barrelLen - 3, 14, 5);
+        ctx.fillRect(-5, -barrelLen - 2, 10, 4);
         ctx.restore();
 
         if (def.muzzleGlow > 0) {
@@ -893,7 +842,7 @@
           ctx.globalCompositeOperation = 'lighter';
           ctx.fillStyle = hexA(def.color, def.muzzleGlow * 0.65);
           ctx.beginPath();
-          ctx.arc(mx, my, 9 + def.muzzleGlow * 10, 0, Math.PI * 2);
+          ctx.arc(mx, my, 6 + def.muzzleGlow * 7, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
         }
@@ -902,11 +851,11 @@
         ctx.lineWidth = 2;
         ctx.beginPath();
         if (def.axis === 'x') {
-          const railY = def.baseY + (def.side === 'top' ? 32 : -32);
+          const railY = def.baseY + (def.side === 'top' ? 24 : -24);
           ctx.moveTo(0, railY);
           ctx.lineTo(W, railY);
         } else {
-          const railX = def.baseX + (def.side === 'left' ? 32 : -32);
+          const railX = def.baseX + (def.side === 'left' ? 24 : -24);
           ctx.moveTo(railX, 0);
           ctx.lineTo(railX, H);
         }
@@ -930,7 +879,6 @@
         const longSize = clamp((longEdge - 118 - gap * (AMMO_CAPACITY - 1)) / AMMO_CAPACITY, 3, 7);
         const shortSize = 5;
         const stockLength = AMMO_CAPACITY * longSize + (AMMO_CAPACITY - 1) * gap;
-        const count = String(def.ammo).padStart(2, '0');
         const lastRoundPulse = REDUCED_MOTION ? 1 : 0.55 + Math.sin(now * 12) * 0.35;
 
         ctx.save();
@@ -956,24 +904,6 @@
             ctx.lineWidth = 1;
             ctx.strokeRect(x + 0.5, y + 0.5, Math.max(1, width - 1), Math.max(1, height - 1));
           }
-        }
-        ctx.restore();
-
-        ctx.save();
-        ctx.globalAlpha = def.alive ? 1 : 0.36;
-        ctx.fillStyle = def.color;
-        ctx.font = '700 12px ui-monospace, SFMono-Regular, Menlo, monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const label = def.alive ? `AMMO ${count}` : `DEAD ${count}`;
-        if (side === 'top') {
-          ctx.fillText(label, W / 2, 29);
-        } else if (side === 'bottom') {
-          ctx.fillText(label, W / 2, H - 29);
-        } else {
-          ctx.translate(side === 'left' ? 29 : W - 29, H / 2);
-          ctx.rotate(side === 'left' ? -Math.PI / 2 : Math.PI / 2);
-          ctx.fillText(label, 0, 0);
         }
         ctx.restore();
       }

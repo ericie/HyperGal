@@ -14,9 +14,11 @@ The growth model is biased by visible and invisible forces:
 - Cambium memory accumulates age, weather, slope, and wound history so young
   rings start smoother while older rings become less symmetrical.
 - Pest and fire are severity-scaled incidents, pre-marked with abstract chart
-  lines. Each one affects 1-5 years of growth: minor incidents leave narrow
-  kinks, severe incidents compress multiple rings and deform the bark without
-  cutting the new boundary back into older wood.
+  lines. Each one affects 1-5 years of growth. Fire strongly arrests the first
+  local ring, then tapers through a multi-year recovery with a narrow char scar
+  and callus at its edges. Pest wounds begin as small migrating bores, then grow
+  opposing callus lips that wrap over the damage and leave a rounded bark boil
+  with a closing seam. Neither cuts a new boundary back into older wood.
 
 Those forces are drawn as abstract field-map symbols around the trunk. Click or
 press Enter/Space to reseed the specimen.

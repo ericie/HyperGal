@@ -114,7 +114,9 @@
         let lastFrameAt = 0;
         let raf = 0;
         let prefersReducedMotion = reduceQuery.matches;
-        let statusPulse = { text: '', until: 0 };
+        let scoreRun = { sign: 0, count: 0, total: 0 };
+        let scoreHistory = [];
+        let scoreBursts = [];
 
         resize();
         reset();
@@ -150,7 +152,9 @@
           random = mulberry32(seed);
           nextCarId = 1;
           score = 0;
-          statusPulse = { text: '', until: 0 };
+          scoreRun = { sign: 0, count: 0, total: 0 };
+          scoreHistory = [];
+          scoreBursts = [];
           hero = {
             id: 'hero',
             isHero: true,
@@ -170,6 +174,11 @@
             surgeUntil: 0,
             nextSurgeAt: 0,
             stoppedForObstacle: false,
+            mergeRequestLane: null,
+            mergeRequestId: 0,
+            mergeRequestSince: 0,
+            mergeRequestUntil: 0,
+            stuckSince: 0,
           };
           cameraS = hero.s;
           cars = [];
@@ -229,7 +238,7 @@
           preventOverlaps();
           updateCamera(dt);
           resolveExits(t);
-          updateScore();
+          updateScore(t);
           trimOldEvents();
         }
 
@@ -327,6 +336,12 @@
             exitProgress: 0,
             stoppedForObstacle: false,
             scoreFlash: 0,
+            heroRequestId: 0,
+            yieldsToHero: false,
+            yieldUntil: 0,
+            escapeObstacleId: null,
+            escapeTargetLane: null,
+            escapeUrgency: 0,
           };
           nextCarId += 1;
           return car;
@@ -417,6 +432,11 @@
           hero.huntingOpening = false;
           hero.gapTargetSpeed = null;
           hero.pathTargetLane = hero.lane;
+          if (hero.speed < 2.2) {
+            if (!hero.stuckSince) hero.stuckSince = t;
+          } else if (hero.speed > 6) {
+            hero.stuckSince = 0;
+          }
           const obstacle = nearestObstacleAheadFor(hero, hero.lane, 150);
           let requestedLane = hero.lane;
           let forced = false;
@@ -439,25 +459,94 @@
             }
           }
 
+          if (
+            requestedLane === hero.lane &&
+            hero.stuckSince > 0 &&
+            t - hero.stuckSince > 1.15
+          ) {
+            const courtesyLane = bestCourtesyLane();
+            if (courtesyLane !== hero.lane) {
+              requestedLane = courtesyLane;
+              shouldSignal = true;
+              hero.huntingOpening = true;
+              hero.gapTargetSpeed = heroGapTargetSpeed(requestedLane);
+            }
+          }
+
+          if (
+            hero.mergeRequestLane != null &&
+            t < hero.mergeRequestUntil &&
+            Math.abs(hero.mergeRequestLane - hero.lane) === 1 &&
+            laneIsOpenAt(hero.mergeRequestLane, hero.s, hero.length + 7)
+          ) {
+            requestedLane = hero.mergeRequestLane;
+            shouldSignal = true;
+            hero.huntingOpening = true;
+            hero.gapTargetSpeed = heroGapTargetSpeed(requestedLane);
+          }
+
+          if (requestedLane !== hero.lane && shouldSignal) {
+            maintainHeroMergeRequest(requestedLane, t);
+          } else if (hero.mergeRequestLane != null) {
+            clearHeroMergeRequest();
+          }
+
           const changed = requestLaneChange(hero, requestedLane, t, shouldSignal);
-          if (changed && !forced) hero.gapTargetSpeed = Math.max(hero.gapTargetSpeed ?? 0, 45);
+          if (changed) {
+            clearHeroMergeRequest();
+            if (!forced) hero.gapTargetSpeed = Math.max(hero.gapTargetSpeed ?? 0, 45);
+          }
           if (forced && !changed && requestedLane !== hero.lane) hero.stoppedForObstacle = true;
           if (obstacle && obstacle.gap < 36 && requestedLane === hero.lane) hero.stoppedForObstacle = true;
+        }
+
+        function maintainHeroMergeRequest(lane, t) {
+          const expired = t >= hero.mergeRequestUntil;
+          if (hero.mergeRequestLane !== lane || expired) {
+            hero.mergeRequestLane = lane;
+            hero.mergeRequestId += 1;
+            hero.mergeRequestSince = t;
+            hero.mergeRequestUntil = t + 4.4;
+          }
+          hero.signal = Math.sign(lane - hero.lane);
+          hero.signalUntil = Math.max(hero.signalUntil, t + 0.32);
+        }
+
+        function clearHeroMergeRequest() {
+          hero.mergeRequestLane = null;
+          hero.mergeRequestSince = 0;
+          hero.mergeRequestUntil = 0;
+        }
+
+        function bestCourtesyLane() {
+          const options = [hero.lane - 1, hero.lane + 1]
+            .filter(laneExists)
+            .filter((lane) => laneIsOpenAt(lane, hero.s, hero.length + 5))
+            .filter((lane) => laneActiveAt(lane, hero.s + 42))
+            .filter((lane) => {
+              const obstacle = nearestObstacleAheadFor(hero, lane, 24);
+              return !obstacle || obstacle.gap > 12;
+            })
+            .sort((a, b) => laneSafetyScore(hero, b) - laneSafetyScore(hero, a));
+          return options[0] ?? hero.lane;
         }
 
         function planTrafficCar(car, t) {
           if (car.exiting) return;
           expireSignal(car, t);
           car.stoppedForObstacle = false;
+          car.escapeUrgency = 0;
           car.mergeCooldown = Math.max(0, car.mergeCooldown - 0.025);
           car.huntCooldown = Math.max(0, car.huntCooldown - 0.025);
           chooseTrafficExit(car);
-          const obstacle = nearestObstacleAheadFor(car, car.lane, 118);
+          const obstacleLookahead = Math.max(158, car.speed * 4.4);
+          const obstacle = nearestObstacleAheadFor(car, car.lane, obstacleLookahead);
           const front = nearestVehicleAheadFor(car, car.lane, 125);
           const exitDistance = car.exitTarget == null ? Infinity : car.exitTarget - car.s;
           const exitLane = car.exitTarget == null ? null : rightmostLaneAt(car.exitTarget);
           let requestedLane = car.lane;
           let forced = false;
+          const yieldingToHero = updateCourtesyDecision(car, t);
 
           if (car.exitTarget != null && exitDistance < -8) {
             if (car.lane === exitLane) {
@@ -470,12 +559,17 @@
             car.exitTarget = null;
           }
 
-          if (obstacle && obstacle.gap < Math.max(68, car.speed * 2.7)) {
+          if (obstacle && obstacle.gap < obstacleLookahead) {
             requestedLane = bestEscapeLane(car, obstacle);
             forced = true;
+            car.escapeUrgency = clamp((112 - obstacle.gap) / 96, 0, 1);
           } else if (car.exitTarget != null && exitDistance < 280 && car.lane !== exitLane) {
+            car.escapeObstacleId = null;
+            car.escapeTargetLane = null;
             requestedLane = car.lane + Math.sign(exitLane - car.lane);
-          } else if (car.mergeCooldown <= 0 && car.huntCooldown <= 0) {
+          } else if (!yieldingToHero && car.mergeCooldown <= 0 && car.huntCooldown <= 0) {
+            car.escapeObstacleId = null;
+            car.escapeTargetLane = null;
             const trafficBound =
               front &&
               car.desiredSpeed > front.vehicle.speed + 1.4 &&
@@ -492,8 +586,58 @@
             (forced || car.signalDiscipline > (car.aggression > 0.68 ? 0.38 : 0.56));
           const changed = requestLaneChange(car, requestedLane, t, shouldSignal);
           if (changed) car.mergeCooldown = rand(0.55, 2.1) + (1 - car.ambition) * 0.9 + (1 - car.aggression) * 1.15;
-          if (forced && !changed && requestedLane !== car.lane) car.stoppedForObstacle = true;
-          if (obstacle && obstacle.gap < 30 && requestedLane === car.lane) car.stoppedForObstacle = true;
+          if (
+            forced &&
+            !changed &&
+            requestedLane !== car.lane &&
+            obstacle.gap < Math.max(18, car.speed * 0.72)
+          ) {
+            car.stoppedForObstacle = true;
+          }
+          if (obstacle && obstacle.gap < 16 && requestedLane === car.lane) car.stoppedForObstacle = true;
+        }
+
+        function updateCourtesyDecision(car, t) {
+          if (
+            hero.mergeRequestLane == null ||
+            t >= hero.mergeRequestUntil ||
+            car.lane !== hero.mergeRequestLane ||
+            car.exiting
+          ) {
+            car.yieldsToHero = false;
+            return false;
+          }
+
+          const follower = courtesyFollowerForHero(hero.mergeRequestLane, 105);
+          if (!follower || follower.id !== car.id) {
+            car.yieldsToHero = false;
+            return false;
+          }
+
+          if (car.heroRequestId !== hero.mergeRequestId) {
+            car.heroRequestId = hero.mergeRequestId;
+            const courtesyChance = 0.38 + (1 - car.aggression) * 0.46;
+            car.yieldsToHero =
+              hash01(car.id * 31.7 + hero.mergeRequestId * 73.1 + seed * 0.00017) < courtesyChance;
+            car.yieldUntil = car.yieldsToHero ? hero.mergeRequestUntil : 0;
+          }
+
+          if (car.yieldsToHero && t < car.yieldUntil) return true;
+          car.yieldsToHero = false;
+          return false;
+        }
+
+        function courtesyFollowerForHero(lane, maxDistance) {
+          let follower = null;
+          let bestDistance = Infinity;
+          for (const car of cars) {
+            if (car.exiting || car.lane !== lane) continue;
+            const distance = hero.s - car.s;
+            if (distance < -0.5 || distance >= maxDistance || distance >= bestDistance) continue;
+            follower = car;
+            bestDistance = distance;
+          }
+          return follower;
         }
 
         function chooseTrafficExit(car) {
@@ -521,19 +665,45 @@
             return true;
           }
 
-          if (vehicle.isHero && shouldSignal) {
+          if (shouldSignal) {
             vehicle.signal = direction;
-            vehicle.signalUntil = Math.max(vehicle.signalUntil, t + 0.25);
+            vehicle.signalUntil = Math.max(vehicle.signalUntil, t + (vehicle.isHero ? 0.25 : 0.32));
           }
           return false;
         }
 
         function bestEscapeLane(vehicle, obstacle) {
-          const options = [vehicle.lane - 1, vehicle.lane + 1]
-            .filter(laneExists)
-            .filter((lane) => !obstacle.lanes.includes(lane))
-            .sort((a, b) => laneSafetyScore(vehicle, b) - laneSafetyScore(vehicle, a));
-          return options[0] ?? vehicle.lane;
+          const obstacleId = obstacle.id ?? `${obstacle.type}-${Math.round(obstacle.s)}`;
+          const targetStillWorks =
+            vehicle.escapeObstacleId === obstacleId &&
+            laneExists(vehicle.escapeTargetLane) &&
+            !obstacle.lanes.includes(vehicle.escapeTargetLane) &&
+            laneActiveAt(vehicle.escapeTargetLane, obstacle.s + obstacle.length * 0.5 + 10);
+
+          if (!targetStillWorks) {
+            const targets = range(0, LANES)
+              .filter((lane) => !obstacle.lanes.includes(lane))
+              .filter((lane) => laneActiveAt(lane, vehicle.s))
+              .filter((lane) => laneActiveAt(lane, obstacle.s + obstacle.length * 0.5 + 10))
+              .sort((a, b) => escapeLaneScore(vehicle, b) - escapeLaneScore(vehicle, a));
+            vehicle.escapeObstacleId = obstacleId;
+            vehicle.escapeTargetLane = targets[0] ?? null;
+          }
+
+          if (vehicle.escapeTargetLane == null) return vehicle.lane;
+          return vehicle.lane + Math.sign(vehicle.escapeTargetLane - vehicle.lane);
+        }
+
+        function escapeLaneScore(vehicle, lane) {
+          const ahead = nearestVehicleAheadFor(vehicle, lane, 150);
+          const behind = nearestVehicleBehindFor(vehicle, lane, 90);
+          const frontGap = ahead ? ahead.gap : 150;
+          const rearGap = behind ? behind.gap : 90;
+          return (
+            Math.min(frontGap, 120) * 0.62 +
+            Math.min(rearGap, 70) * 0.28 -
+            Math.abs(lane - vehicle.lane) * 13
+          );
         }
 
         function bestCruiseLane(vehicle) {
@@ -674,19 +844,57 @@
         function canMerge(vehicle, lane) {
           if (!laneExists(lane)) return false;
           if (!laneIsOpenAt(lane, vehicle.s, vehicle.length + (vehicle.isHero ? 6 : 8))) return false;
-          const padding = vehicle.isHero ? 5 : vehicle.mergePadding ?? 11;
-          if (!hasVehicleRoom(vehicle, lane, padding)) return false;
+          if (
+            !vehicle.isHero &&
+            hero.mergeRequestLane === lane &&
+            Math.abs(vehicle.s - hero.s) < 44
+          ) {
+            return false;
+          }
+          const courtesyFollower = vehicle.isHero ? activeCourtesyFollower(lane) : null;
+          const escapeUrgency = vehicle.isHero ? 0 : vehicle.escapeUrgency ?? 0;
+          const normalPadding = vehicle.isHero ? 5 : vehicle.mergePadding ?? 11;
+          const mergePadding = vehicle.isHero
+            ? normalPadding
+            : Math.max(3.2, normalPadding * (1 - escapeUrgency * 0.58));
+          const hasRoom = courtesyFollower
+            ? hasCourtesyMergeRoom(vehicle, lane, courtesyFollower)
+            : hasVehicleRoom(vehicle, lane, mergePadding);
+          if (!hasRoom) return false;
 
           const obstacle = nearestObstacleAheadFor(vehicle, lane, 18);
           if (obstacle && obstacle.gap < (vehicle.isHero ? 11 : 14)) return false;
 
           const ahead = nearestVehicleAheadFor(vehicle, lane, vehicle.isHero ? 88 : 75);
           const behind = nearestVehicleBehindFor(vehicle, lane, vehicle.isHero ? 88 : 75);
-          const frontScale = vehicle.isHero ? 0.5 : vehicle.mergeFrontScale ?? 0.95;
+          const frontScale = vehicle.isHero
+            ? 0.5
+            : (vehicle.mergeFrontScale ?? 0.95) * (1 - escapeUrgency * 0.34);
           if (ahead && ahead.gap < safeGap(vehicle, ahead.vehicle) * frontScale) return false;
           if (behind) {
-            const behindNeed = mergeBehindNeed(vehicle, behind.vehicle) * (vehicle.isHero ? 0.58 : vehicle.mergeRearScale ?? 1);
+            const heroRearScale = courtesyFollower && courtesyFollower.id === behind.vehicle.id ? 0.24 : 0.58;
+            const trafficRearScale = (vehicle.mergeRearScale ?? 1) * (1 - escapeUrgency * 0.34);
+            const behindNeed = mergeBehindNeed(vehicle, behind.vehicle) * (vehicle.isHero ? heroRearScale : trafficRearScale);
             if (behind.gap < behindNeed) return false;
+          }
+          return true;
+        }
+
+        function activeCourtesyFollower(lane) {
+          if (hero.mergeRequestLane !== lane) return null;
+          const car = courtesyFollowerForHero(lane, 105);
+          if (!car) return null;
+          return car.yieldsToHero && car.heroRequestId === hero.mergeRequestId ? car : null;
+        }
+
+        function hasCourtesyMergeRoom(vehicle, lane, courtesyFollower) {
+          const vehicleHalf = visualHalfLength(vehicle);
+          for (const other of [hero, ...cars]) {
+            if (!other || other.id === vehicle.id) continue;
+            if (!vehicleClaimsLane(other, lane)) continue;
+            const padding = other.id === courtesyFollower.id ? -1.8 : 1.4;
+            const required = vehicleHalf + visualHalfLength(other) + padding;
+            if (Math.abs(other.s - vehicle.s) < required) return false;
           }
           return true;
         }
@@ -727,6 +935,12 @@
           }
 
           if (vehicle.stoppedForObstacle) targetSpeed = Math.min(targetSpeed, 1.5);
+
+          if (!vehicle.isHero && vehicle.yieldsToHero && vehicle.heroRequestId === hero.mergeRequestId) {
+            const openGap = hero.s - visualHalfLength(hero) - (vehicle.s + visualHalfLength(vehicle));
+            const courtesyBrake = clamp((42 - openGap) * 0.34, 4, 14);
+            targetSpeed = Math.min(targetSpeed, Math.max(0, hero.speed - courtesyBrake));
+          }
 
           const accel = vehicle.isHero ? (hero.huntingOpening ? 9.4 : 4.8) : vehicle.accel ?? 3.4;
           const brake = vehicle.isHero
@@ -884,19 +1098,47 @@
           }
         }
 
-        function updateScore() {
+        function updateScore(t) {
           for (const car of cars) {
             if (car.exiting) continue;
             const delta = car.s - hero.s;
             if (car.prevDelta > 0 && delta <= 0) {
-              score += 1;
+              registerScore(1, car, t);
               car.scoreFlash = 1;
             } else if (car.prevDelta < 0 && delta >= 0) {
-              score -= car.kind === 'semi' ? 5 : 1;
+              registerScore(car.kind === 'semi' ? -5 : -1, car, t);
               car.scoreFlash = 1;
             }
             car.prevDelta = delta;
           }
+        }
+
+        function registerScore(amount, car, t) {
+          score += amount;
+          const sign = Math.sign(amount);
+          if (scoreRun.sign === sign) {
+            scoreRun.count += 1;
+            scoreRun.total += amount;
+          } else {
+            scoreRun = { sign, count: 1, total: amount };
+          }
+
+          const burst = {
+            amount,
+            at: t,
+            until: t + (scoreRun.count % 5 === 0 ? 2.5 : 1.65),
+            chain: scoreRun.count,
+            chainTotal: scoreRun.total,
+            milestone: scoreRun.count % 5 === 0,
+            kind: car.kind,
+            lane: car.drawLane ?? car.lane,
+            side: (car.drawLane ?? car.lane) <= hero.drawLane ? -1 : 1,
+            variant: mod(scoreRun.count + car.id + (sign < 0 ? 2 : 0), 5),
+          };
+          scoreHistory.push({ amount, sign, at: t });
+          scoreHistory = scoreHistory.slice(-9);
+          scoreBursts.push(burst);
+          scoreBursts = scoreBursts.filter((item) => item.until > t - 0.1).slice(-3);
         }
 
         function laneExists(lane) {
@@ -1051,9 +1293,19 @@
         }
 
         function mixRoadBounds(a, b, amount) {
-          const left = a.left + (b.left - a.left) * amount;
-          const right = a.right + (b.right - a.right) * amount;
+          const leftDelta = b.left - a.left;
+          const rightDelta = b.right - a.right;
+          const largestDelta = Math.max(Math.abs(leftDelta), Math.abs(rightDelta), 1);
+          const left = a.left + leftDelta * equalAngleProgress(amount, leftDelta, largestDelta);
+          const right = a.right + rightDelta * equalAngleProgress(amount, rightDelta, largestDelta);
           return { left, right, width: right - left };
+        }
+
+        function equalAngleProgress(amount, delta, largestDelta) {
+          if (Math.abs(delta) < 0.01) return 0;
+          const span = Math.abs(delta) / largestDelta;
+          const start = (1 - span) * 0.5;
+          return clamp((amount - start) / span, 0, 1);
         }
 
         function smoothstep(value) {
@@ -1218,7 +1470,8 @@
 
           for (let y = -stripH; y < height + stripH; y += stripH) {
             const s = screenToWorldY(y + stripH * 0.5);
-            const bounds = roadBoundsAt(s);
+            const rawBounds = roadBoundsAt(s);
+            const bounds = pixelBounds(rawBounds, stripH);
             rect(bounds.left - shoulder, y, bounds.width + shoulder * 2, stripH + 1, COLORS.shoulder);
             rect(bounds.left, y, bounds.width, stripH + 1, COLORS.asphalt);
 
@@ -1245,30 +1498,7 @@
             const ramp = exitRampGeometry(exit.s);
             if (ramp.startY < -180 || ramp.endY > height + 180) continue;
 
-            const rampPath = exitRampPath(ramp);
-
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(ramp.roadRight - 1, 0, width - ramp.roadRight + 1, height);
-            ctx.clip();
-            ctx.strokeStyle = '#263544';
-            ctx.lineWidth = (ramp.half + ramp.shoulder) * 2;
-            ctx.lineCap = 'butt';
-            ctx.lineJoin = 'round';
-            ctx.stroke(rampPath);
-            ctx.restore();
-
-            ctx.strokeStyle = COLORS.asphalt;
-            ctx.lineWidth = ramp.half * 2;
-            ctx.lineCap = 'butt';
-            ctx.lineJoin = 'round';
-            ctx.stroke(rampPath);
-
-            ctx.strokeStyle = '#f9f2a4';
-            ctx.lineWidth = 3;
-            ctx.setLineDash([14, 12]);
-            ctx.stroke(exitRampPath(ramp, true));
-            ctx.setLineDash([]);
+            drawPixelExitRamp(ramp);
 
             const signW = Math.min(78, laneWidth * 0.92);
             const signX = Math.min(width - signW - 8, ramp.roadRight + laneWidth * 0.18);
@@ -1279,6 +1509,47 @@
               drawPixelText('EXIT', signX + signW / 2, signY + 19, 15, '#f5ffe8', 'center');
             }
           }
+        }
+
+        function drawPixelExitRamp(ramp) {
+          const pixel = 6;
+          const shoulderHalf = pixelSnap(ramp.half + ramp.shoulder, pixel);
+          const asphaltHalf = pixelSnap(ramp.half, pixel);
+          const top = Math.floor(ramp.endY / pixel) * pixel;
+          const bottom = Math.ceil(ramp.startY / pixel) * pixel;
+          const seamX = pixelSnap(ramp.roadRight - pixel, pixel);
+
+          for (let y = top; y <= bottom; y += pixel) {
+            const center = pixelSnap(exitRampCenterAtY(ramp, y + pixel * 0.5), pixel);
+            const shoulderLeft = Math.max(seamX, center - shoulderHalf);
+            const shoulderRight = center + shoulderHalf;
+            const asphaltLeft = Math.max(seamX, center - asphaltHalf);
+            const asphaltRight = center + asphaltHalf;
+
+            if (shoulderRight > shoulderLeft) {
+              rect(shoulderLeft, y, shoulderRight - shoulderLeft, pixel + 1, '#263544');
+            }
+            if (asphaltRight > asphaltLeft) {
+              rect(asphaltLeft, y, asphaltRight - asphaltLeft, pixel + 1, COLORS.asphalt);
+              rect(asphaltRight - 4, y, 4, pixel + 1, '#f9f2a4');
+              if (
+                asphaltLeft > ramp.roadRight + pixel &&
+                mod(Math.abs(y - ramp.endY), 30) < 14
+              ) {
+                rect(asphaltLeft, y, 4, pixel + 1, COLORS.lane);
+              }
+            }
+          }
+        }
+
+        function exitRampCenterAtY(ramp, y) {
+          const firstSpan = ramp.startY - ramp.curveY;
+          if (y >= ramp.curveY) {
+            const amount = clamp((ramp.startY - y) / Math.max(1, firstSpan), 0, 1);
+            return ramp.startX + (ramp.curveX - ramp.startX) * amount;
+          }
+          const amount = clamp((ramp.curveY - y) / Math.max(1, ramp.curveY - ramp.endY), 0, 1);
+          return ramp.curveX + (ramp.endX - ramp.curveX) * amount;
         }
 
         function drawObstacles(t) {
@@ -1420,6 +1691,12 @@
           if (vehicle.stoppedForObstacle && !vehicle.isHero) {
             rect(x - w * 0.48, y + h * 0.54, w * 0.96, 4, '#cdd3db');
           }
+          if (!vehicle.isHero && vehicle.yieldsToHero && vehicle.heroRequestId === hero.mergeRequestId) {
+            const courtesyBlink = prefersReducedMotion || Math.floor(t * 5) % 2 === 0;
+            const light = courtesyBlink ? '#ff3b2f' : '#681613';
+            rect(x - w * 0.38, y + h * 0.34, 6, 7, light);
+            rect(x + w * 0.2, y + h * 0.34, 6, 7, light);
+          }
           ctx.restore();
         }
 
@@ -1476,15 +1753,8 @@
 
         function drawHud(t) {
           const pad = clamp(width * 0.025, 14, 28);
-          drawPixelText('HAPPINESS HUNTER', pad, pad + 18, clamp(width * 0.024, 15, 22), COLORS.hud, 'left');
-          drawPixelText(
-            `SCORE ${formatScore(score)}`,
-            pad,
-            pad + 44,
-            clamp(width * 0.023, 15, 21),
-            COLORS.hudHot,
-            'left'
-          );
+          drawScoreBank(t, pad);
+          drawScoreBurst(t);
 
           if (hero.signal) {
             drawPixelText(hero.signal < 0 ? '<' : '>', width - pad, pad + 45, clamp(width * 0.034, 20, 34), COLORS.amber, 'right');
@@ -1492,20 +1762,255 @@
           if (hero.stoppedForObstacle) {
             drawPixelText('WAIT', width / 2, height * 0.16, clamp(width * 0.045, 24, 48), COLORS.hudHot, 'center');
           }
-          if (statusPulse.text && t < statusPulse.until) {
-            const alpha = clamp((statusPulse.until - t) / 0.5, 0, 1);
-            ctx.save();
-            ctx.globalAlpha = alpha;
-            drawPixelText(statusPulse.text, width / 2, height * 0.22, clamp(width * 0.05, 26, 54), COLORS.hud, 'center');
-            ctx.restore();
+          drawMiniMeter(pad, height - pad - 24);
+        }
+
+        function drawScoreBank(t, pad) {
+          const gutter = Math.max(0, roadLeft);
+          const scoreColor = score < 0 ? '#ff5b4f' : COLORS.hudHot;
+          if (gutter < 92) {
+            drawCompactScoreRail(t, gutter, scoreColor);
+            return;
           }
 
-          drawMiniMeter(pad, height - pad - 24);
+          const boardW = Math.min(216, gutter - pad * 2);
+          const x = pad;
+          const y = pad;
+          drawPixelText('HAPPINESS', x, y + 15, clamp(boardW * 0.095, 13, 18), COLORS.hud, 'left');
+          drawPixelText('HUNTER', x, y + 34, clamp(boardW * 0.095, 13, 18), HERO_YELLOW, 'left');
+
+          const bankY = y + 49;
+          rect(x, bankY, boardW, 64, 'rgba(3, 4, 7, 0.88)');
+          rect(x, bankY, boardW, 5, HERO_YELLOW);
+          rect(x, bankY + 59, boardW, 5, '#7a4e00');
+          drawPixelText('SCORE', x + 10, bankY + 24, 12, '#f8f4df', 'left');
+          drawPixelText(formatScore(score), x + boardW - 10, bankY + 48, clamp(boardW * 0.18, 26, 36), scoreColor, 'right');
+
+          const blink = prefersReducedMotion || Math.floor(t * 5) % 2 === 0;
+          for (let lx = x + 9; lx < x + boardW - 4; lx += 18) {
+            rect(lx, bankY - 2, 4, 4, blink ? '#fff8b4' : '#825b0a');
+          }
+          drawScoreHistoryTrail(x + 8, bankY + 76, Math.max(10, boardW - 16), false);
+        }
+
+        function drawCompactScoreRail(t, gutter, scoreColor) {
+          const railW = Math.max(28, Math.floor(gutter - 10));
+          const x = 5;
+          const y = 8;
+          rect(x, y, railW, 137, 'rgba(3, 4, 7, 0.9)');
+          rect(x, y, railW, 4, HERO_YELLOW);
+          drawPixelText('HH', x + railW / 2, y + 22, 11, COLORS.hud, 'center');
+          drawPixelText('S', x + railW / 2, y + 40, 10, HERO_YELLOW, 'center');
+          const chars = formatScore(score).split('');
+          const digitSize = clamp(railW * 0.58, 16, 24);
+          chars.forEach((char, index) => {
+            drawPixelText(char, x + railW / 2, y + 64 + index * 22, digitSize, scoreColor, 'center');
+          });
+          const blink = prefersReducedMotion || Math.floor(t * 5) % 2 === 0;
+          rect(x + 4, y + 129, railW - 8, 4, blink ? '#fff8b4' : '#825b0a');
+          drawScoreHistoryTrail(x + railW / 2, y + 150, 0, true);
+        }
+
+        function drawScoreHistoryTrail(x, y, availableWidth, vertical) {
+          const items = scoreHistory.slice(vertical ? -6 : -9);
+          items.forEach((item, index) => {
+            const px = vertical ? x : x + index * Math.min(18, availableWidth / Math.max(1, items.length));
+            const py = vertical ? y + index * 15 : y;
+            drawPixelBubble(px, py, 5, item.sign > 0 ? '#f6c515' : '#d52f29', COLORS.ink);
+          });
+        }
+
+        function drawScoreBurst(t) {
+          scoreBursts = scoreBursts.filter((burst) => burst.until > t);
+          if (!scoreBursts.length) return;
+          scoreBursts.forEach((burst, index) => drawScoreBubble(burst, t, index));
+          const latest = scoreBursts[scoreBursts.length - 1];
+          if (latest.chain > 1) drawChainOverlay(latest, t);
+        }
+
+        function drawScoreBubble(burst, t, index) {
+          const age = Math.max(0, t - burst.at);
+          const fade = clamp((burst.until - t) / 0.3, 0, 1);
+          const intro = clamp(age / 0.13, 0, 1);
+          const positive = burst.amount > 0;
+          const bubbleW = burst.amount === -5 ? 82 : 66;
+          const bubbleH = 48;
+          const x = scoreBubbleX(burst, bubbleW);
+          const y = heroScreenY - 10 - age * (prefersReducedMotion ? 8 : 27) - index * 9;
+          const scale = prefersReducedMotion ? 1 : 0.72 + easeOutQuart(intro) * 0.28;
+
+          ctx.save();
+          ctx.globalAlpha = fade;
+          ctx.translate(x, y);
+          ctx.scale(scale, scale);
+          drawSteppedBubble(
+            -bubbleW / 2,
+            -bubbleH / 2,
+            bubbleW,
+            bubbleH,
+            positive ? '#0f7c45' : '#6d1014',
+            positive ? '#ffe253' : '#ff6157',
+            burst.side
+          );
+          drawPixelText(formatDelta(burst.amount), 0, 10, burst.amount === -5 ? 28 : 30, '#fffbe2', 'center');
+          ctx.restore();
+        }
+
+        function scoreBubbleX(burst, bubbleW) {
+          const carX = laneCenter(clamp(Math.round(burst.lane), 0, LANES - 1));
+          const heroX = laneCenter(hero.drawLane ?? hero.lane);
+          const clearance = bubbleW * 0.5 + clamp(laneWidth * 0.34, 24, 46);
+          const screenInset = Math.max(14, bubbleW * 0.27);
+          const candidates = [
+            clamp(carX - clearance, screenInset, width - screenInset),
+            clamp(carX + clearance, screenInset, width - screenInset),
+          ];
+          return candidates.sort((a, b) => {
+            const aHeroClearance = Math.abs(a - heroX);
+            const bHeroClearance = Math.abs(b - heroX);
+            const aCarClearance = Math.abs(a - carX);
+            const bCarClearance = Math.abs(b - carX);
+            return bHeroClearance * 3 + bCarClearance - (aHeroClearance * 3 + aCarClearance);
+          })[0];
+        }
+
+        function drawChainOverlay(burst, t) {
+          const age = Math.max(0, t - burst.at);
+          const fade = clamp((burst.until - t) / 0.35, 0, 1);
+          const positive = burst.amount > 0;
+          const hot = positive ? '#ffe253' : '#ff6157';
+          const cool = positive ? '#17c964' : '#a7162a';
+          const copy = chainCopy(burst);
+          const placement = chainOverlayPlacement(burst);
+          const baseY = heroScreenY - clamp(height * 0.2, 120, 175);
+          const pulse = prefersReducedMotion ? 1 : 0.92 + easeOutQuart(clamp(age / 0.18, 0, 1)) * 0.08;
+
+          ctx.save();
+          ctx.globalAlpha = fade;
+          ctx.translate(placement.x, baseY);
+          if (burst.milestone) {
+            ctx.scale(pulse, pulse);
+            drawPixelBurst(0, 0, clamp(placement.width * 0.4, 18, 52), hot, t);
+            drawStackedChainText(copy, 0, -14, placement.width, hot);
+            drawPixelText(`x${burst.chain}`, 0, 39, clamp(placement.width * 0.18, 12, 20), '#fffbe2', 'center');
+          } else if (burst.variant === 0) {
+            const orbit = clamp(placement.width * 0.3, 13, 34);
+            drawPixelBubble(-orbit, 3, 8, cool, COLORS.ink);
+            drawPixelBubble(orbit, 7, 6, hot, COLORS.ink);
+            drawPixelBubble(-orbit * 0.55, -18, 5, hot, COLORS.ink);
+            drawStackedChainText(copy, 0, 0, placement.width, hot);
+          } else if (burst.variant === 1) {
+            ctx.rotate(burst.side * -0.035);
+            drawStackedChainText(copy, 0, -5, placement.width, hot);
+            rect(-placement.width * 0.32, 22, placement.width * 0.22, 4, cool);
+            rect(-placement.width * 0.06, 22, placement.width * 0.12, 4, hot);
+            rect(placement.width * 0.1, 22, placement.width * 0.22, 4, cool);
+          } else if (burst.variant === 2) {
+            const alertW = Math.max(28, placement.width - 6);
+            drawSteppedBubble(-alertW / 2, -27, alertW, 58, 'rgba(3, 4, 7, 0.88)', hot, -burst.side);
+            drawStackedChainText(copy, 0, -7, alertW - 8, hot);
+            drawPixelText(`x${burst.chain}`, 0, 23, clamp(alertW * 0.16, 11, 17), '#fffbe2', 'center');
+          } else if (burst.variant === 3) {
+            const radius = clamp(placement.width * 0.38, 18, 44);
+            drawPixelDiamond(0, 0, radius, 'rgba(3, 4, 7, 0.84)', hot);
+            drawPixelText(`x${burst.chain}`, 0, 6, clamp(radius * 0.55, 13, 23), '#fffbe2', 'center');
+            drawStackedChainText(copy, 0, radius + 18, placement.width, hot);
+          } else {
+            drawStackedChainText(copy, 0, -5, placement.width, hot);
+            for (let i = -2; i <= 2; i += 1) {
+              const spacing = Math.min(17, placement.width / 5);
+              drawPixelBubble(i * spacing, 26 + Math.abs(i) * 3, 4 + (i === 0 ? 2 : 0), i % 2 ? cool : hot, COLORS.ink);
+            }
+          }
+          ctx.restore();
+        }
+
+        function chainOverlayPlacement(burst) {
+          const roadRight = roadLeft + roadWidth;
+          const leftWidth = Math.max(0, roadLeft - 8);
+          const rightWidth = Math.max(0, width - roadRight - 8);
+          let side = burst.side;
+          if (side < 0 && leftWidth < 28 && rightWidth > leftWidth) side = 1;
+          if (side > 0 && rightWidth < 28 && leftWidth > rightWidth) side = -1;
+          const gutterWidth = side < 0 ? leftWidth : rightWidth;
+          return {
+            side,
+            width: Math.max(24, gutterWidth),
+            x: side < 0 ? 4 + gutterWidth / 2 : roadRight + 4 + gutterWidth / 2,
+          };
+        }
+
+        function drawStackedChainText(text, x, y, maxWidth, color) {
+          const words = text.replace(/!+$/, '').split(' ');
+          const longest = Math.max(...words.map((word) => word.length));
+          const size = clamp(maxWidth / Math.max(3.2, longest * 0.62), 9, 19);
+          const lineHeight = size + 3;
+          const startY = y - ((words.length - 1) * lineHeight) / 2;
+          words.forEach((word, index) => {
+            drawPixelText(word, x, startY + index * lineHeight, size, color, 'center');
+          });
+        }
+
+        function chainCopy(burst) {
+          if (burst.milestone) {
+            if (burst.chain === 5) return burst.amount > 0 ? 'FIVE PASSES!' : 'FIVE LOST!';
+            const wins = ['OVERTAKE RUN!', 'FLYING LAP!', 'POLE PACE!'];
+            const losses = ['LOSING GROUND!', 'OFF THE PACE!', 'BOXED IN!'];
+            const milestones = burst.amount > 0 ? wins : losses;
+            return milestones[Math.floor(burst.chain / 5) % milestones.length];
+          }
+          const positive = ['CLEAN PASS', 'TWO WIDE', 'HOT LAP', 'PASSING STREAK', 'FULL THROTTLE'];
+          const negative = ['GOT PASSED', 'OFF PACE', 'LOST POSITION', 'BACK MARKER', 'FIND A GAP'];
+          const options = burst.amount > 0 ? positive : negative;
+          return options[burst.variant % options.length];
+        }
+
+        function drawSteppedBubble(x, y, w, h, fill, border, tailSide) {
+          rect(x + 6, y, w - 12, h, border);
+          rect(x, y + 6, w, h - 12, border);
+          rect(x + 6, y + 5, w - 12, h - 10, fill);
+          rect(x + 5, y + 7, w - 10, h - 14, fill);
+          const tailX = tailSide < 0 ? x + 13 : x + w - 19;
+          rect(tailX, y + h - 1, 12, 6, border);
+          rect(tailX + (tailSide < 0 ? 0 : 6), y + h + 5, 6, 6, border);
+        }
+
+        function drawPixelBubble(x, y, radius, fill, border) {
+          rect(x - radius, y - radius - 2, radius * 2, radius * 2 + 4, border);
+          rect(x - radius - 2, y - radius, radius * 2 + 4, radius * 2, border);
+          rect(x - radius + 2, y - radius, radius * 2 - 4, radius * 2, fill);
+          rect(x - radius, y - radius + 2, radius * 2, radius * 2 - 4, fill);
+        }
+
+        function drawPixelDiamond(x, y, radius, fill, border) {
+          const step = 6;
+          for (let offset = -radius; offset <= radius; offset += step) {
+            const half = radius - Math.abs(offset);
+            rect(x - half - 3, y + offset, half * 2 + 6, step, border);
+            if (half > 6) rect(x - half + 3, y + offset, half * 2 - 6, step, fill);
+          }
+        }
+
+        function drawPixelBurst(x, y, radius, color, t) {
+          const blink = prefersReducedMotion || Math.floor(t * 8) % 2 === 0;
+          const ray = blink ? 18 : 11;
+          rect(x - 3, y - radius, 6, ray, color);
+          rect(x - 3, y + radius - ray, 6, ray, color);
+          rect(x - radius, y - 3, ray, 6, color);
+          rect(x + radius - ray, y - 3, ray, 6, color);
+          rect(x - radius * 0.72, y - radius * 0.72, 10, 10, color);
+          rect(x + radius * 0.62, y - radius * 0.72, 10, 10, color);
+          rect(x - radius * 0.72, y + radius * 0.62, 10, 10, color);
+          rect(x + radius * 0.62, y + radius * 0.62, 10, 10, color);
         }
 
         function formatScore(value) {
           const absolute = String(Math.abs(value)).padStart(3, '0');
           return value < 0 ? `-${absolute}` : absolute;
+        }
+
+        function formatDelta(value) {
+          return value > 0 ? `+${value}` : String(value);
         }
 
         function drawMiniMeter(x, y) {
@@ -1538,110 +2043,55 @@
         }
 
         function exitRampGeometry(s) {
-          const lane = rightmostLaneAt(s);
           const bounds = roadBoundsAt(s);
-          const startX = laneCenter(lane);
           const startY = worldToY(s);
+          const half = clamp(laneWidth * 0.3, 18, 44);
+          const shoulder = clamp(laneWidth * 0.09, 6, 14);
+          const startX = bounds.right - half;
+          const endX = width + Math.max(laneWidth * 0.58, 64);
+          const endY = startY - clamp((endX - startX) * 0.58, 142, height * 0.46);
+          const curveX = startX + (endX - startX) * 0.38;
+          const curveY = startY + (endY - startY) * 0.38;
           return {
             startX,
             startY,
             roadRight: bounds.right,
-            curveX: bounds.right + laneWidth * 0.72,
-            curveY: startY - laneWidth * 1.05,
-            endX: width + Math.max(laneWidth * 1.45, 120),
-            endY: startY - Math.max(laneWidth * 1.85, 128),
-            half: clamp(laneWidth * 0.38, 18, 52),
-            shoulder: clamp(laneWidth * 0.1, 6, 16),
+            curveX,
+            curveY,
+            endX,
+            endY,
+            half,
+            shoulder,
           };
-        }
-
-        function exitRampPath(ramp, fromCurve = false) {
-          const path = new Path2D();
-          if (!fromCurve) {
-            path.moveTo(ramp.startX, ramp.startY);
-            path.bezierCurveTo(
-              ramp.startX,
-              ramp.startY - laneWidth * 0.44,
-              ramp.roadRight - laneWidth * 0.1,
-              ramp.startY - laneWidth * 0.8,
-              ramp.curveX,
-              ramp.curveY
-            );
-          } else {
-            path.moveTo(ramp.curveX, ramp.curveY);
-          }
-          path.bezierCurveTo(
-            ramp.roadRight + laneWidth * 1.5,
-            ramp.startY - laneWidth * 1.34,
-            ramp.endX - laneWidth * 0.65,
-            ramp.endY + laneWidth * 0.14,
-            ramp.endX,
-            ramp.endY
-          );
-          return path;
         }
 
         function exitVehiclePosition(vehicle) {
           const ramp = exitRampGeometry(vehicle.exitTarget ?? vehicle.s);
           const amount = smoothstep(clamp(vehicle.exitProgress / 1.08, 0, 1));
           const split = 0.46;
-          let point;
-          let tangent;
+          let x;
+          let y;
+          let tangentX;
+          let tangentY;
 
           if (amount < split) {
             const t = amount / split;
-            const p0 = { x: ramp.startX, y: ramp.startY };
-            const p1 = { x: ramp.startX, y: ramp.startY - laneWidth * 0.44 };
-            const p2 = { x: ramp.roadRight - laneWidth * 0.1, y: ramp.startY - laneWidth * 0.8 };
-            const p3 = { x: ramp.curveX, y: ramp.curveY };
-            point = cubicBezierPoint(p0, p1, p2, p3, t);
-            tangent = cubicBezierTangent(p0, p1, p2, p3, t);
+            x = ramp.startX + (ramp.curveX - ramp.startX) * t;
+            y = ramp.startY + (ramp.curveY - ramp.startY) * t;
+            tangentX = ramp.curveX - ramp.startX;
+            tangentY = ramp.curveY - ramp.startY;
           } else {
             const t = (amount - split) / (1 - split);
-            const p0 = { x: ramp.curveX, y: ramp.curveY };
-            const p1 = {
-              x: ramp.roadRight + laneWidth * 1.5,
-              y: ramp.startY - laneWidth * 1.34,
-            };
-            const p2 = {
-              x: ramp.endX - laneWidth * 0.65,
-              y: ramp.endY + laneWidth * 0.14,
-            };
-            const p3 = { x: ramp.endX, y: ramp.endY };
-            point = cubicBezierPoint(p0, p1, p2, p3, t);
-            tangent = cubicBezierTangent(p0, p1, p2, p3, t);
+            x = ramp.curveX + (ramp.endX - ramp.curveX) * t;
+            y = ramp.curveY + (ramp.endY - ramp.curveY) * t;
+            tangentX = ramp.endX - ramp.curveX;
+            tangentY = ramp.endY - ramp.curveY;
           }
 
           return {
-            x: point.x,
-            y: point.y,
-            angle: Math.atan2(tangent.y, tangent.x) + Math.PI / 2,
-          };
-        }
-
-        function cubicBezierPoint(p0, p1, p2, p3, t) {
-          const oneMinusT = 1 - t;
-          const a = oneMinusT * oneMinusT * oneMinusT;
-          const b = 3 * oneMinusT * oneMinusT * t;
-          const c = 3 * oneMinusT * t * t;
-          const d = t * t * t;
-          return {
-            x: p0.x * a + p1.x * b + p2.x * c + p3.x * d,
-            y: p0.y * a + p1.y * b + p2.y * c + p3.y * d,
-          };
-        }
-
-        function cubicBezierTangent(p0, p1, p2, p3, t) {
-          const oneMinusT = 1 - t;
-          return {
-            x:
-              3 * oneMinusT * oneMinusT * (p1.x - p0.x) +
-              6 * oneMinusT * t * (p2.x - p1.x) +
-              3 * t * t * (p3.x - p2.x),
-            y:
-              3 * oneMinusT * oneMinusT * (p1.y - p0.y) +
-              6 * oneMinusT * t * (p2.y - p1.y) +
-              3 * t * t * (p3.y - p2.y),
+            x: pixelSnap(x, 3),
+            y: pixelSnap(y, 3),
+            angle: Math.atan2(tangentY, tangentX) + Math.PI / 2,
           };
         }
 
@@ -1691,6 +2141,20 @@
 
         function screenToWorldY(y) {
           return cameraS + (heroScreenY - y) / metersToPixels;
+        }
+
+        function pixelBounds(bounds, size) {
+          const left = pixelSnap(bounds.left, size);
+          const right = pixelSnap(bounds.right, size);
+          return { left, right, width: Math.max(size, right - left) };
+        }
+
+        function pixelSnap(value, size) {
+          return Math.round(value / size) * size;
+        }
+
+        function easeOutQuart(value) {
+          return 1 - Math.pow(1 - clamp(value, 0, 1), 4);
         }
 
         function rect(x, y, w, h, fill) {
