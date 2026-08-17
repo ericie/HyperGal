@@ -455,8 +455,24 @@
         aspect-ratio: auto;
         overflow: hidden;
         border: 0;
-        background: #171817 url("./elevator-front.jpg") center / 100% 100% no-repeat;
+        background-color: #2b2e2c;
+        background-image:
+          linear-gradient(90deg, #141615 0%, #555a56 5%, #8a8f8b 14%, #484d49 43%, #727773 72%, #292c2a 95%, #101211 100%),
+          radial-gradient(circle, rgba(8,10,9,.48) 0 1px, transparent 1.4px);
+        background-size: clamp(130px, 14vw, 210px) 100%, 4px 4px;
+        background-repeat: repeat-x, repeat;
         box-shadow: none;
+      }
+
+      .elevator-stage {
+        position: absolute;
+        inset: 0 auto 0 50%;
+        z-index: 1;
+        width: calc(100dvh * .800285);
+        height: 100dvh;
+        overflow: hidden;
+        background: #171817 url("./elevator-front.jpg") center / 100% 100% no-repeat;
+        transform: translateX(-50%);
       }
 
       .elevator::before,
@@ -636,6 +652,7 @@
   </head>
   <body>
     <main class="elevator" id="elevator" data-direction="up" aria-label="An elevator traveling between fantastical office rooms">
+      <div class="elevator-stage">
       <div class="ceiling" aria-hidden="true"></div>
 
       <div class="indicator-shell" aria-hidden="true">
@@ -676,6 +693,7 @@
 
       <div class="service-label" aria-hidden="true">AUTOMATIC PASSENGER SERVICE · CAR 4</div>
       <p class="screen-reader-status" id="status" aria-live="polite"></p>
+      </div>
     </main>
 
     <script>
