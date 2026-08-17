@@ -15,15 +15,19 @@ desert lays paired dark and pale rock chips over sand, green, and brown bands.
 Every marking uses a hard boundary and a small flat-color palette; there is no
 edge smoothing or ordered dithering between pixels.
 
-Every camouflage field is completely still. The piece rests on each pattern
-before its colors shift into the next palette. Each color region then becomes a
+Every camouflage field is completely still. The piece holds each pattern for
+4.2 seconds, drawing from a shuffled bag so all nine appear once before the
+order is reshuffled without an immediate repeat. Its colors then shift into the
+next palette. Each color region becomes a
 two-dimensional distance field. Interpolating those fields lets boundaries
 flow across both axes while spots split, stripes narrow, and polygons merge into
 the next geometry. The pixels remain hard-edged throughout; there is no wipe,
-crossfade, or dissolve. Click or tap the field to advance, use the nine controls
-or number keys to choose a pattern directly, press `Space`
+crossfade, or dissolve. The HUD is hidden by default; add `?debug=true` to the
+URL to reveal the status, nine pattern controls, and pause button. Click or tap
+the field to advance in the shuffled order, use the number keys to choose a
+pattern directly, press `Space`
 to pause automatic changes, press `R` to grow a new hide from a new seed, and
-press `H` to hide or reveal the controls.
+press `H` to hide or reveal the controls while debugging.
 
 With `prefers-reduced-motion` active, automatic cycling stops and pattern
 changes happen immediately.

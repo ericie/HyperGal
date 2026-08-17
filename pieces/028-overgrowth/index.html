@@ -29,7 +29,8 @@
         overscroll-behavior: none;
       }
 
-      canvas {
+      #garden,
+      #new-growth {
         position: fixed;
         inset: 0;
         display: block;
@@ -57,7 +58,119 @@
         white-space: nowrap;
         border: 0;
       }
+
+      #debug-catalog[hidden] {
+        display: none;
+      }
+
+      body.debug-mode {
+        min-height: 100%;
+        height: auto;
+        overflow: auto;
+        color: #292927;
+        background: #dededb;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      body.debug-mode #garden,
+      body.debug-mode #new-growth {
+        display: none;
+      }
+
+      .debug-catalog {
+        min-height: 100vh;
+        padding: clamp(18px, 3vw, 42px);
+        background: #dededb;
+      }
+
+      .debug-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 24px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid #292927;
+      }
+
+      .debug-header h1,
+      .debug-header p,
+      .debug-specimen {
+        margin: 0;
+      }
+
+      .debug-header h1 {
+        font-size: clamp(1.25rem, 2.3vw, 2rem);
+        line-height: 1;
+        letter-spacing: -0.025em;
+      }
+
+      .debug-header p {
+        color: #555550;
+        font-size: 0.875rem;
+      }
+
+      .debug-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+        border-left: 1px solid #b5b5b0;
+      }
+
+      .debug-specimen {
+        display: grid;
+        min-width: 0;
+        grid-template-rows: minmax(230px, 1fr) auto;
+        border-right: 1px solid #b5b5b0;
+        border-bottom: 1px solid #b5b5b0;
+      }
+
+      .debug-specimen-canvas {
+        display: block;
+        position: static;
+        width: 100%;
+        height: clamp(230px, 24vw, 320px);
+      }
+
+      .debug-caption {
+        display: grid;
+        grid-template-columns: 2.5rem minmax(0, 1fr);
+        gap: 10px;
+        min-height: 66px;
+        padding: 13px 14px 12px;
+        border-top: 1px solid #b5b5b0;
+      }
+
+      .debug-number {
+        color: #62625d;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .debug-name,
+      .debug-latin {
+        display: block;
+      }
+
+      .debug-name {
+        font-size: 0.9375rem;
+        line-height: 1.2;
+      }
+
+      .debug-latin {
+        margin-top: 3px;
+        color: #555550;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 0.8125rem;
+        line-height: 1.25;
+      }
+
+      @media (max-width: 520px) {
+        .debug-header {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 7px;
+        }
+      }
     </style>
+    <script defer src="https://bakalytics.com/bakalytics.js" data-property="380ba6de-d087-4f44-a235-7dd4b9b174f9"></script>
   </head>
   <body>
     <canvas
@@ -68,6 +181,13 @@
     ></canvas>
     <canvas id="new-growth" aria-hidden="true"></canvas>
     <p id="status" class="sr-only" aria-live="polite"></p>
+    <main id="debug-catalog" class="debug-catalog" hidden>
+      <header class="debug-header">
+        <h1>Overgrowth specimen index</h1>
+        <p id="debug-count"></p>
+      </header>
+      <div id="debug-grid" class="debug-grid"></div>
+    </main>
 
     <script>
       (() => {
@@ -83,6 +203,7 @@
         const LEAF_DEVELOPMENT_FRAMES = 20;
         const FLOWER_DEVELOPMENT_FRAMES = 20;
         const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+        const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === 'true';
 
         // `ctx` is swapped to an offscreen surface while the faded underprint
         // layer is drawn, so every draw routine reads this binding.
@@ -133,19 +254,19 @@
         };
 
         const SPECIES = [
-          { key: 'rose', latin: 'Rosa gallica', leaf: 'rose', blooms: [1, 3], scale: [0.74, 1.14], weight: 13, height: [130, 215] },
-          { key: 'peony', latin: 'Paeonia officinalis', leaf: 'round', blooms: [1, 2], scale: [0.82, 1.2], weight: 10, height: [125, 200] },
-          { key: 'cosmos', latin: 'Cosmos bipinnatus', leaf: 'fine', blooms: [2, 5], scale: [0.68, 1.02], weight: 11, height: [150, 240] },
-          { key: 'poppy', latin: 'Papaver rhoeas', leaf: 'fine', blooms: [1, 3], scale: [0.78, 1.12], weight: 11, height: [140, 235] },
-          { key: 'daisy', latin: 'Leucanthemum vulgare', leaf: 'small', blooms: [2, 5], scale: [0.64, 0.98], weight: 12, height: [120, 200] },
-          { key: 'lily', latin: 'Lilium lancifolium', leaf: 'lance', blooms: [1, 3], scale: [0.74, 1.08], weight: 8, height: [150, 240] },
-          { key: 'hydrangea', latin: 'Hydrangea macrophylla', leaf: 'round', blooms: [1, 2], scale: [0.78, 1.14], weight: 7, height: [115, 185] },
-          { key: 'anemone', latin: 'Anemone coronaria', leaf: 'small', blooms: [1, 4], scale: [0.66, 1.0], weight: 9, height: [120, 195] },
-          { key: 'honeysuckle', latin: 'Lonicera periclymenum', leaf: 'ovate', blooms: [2, 4], scale: [0.72, 1.08], weight: 10, height: [260, 400], vine: true },
-          { key: 'none', latin: 'Acanthus mollis', leaf: 'acanthus', blooms: [0, 0], scale: [0.88, 1.32], weight: 12, height: [110, 195], scroll: true },
-          { key: 'caladium', latin: 'Caladium bicolor', leaf: 'caladium', blooms: [0, 0], scale: [0.92, 1.28], weight: 2, height: [120, 200], branches: [3, 5], pale: true },
-          { key: 'hosta', latin: 'Hosta plantaginea', leaf: 'hosta', blooms: [0, 0], scale: [0.78, 1.12], weight: 2, height: [90, 155], branches: [4, 6], pale: true },
-          { key: 'arum', latin: 'Arum italicum', leaf: 'arum', blooms: [0, 0], scale: [0.88, 1.22], weight: 2, height: [145, 225], branches: [2, 4], pale: true },
+          { key: 'rose', name: 'Rose', latin: 'Rosa gallica', leaf: 'rose', blooms: [1, 3], scale: [0.74, 1.14], weight: 13, height: [130, 215] },
+          { key: 'peony', name: 'Peony', latin: 'Paeonia officinalis', leaf: 'round', blooms: [1, 2], scale: [0.82, 1.2], weight: 10, height: [125, 200] },
+          { key: 'cosmos', name: 'Cosmos', latin: 'Cosmos bipinnatus', leaf: 'fine', blooms: [2, 5], scale: [0.68, 1.02], weight: 11, height: [150, 240] },
+          { key: 'poppy', name: 'Poppy', latin: 'Papaver rhoeas', leaf: 'fine', blooms: [1, 3], scale: [0.78, 1.12], weight: 11, height: [140, 235] },
+          { key: 'daisy', name: 'Daisy', latin: 'Leucanthemum vulgare', leaf: 'small', blooms: [2, 5], scale: [0.64, 0.98], weight: 12, height: [120, 200] },
+          { key: 'lily', name: 'Lily', latin: 'Lilium lancifolium', leaf: 'lance', blooms: [1, 3], scale: [0.74, 1.08], weight: 8, height: [150, 240] },
+          { key: 'hydrangea', name: 'Hydrangea', latin: 'Hydrangea macrophylla', leaf: 'round', blooms: [1, 2], scale: [0.78, 1.14], weight: 7, height: [115, 185] },
+          { key: 'anemone', name: 'Anemone', latin: 'Anemone coronaria', leaf: 'small', blooms: [1, 4], scale: [0.66, 1.0], weight: 9, height: [120, 195] },
+          { key: 'honeysuckle', name: 'Honeysuckle', latin: 'Lonicera periclymenum', leaf: 'ovate', blooms: [2, 4], scale: [0.72, 1.08], weight: 10, height: [260, 400], vine: true },
+          { key: 'none', name: 'Acanthus', latin: 'Acanthus mollis', leaf: 'acanthus', blooms: [0, 0], scale: [0.88, 1.32], weight: 12, height: [110, 195], scroll: true },
+          { key: 'caladium', name: 'Caladium', latin: 'Caladium bicolor', leaf: 'caladium', blooms: [0, 0], scale: [0.92, 1.28], weight: 2, height: [120, 200], branches: [3, 5], pale: true },
+          { key: 'hosta', name: 'Hosta', latin: 'Hosta plantaginea', leaf: 'hosta', blooms: [0, 0], scale: [0.78, 1.12], weight: 2, height: [90, 155], branches: [4, 6], pale: true },
+          { key: 'arum', name: 'Arum', latin: 'Arum italicum', leaf: 'arum', blooms: [0, 0], scale: [0.88, 1.22], weight: 2, height: [145, 225], branches: [2, 4], pale: true },
         ];
 
         const LEAF_KIND = {
@@ -189,10 +310,147 @@
         let growingPlants = [];
         let census = [];
 
-        resize(true);
-        bindEvents();
-        regrow();
-        startOvergrowth();
+        if (DEBUG_MODE) {
+          showDebugCatalog();
+        } else {
+          resize(true);
+          bindEvents();
+          regrow();
+          startOvergrowth();
+        }
+
+        function showDebugCatalog() {
+          const catalog = document.getElementById('debug-catalog');
+          const grid = document.getElementById('debug-grid');
+          const count = document.getElementById('debug-count');
+          const specimens = [];
+
+          document.body.classList.add('debug-mode');
+          catalog.hidden = false;
+          count.textContent = `${SPECIES.length} plant types`;
+
+          for (let index = 0; index < SPECIES.length; index += 1) {
+            const spec = SPECIES[index];
+            const figure = document.createElement('figure');
+            const specimenCanvas = document.createElement('canvas');
+            const caption = document.createElement('figcaption');
+            const labelId = `debug-plant-${index + 1}`;
+
+            figure.className = 'debug-specimen';
+            specimenCanvas.className = 'debug-specimen-canvas';
+            specimenCanvas.setAttribute('aria-hidden', 'true');
+            caption.className = 'debug-caption';
+            caption.id = labelId;
+            caption.innerHTML =
+              `<span class="debug-number">${String(index + 1).padStart(2, '0')}</span>` +
+              `<span><strong class="debug-name">${spec.name}</strong>` +
+              `<em class="debug-latin">${spec.latin}</em></span>`;
+
+            figure.setAttribute('aria-labelledby', labelId);
+            figure.append(specimenCanvas, caption);
+            grid.append(figure);
+
+            random = mulberry32((seed ^ Math.imul(index + 1, 0x9e3779b9)) >>> 0);
+            const plant = createPlant(0, 0, index, 1, {
+              census: false,
+              bloomBoost: 1,
+              rotation: 0,
+            });
+            plant.scale = 1;
+            specimens.push({ canvas: specimenCanvas, plant, bounds: measurePlant(plant) });
+          }
+
+          let renderFrame = 0;
+          const scheduleRender = () => {
+            cancelAnimationFrame(renderFrame);
+            renderFrame = requestAnimationFrame(() => {
+              for (const specimen of specimens) renderDebugSpecimen(specimen);
+            });
+          };
+
+          if ('ResizeObserver' in window) {
+            const observer = new ResizeObserver(scheduleRender);
+            observer.observe(grid);
+          } else {
+            addEventListener('resize', scheduleRender, { passive: true });
+          }
+          scheduleRender();
+        }
+
+        function measurePlant(plant) {
+          const size = 1024;
+          const origin = { x: size / 2, y: size * 0.74 };
+          const surface = document.createElement('canvas');
+          const measureCtx = surface.getContext('2d', { willReadFrequently: true });
+          const previous = { x: plant.x, y: plant.y, scale: plant.scale };
+          surface.width = size;
+          surface.height = size;
+
+          plant.x = origin.x;
+          plant.y = origin.y;
+          plant.scale = 1;
+          ctx = measureCtx;
+          drawPlant(plant);
+
+          const pixels = measureCtx.getImageData(0, 0, size, size).data;
+          let left = size;
+          let top = size;
+          let right = 0;
+          let bottom = 0;
+          for (let y = 0; y < size; y += 1) {
+            for (let x = 0; x < size; x += 1) {
+              if (pixels[(y * size + x) * 4 + 3] === 0) continue;
+              left = Math.min(left, x);
+              top = Math.min(top, y);
+              right = Math.max(right, x);
+              bottom = Math.max(bottom, y);
+            }
+          }
+
+          plant.x = previous.x;
+          plant.y = previous.y;
+          plant.scale = previous.scale;
+          return left <= right
+            ? {
+                left: left - origin.x,
+                top: top - origin.y,
+                width: right - left + 1,
+                height: bottom - top + 1,
+              }
+            : { left: -1, top: -1, width: 2, height: 2 };
+        }
+
+        function renderDebugSpecimen(specimen) {
+          const rect = specimen.canvas.getBoundingClientRect();
+          const cssWidth = Math.max(1, Math.round(rect.width));
+          const cssHeight = Math.max(1, Math.round(rect.height));
+          const pixelRatio = Math.min(2, devicePixelRatio || 1);
+          const padding = 18;
+          const availableWidth = Math.max(1, cssWidth - padding * 2);
+          const availableHeight = Math.max(1, cssHeight - padding * 2);
+          const scale = Math.min(
+            availableWidth / specimen.bounds.width,
+            availableHeight / specimen.bounds.height
+          );
+
+          specimen.canvas.width = Math.round(cssWidth * pixelRatio);
+          specimen.canvas.height = Math.round(cssHeight * pixelRatio);
+          const specimenCtx = specimen.canvas.getContext('2d');
+          specimenCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+          specimenCtx.clearRect(0, 0, cssWidth, cssHeight);
+
+          specimen.plant.scale = scale;
+          specimen.plant.x =
+            padding +
+            (availableWidth - specimen.bounds.width * scale) / 2 -
+            specimen.bounds.left * scale;
+          specimen.plant.y =
+            padding +
+            (availableHeight - specimen.bounds.height * scale) / 2 -
+            specimen.bounds.top * scale;
+          ctx = specimenCtx;
+          drawPlant(specimen.plant);
+        }
 
         function bindEvents() {
           addEventListener(

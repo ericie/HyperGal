@@ -2,8 +2,9 @@
   "title": "Obstacles and How to Go Around Them",
   "year": 2026,
   "date": "2026-08-10",
-  "category": "generative",
+  "category": "nature",
   "type": "interactive",
+  "wip": true,
   "thumbnail": "thumbnail.jpg",
   "description": "A top-down field study plots how blossom-pink petals move around flat, contour-drawn rock obstacles through shoals, quick channels, and turbulent wakes."
 }

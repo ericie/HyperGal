@@ -20,6 +20,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-06-18",
       "category": "generative",
       "type": "interactive",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A patterned wall of falling bricks. One color pair and one high-contrast textile tile seed each run; staggered rows scroll downward while new faux-3D bricks tumble in from above, flatten, and join the wall. Click to reshuffle.",
       "updated": "2026-08-10"
@@ -40,7 +41,7 @@ window.HYPERGAL_MANIFEST = {
       "title": "hunt prey paint",
       "year": 2026,
       "date": "2026-06-24",
-      "category": "generative",
+      "category": "nature",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
       "description": "An abstract ecosystem that paints itself in watercolour and cartographic linework, then wipes the painting clean forever. Over a pale NES-bright pixel terrain, blocky prey graze, grow into spiny square emblems that age toward white, and flee hunters with their own alertness and sprint speed. Spiny prey trundle toward richer plant patches and, when they die, burst into clean eraser blasts that wipe stains, foliage, food, and husks instead of fertilizing the ground. Compact black arcade hunters run prey down, fatten, and breed only by splitting in half. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats.",
@@ -53,9 +54,10 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-06-24",
       "category": "games",
       "type": "interactive",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "Space Invaders after the invaders have vanished. Four small inset cannons fire only at the opposite edge, while any armed non-shooter may volunteer to intercept. Their finite ammunition appears only as cartridge rows; the final round becomes the sole suicide nuke.",
-      "updated": "2026-08-10"
+      "updated": "2026-08-14"
     },
     {
       "slug": "006-only-centipede",
@@ -64,6 +66,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-06-25",
       "category": "games",
       "type": "interactive",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A Centipede riff with small defenders at the top and bottom, one straight bullet each, and fast, hard-edged centipedes that enter from offscreen once the field is nearly cleared. Head shots remove the head and promote the next segment; body shots split the chain. Every hit segment becomes a three-shot mushroom that dents and deforms in the centipede's color.",
       "updated": "2026-08-10"
@@ -77,7 +80,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
       "description": "Five autonomous snakes hunt one mouse in an 8-bit underground Mega Man palette. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Continuous rounded bodies cross a cavern-dark field; dead snakes remain as translucent watercolor gestures that bloom and blend into a shared mural. Click to reseed.",
-      "updated": "2026-08-11"
+      "updated": "2026-08-14"
     },
     {
       "slug": "008-vectrex-asteroids",
@@ -97,6 +100,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-15",
       "category": "games",
       "type": "interactive",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A two-sided Missile Command riff. A north row and south row of pixel towns and batteries launch paired attacks while their defenses try to erase incoming missiles at roughly the same rate. Each side starts at 1000 points and loses score as cities, batteries, and ground are destroyed; when a side reaches zero, the ruined row is cleared and a fresh set of towns slides in from the side.",
       "updated": "2026-08-10"
@@ -119,6 +123,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-01",
       "category": "generative",
       "type": "interactive",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "An edge-to-edge masonry of black-and-white labels and utilitarian light-switch diagrams. Each box flips between ON and OFF in a discrete ten-frame transition as its center crosses a hot-pink midpoint line.",
       "updated": "2026-08-10"
@@ -130,9 +135,10 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-15",
       "category": "games",
       "type": "interactive",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "One yellow arcade car hunts for the fastest lane through compact gray traffic, buses, and semi trucks, signaling, speeding up, surging, or backing off to make openings, but never exits. Other gray vehicles have wider speed personalities, from aggressive squeezers to conservative gap-waiters, and try to pass too. Slow traffic packs tighter while fast traffic leaves more room. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray vehicles can take diagonal ramps offscreen and leave the highway. Every vehicle claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car scores +1 for every pass, loses 1 when most vehicles pass it, and loses 5 when a semi passes it.",
-      "updated": "2026-08-12"
+      "updated": "2026-08-14"
     },
     {
       "slug": "013-paddle",
@@ -152,6 +158,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-22",
       "category": "games",
       "type": "interactive",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "Pac hunts every power pellet across a full-frame maze.",
       "updated": "2026-08-14"
@@ -161,11 +168,11 @@ window.HYPERGAL_MANIFEST = {
       "title": "Growth Rings",
       "year": 2026,
       "date": "2026-07-22",
-      "category": "generative",
+      "category": "nature",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
       "description": "A trunk cross-section that grows toward 200 years one ring at a time. Latitude, solar angle, wind exposure, temperature, rainfall, and ground slope push the cambium out of symmetry; heavy rain years bloom into wider uneven rings while severity-scaled fire and pest incidents suppress 1-5 years of growth without cutting into older wood.",
-      "updated": "2026-08-10"
+      "updated": "2026-08-14"
     },
     {
       "slug": "016-up-mario",
@@ -186,6 +193,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-25",
       "category": "generative",
       "type": "generative",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "An edge-to-edge field of loose Celtic interlace printed in dark brown on worn paper. Continuous rounded cords pass through a Truchet-like knot grid, alternating over and under at crossings and running beyond every side of the browser. Click or press Enter/Space to reseed.",
       "updated": "2026-08-10"
@@ -207,7 +215,7 @@ window.HYPERGAL_MANIFEST = {
       "title": "City of Signs",
       "year": 2026,
       "date": "2026-07-30",
-      "category": "generative",
+      "category": "other",
       "type": "illustration",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
@@ -242,7 +250,7 @@ window.HYPERGAL_MANIFEST = {
       "title": "Hyper-Lichen",
       "year": 2026,
       "date": "2026-08-01",
-      "category": "generative",
+      "category": "nature",
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
       "description": "Crustose lichen colonies continuously recolonize an entire dark stone surface in full-coverage radial waves of mint, sage, cream, and pale pink. Each completed layer immediately gives way to the next.",
@@ -253,22 +261,24 @@ window.HYPERGAL_MANIFEST = {
       "title": "Marbled Water",
       "year": 2026,
       "date": "2026-08-03",
-      "category": "generative",
+      "category": "nature",
       "type": "interactive",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "Large colored ink drops alternate with open-water spaces, building wandering suminagashi rings inside a bounded floating bath. Adjustable disturbances pull the accumulated contours into new patterns.",
-      "updated": "2026-08-12"
+      "updated": "2026-08-14"
     },
     {
       "slug": "024-fuel-seekers",
       "title": "Fuel Seekers",
       "year": 2026,
       "date": "2026-08-03",
-      "category": "generative",
+      "category": "nature",
       "type": "generative",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "Sixty fuel bubbles grow color-shifting vine trails as they travel between four-port diamond stations. Exhausted oil deposits burn out permanently, forcing replacement stations into untouched parts of the field.",
-      "updated": "2026-08-10"
+      "updated": "2026-08-14"
     },
     {
       "slug": "025-cloudcutter",
@@ -277,6 +287,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-08-03",
       "category": "games",
       "type": "interactive",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A black-and-white vector Asteroids variant flown against weather instead of rock. Rounds explosively punch broad chunks out of wide, scalloped cumulus, so the only way through a body is to bore a tunnel and fly down it. The ship never targets anything. It holds a wandering course with the guns held down, and where the sky is thick it grinds to a crawl until its own fire has opened the way — an icebreaker, not a hunter. Its hull reams out what the guns began, so it can never wedge itself in a bore too narrow to fly. Sparse cloudscapes pan endlessly left while the ship works up and down through them; the camera follows, keeping it in frame. Bites heal slowly like liquid, and a bore that reaches all the way through leaves the exact same cloud outline divided into two halves.",
       "updated": "2026-08-10"
@@ -286,21 +297,22 @@ window.HYPERGAL_MANIFEST = {
       "title": "Top of the Heap",
       "year": 2026,
       "date": "2026-08-05",
-      "category": "generative",
+      "category": "games",
       "type": "generative",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A bright ball character defends a twenty-storey cube pyramid from waves of wide spring-snakes that reserve individual squares, hunting whichever coil is closest to the summit. ON wins by lighting every cube; OFF wins by taking the top.",
-      "updated": "2026-08-10"
+      "updated": "2026-08-14"
     },
     {
       "slug": "027-camouflage",
       "title": "Camouflage",
       "year": 2026,
       "date": "2026-08-07",
-      "category": "generative",
+      "category": "nature",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "Nine still, finely pixelated fields include zebra, leopard, ocelot, tiger, giraffe, fawn, Gaboon viper, woodland, and desert camouflage. Palette shifts lead into hard-edged distance-field morphs that split, merge, expand, and contract each region into the next pattern.",
+      "description": "Nine still, finely pixelated fields include zebra, leopard, ocelot, tiger, giraffe, fawn, Gaboon viper, woodland, and desert camouflage. A shuffled cycle leads each palette shift into a hard-edged distance-field morph that splits, merges, expands, and contracts each region into the next pattern.",
       "updated": "2026-08-10"
     },
     {
@@ -308,11 +320,12 @@ window.HYPERGAL_MANIFEST = {
       "title": "Overgrowth",
       "year": 2026,
       "date": "2026-08-07",
-      "category": "generative",
+      "category": "nature",
       "type": "generative",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A dense, directionless botanical wallpaper on aged rag paper. Dye-pot flowers and varied cream caladium, hosta, and arum leaves unfold through twenty hand-drawn growth stages in every direction.",
-      "updated": "2026-08-12"
+      "updated": "2026-08-14"
     },
     {
       "slug": "029-eyes-open",
@@ -321,6 +334,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-08-08",
       "category": "generative",
       "type": "generative",
+      "wip": true,
       "thumbnail": "thumbnail.svg",
       "description": "A black field populated by bright graphic eyes. Ten to twenty are open at once on a phone, each arriving independently, holding its gaze, blinking shut, and vanishing before another appears elsewhere.",
       "updated": "2026-08-10"
@@ -330,8 +344,9 @@ window.HYPERGAL_MANIFEST = {
       "title": "Obstacles and How to Go Around Them",
       "year": 2026,
       "date": "2026-08-10",
-      "category": "generative",
+      "category": "nature",
       "type": "interactive",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A top-down field study plots how blossom-pink petals move around flat, contour-drawn rock obstacles through shoals, quick channels, and turbulent wakes.",
       "updated": "2026-08-12"
@@ -341,10 +356,12 @@ window.HYPERGAL_MANIFEST = {
       "title": "Elevator",
       "year": 2026,
       "date": "2026-08-13",
-      "category": "generative",
+      "category": "other",
       "type": "interactive",
+      "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A perfectly ordinary elevator makes its rounds through five still, fantastical office rooms: flooded desks, indoor weather, a midnight orchard, a sky boardroom, and records without end."
+      "description": "A perfectly ordinary elevator makes its rounds through five still, fantastical office rooms: flooded desks, indoor weather, a midnight orchard, a sky boardroom, and records without end.",
+      "updated": "2026-08-17"
     }
   ]
 };

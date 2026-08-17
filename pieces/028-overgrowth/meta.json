@@ -2,8 +2,9 @@
   "title": "Overgrowth",
   "year": 2026,
   "date": "2026-08-07",
-  "category": "generative",
+  "category": "nature",
   "type": "generative",
+  "wip": true,
   "thumbnail": "thumbnail.jpg",
   "description": "A dense, directionless botanical wallpaper on aged rag paper. Dye-pot flowers and varied cream caladium, hosta, and arum leaves unfold through twenty hand-drawn growth stages in every direction."
 }

@@ -2,8 +2,9 @@
   "title": "Fuel Seekers",
   "year": 2026,
   "date": "2026-08-03",
-  "category": "generative",
+  "category": "nature",
   "type": "generative",
+  "wip": true,
   "thumbnail": "thumbnail.jpg",
   "description": "Sixty fuel bubbles grow color-shifting vine trails as they travel between four-port diamond stations. Exhausted oil deposits burn out permanently, forcing replacement stations into untouched parts of the field."
 }

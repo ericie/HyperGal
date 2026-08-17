@@ -71,16 +71,20 @@
         line-height: 1.35;
       }
 
-      /* control rows — See / Sort by / View as */
+      /* Single-line catalog controls */
       .controls {
         margin-top: clamp(1rem, 2.4vw, 1.6rem);
         font-size: clamp(1rem, 1.5vw, 1.18rem);
         line-height: 1.55;
+        overflow-x: auto;
+        scrollbar-width: none;
       }
-      .ctl { margin: .12rem 0; }
+      .controls::-webkit-scrollbar { display: none; }
+      .ctl { margin: .12rem 0; white-space: nowrap; }
       .ctl .lbl {
-        font-style: italic;
-        color: #555;
+        font-style: normal;
+        font-weight: 700;
+        color: var(--ink);
         margin-right: .5ch;
       }
       .opt {
@@ -88,7 +92,7 @@
         padding: 0;
         background: none;
         font: inherit;
-        font-style: italic;
+        font-style: normal;
         color: var(--ink);
         cursor: pointer;
       }
@@ -217,6 +221,7 @@
         .skip-link { transition: none; }
       }
     </style>
+    <script defer src="https://bakalytics.com/bakalytics.js" data-property="380ba6de-d087-4f44-a235-7dd4b9b174f9"></script>
   </head>
   <body>
     <a class="skip-link" href="#works">Skip to the works</a>
@@ -225,9 +230,7 @@
       <h1>HyperMedia Club</h1>
       <p class="lede">A collection of browser based games.</p>
       <div class="controls">
-        <p class="ctl"><span class="lbl">See:</span><span id="cats"></span></p>
-        <p class="ctl"><span class="lbl">Sort by:</span><span id="sorts"></span></p>
-        <p class="ctl"><span class="lbl">View as</span><span id="views"></span></p>
+        <p class="ctl"><strong class="lbl">Status:</strong><span id="statuses" role="group" aria-label="Status"></span>. <strong class="lbl">Theme:</strong><span id="themes" role="group" aria-label="Theme"></span>. <strong class="lbl">View:</strong><span id="views" role="group" aria-label="View"></span></p>
       </div>
     </header>
 
@@ -240,24 +243,26 @@
     <script>
       (() => {
         const worksEl = document.getElementById('works');
-        const catsEl = document.getElementById('cats');
-        const sortsEl = document.getElementById('sorts');
+        const statusesEl = document.getElementById('statuses');
+        const themesEl = document.getElementById('themes');
         const viewsEl = document.getElementById('views');
 
         let pieces = [];
-        let filter = 'all';
-        let sort = 'date';
+        let status = 'published';
+        let theme = '';
         let view = 'grid';
 
-        // Fixed taxonomy. Work in Progress is hidden everywhere except its own
-        // filter, so every other view excludes wip pieces.
-        const TAXONOMY = [
-          ['all', 'Everything', p => !p.wip],
-          ['generative', 'Generative', p => p.category === 'generative' && !p.wip],
-          ['games', 'Games', p => p.category === 'games' && !p.wip],
-          ['wip', 'Work in Progress', p => p.wip === true]
+        const STATUSES = [
+          ['published', 'Published', p => !p.wip],
+          ['wip', 'WIP', p => p.wip === true],
+          ['all', 'All', () => true]
         ];
-        const SORTS = [['date', 'Date'], ['alpha', 'Alpha']];
+        const THEMES = [
+          ['generative', 'Generative'],
+          ['nature', 'Nature'],
+          ['games', 'Games'],
+          ['other', 'Other']
+        ];
         const VIEWS = [['grid', 'Grid'], ['list', 'List']];
         const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -274,8 +279,10 @@
             return fail();
           }
           pieces = data.pieces.slice();
-          buildGroup(catsEl, TAXONOMY, () => filter, v => { filter = v; render(); });
-          buildGroup(sortsEl, SORTS, () => sort, v => { sort = v; render(); });
+          buildGroup(statusesEl, STATUSES, () => status,
+            v => { status = v; render(); });
+          buildGroup(themesEl, THEMES, () => theme,
+            v => { theme = theme === v ? '' : v; render(); });
           buildGroup(viewsEl, VIEWS, () => view, v => { view = v; render(); });
           render();
         }
@@ -287,17 +294,14 @@
         function title(p) { return p.title || p.slug; }
 
         function currentList() {
-          const match = (TAXONOMY.find(t => t[0] === filter) || TAXONOMY[0])[2];
-          const list = pieces.filter(match);
-          if (sort === 'alpha') {
-            list.sort((a, b) =>
-              title(a).localeCompare(title(b), undefined, { sensitivity: 'base' }));
-          } else {
-            // newest first; slug (≈ creation order) breaks same-day ties
-            list.sort((a, b) =>
-              a.date < b.date ? 1 : a.date > b.date ? -1 :
-              a.slug < b.slug ? 1 : a.slug > b.slug ? -1 : 0);
-          }
+          const matchStatus =
+            (STATUSES.find(item => item[0] === status) || STATUSES[0])[2];
+          const list = pieces.filter(p =>
+            matchStatus(p) && (!theme || p.category === theme));
+          // newest first; slug (≈ creation order) breaks same-day ties
+          list.sort((a, b) =>
+            a.date < b.date ? 1 : a.date > b.date ? -1 :
+            a.slug < b.slug ? 1 : a.slug > b.slug ? -1 : 0);
           return list;
         }
 

@@ -2,8 +2,9 @@
   "title": "Marbled Water",
   "year": 2026,
   "date": "2026-08-03",
-  "category": "generative",
+  "category": "nature",
   "type": "interactive",
+  "wip": true,
   "thumbnail": "thumbnail.jpg",
   "description": "Large colored ink drops alternate with open-water spaces, building wandering suminagashi rings inside a bounded floating bath. Adjustable disturbances pull the accumulated contours into new patterns."
 }

@@ -5,9 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="Nine still animal and military camouflage patterns change through a finely pixelated field."
+      content="Nine still animal and military camouflage patterns cycle in random order through a finely pixelated field."
     />
     <title>Camouflage · HyperGal</title>
+    <script>
+      if (new URLSearchParams(location.search).get('debug') === 'true') {
+        document.documentElement.classList.add('debug');
+      }
+    </script>
     <style>
       :root {
         color-scheme: dark;
@@ -175,6 +180,9 @@
       body.chrome-hidden .hint { display: none; }
       body.chrome-hidden canvas { cursor: none; }
 
+      html:not(.debug) .interface,
+      html:not(.debug) .hint { display: none; }
+
       @media (max-width: 700px) {
         .interface {
           right: max(8px, env(safe-area-inset-right));
@@ -221,6 +229,7 @@
         canvas { cursor: pointer; }
       }
     </style>
+    <script defer src="https://bakalytics.com/bakalytics.js" data-property="380ba6de-d087-4f44-a235-7dd4b9b174f9"></script>
   </head>
   <body>
     <canvas id="stage" tabindex="0" aria-label="Still pixel camouflage. Click or press Enter to show the next pattern."></canvas>
@@ -249,7 +258,7 @@
         const statusEl = document.getElementById('status');
         const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
 
-        const HOLD_MS = 9000;
+        const HOLD_MS = 4200;
         const MORPH_MS = 2300;
         const COLOR_PHASE = 0.28;
         const FRAME_MS = 1000 / 30;
@@ -259,7 +268,8 @@
         let pixelSize = 8;
         let imageData;
         let current = 0;
-        let next = 1;
+        let next = 0;
+        let patternBag = [];
         let phase = 'hold';
         let phaseStarted = performance.now();
         let pausedAt = 0;
@@ -307,6 +317,32 @@
             active: '#a47543', colors: [[39, 35, 27], [116, 75, 43], [158, 110, 63], [171, 166, 112], [190, 151, 88], [211, 187, 130], [237, 225, 187]], sample: desert,
           },
         ];
+
+        function refillPatternBag(exclude) {
+          patternBag = palettes
+            .map((_, index) => index)
+            .filter(index => index !== exclude);
+
+          for (let index = patternBag.length - 1; index > 0; index -= 1) {
+            const swapIndex = Math.floor(Math.random() * (index + 1));
+            [patternBag[index], patternBag[swapIndex]] = [patternBag[swapIndex], patternBag[index]];
+          }
+        }
+
+        function peekRandomPattern(exclude) {
+          patternBag = patternBag.filter(index => index !== exclude);
+          if (patternBag.length === 0) refillPatternBag(exclude);
+          return patternBag[0];
+        }
+
+        function consumePattern(index) {
+          const position = patternBag.indexOf(index);
+          if (position !== -1) patternBag.splice(position, 1);
+        }
+
+        current = Math.floor(Math.random() * palettes.length);
+        refillPatternBag(current);
+        next = peekRandomPattern(current);
 
         const buttons = palettes.map((palette, index) => {
           const button = document.createElement('button');
@@ -770,7 +806,7 @@
           let progress = phase === 'morph' ? clamp(elapsed / MORPH_MS) : 0;
 
           if (!isPaused && !reducedMotion) {
-            if (phase === 'hold' && elapsed >= HOLD_MS) startMorph((current + 1) % palettes.length, now);
+            if (phase === 'hold' && elapsed >= HOLD_MS) startMorph(next, now);
             if (phase === 'morph' && progress >= 1) settle(now);
           }
 
@@ -816,7 +852,7 @@
 
         function frame(now) {
           if (!isPaused && !reducedMotion && phase === 'hold' && now - phaseStarted >= HOLD_MS) {
-            startMorph((current + 1) % palettes.length, now);
+            startMorph(next, now);
           }
           if (phase === 'morph' && !isPaused && now - lastFrame >= FRAME_MS) {
             lastFrame = now;
@@ -827,9 +863,10 @@
 
         function startMorph(index, now = performance.now()) {
           if (index === current && phase === 'hold') return;
+          consumePattern(index);
           if (reducedMotion) {
             current = index;
-            next = (current + 1) % palettes.length;
+            next = peekRandomPattern(current);
             fieldMorph = null;
             phase = 'hold';
             phaseStarted = now;
@@ -847,7 +884,7 @@
 
         function settle(now) {
           current = next;
-          next = (current + 1) % palettes.length;
+          next = peekRandomPattern(current);
           fieldMorph = null;
           phase = 'hold';
           phaseStarted = now;
@@ -864,7 +901,7 @@
         }
 
         function advance() {
-          choose(phase === 'morph' ? (next + 1) % palettes.length : (current + 1) % palettes.length);
+          choose(phase === 'morph' ? peekRandomPattern(next) : next);
         }
 
         function updateButtons() {

@@ -4,6 +4,7 @@
   "date": "2026-08-03",
   "category": "games",
   "type": "interactive",
+  "wip": true,
   "thumbnail": "thumbnail.jpg",
   "description": "A black-and-white vector Asteroids variant flown against weather instead of rock. Rounds explosively punch broad chunks out of wide, scalloped cumulus, so the only way through a body is to bore a tunnel and fly down it. The ship never targets anything. It holds a wandering course with the guns held down, and where the sky is thick it grinds to a crawl until its own fire has opened the way — an icebreaker, not a hunter. Its hull reams out what the guns began, so it can never wedge itself in a bore too narrow to fly. Sparse cloudscapes pan endlessly left while the ship works up and down through them; the camera follows, keeping it in frame. Bites heal slowly like liquid, and a bore that reaches all the way through leaves the exact same cloud outline divided into two halves."
 }

@@ -4,6 +4,7 @@
   "date": "2026-07-22",
   "category": "games",
   "type": "interactive",
+  "wip": true,
   "thumbnail": "thumbnail.jpg",
   "description": "Pac hunts every power pellet across a full-frame maze."
 }
