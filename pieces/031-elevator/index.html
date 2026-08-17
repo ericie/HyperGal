@@ -175,7 +175,6 @@
         background: #020303;
         object-fit: cover;
         object-position: center;
-        transform: scale(1.3);
       }
 
       .threshold {
@@ -665,7 +664,7 @@
       </div>
 
       <section class="floor-zone" aria-label="View through the elevator doors">
-        <img id="world" src="./room-01-tide-office.jpg" alt="A moonlit office flooded with clear seawater" />
+        <img id="world" src="./room-01-tide-office.jpg" alt="A vast office lined with reel-to-reel computers and operator consoles" />
         <div class="door left" aria-hidden="true"><img class="door-photo" src="./elevator-front.jpg" alt="" /></div>
         <div class="door right" aria-hidden="true"><img class="door-photo" src="./elevator-front.jpg" alt="" /></div>
         <div class="threshold" aria-hidden="true"></div>
@@ -711,11 +710,11 @@
         const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
         const stops = [
-          { id: '1', name: 'the tide office', room: './room-01-tide-office.jpg', alt: 'A moonlit office flooded with clear seawater', direction: 'down' },
-          { id: '3', name: 'the weather department', room: './room-03-weather-office.jpg', alt: 'An office containing a cloud and an indoor rain shower', direction: 'up' },
-          { id: '5', name: 'the midnight orchard', room: './room-05-midnight-orchard.jpg', alt: 'A dark office where glowing fruit trees grow through the carpet', direction: 'up' },
-          { id: '7', name: 'the sky boardroom', room: './room-07-sky-boardroom.jpg', alt: 'A boardroom suspended above a sea of clouds', direction: 'up' },
-          { id: '9', name: 'the infinite records office', room: './room-09-infinite-records.jpg', alt: 'An ordinary records office repeating into an impossible distance', direction: 'up' },
+          { id: '1', name: 'the tape cathedral', room: './room-01-tide-office.jpg', alt: 'A vast office lined with reel-to-reel computers and operator consoles', direction: 'down' },
+          { id: '3', name: 'the glass core bureau', room: './room-03-weather-office.jpg', alt: 'A deep office filled with transparent mainframes and dense exposed circuitry', direction: 'up' },
+          { id: '5', name: 'the terminal department', room: './room-05-midnight-orchard.jpg', alt: 'An enormous open office of repeating CRT terminals and tape drives', direction: 'up' },
+          { id: '7', name: 'the cooling office', room: './room-07-sky-boardroom.jpg', alt: 'A computer office overtaken by immense cooling pipes and mainframe cabinets', direction: 'up' },
+          { id: '9', name: 'the infinite mainframe', room: './room-09-infinite-records.jpg', alt: 'Endless rows of mainframes and computer consoles receding into the distance', direction: 'up' },
         ];
         const panelLabels = ['9', '7', '5', '3', '1'];
         const sceneNames = Object.fromEntries(stops.map(stop => [stop.id, stop.name]));
