@@ -484,13 +484,29 @@
         aspect-ratio: auto;
         overflow: hidden;
         border: 0;
-        background-color: #2b2e2c;
+        background-color: #8c908e;
         background-image:
-          linear-gradient(90deg, #141615 0%, #555a56 5%, #8a8f8b 14%, #484d49 43%, #727773 72%, #292c2a 95%, #101211 100%),
-          radial-gradient(circle, rgba(8,10,9,.48) 0 1px, transparent 1.4px);
-        background-size: clamp(130px, 14vw, 210px) 100%, 4px 4px;
-        background-repeat: repeat-x, repeat;
+          linear-gradient(90deg, rgba(24,27,26,.3), rgba(255,255,255,.1) 17%, rgba(255,255,255,.18) 48%, rgba(255,255,255,.05) 74%, rgba(24,27,26,.27)),
+          linear-gradient(90deg, rgba(255,255,255,.018), rgba(0,0,0,.014) 50%, rgba(255,255,255,.012));
+        background-size: 100% 100%, 4px 100%;
+        background-repeat: no-repeat, repeat-x;
         box-shadow: none;
+      }
+
+      .elevator::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        display: block;
+        pointer-events: none;
+        background-image: linear-gradient(90deg,
+          transparent calc(100% - 2px),
+          rgba(28,31,30,.3) calc(100% - 2px),
+          rgba(28,31,30,.3) calc(100% - 1px),
+          rgba(255,255,255,.16) calc(100% - 1px));
+        background-size: clamp(180px, 16vw, 220px) 100%;
+        background-repeat: repeat-x;
       }
 
       .elevator-stage {
@@ -504,7 +520,6 @@
         transform: translateX(-50%);
       }
 
-      .elevator::before,
       .ceiling,
       .wall-panel.left,
       .service-label,
