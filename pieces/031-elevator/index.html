@@ -177,6 +177,36 @@
         object-position: center;
       }
 
+      .maintenance-drone {
+        position: absolute;
+        z-index: 1;
+        top: 52%;
+        left: 14%;
+        width: 32%;
+        height: auto;
+        opacity: 0;
+        pointer-events: none;
+        filter: drop-shadow(0 8px 7px rgba(0,0,0,.58));
+        transform-origin: center;
+        animation: maintenance-patrol 14s ease-in-out infinite;
+        animation-play-state: paused;
+        transition: opacity 220ms linear;
+        will-change: transform;
+      }
+
+      .doors-open .maintenance-drone {
+        opacity: .92;
+        animation-play-state: running;
+        transition-delay: 1.7s;
+      }
+
+      @keyframes maintenance-patrol {
+        0%, 100% { transform: translate3d(-30%, 18%, 0) scale(.7) rotate(-2deg); }
+        24% { transform: translate3d(30%, -58%, 0) scale(.5) rotate(1deg); }
+        51% { transform: translate3d(125%, -72%, 0) scale(.43) rotate(2deg); }
+        76% { transform: translate3d(92%, 12%, 0) scale(.63) rotate(-1deg); }
+      }
+
       .threshold {
         position: absolute;
         z-index: 5;
@@ -591,12 +621,13 @@
         position: absolute;
         top: 37.55%;
         left: 85.75%;
-        width: 4.45%;
+        width: 8.4%;
         height: 14.4%;
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
         grid-template-rows: repeat(5, 1fr);
-        gap: 3.5%;
+        column-gap: 10%;
+        row-gap: 3.5%;
         pointer-events: auto;
       }
 
@@ -646,12 +677,13 @@
 
       @media (prefers-reduced-motion: reduce) {
         .door { transition-duration: 650ms; }
+        .maintenance-drone { display: none; }
       }
     </style>
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="380ba6de-d087-4f44-a235-7dd4b9b174f9"></script>
   </head>
   <body>
-    <main class="elevator" id="elevator" data-direction="up" aria-label="An elevator traveling between fantastical office rooms">
+    <main class="elevator" id="elevator" data-direction="up" aria-label="An elevator traveling between impossible computer rooms">
       <div class="elevator-stage">
       <div class="ceiling" aria-hidden="true"></div>
 
@@ -664,7 +696,8 @@
       </div>
 
       <section class="floor-zone" aria-label="View through the elevator doors">
-        <img id="world" src="./room-01-tide-office.jpg" alt="A vast office lined with reel-to-reel computers and operator consoles" />
+        <img id="world" src="./weave-floor-01.png" alt="A dense vintage computer room viewed between rows of illuminated equipment cabinets" />
+        <img class="maintenance-drone" src="./maintenance-drone.png" alt="" aria-hidden="true" />
         <div class="door left" aria-hidden="true"><img class="door-photo" src="./elevator-front.jpg" alt="" /></div>
         <div class="door right" aria-hidden="true"><img class="door-photo" src="./elevator-front.jpg" alt="" /></div>
         <div class="threshold" aria-hidden="true"></div>
@@ -710,13 +743,16 @@
         const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
         const stops = [
-          { id: '1', name: 'the tape cathedral', room: './room-01-tide-office.jpg', alt: 'A vast office lined with reel-to-reel computers and operator consoles', direction: 'down' },
-          { id: '3', name: 'the glass core bureau', room: './room-03-weather-office.jpg', alt: 'A deep office filled with transparent mainframes and dense exposed circuitry', direction: 'up' },
-          { id: '5', name: 'the terminal department', room: './room-05-midnight-orchard.jpg', alt: 'An enormous open office of repeating CRT terminals and tape drives', direction: 'up' },
-          { id: '7', name: 'the cooling office', room: './room-07-sky-boardroom.jpg', alt: 'A computer office overtaken by immense cooling pipes and mainframe cabinets', direction: 'up' },
-          { id: '9', name: 'the infinite mainframe', room: './room-09-infinite-records.jpg', alt: 'Endless rows of mainframes and computer consoles receding into the distance', direction: 'up' },
+          { id: '1', name: 'the signal racks', room: './weave-floor-01.png', alt: 'A dense vintage computer room viewed between rows of illuminated equipment cabinets', direction: 'down' },
+          { id: '2', name: 'the black mainframe', room: './weave-floor-02.png', alt: 'A contemporary black mainframe room extending beyond the elevator', direction: 'up' },
+          { id: '3', name: 'the cable aisle', room: './weave-floor-03.png', alt: 'A warm machine aisle crowded with cables and colored status lights', direction: 'up' },
+          { id: '4', name: 'the tape cathedral', room: './room-01-tide-office.jpg', alt: 'A narrow service passage engulfed by reel-to-reel computers', direction: 'up' },
+          { id: '5', name: 'the glass core', room: './room-03-weather-office.jpg', alt: 'A machine fissure surrounded by transparent mainframes and exposed circuitry', direction: 'up' },
+          { id: '6', name: 'the terminal engine', room: './room-05-midnight-orchard.jpg', alt: 'A room-sized computer assembled from stacked processor and tape modules', direction: 'up' },
+          { id: '7', name: 'the cooling machine', room: './room-07-sky-boardroom.jpg', alt: 'Dense computer racks consumed by pipes, fans, and cooling infrastructure', direction: 'up' },
+          { id: '8', name: 'the infinite mainframe', room: './room-09-infinite-records.jpg', alt: 'Interlocking mainframes repeat endlessly around a narrow service channel', direction: 'up' },
         ];
-        const panelLabels = ['9', '7', '5', '3', '1'];
+        const panelLabels = ['9', '10', '7', '8', '5', '6', '3', '4', '1', '2'];
         const sceneNames = Object.fromEntries(stops.map(stop => [stop.id, stop.name]));
         stops.forEach(stop => {
           const room = new Image();
