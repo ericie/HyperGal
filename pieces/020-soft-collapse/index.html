@@ -26,7 +26,7 @@
         background: var(--ground);
       }
 
-      canvas {
+      #stage {
         position: fixed;
         inset: 0;
         display: block;
@@ -36,9 +36,112 @@
         touch-action: none;
       }
 
-      canvas:focus-visible {
+      #stage:focus-visible {
         outline: 3px solid var(--ink);
         outline-offset: -7px;
+      }
+
+      #debug-catalog[hidden] {
+        display: none;
+      }
+
+      html.debug-mode {
+        height: auto;
+        min-height: 100%;
+        overflow-x: hidden;
+        overflow-y: scroll;
+      }
+
+      body.debug-mode {
+        min-height: 100%;
+        height: auto;
+        overflow: visible;
+        color: var(--ink);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      body.debug-mode #stage {
+        display: none;
+      }
+
+      .debug-catalog {
+        min-height: 100vh;
+        padding: clamp(18px, 3vw, 42px);
+        background: var(--ground);
+      }
+
+      .debug-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 24px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid var(--ink);
+      }
+
+      .debug-header h1,
+      .debug-header p,
+      .debug-specimen {
+        margin: 0;
+      }
+
+      .debug-header h1 {
+        font-size: clamp(1.25rem, 2.3vw, 2rem);
+        line-height: 1;
+        letter-spacing: -0.025em;
+      }
+
+      .debug-header p {
+        color: #51514c;
+        font-size: 0.875rem;
+      }
+
+      .debug-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+        border-left: 1px solid #b8b8b2;
+      }
+
+      .debug-specimen {
+        display: grid;
+        min-width: 0;
+        grid-template-rows: minmax(230px, 1fr) auto;
+        border-right: 1px solid #b8b8b2;
+        border-bottom: 1px solid #b8b8b2;
+      }
+
+      .debug-specimen-canvas {
+        position: static;
+        display: block;
+        width: 100%;
+        height: clamp(230px, 24vw, 320px);
+      }
+
+      .debug-caption {
+        display: grid;
+        grid-template-columns: 2.5rem minmax(0, 1fr);
+        gap: 10px;
+        min-height: 52px;
+        padding: 13px 14px 12px;
+        border-top: 1px solid #b8b8b2;
+      }
+
+      .debug-number {
+        color: #5e5e58;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .debug-name {
+        font-size: 0.9375rem;
+        line-height: 1.2;
+      }
+
+      @media (max-width: 520px) {
+        .debug-header {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 7px;
+        }
       }
 
       .status {
@@ -63,6 +166,13 @@
       aria-label="Soft Collapse: an edge-to-edge black-and-white geometric field where groups of small cells merge into large four-by-four forms and split apart again. Motifs also slide out of cropped frames while new motifs enter from the opposite side. Click to change a block, press Space to pause, and R to recompose."
     ></canvas>
     <p id="status" class="status" aria-live="polite"></p>
+    <main id="debug-catalog" class="debug-catalog" hidden>
+      <header class="debug-header">
+        <h1>Soft Collapse shape index</h1>
+        <p id="debug-count"></p>
+      </header>
+      <div id="debug-grid" class="debug-grid"></div>
+    </main>
 
     <script>
       (() => {
@@ -71,6 +181,7 @@
         const ctx = canvas.getContext('2d', { alpha: false });
         const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
         const params = new URLSearchParams(location.search);
+        const DEBUG_MODE = params.get('debug') === 'true';
 
         const GROUND = '#f7f7f4';
         const INK = '#11110f';
@@ -87,6 +198,20 @@
           [-1, 0],
           [0, 1],
           [0, -1]
+        ];
+        const MOTIF_NAMES = [
+          'Half square',
+          'Inward wedges',
+          'Diamond',
+          'Square aperture',
+          'Broken bars',
+          'Hourglass',
+          'Folded chevron',
+          'Diagonal band',
+          'Pinwheel',
+          'Staggered columns',
+          'Stacked chevrons',
+          'Diamond aperture'
         ];
 
         let width = 1;
@@ -106,13 +231,87 @@
         let seed = params.get('seed') || randomSeed();
         let random = makeRandom(seed);
 
-        resize(true);
-        requestAnimationFrame(frame);
+        if (DEBUG_MODE) {
+          showDebugCatalog();
+        } else {
+          resize(true);
+          requestAnimationFrame(frame);
+          addEventListener('resize', () => resize(false), { passive: true });
+          canvas.addEventListener('pointerdown', onPointerDown);
+          canvas.addEventListener('keydown', onKeyDown);
+          reducedMotion.addEventListener('change', onMotionPreference);
+        }
 
-        addEventListener('resize', () => resize(false), { passive: true });
-        canvas.addEventListener('pointerdown', onPointerDown);
-        canvas.addEventListener('keydown', onKeyDown);
-        reducedMotion.addEventListener('change', onMotionPreference);
+        function showDebugCatalog() {
+          const catalog = document.getElementById('debug-catalog');
+          const grid = document.getElementById('debug-grid');
+          const count = document.getElementById('debug-count');
+          const specimens = [];
+
+          document.documentElement.classList.add('debug-mode');
+          document.body.classList.add('debug-mode');
+          catalog.hidden = false;
+          count.textContent = `${MOTIF_NAMES.length} motif types`;
+
+          for (let motif = 0; motif < MOTIF_NAMES.length; motif += 1) {
+            const figure = document.createElement('figure');
+            const specimenCanvas = document.createElement('canvas');
+            const caption = document.createElement('figcaption');
+            const labelId = `debug-motif-${motif + 1}`;
+
+            figure.className = 'debug-specimen';
+            specimenCanvas.className = 'debug-specimen-canvas';
+            specimenCanvas.setAttribute('aria-hidden', 'true');
+            caption.className = 'debug-caption';
+            caption.id = labelId;
+            caption.innerHTML =
+              `<span class="debug-number">${String(motif + 1).padStart(2, '0')}</span>` +
+              `<strong class="debug-name">${MOTIF_NAMES[motif]}</strong>`;
+
+            figure.setAttribute('aria-labelledby', labelId);
+            figure.append(specimenCanvas, caption);
+            grid.append(figure);
+            specimens.push({ canvas: specimenCanvas, motif });
+          }
+
+          let renderFrame = 0;
+          const scheduleRender = () => {
+            cancelAnimationFrame(renderFrame);
+            renderFrame = requestAnimationFrame(() => {
+              for (const specimen of specimens) renderDebugSpecimen(specimen);
+            });
+          };
+
+          if ('ResizeObserver' in window) {
+            const observer = new ResizeObserver(scheduleRender);
+            observer.observe(grid);
+          } else {
+            addEventListener('resize', scheduleRender, { passive: true });
+          }
+          scheduleRender();
+        }
+
+        function renderDebugSpecimen(specimen) {
+          const rect = specimen.canvas.getBoundingClientRect();
+          const cssWidth = Math.max(1, Math.round(rect.width));
+          const cssHeight = Math.max(1, Math.round(rect.height));
+          const pixelRatio = Math.min(2, devicePixelRatio || 1);
+          const drawSize = Math.min(cssWidth, cssHeight) * 0.68;
+          const specimenCtx = specimen.canvas.getContext('2d', { alpha: false });
+
+          specimen.canvas.width = Math.round(cssWidth * pixelRatio);
+          specimen.canvas.height = Math.round(cssHeight * pixelRatio);
+          specimenCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+          specimenCtx.imageSmoothingEnabled = false;
+          specimenCtx.fillStyle = GROUND;
+          specimenCtx.fillRect(0, 0, cssWidth, cssHeight);
+          specimenCtx.fillStyle = INK;
+          specimenCtx.save();
+          specimenCtx.translate(cssWidth * 0.5, cssHeight * 0.5);
+          specimenCtx.scale(drawSize, drawSize);
+          drawMotifOn(specimenCtx, specimen.motif);
+          specimenCtx.restore();
+        }
 
         function randomSeed() {
           return Math.floor(Math.random() * 0xffffffff).toString(36);

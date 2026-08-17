@@ -1,9 +1,9 @@
 # City of Signs
 
-A fixed vector reconstruction of the black-and-white reference city. The
-236-by-236 master uses the source image's compact bounding box and is assembled
-entirely from filled circles, rectangles, polygons, and arcs.
+A city assembled from a disciplined kit of blocks, arches, circles, stairs,
+domes, tiles, and repeating patterns. Each building follows its own modular
+grammar while borrowing colors and facade motifs from its neighbors.
 
-Seven joined towers rise above a continuous circle-and-diamond belt and a shared
-colonnaded base. The two principal side roofs and the smaller central roof are
-true semicircles.
+The limited coral, blue, yellow, paper, and deep blue-gray palette keeps the
+crowded architecture precise. Click, tap, or press Enter to build another city.
+The piece uses only the Canvas 2D API.

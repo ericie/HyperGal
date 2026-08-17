@@ -11,6 +11,9 @@ Click or tap to move the block under the pointer. Press Space to pause or
 resume and R to build a new composition. Add `?seed=anything` to the URL to
 revisit a composition.
 
+Add `?debug=true` to open a scrollable index of every individual motif instead
+of the animated composition.
+
 The piece respects `prefers-reduced-motion`: the automatic transitions stop,
 and clicking changes a local group without an animated transition.
 

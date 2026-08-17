@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="A top-down dry garden composes odd-numbered groups of contour-drawn rocks and rakes the open space between them."
+    />
+    <title>Obstacles, and The Space Between · HyperGal</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --sand: #eee9d8;
+        --panel: rgba(246, 243, 226, 0.95);
+        --ink: #2b1720;
+        --muted: #6e6261;
+        --rule: #aaa28f;
+        --focus: #006a83;
+      }
+
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--sand);
+      }
+
+      body {
+        min-width: 320px;
+        font-family: "Avenir Next", Avenir, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: var(--sand);
+        cursor: crosshair;
+        touch-action: manipulation;
+      }
+
+      canvas:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: -8px;
+      }
+
+      .garden-panel {
+        position: fixed;
+        z-index: 10;
+        top: max(14px, env(safe-area-inset-top));
+        left: max(14px, env(safe-area-inset-left));
+        width: min(318px, calc(100vw - 28px));
+        max-height: calc(100vh - 28px);
+        overflow: hidden;
+        border: 1px solid var(--ink);
+        border-radius: 0;
+        background: var(--panel);
+        box-shadow: 4px 4px 0 rgba(43, 23, 32, 0.14);
+        color: var(--ink);
+        font-size: 12px;
+        line-height: 1.2;
+        user-select: none;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 9px;
+        min-height: 48px;
+        padding: 8px 8px 8px 11px;
+        border-bottom: 1px solid var(--ink);
+        cursor: grab;
+        touch-action: none;
+      }
+
+      .garden-panel.is-dragging .panel-header { cursor: grabbing; }
+      .panel-heading { min-width: 0; }
+
+      h1 {
+        margin: 0;
+        overflow: hidden;
+        font: 700 11px/1.08 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        letter-spacing: 0.02em;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .panel-heading p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font: 9px/1.1 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .panel-actions {
+        display: flex;
+        flex: 0 0 auto;
+        gap: 4px;
+      }
+
+      button,
+      input { font: inherit; }
+
+      .panel-button {
+        display: grid;
+        width: 29px;
+        height: 29px;
+        padding: 0;
+        place-items: center;
+        border: 1px solid var(--ink);
+        border-radius: 0;
+        background: transparent;
+        color: var(--ink);
+        font-size: 17px;
+        font-weight: 700;
+        line-height: 1;
+        cursor: pointer;
+      }
+
+      .panel-button[data-action="reseed"] {
+        background: var(--ink);
+        color: var(--panel);
+      }
+
+      .panel-button:hover { background: #fffdf1; }
+
+      .panel-button[data-action="reseed"]:hover {
+        background: var(--focus);
+        color: #fff;
+      }
+
+      button:focus-visible,
+      input:focus-visible {
+        outline: 2px solid #006eb3;
+        outline-offset: 2px;
+      }
+
+      .panel-body {
+        max-height: calc(100vh - 82px);
+        padding: 9px 11px 11px;
+        overflow-y: auto;
+      }
+
+      .garden-panel.is-collapsed { width: 224px; }
+      .garden-panel.is-collapsed .panel-header { border-bottom: 0; }
+      .garden-panel.is-collapsed .panel-body,
+      .garden-panel.is-collapsed .panel-heading p { display: none; }
+
+      .panel-intro {
+        margin: 0 0 9px;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.35;
+      }
+
+      .section-label {
+        margin: 9px 0 2px;
+        color: var(--muted);
+        font: 700 8px/1 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .section-label:not(:first-of-type) {
+        padding-top: 8px;
+        border-top: 1px solid var(--rule);
+      }
+
+      .odd-count {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 3px;
+        padding: 4px 0 8px;
+      }
+
+      .count-button {
+        min-height: 28px;
+        padding: 4px;
+        border: 1px solid var(--ink);
+        border-radius: 0;
+        background: transparent;
+        color: var(--ink);
+        font: 700 10px/1 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        cursor: pointer;
+      }
+
+      .count-button[aria-pressed="true"] {
+        background: var(--ink);
+        color: var(--panel);
+      }
+
+      .range-row {
+        --progress: 50%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 70px;
+        align-items: center;
+        column-gap: 8px;
+        min-height: 47px;
+      }
+
+      .range-row + .range-row { border-top: 1px solid rgba(43, 23, 32, 0.2); }
+
+      .principle {
+        min-width: 0;
+        font-weight: 700;
+      }
+
+      .principle small {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font: 9px/1.15 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-weight: 400;
+      }
+
+      .control-value {
+        color: var(--muted);
+        font: 10px/1 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+      }
+
+      input[type="range"] {
+        grid-column: 1 / 3;
+        width: 100%;
+        height: 11px;
+        margin: -3px 0 0;
+        padding: 0;
+        appearance: none;
+        background: transparent;
+        cursor: ew-resize;
+      }
+
+      input[type="range"]::-webkit-slider-runnable-track {
+        height: 2px;
+        background: linear-gradient(
+          to right,
+          var(--ink) 0 var(--progress),
+          var(--rule) var(--progress) 100%
+        );
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        width: 11px;
+        height: 11px;
+        margin-top: -4.5px;
+        border: 1px solid var(--ink);
+        border-radius: 50%;
+        appearance: none;
+        background: var(--panel);
+      }
+
+      input[type="range"]::-moz-range-track { height: 2px; background: var(--rule); }
+      input[type="range"]::-moz-range-progress { height: 2px; background: var(--ink); }
+      input[type="range"]::-moz-range-thumb {
+        width: 10px;
+        height: 10px;
+        border: 1px solid var(--ink);
+        border-radius: 50%;
+        background: var(--panel);
+      }
+
+      .panel-note {
+        margin: 9px 0 0;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.35;
+      }
+
+      @media (max-width: 540px) {
+        .garden-panel { width: min(288px, calc(100vw - 28px)); }
+        .panel-body { padding-top: 8px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        canvas { cursor: default; }
+      }
+    </style>
+    <script defer src="https://bakalytics.com/bakalytics.js" data-property="380ba6de-d087-4f44-a235-7dd4b9b174f9"></script>
+  </head>
+  <body>
+    <canvas
+      id="garden"
+      tabindex="0"
+      role="img"
+      aria-label="A top-down Zen dry garden. Contour-drawn rocks sit in asymmetric odd-numbered groups while fine samon rake lines bend through the open gravel."
+    ></canvas>
+
+    <aside class="garden-panel" aria-label="Dry garden composition controls">
+      <header class="panel-header">
+        <div class="panel-heading">
+          <h1>OBSTACLES / SPACE BETWEEN</h1>
+          <p>dry-garden study / plan 032</p>
+        </div>
+        <div class="panel-actions">
+          <button class="panel-button" data-action="reseed" type="button" aria-label="New garden" title="New garden">&#8635;</button>
+          <button class="panel-button" data-action="collapse" type="button" aria-label="Collapse controls" aria-expanded="true" title="Collapse controls">−</button>
+        </div>
+      </header>
+
+      <div class="panel-body">
+        <p class="panel-intro">The stones hold the composition. The interval completes it.</p>
+
+        <p class="section-label">Stone-setting principles</p>
+        <div class="odd-count" role="group" aria-label="Kisū odd-numbered stone count">
+          <button class="count-button" type="button" data-count="5" aria-pressed="false">5 stones</button>
+          <button class="count-button" type="button" data-count="7" aria-pressed="true">7 stones</button>
+          <button class="count-button" type="button" data-count="9" aria-pressed="false">9 stones</button>
+        </div>
+
+        <div class="range-row">
+          <label class="principle" for="ma">Ma <small>interval / room to breathe</small></label>
+          <output class="control-value" for="ma">72%</output>
+          <input id="ma" type="range" min="35" max="100" step="1" value="72" />
+        </div>
+        <div class="range-row">
+          <label class="principle" for="asymmetry">Fukinsei <small>balanced asymmetry</small></label>
+          <output class="control-value" for="asymmetry">78%</output>
+          <input id="asymmetry" type="range" min="0" max="100" step="1" value="78" />
+        </div>
+        <div class="range-row">
+          <label class="principle" for="triads">Sanzon-seki <small>unequal triangular groups</small></label>
+          <output class="control-value" for="triads">84%</output>
+          <input id="triads" type="range" min="0" max="100" step="1" value="84" />
+        </div>
+        <div class="range-row">
+          <label class="principle" for="nature">Shizen <small>follow each stone’s character</small></label>
+          <output class="control-value" for="nature">88%</output>
+          <input id="nature" type="range" min="0" max="100" step="1" value="88" />
+        </div>
+        <div class="range-row">
+          <label class="principle" for="beyond">Shakkei <small>let the garden continue beyond</small></label>
+          <output class="control-value" for="beyond">62%</output>
+          <input id="beyond" type="range" min="0" max="100" step="1" value="62" />
+        </div>
+
+        <p class="section-label">Samon / raked space</p>
+        <div class="range-row">
+          <label class="principle" for="rake-spacing">Interval <small>distance between furrows</small></label>
+          <output class="control-value" for="rake-spacing">11 px</output>
+          <input id="rake-spacing" type="range" min="7" max="18" step="1" value="11" />
+        </div>
+        <div class="range-row">
+          <label class="principle" for="rake-turn">Current <small>how strongly lines yield</small></label>
+          <output class="control-value" for="rake-turn">74%</output>
+          <input id="rake-turn" type="range" min="20" max="100" step="1" value="74" />
+        </div>
+
+        <p class="panel-note">Click the gravel or press R to reset the stones. Drag this panel by its heading.</p>
+      </div>
+    </aside>
+
+    <script>
+      (() => {
+        'use strict';
+
+        const canvas = document.getElementById('garden');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const panel = document.querySelector('.garden-panel');
+        const panelHeader = panel.querySelector('.panel-header');
+        const collapseButton = panel.querySelector('[data-action="collapse"]');
+        const reseedButton = panel.querySelector('[data-action="reseed"]');
+        const countButtons = [...panel.querySelectorAll('[data-count]')];
+        const maInput = document.getElementById('ma');
+        const asymmetryInput = document.getElementById('asymmetry');
+        const triadsInput = document.getElementById('triads');
+        const natureInput = document.getElementById('nature');
+        const beyondInput = document.getElementById('beyond');
+        const spacingInput = document.getElementById('rake-spacing');
+        const turnInput = document.getElementById('rake-turn');
+
+        const TAU = Math.PI * 2;
+        const ROCK_COLORS = [
+          ['#d8cfba', '#342a2d'],
+          ['#c8c1ad', '#342a2d'],
+          ['#ded8c7', '#342a2d'],
+          ['#cfc6b0', '#342a2d'],
+          ['#d6cfbd', '#342a2d'],
+        ];
+
+        const settings = {
+          count: 7,
+          ma: 0.72,
+          asymmetry: 0.78,
+          triads: 0.84,
+          nature: 0.88,
+          beyond: 0.62,
+          rakeSpacing: 11,
+          rakeTurn: 0.74,
+        };
+
+        let width = 1;
+        let height = 1;
+        let dpr = 1;
+        let seed = seedFromLocation();
+        let random = mulberry32(seed);
+        let rocks = [];
+        let rakePaths = [];
+        let gravelPattern = null;
+        let panelDrag = null;
+        let resizeTimer = 0;
+        let composeTimer = 0;
+
+        function seedFromLocation() {
+          const value = new URLSearchParams(location.search).get('seed');
+          const parsed = Number.parseInt(value || '', 36);
+          return Number.isFinite(parsed)
+            ? parsed >>> 0
+            : ((Date.now() * 2654435761) ^ (Math.random() * 0xffffffff)) >>> 0;
+        }
+
+        function mulberry32(a) {
+          return function next() {
+            a |= 0;
+            a = (a + 0x6d2b79f5) | 0;
+            let t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        function rand(min, max) { return min + random() * (max - min); }
+        function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+        function mix(a, b, t) { return a + (b - a) * clamp(t, 0, 1); }
+        function smooth(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
+
+        function resize() {
+          width = Math.max(1, innerWidth);
+          height = Math.max(1, innerHeight);
+          dpr = Math.min(2, devicePixelRatio || 1);
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          compose();
+        }
+
+        function compose() {
+          random = mulberry32((seed ^ Math.round(width * 19) ^ Math.round(height * 37)) >>> 0);
+          gravelPattern = makeGravelPattern();
+          rocks = makeGarden();
+          rakePaths = makeRakePaths();
+          render();
+        }
+
+        function makeGravelPattern() {
+          const tile = document.createElement('canvas');
+          tile.width = 128;
+          tile.height = 128;
+          const tileCtx = tile.getContext('2d');
+          tileCtx.fillStyle = '#eee9d8';
+          tileCtx.fillRect(0, 0, tile.width, tile.height);
+          for (let i = 0; i < 620; i++) {
+            const alpha = rand(0.018, 0.08);
+            const value = random() > 0.54 ? '52,42,45' : '255,253,241';
+            tileCtx.fillStyle = `rgba(${value},${alpha})`;
+            const size = rand(0.35, 1.15);
+            tileCtx.fillRect(rand(0, 128), rand(0, 128), size, size);
+          }
+          return ctx.createPattern(tile, 'repeat');
+        }
+
+        function makeGarden() {
+          const small = Math.min(width, height);
+          const landscape = width >= height;
+          const asym = settings.asymmetry;
+          const openness = mix(0.8, 1.2, settings.ma);
+          const triangleLift = mix(0.12, 1, settings.triads);
+          const edgeReach = settings.beyond;
+          const anchors = [];
+
+          function add(group, x, y, size, ratio, rotation, role) {
+            anchors.push({ group, x, y, size, ratio, rotation, role });
+          }
+
+          if (landscape) {
+            const ax = width * mix(0.55, 0.66, asym);
+            const ay = height * mix(0.43, 0.35, asym);
+            const triadGap = small * openness * 0.19;
+            add('A', ax, ay, 1.2, 0.55, -0.72, 'dominant');
+            add('A', ax - triadGap * 0.82, ay + triadGap * 0.62 * triangleLift, 0.67, 1.45, 0.2, 'reclining');
+            add('A', ax + triadGap * 0.68, ay + triadGap * 0.45 * triangleLift, 0.48, 0.82, 0.94, 'attendant');
+
+            const bx = width * mix(0.37, 0.25, asym);
+            const by = height * mix(0.62, 0.72, asym);
+            const groupGap = small * openness * 0.135;
+            add('B', bx, by, 0.82, 1.22, -0.15, 'low');
+            add('B', bx + groupGap, by - groupGap * 0.55 * triangleLift, 0.52, 0.66, 0.58, 'attendant');
+            if (settings.count >= 7) {
+              add('B', bx - groupGap * 0.72, by - groupGap * 0.8 * triangleLift, 0.38, 1.3, -0.46, 'small');
+            }
+
+            const cropX = mix(width * 0.91, width + small * 0.045, edgeReach);
+            add('C', cropX, height * mix(0.77, 0.84, asym), 0.7, 1.7, -0.42, 'borrowed');
+
+            if (settings.count >= 9) {
+              add('D', width * 0.39, height * 0.22, 0.42, 0.62, 0.7, 'small');
+              add('D', width * 0.43, height * 0.17, 0.31, 1.42, -0.22, 'small');
+            }
+          } else {
+            const ax = width * mix(0.52, 0.63, asym);
+            const ay = height * mix(0.37, 0.29, asym);
+            const triadGap = small * openness * 0.18;
+            add('A', ax, ay, 1.16, 0.55, -0.66, 'dominant');
+            add('A', ax - triadGap * 0.75, ay + triadGap * 0.85 * triangleLift, 0.64, 1.5, 0.18, 'reclining');
+            add('A', ax + triadGap * 0.58, ay + triadGap * 0.7 * triangleLift, 0.46, 0.84, 0.9, 'attendant');
+
+            const bx = width * mix(0.41, 0.28, asym);
+            const by = height * mix(0.66, 0.7, asym);
+            const groupGap = small * openness * 0.14;
+            add('B', bx, by, 0.78, 1.2, -0.15, 'low');
+            add('B', bx + groupGap, by - groupGap * 0.55 * triangleLift, 0.48, 0.65, 0.64, 'attendant');
+            if (settings.count >= 7) {
+              add('B', bx - groupGap * 0.64, by - groupGap * 0.78 * triangleLift, 0.36, 1.35, -0.42, 'small');
+            }
+
+            const cropY = mix(height * 0.91, height + small * 0.045, edgeReach);
+            add('C', width * mix(0.73, 0.8, asym), cropY, 0.68, 1.7, -0.36, 'borrowed');
+
+            if (settings.count >= 9) {
+              add('D', width * 0.2, height * 0.45, 0.41, 0.64, 0.74, 'small');
+              add('D', width * 0.17, height * 0.5, 0.3, 1.45, -0.18, 'small');
+            }
+          }
+
+          if (settings.count === 5) anchors.splice(5, 1);
+          return anchors.slice(0, settings.count).map((anchor, index) => makeRock(anchor, index, small));
+        }
+
+        function makeRock(anchor, index, small) {
+          const nature = settings.nature;
+          const jitter = small * mix(0.002, 0.016, nature);
+          const base = clamp(small * 0.095, 34, 82) * anchor.size;
+          const ratio = anchor.ratio * mix(1, rand(0.84, 1.16), nature);
+          const rx = clamp(base * Math.sqrt(ratio), 12, small * 0.19);
+          const ry = clamp(base / Math.sqrt(ratio), 10, small * 0.18);
+          const rock = {
+            id: index,
+            group: anchor.group,
+            role: anchor.role,
+            x: anchor.x + rand(-jitter, jitter),
+            y: anchor.y + rand(-jitter, jitter),
+            rx,
+            ry,
+            radius: Math.max(rx, ry),
+            rotation: mix(0, anchor.rotation + rand(-0.18, 0.18), nature),
+            points: [],
+            flecks: [],
+            colors: ROCK_COLORS[index % ROCK_COLORS.length],
+          };
+
+          const pointCount = 18;
+          let wobble = rand(0, TAU);
+          for (let p = 0; p < pointCount; p++) {
+            const angle = p / pointCount * TAU;
+            wobble += rand(-0.65, 0.65);
+            const roughness = 1 + Math.sin(angle * 3 + wobble) * 0.055 + rand(-0.07, 0.07) * nature;
+            rock.points.push({ angle, roughness });
+          }
+          for (let f = 0; f < 10; f++) {
+            const angle = rand(0, TAU);
+            const radius = Math.sqrt(random()) * 0.72;
+            rock.flecks.push({
+              x: Math.cos(angle) * radius,
+              y: Math.sin(angle) * radius,
+              r: rand(0.8, 2.1),
+              alpha: rand(0.08, 0.22),
+            });
+          }
+          return rock;
+        }
+
+        function pointInRock(x, y, rock, padding = 0) {
+          const cos = Math.cos(-rock.rotation);
+          const sin = Math.sin(-rock.rotation);
+          const dx = x - rock.x;
+          const dy = y - rock.y;
+          const lx = dx * cos - dy * sin;
+          const ly = dx * sin + dy * cos;
+          return Math.hypot(lx / (rock.rx + padding), ly / (rock.ry + padding)) < 1;
+        }
+
+        function rakeTurnAt(x, y, direction) {
+          let turn = 0;
+          for (const rock of rocks) {
+            const dx = x - rock.x;
+            const dy = y - rock.y;
+            const reachX = rock.rx * 2.35 + 45;
+            const reachY = rock.ry * 2.5 + settings.rakeSpacing * 1.8;
+            if (Math.abs(dx) > reachX || Math.abs(dy) > reachY) continue;
+            const along = smooth(1 - Math.abs(dx) / reachX);
+            const across = smooth(1 - Math.abs(dy) / reachY);
+            const side = Math.abs(dy) < 0.5 ? direction : Math.sign(dy);
+            turn += side * along * across * mix(0.18, 0.55, settings.rakeTurn);
+          }
+          return clamp(turn, -0.82, 0.82);
+        }
+
+        function makeRakePaths() {
+          const paths = [];
+          const step = 5;
+          const margin = 34;
+          const spacing = settings.rakeSpacing;
+          let index = 0;
+          for (let startY = -margin + spacing * 0.5; startY < height + margin; startY += spacing) {
+            const points = [];
+            let x = -margin;
+            let y = startY;
+            let velocityY = 0;
+            const direction = index++ % 2 ? 1 : -1;
+            while (x <= width + margin) {
+              points.push({ x, y });
+              const turn = rakeTurnAt(x + 22, y, direction);
+              velocityY = mix(velocityY, turn * 3.2, 0.14);
+              const home = (startY - y) * 0.009;
+              const broad = Math.sin(x * 0.006 + seed * 0.00001 + startY * 0.017) * 0.018 * settings.rakeTurn;
+              y += velocityY + home + broad;
+              x += step;
+            }
+            paths.push(points);
+          }
+          return paths;
+        }
+
+        function drawBackground() {
+          ctx.fillStyle = '#eee9d8';
+          ctx.fillRect(0, 0, width, height);
+          if (gravelPattern) {
+            ctx.fillStyle = gravelPattern;
+            ctx.fillRect(0, 0, width, height);
+          }
+        }
+
+        function drawRakeStroke(points, offsetY, color, lineWidth) {
+          ctx.beginPath();
+          for (let i = 0; i < points.length; i++) {
+            const point = points[i];
+            if (i === 0) ctx.moveTo(point.x, point.y + offsetY);
+            else ctx.lineTo(point.x, point.y + offsetY);
+          }
+          ctx.strokeStyle = color;
+          ctx.lineWidth = lineWidth;
+          ctx.stroke();
+        }
+
+        function drawSamon() {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(4, 4, width - 8, height - 8);
+          ctx.clip();
+          for (const path of rakePaths) {
+            drawRakeStroke(path, 0.7, 'rgba(255, 253, 241, 0.72)', 1.15);
+            drawRakeStroke(path, 0, 'rgba(71, 58, 53, 0.29)', 0.82);
+          }
+          ctx.restore();
+        }
+
+        function rockPath(rock) {
+          ctx.beginPath();
+          for (let i = 0; i < rock.points.length; i++) {
+            const point = rock.points[i];
+            const x = Math.cos(point.angle) * rock.rx * point.roughness;
+            const y = Math.sin(point.angle) * rock.ry * point.roughness;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.closePath();
+        }
+
+        function drawRockAprons() {
+          ctx.save();
+          for (const rock of rocks) {
+            const rings = rock.role === 'dominant' ? 4 : 3;
+            for (let ring = rings; ring >= 1; ring--) {
+              const pad = ring * settings.rakeSpacing * 0.62 + 4;
+              ctx.save();
+              ctx.translate(rock.x, rock.y);
+              ctx.rotate(rock.rotation);
+              ctx.beginPath();
+              ctx.ellipse(0, 0, rock.rx + pad, rock.ry + pad, 0, 0, TAU);
+              ctx.strokeStyle = `rgba(71, 58, 53, ${0.12 + (rings - ring) * 0.035})`;
+              ctx.lineWidth = 0.7;
+              ctx.stroke();
+              ctx.restore();
+            }
+          }
+          ctx.restore();
+        }
+
+        function drawRocks() {
+          for (const rock of rocks) {
+            ctx.save();
+            ctx.translate(rock.x, rock.y);
+            ctx.rotate(rock.rotation);
+            rockPath(rock);
+            ctx.fillStyle = rock.colors[0];
+            ctx.fill();
+            ctx.strokeStyle = rock.colors[1];
+            ctx.lineWidth = 1.35;
+            ctx.stroke();
+
+            ctx.save();
+            rockPath(rock);
+            ctx.clip();
+            for (const fleck of rock.flecks) {
+              ctx.beginPath();
+              const x = fleck.x * rock.rx;
+              const y = fleck.y * rock.ry;
+              ctx.moveTo(x - fleck.r * 1.6, y + fleck.r * 0.45);
+              ctx.lineTo(x + fleck.r * 1.6, y - fleck.r * 0.45);
+              ctx.strokeStyle = `rgba(52, 42, 45, ${0.22 + fleck.alpha})`;
+              ctx.lineWidth = 0.55;
+              ctx.stroke();
+            }
+            ctx.restore();
+
+            for (const scale of [0.78, 0.56]) {
+              ctx.save();
+              ctx.scale(scale, scale);
+              rockPath(rock);
+              ctx.strokeStyle = scale > 0.7
+                ? 'rgba(52, 42, 45, 0.34)'
+                : 'rgba(52, 42, 45, 0.2)';
+              ctx.lineWidth = 0.7 / scale;
+              ctx.stroke();
+              ctx.restore();
+            }
+            ctx.restore();
+
+            if (rock.radius > 44 && rock.x > 0 && rock.x < width && rock.y > 0 && rock.y < height) {
+              ctx.save();
+              ctx.fillStyle = 'rgba(43, 23, 32, 0.68)';
+              ctx.font = '7px "SFMono-Regular", Consolas, monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(`R${String(rock.id + 1).padStart(2, '0')}`, rock.x, rock.y);
+              ctx.restore();
+            }
+          }
+        }
+
+        function drawFrame() {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(43, 23, 32, 0.54)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(4.5, 4.5, width - 9, height - 9);
+          ctx.fillStyle = 'rgba(43, 23, 32, 0.72)';
+          ctx.font = '8px "SFMono-Regular", Consolas, monospace';
+          ctx.textAlign = 'right';
+          ctx.fillText(`KARESANSUI / ${String(settings.count).padStart(2, '0')} STONES`, width - 14, height - 13);
+          ctx.restore();
+        }
+
+        function render() {
+          drawBackground();
+          drawSamon();
+          drawRockAprons();
+          drawRocks();
+          drawFrame();
+        }
+
+        function scheduleCompose() {
+          clearTimeout(composeTimer);
+          composeTimer = setTimeout(compose, 90);
+        }
+
+        function bindRange(input, onInput, format) {
+          const row = input.closest('.range-row');
+          const output = row.querySelector('output');
+          function update() {
+            const value = Number(input.value);
+            const progress = (value - Number(input.min)) / (Number(input.max) - Number(input.min));
+            row.style.setProperty('--progress', `${progress * 100}%`);
+            output.textContent = format(value);
+            onInput(value);
+            scheduleCompose();
+          }
+          input.addEventListener('input', update);
+          update();
+        }
+
+        bindRange(maInput, value => { settings.ma = value / 100; }, value => `${value}%`);
+        bindRange(asymmetryInput, value => { settings.asymmetry = value / 100; }, value => `${value}%`);
+        bindRange(triadsInput, value => { settings.triads = value / 100; }, value => `${value}%`);
+        bindRange(natureInput, value => { settings.nature = value / 100; }, value => `${value}%`);
+        bindRange(beyondInput, value => { settings.beyond = value / 100; }, value => `${value}%`);
+        bindRange(spacingInput, value => { settings.rakeSpacing = value; }, value => `${value} px`);
+        bindRange(turnInput, value => { settings.rakeTurn = value / 100; }, value => `${value}%`);
+
+        countButtons.forEach(button => {
+          button.addEventListener('click', () => {
+            settings.count = Number(button.dataset.count);
+            countButtons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+            compose();
+          });
+        });
+
+        reseedButton.addEventListener('click', () => {
+          seed = ((seed + 0x9e3779b9) ^ (Date.now() & 0xffffffff)) >>> 0;
+          compose();
+        });
+
+        collapseButton.addEventListener('click', () => {
+          const collapsed = panel.classList.toggle('is-collapsed');
+          collapseButton.textContent = collapsed ? '+' : '−';
+          collapseButton.setAttribute('aria-expanded', String(!collapsed));
+          collapseButton.setAttribute('aria-label', collapsed ? 'Expand controls' : 'Collapse controls');
+        });
+
+        panelHeader.addEventListener('pointerdown', event => {
+          if (event.target.closest('button')) return;
+          const rect = panel.getBoundingClientRect();
+          panelDrag = {
+            pointerId: event.pointerId,
+            offsetX: event.clientX - rect.left,
+            offsetY: event.clientY - rect.top,
+          };
+          panel.classList.add('is-dragging');
+          panelHeader.setPointerCapture(event.pointerId);
+        });
+
+        panelHeader.addEventListener('pointermove', event => {
+          if (!panelDrag || panelDrag.pointerId !== event.pointerId) return;
+          const rect = panel.getBoundingClientRect();
+          const left = clamp(event.clientX - panelDrag.offsetX, 8, width - rect.width - 8);
+          const top = clamp(event.clientY - panelDrag.offsetY, 8, height - rect.height - 8);
+          panel.style.left = `${left}px`;
+          panel.style.top = `${top}px`;
+        });
+
+        function endPanelDrag(event) {
+          if (!panelDrag || panelDrag.pointerId !== event.pointerId) return;
+          panelDrag = null;
+          panel.classList.remove('is-dragging');
+          if (panelHeader.hasPointerCapture(event.pointerId)) panelHeader.releasePointerCapture(event.pointerId);
+        }
+
+        panelHeader.addEventListener('pointerup', endPanelDrag);
+        panelHeader.addEventListener('pointercancel', endPanelDrag);
+
+        canvas.addEventListener('pointerdown', () => reseedButton.click());
+
+        window.addEventListener('keydown', event => {
+          if (event.target.matches('input, button')) return;
+          if (event.key.toLowerCase() === 'r' || event.key === ' ' || event.key === 'Enter') {
+            event.preventDefault();
+            reseedButton.click();
+          }
+        });
+
+        window.addEventListener('resize', () => {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(resize, 120);
+        });
+
+        resize();
+      })();
+    </script>
+  </body>
+</html>

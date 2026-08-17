@@ -71,16 +71,13 @@
         line-height: 1.35;
       }
 
-      /* Single-line catalog controls */
+      /* Catalog controls */
       .controls {
         margin-top: clamp(1rem, 2.4vw, 1.6rem);
         font-size: clamp(1rem, 1.5vw, 1.18rem);
         line-height: 1.55;
-        overflow-x: auto;
-        scrollbar-width: none;
       }
-      .controls::-webkit-scrollbar { display: none; }
-      .ctl { margin: .12rem 0; white-space: nowrap; }
+      .ctl { margin: .12rem 0; }
       .ctl .lbl {
         font-style: normal;
         font-weight: 700;
@@ -99,6 +96,10 @@
       .opt:hover { text-decoration: underline; text-underline-offset: 2px; }
       .opt[aria-pressed="true"] { color: var(--blue); font-weight: 600; }
       .opt:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+      .sort-dir {
+        font-size: .68em;
+        vertical-align: .12em;
+      }
 
       /* ---- the works ---- */
       main { padding: 0 var(--pad) 4rem; }
@@ -230,7 +231,7 @@
       <h1>HyperMedia Club</h1>
       <p class="lede">A collection of browser based games.</p>
       <div class="controls">
-        <p class="ctl"><strong class="lbl">Status:</strong><span id="statuses" role="group" aria-label="Status"></span>. <strong class="lbl">Theme:</strong><span id="themes" role="group" aria-label="Theme"></span>. <strong class="lbl">View:</strong><span id="views" role="group" aria-label="View"></span></p>
+        <p class="ctl"><strong class="lbl">Status:</strong><span id="statuses" role="group" aria-label="Status"></span>. <strong class="lbl">Theme:</strong><span id="themes" role="group" aria-label="Theme"></span>. <strong class="lbl">View:</strong><span id="views" role="group" aria-label="View"></span>. <strong class="lbl">Sort:</strong><span id="sorts" role="group" aria-label="Sort"></span></p>
       </div>
     </header>
 
@@ -246,11 +247,14 @@
         const statusesEl = document.getElementById('statuses');
         const themesEl = document.getElementById('themes');
         const viewsEl = document.getElementById('views');
+        const sortsEl = document.getElementById('sorts');
 
         let pieces = [];
         let status = 'published';
         let theme = '';
         let view = 'grid';
+        let sort = 'date';
+        const sortDirections = { alpha: 'asc', date: 'desc' };
 
         const STATUSES = [
           ['published', 'Published', p => !p.wip],
@@ -264,6 +268,7 @@
           ['other', 'Other']
         ];
         const VIEWS = [['grid', 'Grid'], ['list', 'List']];
+        const SORTS = [['alpha', 'Alpha'], ['date', 'Date']];
         const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -284,6 +289,7 @@
           buildGroup(themesEl, THEMES, () => theme,
             v => { theme = theme === v ? '' : v; render(); });
           buildGroup(viewsEl, VIEWS, () => view, v => { view = v; render(); });
+          buildSortGroup();
           render();
         }
 
@@ -298,10 +304,16 @@
             (STATUSES.find(item => item[0] === status) || STATUSES[0])[2];
           const list = pieces.filter(p =>
             matchStatus(p) && (!theme || p.category === theme));
-          // newest first; slug (≈ creation order) breaks same-day ties
-          list.sort((a, b) =>
-            a.date < b.date ? 1 : a.date > b.date ? -1 :
-            a.slug < b.slug ? 1 : a.slug > b.slug ? -1 : 0);
+          const direction = sortDirections[sort] === 'asc' ? 1 : -1;
+          if (sort === 'alpha') {
+            list.sort((a, b) => direction * title(a).localeCompare(
+              title(b), undefined, { sensitivity: 'base' }));
+          } else {
+            // Slug (≈ creation order) breaks same-day ties.
+            list.sort((a, b) => direction * (
+              a.date < b.date ? -1 : a.date > b.date ? 1 :
+              a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0));
+          }
           return list;
         }
 
@@ -388,6 +400,51 @@
             });
             container.append(b);
             if (i < items.length - 1) container.append(document.createTextNode(', '));
+          });
+        }
+
+        function buildSortGroup() {
+          sortsEl.replaceChildren();
+          SORTS.forEach((item, i) => {
+            const [value, label] = item;
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'opt';
+            b.dataset.value = value;
+            b.dataset.label = label;
+            b.addEventListener('click', () => {
+              if (sort === value) {
+                sortDirections[value] =
+                  sortDirections[value] === 'asc' ? 'desc' : 'asc';
+              } else {
+                sort = value;
+              }
+              updateSortGroup();
+              render();
+            });
+            sortsEl.append(b);
+            if (i < SORTS.length - 1) {
+              sortsEl.append(document.createTextNode(', '));
+            }
+          });
+          updateSortGroup();
+        }
+
+        function updateSortGroup() {
+          sortsEl.querySelectorAll('.opt').forEach(b => {
+            const active = b.dataset.value === sort;
+            const direction = sortDirections[b.dataset.value];
+            b.replaceChildren(document.createTextNode(b.dataset.label));
+            if (active) {
+              const triangle = el('span', 'sort-dir',
+                direction === 'asc' ? ' ▲' : ' ▼');
+              triangle.setAttribute('aria-hidden', 'true');
+              b.append(triangle);
+            }
+            b.setAttribute('aria-pressed', String(active));
+            b.setAttribute('aria-label', active
+              ? `${b.dataset.label}, ${direction === 'asc' ? 'ascending' : 'descending'}`
+              : `Sort by ${b.dataset.label}`);
           });
         }
 
