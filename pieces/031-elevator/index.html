@@ -177,36 +177,6 @@
         object-position: center;
       }
 
-      .maintenance-drone {
-        position: absolute;
-        z-index: 1;
-        top: 52%;
-        left: 14%;
-        width: 32%;
-        height: auto;
-        opacity: 0;
-        pointer-events: none;
-        filter: drop-shadow(0 8px 7px rgba(0,0,0,.58));
-        transform-origin: center;
-        animation: maintenance-patrol 14s ease-in-out infinite;
-        animation-play-state: paused;
-        transition: opacity 220ms linear;
-        will-change: transform;
-      }
-
-      .doors-open .maintenance-drone {
-        opacity: .92;
-        animation-play-state: running;
-        transition-delay: 1.7s;
-      }
-
-      @keyframes maintenance-patrol {
-        0%, 100% { transform: translate3d(-30%, 18%, 0) scale(.7) rotate(-2deg); }
-        24% { transform: translate3d(30%, -58%, 0) scale(.5) rotate(1deg); }
-        51% { transform: translate3d(125%, -72%, 0) scale(.43) rotate(2deg); }
-        76% { transform: translate3d(92%, 12%, 0) scale(.63) rotate(-1deg); }
-      }
-
       .threshold {
         position: absolute;
         z-index: 5;
@@ -692,7 +662,6 @@
 
       @media (prefers-reduced-motion: reduce) {
         .door { transition-duration: 650ms; }
-        .maintenance-drone { display: none; }
       }
     </style>
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="380ba6de-d087-4f44-a235-7dd4b9b174f9"></script>
@@ -712,7 +681,6 @@
 
       <section class="floor-zone" aria-label="View through the elevator doors">
         <img id="world" src="./weave-floor-01.png" alt="A dense vintage computer room viewed between rows of illuminated equipment cabinets" />
-        <img class="maintenance-drone" src="./maintenance-drone.png" alt="" aria-hidden="true" />
         <div class="door left" aria-hidden="true"><img class="door-photo" src="./elevator-front.jpg" alt="" /></div>
         <div class="door right" aria-hidden="true"><img class="door-photo" src="./elevator-front.jpg" alt="" /></div>
         <div class="threshold" aria-hidden="true"></div>
