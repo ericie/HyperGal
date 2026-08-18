@@ -1,9 +1,13 @@
 # City of Signs
 
-A city assembled from a disciplined kit of blocks, arches, circles, stairs,
-domes, tiles, and repeating patterns. Each building follows its own modular
-grammar while borrowing colors and facade motifs from its neighbors.
+A dense, edge-to-edge architectural field assembled on one shared grid. Wide
+chambers alternate with needle-thin towers while common horizontal registers
+carry circles, diamonds, arches, miniature buildings, flags, and colonnades
+across otherwise distinct bays.
 
-The limited coral, blue, yellow, paper, and deep blue-gray palette keeps the
-crowded architecture precise. Click, tap, or press Enter to build another city.
-The piece uses only the Canvas 2D API.
+The piece uses only pure black and white. Solid masses and carved negative
+spaces continually reverse from one bay to the next. Click, tap, or press Enter
+to construct another arrangement. Built entirely with the Canvas 2D API.
+
+Append `?debug=true` to open a labeled specimen grid of every primitive, nested
+motif, surface pattern, ornamental band, chamber, cap, finial, and bay grammar.

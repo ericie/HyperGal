@@ -260,7 +260,6 @@
 
         const HOLD_MS = 4200;
         const MORPH_MS = 2300;
-        const COLOR_PHASE = 0.28;
         const FRAME_MS = 1000 / 30;
 
         let width = 1;
@@ -305,8 +304,8 @@
             active: '#9c6233', colors: [[166, 99, 56], [236, 219, 185], [247, 235, 207]], sample: fawn,
           },
           {
-            name: 'Gaboon', short: 'GV', swatch: 'linear-gradient(90deg,#cdbd91 0 20%,#513b34 20% 39%,#1d1a17 39% 54%,#9f7168 54% 72%,#d1ac58 72%)',
-            active: '#513b34', colors: [[27, 24, 21], [68, 49, 39], [76, 52, 48], [119, 91, 68], [158, 103, 96], [207, 168, 81], [207, 190, 147]], sample: gaboon,
+            name: 'Crocodile', short: 'C', swatch: 'linear-gradient(90deg,#1d1f16 0 17%,#32341f 17% 34%,#484828 34% 56%,#665b32 56% 78%,#8b7744 78%)',
+            active: '#484828', colors: [[29, 31, 22], [50, 52, 31], [72, 72, 40], [102, 91, 50], [139, 119, 68]], sample: crocodile,
           },
           {
             name: 'Woodland', short: 'W', swatch: 'linear-gradient(90deg,#83784a 0 24%,#53633a 24% 50%,#293720 50% 77%,#181a13 77%)',
@@ -427,6 +426,46 @@
               const dx = gx + jx - px;
               const dy = gy + jy - py;
               const distance = Math.hypot(dx, dy);
+              if (distance < first) {
+                second = first;
+                first = distance;
+                id = hash(gx, gy, salt + 137);
+                bestX = dx;
+                bestY = dy;
+                bestGX = gx;
+                bestGY = gy;
+              } else if (distance < second) {
+                second = distance;
+              }
+            }
+          }
+          return { first, second, id, x: bestX, y: bestY, gx: bestGX, gy: bestGY };
+        }
+
+        function blockVoronoi(x, y, cellWidth, cellHeight, salt) {
+          const px = x / cellWidth;
+          const py = y / cellHeight;
+          const ix = Math.floor(px);
+          const iy = Math.floor(py);
+          let first = 99;
+          let second = 99;
+          let id = 0;
+          let bestX = 0;
+          let bestY = 0;
+          let bestGX = 0;
+          let bestGY = 0;
+
+          for (let oy = -1; oy <= 1; oy += 1) {
+            for (let ox = -1; ox <= 1; ox += 1) {
+              const gx = ix + ox;
+              const gy = iy + oy;
+              const jx = 0.5 + (hash(gx, gy, salt) - 0.5) * 0.28;
+              const jy = 0.5 + (hash(gx, gy, salt + 71) - 0.5) * 0.22;
+              const dx = gx + jx - px;
+              const dy = gy + jy - py;
+              const ax = Math.abs(dx);
+              const ay = Math.abs(dy);
+              const distance = Math.max(ax, ay) + Math.min(ax, ay) * 0.16;
               if (distance < first) {
                 second = first;
                 first = distance;
@@ -580,48 +619,27 @@
           return [166, 99, 56];
         }
 
-        function gaboon(x, y) {
-          const tileWidth = 25;
-          const tileHeight = 18;
-          const warpX = x + (fbm(x * 0.031, y * 0.028, 311) - 0.5) * 2.2;
-          const warpY = y + (fbm(x * 0.027, y * 0.033, 313) - 0.5) * 1.7;
+        function crocodile(x, y) {
+          const warpX = x
+            + (fbm(x * 0.026, y * 0.021, 311) - 0.5) * 4.2
+            + Math.sin(y * 0.031) * 1.3;
+          const warpY = y
+            + (fbm(x * 0.019, y * 0.028, 313) - 0.5) * 2.8;
+          const scute = blockVoronoi(warpX, warpY, 25.5, 17.5, 317);
+          const seam = scute.second - scute.first;
+          const weathering = fbm(x * 0.041, y * 0.034, 331);
+          const tone = scute.id * 0.58 + weathering * 0.42;
+          const keel = Math.abs(scute.y) < 0.105
+            && Math.abs(scute.x) < 0.56
+            && hash(scute.gx, scute.gy, 337) > 0.27;
 
-          const diamondRow = Math.round(warpY / tileHeight);
-          const diamondStagger = (Math.abs(diamondRow) % 2) * tileWidth * 0.5;
-          const diamondColumn = Math.round((warpX - diamondStagger) / tileWidth);
-          const diamondX = warpX - (diamondColumn * tileWidth + diamondStagger);
-          const diamondY = warpY - diamondRow * tileHeight;
-          const diamondIdentity = hash(diamondColumn, diamondRow, 317);
-          const diamondOuter = Math.abs(diamondX) / (8.2 + diamondIdentity * 1.1)
-            + Math.abs(diamondY) / (8.1 + hash(diamondColumn, diamondRow, 319) * 0.7);
-          const diamondInner = Math.abs(diamondX) / (4.8 + diamondIdentity * 0.6)
-            + Math.abs(diamondY) / 6.1;
-          const centerBar = Math.abs(diamondX) < 1.15
-            && Math.abs(diamondY) < 4.8 - Math.abs(diamondX) * 0.8;
-
-          const linkRow = Math.round((warpY - tileHeight * 0.5) / tileHeight);
-          const linkYCenter = linkRow * tileHeight + tileHeight * 0.5;
-          const linkStagger = (Math.abs(linkRow + 1) % 2) * tileWidth * 0.5;
-          const linkColumn = Math.round((warpX - linkStagger) / tileWidth);
-          const linkX = warpX - (linkColumn * tileWidth + linkStagger);
-          const linkY = warpY - linkYCenter;
-          const linkHeight = 7.2 + hash(linkColumn, linkRow, 323) * 0.7;
-          const outerWidth = 1.85 + Math.abs(linkY) * 0.72;
-          const innerWidth = 0.7 + Math.abs(linkY) * 0.54;
-          const hourglassOuter = Math.abs(linkY) < linkHeight && Math.abs(linkX) < outerWidth;
-          const hourglassInner = Math.abs(linkY) < linkHeight - 0.8 && Math.abs(linkX) < innerWidth;
-
-          const flank = Math.abs(linkX) / 9 + Math.abs(linkY) / 5.4;
-          const flankCore = Math.abs(linkX) / 6.7 + Math.abs(linkY) / 3.7;
-
-          if (centerBar) return [158, 103, 96];
-          if (diamondInner < 1) return [207, 190, 147];
-          if (diamondOuter < 1) return [76, 52, 48];
-          if (hourglassInner) return [27, 24, 21];
-          if (hourglassOuter) return [207, 168, 81];
-          if (flankCore < 1) return [68, 49, 39];
-          if (flank < 1) return [154, 111, 91];
-          return [119, 91, 68];
+          if (seam < 0.055) return [29, 31, 22];
+          if (seam < 0.115) return [50, 52, 31];
+          if (keel && tone > 0.43) return [139, 119, 68];
+          if (tone < 0.35) return [50, 52, 31];
+          if (tone < 0.56) return [72, 72, 40];
+          if (tone < 0.76) return [102, 91, 50];
+          return [139, 119, 68];
         }
 
         function woodland(x, y) {
@@ -656,10 +674,6 @@
           return [211, 187, 130];
         }
 
-        function easeOutQuint(value) {
-          return 1 - Math.pow(1 - clamp(value), 5);
-        }
-
         function paletteIndex(color, colors) {
           let closest = 0;
           let closestDistance = Infinity;
@@ -678,17 +692,6 @@
         function palettePosition(color, colors) {
           const index = paletteIndex(color, colors);
           return colors.length === 1 ? 0 : index / (colors.length - 1);
-        }
-
-        function hardColorAtPalettePosition(colors, position) {
-          const index = Math.round(clamp(position) * (colors.length - 1));
-          return colors[index];
-        }
-
-        function shiftedPaletteColor(color, fromPalette, toPalette, amount) {
-          const position = palettePosition(color, fromPalette.colors);
-          const target = hardColorAtPalettePosition(toPalette.colors, position);
-          return mix(color, target, amount);
         }
 
         function patternLabels(palette, outputColorCount, sampleScale) {
@@ -781,7 +784,7 @@
           fieldMorph = { width: buffer.width, height: buffer.height, labels, fromFields, toFields };
         }
 
-        function fieldMorphColor(index, progress) {
+        function fieldMorphColor(index, progress, sourceColor) {
           const eased = progress * progress * (3 - 2 * progress);
           let winningLabel = fieldMorph.labels[0];
           let winningDistance = Infinity;
@@ -795,7 +798,7 @@
               winningLabel = fieldMorph.labels[field];
             }
           }
-          return palettes[next].colors[winningLabel];
+          return mix(sourceColor, palettes[next].colors[winningLabel], eased);
         }
 
         function render(now) {
@@ -816,21 +819,11 @@
 
           let offset = 0;
           for (let y = 0; y < buffer.height; y += 1) {
-            const colorProgress = phase === 'morph' ? easeOutQuint(progress / COLOR_PHASE) : 0;
-            const shapeProgress = phase === 'morph'
-              ? clamp((progress - COLOR_PHASE) / (1 - COLOR_PHASE))
-              : 0;
-
             for (let x = 0; x < buffer.width; x += 1) {
-              let color;
-              if (shapeProgress > 0 && fieldMorph) {
-                color = fieldMorphColor(y * buffer.width + x, shapeProgress);
-              } else {
-                const from = palettes[current].sample(x * sampleScale, y * sampleScale);
-                color = phase === 'morph'
-                  ? shiftedPaletteColor(from, palettes[current], palettes[next], colorProgress)
-                  : from;
-              }
+              const sourceColor = palettes[current].sample(x * sampleScale, y * sampleScale);
+              const color = phase === 'morph' && fieldMorph
+                ? fieldMorphColor(y * buffer.width + x, progress, sourceColor)
+                : sourceColor;
               data[offset++] = color[0];
               data[offset++] = color[1];
               data[offset++] = color[2];

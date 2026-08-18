@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="A playful city of intricate modular buildings assembled from a disciplined kit of geometric shapes and patterns."
+      content="A dense black-and-white architecture assembled from nested geometric modules on a shared structural grid."
     />
     <title>City of Signs · HyperGal</title>
     <style>
@@ -17,7 +17,7 @@
         height: 100%;
         margin: 0;
         overflow: hidden;
-        background: #f1f3ef;
+        background: #fff;
       }
 
       body { overscroll-behavior: none; }
@@ -33,8 +33,118 @@
       }
 
       canvas:focus-visible {
-        outline: 3px solid #27343a;
+        outline: 3px solid #000;
         outline-offset: -8px;
+      }
+
+      #debug-catalog[hidden] { display: none; }
+
+      html.debug-mode {
+        min-height: 100%;
+        height: auto;
+        overflow-x: hidden;
+        overflow-y: scroll;
+      }
+
+      body.debug-mode {
+        min-height: 100%;
+        height: auto;
+        overflow: visible;
+        background: #dededb;
+        color: #111;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body.debug-mode #city { display: none; }
+
+      .debug-catalog {
+        min-height: 100vh;
+        padding: clamp(18px, 3vw, 42px);
+        background: #dededb;
+      }
+
+      .debug-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 24px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid #111;
+      }
+
+      .debug-header h1,
+      .debug-header p,
+      .debug-specimen { margin: 0; }
+
+      .debug-header h1 {
+        font-size: clamp(1.25rem, 2.3vw, 2rem);
+        letter-spacing: -0.025em;
+        line-height: 1;
+      }
+
+      .debug-header p {
+        color: #555;
+        font-size: 0.875rem;
+      }
+
+      .debug-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+        border-left: 1px solid #aaa;
+      }
+
+      .debug-specimen {
+        display: grid;
+        min-width: 0;
+        grid-template-rows: minmax(250px, 1fr) auto;
+        border-right: 1px solid #aaa;
+        border-bottom: 1px solid #aaa;
+      }
+
+      .debug-specimen-canvas {
+        position: static;
+        inset: auto;
+        width: 100%;
+        height: clamp(250px, 27vw, 340px);
+        cursor: default;
+        touch-action: auto;
+      }
+
+      .debug-caption {
+        display: grid;
+        grid-template-columns: 2.5rem minmax(0, 1fr);
+        gap: 10px;
+        min-height: 66px;
+        padding: 12px 14px;
+        border-top: 1px solid #aaa;
+      }
+
+      .debug-number {
+        color: #666;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .debug-name,
+      .debug-group { display: block; }
+
+      .debug-name {
+        font-size: 0.9375rem;
+        line-height: 1.2;
+      }
+
+      .debug-group {
+        margin-top: 4px;
+        color: #666;
+        font-size: 0.75rem;
+        line-height: 1.2;
+      }
+
+      @media (max-width: 520px) {
+        .debug-header {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 7px;
+        }
       }
     </style>
   </head>
@@ -43,32 +153,77 @@
       id="city"
       tabindex="0"
       role="img"
-      aria-label="A playful geometric city. Every building is assembled from simple blocks, arches, circles, stairs, domes, tiles, and patterned facades in coral, blue, yellow, and deep blue-gray. Click, tap, or press Enter to build another city."
+      aria-label="A dense edge-to-edge black-and-white architectural field. Wide and narrow frontal towers share a structural grid and contain nested arches, circles, diamonds, flags, colonnades, and carved geometric ornament. Click, tap, or press Enter to construct another arrangement."
     ></canvas>
+
+    <main id="debug-catalog" class="debug-catalog" hidden>
+      <header class="debug-header">
+        <h1>City of Signs shape index</h1>
+        <p id="debug-count"></p>
+      </header>
+      <div id="debug-grid" class="debug-grid"></div>
+    </main>
 
     <script>
       (() => {
         'use strict';
 
         const canvas = document.getElementById('city');
-        const ctx = canvas.getContext('2d', { alpha: false });
+        let ctx = canvas.getContext('2d', { alpha: false });
+        const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === 'true';
         const TAU = Math.PI * 2;
-        const palette = {
-          paper: '#f1f3ef',
-          ink: '#27343a',
-          coral: '#e85c44',
-          yellow: '#efc44f',
-          blue: '#6381cd',
-          pale: '#dce4dc'
-        };
-        const colors = [palette.coral, palette.yellow, palette.blue, palette.paper];
+        const BLACK = '#000';
+        const WHITE = '#fff';
 
         let width = 0;
         let height = 0;
         let dpr = 1;
         let seed = 1907;
-        let buildings = [];
-        let bridges = [];
+        let bays = [];
+        let registers = [];
+        let weights = { heavy: 5, medium: 3, fine: 1.5 };
+
+        const DEBUG_SPECIMENS = [
+          { key: 'rectangle', name: 'Rectangle and frame', group: 'Primitive' },
+          { key: 'circle', name: 'Circle', group: 'Primitive' },
+          { key: 'semicircle', name: 'Semicircle', group: 'Primitive' },
+          { key: 'arch', name: 'Arch', group: 'Primitive' },
+          { key: 'triangle', name: 'Triangle', group: 'Primitive' },
+          { key: 'diamond', name: 'Diamond', group: 'Primitive' },
+          { key: 'nested-diamond', name: 'Nested diamond', group: 'Nested motif' },
+          { key: 'roundel-ring', name: 'Concentric roundel', group: 'Nested motif' },
+          { key: 'roundel-diamond', name: 'Diamond roundel', group: 'Nested motif' },
+          { key: 'roundel-flower', name: 'Four-lobed roundel', group: 'Nested motif' },
+          { key: 'roundel-star', name: 'Eight-point roundel', group: 'Nested motif' },
+          { key: 'nested-arch', name: 'Nested arch', group: 'Nested motif' },
+          { key: 'diamond-band', name: 'Diamond register', group: 'Ornamental band' },
+          { key: 'circle-band', name: 'Roundel register', group: 'Ornamental band' },
+          { key: 'checker', name: 'Checker field', group: 'Surface pattern' },
+          { key: 'dots', name: 'Offset dot field', group: 'Surface pattern' },
+          { key: 'colonnade', name: 'Colonnade', group: 'Architectural module' },
+          { key: 'mini-city', name: 'Miniature city', group: 'Architectural module' },
+          { key: 'module-roundel', name: 'Roundel chamber', group: 'Framed chamber' },
+          { key: 'module-roundel-reverse', name: 'Roundel chamber, reversed', group: 'Framed chamber' },
+          { key: 'module-arch', name: 'Arch chamber', group: 'Framed chamber' },
+          { key: 'module-diamond', name: 'Diamond chamber', group: 'Framed chamber' },
+          { key: 'module-checker', name: 'Checker chamber', group: 'Framed chamber' },
+          { key: 'module-dots', name: 'Dot chamber', group: 'Framed chamber' },
+          { key: 'module-city', name: 'Miniature-city chamber', group: 'Framed chamber' },
+          { key: 'module-colonnade', name: 'Colonnade chamber', group: 'Framed chamber' },
+          { key: 'module-split', name: 'Split register chamber', group: 'Framed chamber' },
+          { key: 'module-jewel-stack', name: 'Needle-bay jewel stack', group: 'Framed chamber' },
+          { key: 'cap-triangle', name: 'Triangular roof', group: 'Cap' },
+          { key: 'cap-semicircle', name: 'Semicircular roof', group: 'Cap' },
+          { key: 'cap-stepped', name: 'Stepped roof', group: 'Cap' },
+          { key: 'cap-crenellated', name: 'Crenellated roof', group: 'Cap' },
+          { key: 'cap-pavilion', name: 'Pavilion roof', group: 'Cap' },
+          { key: 'finial-ball', name: 'Ball finial', group: 'Finial' },
+          { key: 'finial-diamond', name: 'Diamond finial', group: 'Finial' },
+          { key: 'finial-flag', name: 'Flag finial', group: 'Finial' },
+          { key: 'bay-broad', name: 'Broad composite bay', group: 'Bay grammar' },
+          { key: 'bay-needle', name: 'Needle composite bay', group: 'Bay grammar' },
+          { key: 'bay-reversed', name: 'Reversed composite bay', group: 'Bay grammar' }
+        ];
 
         function randomFactory(value) {
           return () => {
@@ -88,39 +243,6 @@
           return values[Math.floor(random() * values.length)];
         }
 
-        function snap(value, unit) {
-          return Math.round(value / unit) * unit;
-        }
-
-        function circle(x, y, radius, fill, stroke = null, lineWidth = 0) {
-          ctx.beginPath();
-          ctx.arc(x, y, radius, 0, TAU);
-          if (fill) {
-            ctx.fillStyle = fill;
-            ctx.fill();
-          }
-          if (stroke && lineWidth) {
-            ctx.strokeStyle = stroke;
-            ctx.lineWidth = lineWidth;
-            ctx.stroke();
-          }
-        }
-
-        function flower(x, y, radius, petal, center, stroke) {
-          for (let i = 0; i < 5; i += 1) {
-            const angle = -Math.PI * 0.5 + (i * TAU) / 5;
-            circle(
-              x + Math.cos(angle) * radius * 0.48,
-              y + Math.sin(angle) * radius * 0.48,
-              radius * 0.42,
-              petal,
-              palette.ink,
-              stroke * 0.45
-            );
-          }
-          circle(x, y, radius * 0.32, center, palette.ink, stroke * 0.42);
-        }
-
         function rect(x, y, w, h, fill, stroke = null, lineWidth = 0) {
           if (fill) {
             ctx.fillStyle = fill;
@@ -133,11 +255,9 @@
           }
         }
 
-        function polygon(points, fill, stroke = null, lineWidth = 0) {
+        function circle(x, y, radius, fill, stroke = null, lineWidth = 0) {
           ctx.beginPath();
-          ctx.moveTo(points[0][0], points[0][1]);
-          for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i][0], points[i][1]);
-          ctx.closePath();
+          ctx.arc(x, y, radius, 0, TAU);
           if (fill) {
             ctx.fillStyle = fill;
             ctx.fill();
@@ -158,7 +278,23 @@
           ctx.stroke();
         }
 
-        function arch(x, y, w, h, fill, stroke, lineWidth) {
+        function polygon(points, fill, stroke = null, lineWidth = 0) {
+          ctx.beginPath();
+          ctx.moveTo(points[0][0], points[0][1]);
+          for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i][0], points[i][1]);
+          ctx.closePath();
+          if (fill) {
+            ctx.fillStyle = fill;
+            ctx.fill();
+          }
+          if (stroke && lineWidth) {
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = lineWidth;
+            ctx.stroke();
+          }
+        }
+
+        function archPath(x, y, w, h) {
           const radius = w * 0.5;
           ctx.beginPath();
           ctx.moveTo(x, y + radius);
@@ -166,6 +302,10 @@
           ctx.lineTo(x + w, y + h);
           ctx.lineTo(x, y + h);
           ctx.closePath();
+        }
+
+        function arch(x, y, w, h, fill, stroke = null, lineWidth = 0) {
+          archPath(x, y, w, h);
           ctx.fillStyle = fill;
           ctx.fill();
           if (stroke && lineWidth) {
@@ -175,517 +315,580 @@
           }
         }
 
-        function scallopStrip(x, y, w, h, fill, background, count, stroke) {
-          rect(x, y, w, h, background);
-          const size = w / count;
-          ctx.fillStyle = fill;
-          for (let i = 0; i < count; i += 1) {
-            ctx.beginPath();
-            ctx.arc(x + size * (i + 0.5), y + h * 0.34, size * 0.48, 0, Math.PI);
-            ctx.lineTo(x + size * (i + 1), y + h);
-            ctx.lineTo(x + size * i, y + h);
-            ctx.closePath();
-            ctx.fill();
-          }
-          if (stroke) rect(x, y, w, h, null, palette.ink, stroke);
+        function diamond(x, y, w, h, fill, stroke = null, lineWidth = 0) {
+          polygon([[x, y - h * 0.5], [x + w * 0.5, y], [x, y + h * 0.5], [x - w * 0.5, y]], fill, stroke, lineWidth);
         }
 
-        function drawPattern(panel, motif, a, b, stroke) {
-          const { x, y, w, h } = panel;
-          rect(x, y, w, h, b, palette.ink, stroke);
-          ctx.save();
-          ctx.beginPath();
-          ctx.rect(x + stroke * 0.5, y + stroke * 0.5, w - stroke, h - stroke);
-          ctx.clip();
+        function frame(x, y, w, h, color, lineWidth) {
+          rect(x, y, w, h, null, color, lineWidth);
+        }
 
-          if (motif === 'checker') {
-            const unit = clamp(Math.min(w / 4, h / 6), 6, 18);
-            for (let row = 0; y + row * unit < y + h; row += 1) {
-              for (let col = 0; x + col * unit < x + w; col += 1) {
-                if ((row + col) % 2 === 0) rect(x + col * unit, y + row * unit, unit, unit, a);
-              }
+        function opposite(color) {
+          return color === BLACK ? WHITE : BLACK;
+        }
+
+        function drawNestedDiamond(x, y, size, ink, paper, depth = 3) {
+          for (let i = 0; i < depth; i += 1) {
+            const scale = 1 - i * 0.27;
+            diamond(x, y, size * scale, size * scale, i % 2 === 0 ? ink : paper);
+          }
+        }
+
+        function drawRoundel(x, y, radius, ink, paper, variant) {
+          circle(x, y, radius, ink);
+          circle(x, y, radius * 0.72, paper);
+
+          if (variant % 4 === 0) {
+            circle(x, y, radius * 0.42, ink);
+            circle(x, y, radius * 0.16, paper);
+          } else if (variant % 4 === 1) {
+            drawNestedDiamond(x, y, radius * 1.03, ink, paper, 3);
+          } else if (variant % 4 === 2) {
+            for (let i = 0; i < 4; i += 1) {
+              const angle = Math.PI * 0.25 + (i * TAU) / 4;
+              circle(x + Math.cos(angle) * radius * 0.34, y + Math.sin(angle) * radius * 0.34, radius * 0.2, ink);
             }
-          } else if (motif === 'arches') {
-            const columns = w < 48 ? 1 : 2;
-            const gap = stroke * 1.5;
-            const aw = (w - gap * (columns + 1)) / columns;
-            const rows = Math.max(1, Math.floor(h / (aw * 1.35)));
-            const ah = (h - gap * (rows + 1)) / rows;
-            for (let row = 0; row < rows; row += 1) {
-              for (let col = 0; col < columns; col += 1) {
-                arch(x + gap + col * (aw + gap), y + gap + row * (ah + gap), aw, ah, a, null, 0);
-              }
-            }
-          } else if (motif === 'dots') {
-            const unit = clamp(w / 3.2, 10, 24);
-            const radius = unit * 0.24;
-            for (let row = 0; y + unit * (row + 0.6) < y + h; row += 1) {
-              for (let col = 0; x + unit * (col + 0.55) < x + w; col += 1) {
-                circle(x + unit * (col + 0.55) + (row % 2) * unit * 0.46, y + unit * (row + 0.65), radius, a);
-              }
-            }
-          } else if (motif === 'lozenges') {
-            const unit = clamp(w / 3.1, 11, 25);
-            for (let row = 0; y + row * unit < y + h + unit; row += 1) {
-              for (let col = 0; x + col * unit < x + w + unit; col += 1) {
-                const cx = x + col * unit + (row % 2) * unit * 0.5;
-                const cy = y + row * unit;
-                polygon([[cx, cy - unit * 0.36], [cx + unit * 0.36, cy], [cx, cy + unit * 0.36], [cx - unit * 0.36, cy]], a);
-              }
-            }
-          } else if (motif === 'steps') {
-            const bands = Math.max(3, Math.round(h / 20));
-            const band = h / bands;
-            for (let row = 0; row < bands; row += 1) {
-              const inset = (row % 3) * w * 0.13;
-              rect(x + inset, y + row * band, w - inset * 2, band * 0.48, a);
-            }
-          } else if (motif === 'bricks') {
-            const bw = clamp(w * 0.42, 14, 34);
-            const bh = clamp(bw * 0.46, 8, 16);
-            for (let row = -1; y + row * bh < y + h; row += 1) {
-              const offset = row % 2 ? -bw * 0.5 : 0;
-              for (let col = -1; x + col * bw < x + w; col += 1) {
-                rect(x + col * bw + offset, y + row * bh, bw - stroke, bh - stroke, a);
-              }
-            }
+            circle(x, y, radius * 0.13, paper);
           } else {
-            const bands = Math.max(3, Math.round(w / 13));
-            const band = w / bands;
-            for (let col = 0; col < bands; col += 1) {
-              if (col % 2 === 0) rect(x + col * band, y, band, h, a);
-            }
+            polygon([
+              [x, y - radius * 0.58],
+              [x + radius * 0.2, y - radius * 0.2],
+              [x + radius * 0.58, y],
+              [x + radius * 0.2, y + radius * 0.2],
+              [x, y + radius * 0.58],
+              [x - radius * 0.2, y + radius * 0.2],
+              [x - radius * 0.58, y],
+              [x - radius * 0.2, y - radius * 0.2]
+            ], ink);
+            circle(x, y, radius * 0.13, paper);
           }
-          ctx.restore();
         }
 
-        function makeBuilding(random, index, x, cellWidth, base, previous) {
-          const unit = clamp(cellWidth / 12, 4, 10);
-          const w = snap(cellWidth * (0.82 + random() * 0.16), unit);
-          const bx = snap(x + (cellWidth - w) * random(), unit * 0.5);
-          const independentHeight = height * (0.47 + random() * 0.29);
-          const h = previous
-            ? clamp(previous.h * (0.72 + random() * 0.36) + (independentHeight - previous.h) * 0.58, height * 0.42, height * 0.79)
-            : independentHeight;
-          const top = snap(base - h, unit);
-          const inheritedMotif = previous && random() < 0.58 ? previous.motif : null;
-          const motif = inheritedMotif || choose(random, ['checker', 'arches', 'dots', 'lozenges', 'steps', 'bricks', 'stripes']);
-          const colorIndex = previous ? (previous.colorIndex + 1 + Math.floor(random() * 2)) % 3 : Math.floor(random() * 3);
-          const main = colors[colorIndex];
-          const second = colors[(colorIndex + 1 + Math.floor(random() * 2)) % 3];
-          const side = random() < 0.5 ? -1 : 1;
-          let grammar = (index + Math.floor(random() * 4)) % 5;
-          if (previous && grammar === previous.grammar) grammar = (grammar + 1) % 5;
-          const split = clamp(0.38 + random() * 0.2, 0.38, 0.58);
-          const lowerH = (base - top) * split;
-          const upperScale = grammar === 1 ? 0.88 + random() * 0.18 : grammar === 3 ? 0.38 + random() * 0.18 : 0.52 + random() * 0.28;
-          const upperW = snap(w * upperScale, unit);
-          const upperX = grammar === 1
-            ? bx + (side < 0 ? -unit * 0.7 : w - upperW + unit * 0.7)
-            : side < 0 ? bx + unit * random() : bx + w - upperW - unit * random();
-          const upperH = base - top - lowerH + unit * (1 + Math.floor(random() * 3));
+        function drawArchNest(x, y, w, h, ink, paper, depth = 3) {
+          for (let i = 0; i < depth; i += 1) {
+            const inset = (i * Math.min(w, h)) / 7;
+            arch(x + inset, y + inset, w - inset * 2, h - inset, i % 2 === 0 ? ink : paper);
+          }
+        }
 
-          return {
-            index,
-            x: bx,
-            y: top,
-            w,
-            h: base - top,
-            base,
-            unit,
-            motif,
-            secondaryMotif: choose(random, ['checker', 'arches', 'dots', 'lozenges', 'steps', 'bricks', 'stripes']),
-            colorIndex,
-            main,
-            second,
-            side,
-            grammar,
-            lowerH,
-            upperX,
-            upperW,
-            upperH,
-            roof: Math.floor(random() * 6),
-            attachment: Math.floor(random() * 5),
-            cutout: Math.floor(random() * 4),
-            finial: Math.floor(random() * 4),
-            randomValues: Array.from({ length: 12 }, () => random())
+        function drawDiamondBand(x, y, w, h, ink, paper, variant) {
+          const count = clamp(Math.round(w / Math.max(h * 0.82, 12)), 2, 9);
+          const cell = w / count;
+          rect(x, y, w, h, paper);
+          for (let i = 0; i < count; i += 1) {
+            const cx = x + cell * (i + 0.5);
+            const size = Math.min(cell * 0.72, h * 0.68);
+            if ((i + variant) % 3 === 0) drawNestedDiamond(cx, y + h * 0.5, size, ink, paper, 2);
+            else diamond(cx, y + h * 0.5, size, size, ink);
+          }
+        }
+
+        function drawCircleBand(x, y, w, h, ink, paper, variant) {
+          const count = clamp(Math.round(w / Math.max(h * 0.9, 13)), 2, 8);
+          const cell = w / count;
+          rect(x, y, w, h, paper);
+          for (let i = 0; i < count; i += 1) {
+            const radius = Math.min(cell * 0.34, h * 0.34);
+            drawRoundel(x + cell * (i + 0.5), y + h * 0.5, radius, ink, paper, variant + i);
+          }
+        }
+
+        function drawChecker(x, y, w, h, ink, paper) {
+          const cell = clamp(Math.min(w / 5, h / 5), 5, 18);
+          rect(x, y, w, h, paper);
+          for (let row = 0; y + row * cell < y + h; row += 1) {
+            for (let col = 0; x + col * cell < x + w; col += 1) {
+              if ((row + col) % 2 === 0) rect(x + col * cell, y + row * cell, cell, cell, ink);
+            }
+          }
+        }
+
+        function drawDotField(x, y, w, h, ink, paper) {
+          rect(x, y, w, h, paper);
+          const cell = clamp(w / 4.3, 8, 21);
+          const radius = cell * 0.21;
+          for (let row = 0; y + cell * (row + 0.6) < y + h; row += 1) {
+            for (let col = 0; x + cell * (col + 0.55) < x + w; col += 1) {
+              circle(x + cell * (col + 0.55) + (row % 2) * cell * 0.47, y + cell * (row + 0.62), radius, ink);
+            }
+          }
+        }
+
+        function drawColonnade(x, y, w, h, ink, paper, count) {
+          rect(x, y, w, h, ink);
+          const gap = Math.max(weights.medium, w * 0.035);
+          const archW = (w - gap * (count + 1)) / count;
+          for (let i = 0; i < count; i += 1) {
+            arch(x + gap + i * (archW + gap), y + gap, archW, h + weights.heavy, paper);
+          }
+        }
+
+        function drawMiniatureCity(x, y, w, h, ink, paper, variant) {
+          rect(x, y, w, h, paper);
+          const count = clamp(Math.floor(w / Math.max(h * 0.22, 16)), 3, 6);
+          const gap = w * 0.025;
+          const cell = (w - gap * (count + 1)) / count;
+          for (let i = 0; i < count; i += 1) {
+            const mh = h * (0.42 + ((i + variant) % 3) * 0.13);
+            const mx = x + gap + i * (cell + gap);
+            const my = y + h - mh;
+            rect(mx, my + cell * 0.18, cell, mh - cell * 0.18, ink);
+            if ((i + variant) % 2 === 0) {
+              polygon([[mx, my + cell * 0.2], [mx + cell * 0.5, my - cell * 0.35], [mx + cell, my + cell * 0.2]], ink);
+            } else {
+              ctx.beginPath();
+              ctx.arc(mx + cell * 0.5, my + cell * 0.22, cell * 0.5, Math.PI, 0);
+              ctx.closePath();
+              ctx.fillStyle = ink;
+              ctx.fill();
+            }
+            arch(mx + cell * 0.32, y + h - mh * 0.38, cell * 0.36, mh * 0.38, paper);
+            circle(mx + cell * 0.5, my - cell * 0.35, Math.max(1.4, cell * 0.08), ink);
+          }
+        }
+
+        function drawModule(bay, top, bottom, index) {
+          const x = bay.x;
+          const y = top;
+          const w = bay.w;
+          const h = bottom - top;
+          const fill = (bay.polarity + index) % 2 === 0 ? BLACK : WHITE;
+          const ink = opposite(fill);
+          const pad = clamp(Math.min(w, h) * 0.09, weights.medium * 1.25, 14);
+
+          rect(x, y, w, h + weights.heavy * 0.5, fill, BLACK, weights.heavy);
+
+          const inner = {
+            x: x + pad,
+            y: y + pad,
+            w: Math.max(1, w - pad * 2),
+            h: Math.max(1, h - pad * 2)
           };
-        }
 
-        function buildCity() {
-          const random = randomFactory(seed);
-          const count = width < 500 ? 4 : width < 800 ? 5 : clamp(Math.round(width / 180), 6, 9);
-          const margin = width < 500 ? 5 : clamp(width * 0.018, 10, 30);
-          const usable = width - margin * 2;
-          const cell = usable / count;
-          const base = height * 0.94;
-          buildings = [];
-          bridges = [];
+          if (inner.w < 9 || inner.h < 9) return;
+          const motif = bay.motifs[index % bay.motifs.length];
+          const narrow = w < width * 0.065;
+          const shallow = h < height * 0.13;
 
-          for (let i = 0; i < count; i += 1) {
-            const building = makeBuilding(random, i, margin + i * cell, cell, base, buildings[i - 1]);
-            buildings.push(building);
-            if (i > 0 && random() < 0.48) {
-              const left = buildings[i - 1];
-              bridges.push({
-                left,
-                right: building,
-                level: 0.28 + random() * 0.42,
-                style: Math.floor(random() * 3),
-                color: random() < 0.62 ? left.second : building.main
-              });
+          if (shallow) {
+            if (motif % 2 === 0) drawDiamondBand(inner.x, inner.y, inner.w, inner.h, ink, fill, bay.variant + index);
+            else drawCircleBand(inner.x, inner.y, inner.w, inner.h, ink, fill, bay.variant + index);
+            frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
+            return;
+          }
+
+          if (narrow) {
+            const count = clamp(Math.floor(inner.h / Math.max(inner.w * 0.86, 15)), 1, 7);
+            const cellH = inner.h / count;
+            for (let i = 0; i < count; i += 1) {
+              const cy = inner.y + cellH * (i + 0.5);
+              const size = Math.min(inner.w * 0.62, cellH * 0.62);
+              if ((motif + i) % 3 === 0) drawRoundel(inner.x + inner.w * 0.5, cy, size * 0.5, ink, fill, bay.variant + i);
+              else drawNestedDiamond(inner.x + inner.w * 0.5, cy, size, ink, fill, 3);
             }
-          }
-        }
-
-        function drawSky(random) {
-          ctx.fillStyle = palette.paper;
-          ctx.fillRect(0, 0, width, height);
-
-          const sunR = clamp(Math.min(width, height) * 0.088, 34, 76);
-          circle(width * 0.83, height * 0.13, sunR, palette.yellow, palette.ink, clamp(width * 0.0025, 2, 4));
-
-          const clouds = width < 520 ? 2 : 4;
-          for (let i = 0; i < clouds; i += 1) {
-            const x = width * (0.05 + random() * 0.72);
-            const y = height * (0.09 + random() * 0.2);
-            const size = clamp(width * (0.025 + random() * 0.018), 13, 34);
-            const fill = i % 2 ? palette.pale : palette.paper;
-            circle(x, y, size * 0.55, fill, palette.ink, 2);
-            circle(x + size * 0.62, y - size * 0.22, size * 0.78, fill, palette.ink, 2);
-            circle(x + size * 1.35, y, size * 0.58, fill, palette.ink, 2);
-            rect(x - size * 0.03, y, size * 1.42, size * 0.5, fill);
-            line(x, y + size * 0.48, x + size * 1.35, y + size * 0.48, palette.ink, 2);
+            frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
+            return;
           }
 
-          ctx.lineCap = 'round';
-          for (let i = 0; i < (width < 520 ? 3 : 6); i += 1) {
-            const x = width * (0.08 + random() * 0.8);
-            const y = height * (0.16 + random() * 0.24);
-            const s = 5 + random() * 7;
-            line(x - s, y, x, y - s * 0.48, palette.ink, 2);
-            line(x, y - s * 0.48, x + s, y, palette.ink, 2);
-          }
-          ctx.lineCap = 'butt';
-        }
-
-        function drawAttachment(building, stroke) {
-          const { x, y, w, h, unit, side, attachment, main, second, randomValues } = building;
-          const attachmentW = clamp(w * (0.23 + randomValues[0] * 0.14), unit * 2.5, w * 0.4);
-          const ax = side < 0 ? x - attachmentW * 0.62 : x + w - attachmentW * 0.38;
-          const ay = y + h * (0.37 + randomValues[1] * 0.24);
-          const ah = building.base - ay;
-
-          if (attachment === 0) {
-            arch(ax, ay, attachmentW, ah, second, palette.ink, stroke);
-            circle(ax + attachmentW * 0.5, ay + attachmentW * 0.5, attachmentW * 0.16, palette.paper, palette.ink, stroke * 0.72);
-          } else if (attachment === 1) {
-            rect(ax, ay + unit, attachmentW, ah - unit, second, palette.ink, stroke);
-            polygon([[ax, ay + unit], [ax + attachmentW * 0.52, ay - unit * 1.5], [ax + attachmentW, ay + unit]], main, palette.ink, stroke);
-          } else if (attachment === 2) {
-            rect(ax, ay, attachmentW, ah, palette.paper, palette.ink, stroke);
-            scallopStrip(ax, ay + unit, attachmentW, clamp(unit * 2.4, 14, 30), main, palette.paper, 3, stroke * 0.65);
-          } else if (attachment === 3) {
-            const drumR = attachmentW * 0.5;
-            rect(ax, ay + drumR, attachmentW, ah - drumR, second, palette.ink, stroke);
-            circle(ax + drumR, ay + drumR, drumR, second, palette.ink, stroke);
-            for (let i = 0; i < 3; i += 1) {
-              const angle = -Math.PI * 0.5 + (i * TAU) / 3;
-              circle(ax + drumR + Math.cos(angle) * drumR * 0.38, ay + drumR + Math.sin(angle) * drumR * 0.38, drumR * 0.13, palette.paper);
+          if (motif === 0) {
+            const bandH = inner.h > inner.w * 1.28 ? clamp(inner.h * 0.15, 12, 30) : 0;
+            const fieldH = inner.h - bandH;
+            const radius = Math.min(inner.w, fieldH) * 0.34;
+            drawRoundel(inner.x + inner.w * 0.5, inner.y + fieldH * 0.5, radius, ink, fill, bay.variant + index);
+            if (bandH) {
+              if ((bay.variant + index) % 2 === 0) drawDiamondBand(inner.x, inner.y + fieldH, inner.w, bandH, ink, fill, bay.variant);
+              else drawCircleBand(inner.x, inner.y + fieldH, inner.w, bandH, ink, fill, bay.variant);
             }
+            frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
+          } else if (motif === 1) {
+            const aw = Math.min(inner.w * 0.58, inner.h * 0.64);
+            drawArchNest(inner.x + (inner.w - aw) * 0.5, inner.y + inner.h * 0.1, aw, inner.h * 0.86, ink, fill, 4);
+            frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
+          } else if (motif === 2) {
+            const bandH = inner.h > inner.w * 1.25 ? clamp(inner.h * 0.15, 12, 30) : 0;
+            const fieldH = inner.h - bandH;
+            drawNestedDiamond(inner.x + inner.w * 0.5, inner.y + fieldH * 0.5, Math.min(inner.w, fieldH) * 0.8, ink, fill, 4);
+            if (bandH) drawDiamondBand(inner.x, inner.y + fieldH, inner.w, bandH, ink, fill, bay.variant + index);
+            frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
+          } else if (motif === 3) {
+            drawChecker(inner.x, inner.y, inner.w, inner.h, ink, fill);
+            frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
+          } else if (motif === 4) {
+            drawDotField(inner.x, inner.y, inner.w, inner.h, ink, fill);
+            frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
+          } else if (motif === 5) {
+            const bandH = inner.h > inner.w * 1.05 ? clamp(inner.h * 0.13, 11, 27) : 0;
+            if (bandH) drawDiamondBand(inner.x, inner.y, inner.w, bandH, ink, fill, bay.variant + index);
+            drawMiniatureCity(inner.x, inner.y + bandH, inner.w, inner.h - bandH, ink, fill, bay.variant + index);
+            frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
+          } else if (motif === 6) {
+            const columns = clamp(Math.floor(inner.w / Math.max(inner.h * 0.2, 22)), 2, 5);
+            drawColonnade(inner.x, inner.y, inner.w, inner.h, ink, fill, columns);
+            frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
           } else {
-            rect(ax, ay + unit * 1.5, attachmentW, ah - unit * 1.5, second, palette.ink, stroke);
-            for (let step = 0; step < 3; step += 1) {
-              rect(
-                side < 0 ? ax + step * unit * 0.48 : ax,
-                ay + step * unit * 0.5,
-                attachmentW - step * unit * 0.48,
-                unit * 0.55,
-                main,
-                palette.ink,
-                stroke * 0.45
-              );
-            }
+            const split = inner.h * 0.38;
+            drawCircleBand(inner.x, inner.y, inner.w, split, ink, fill, bay.variant);
+            drawDiamondBand(inner.x, inner.y + split, inner.w, inner.h - split, ink, fill, bay.variant + 1);
+            frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
           }
         }
 
-        function drawRoof(building, stroke) {
-          const { upperX: x, y, upperW: w, unit, roof, main, second } = building;
-          const topY = y + unit * 0.8;
-          if (roof === 0) {
-            polygon([[x, topY], [x + w * 0.35, y - unit * 2.8], [x + w, topY]], second, palette.ink, stroke);
-            circle(x + w * 0.35, y - unit * 3.15, unit * 0.55, palette.coral, palette.ink, stroke * 0.55);
-          } else if (roof === 1) {
+        function drawCap(bay) {
+          const x = bay.x;
+          const y = bay.top;
+          const w = bay.w;
+          const capH = clamp(w * 0.34, 13, height * 0.085);
+          const fill = bay.polarity === 0 ? BLACK : WHITE;
+          const ink = opposite(fill);
+
+          if (bay.cap === 0) {
+            polygon([[x, y], [x + w * 0.5, y - capH], [x + w, y]], fill, BLACK, weights.heavy);
+            polygon([[x + w * 0.27, y - capH * 0.06], [x + w * 0.5, y - capH * 0.58], [x + w * 0.73, y - capH * 0.06]], ink);
+          } else if (bay.cap === 1) {
             ctx.beginPath();
-            ctx.moveTo(x, topY);
-            ctx.arc(x + w * 0.5, topY, w * 0.5, Math.PI, 0);
+            ctx.moveTo(x, y);
+            ctx.arc(x + w * 0.5, y, w * 0.5, Math.PI, 0);
             ctx.closePath();
-            ctx.fillStyle = second;
+            ctx.fillStyle = fill;
             ctx.fill();
-            ctx.strokeStyle = palette.ink;
-            ctx.lineWidth = stroke;
+            ctx.strokeStyle = BLACK;
+            ctx.lineWidth = weights.heavy;
             ctx.stroke();
-            circle(x + w * 0.5, topY - w * 0.5, unit * 0.55, palette.yellow, palette.ink, stroke * 0.5);
-          } else if (roof === 2) {
+            ctx.beginPath();
+            ctx.moveTo(x + w * 0.2, y);
+            ctx.arc(x + w * 0.5, y, w * 0.3, Math.PI, 0);
+            ctx.closePath();
+            ctx.fillStyle = ink;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(x + w * 0.34, y);
+            ctx.arc(x + w * 0.5, y, w * 0.16, Math.PI, 0);
+            ctx.closePath();
+            ctx.fillStyle = fill;
+            ctx.fill();
+          } else if (bay.cap === 2) {
             const steps = 3;
             for (let i = 0; i < steps; i += 1) {
               const inset = i * w * 0.12;
-              rect(x + inset, topY - i * unit * 1.25, w - inset * 2, unit * 1.25, i % 2 ? main : second, palette.ink, stroke * 0.55);
+              rect(x + inset, y - (i + 1) * capH / steps, w - inset * 2, capH / steps + weights.medium, i % 2 === 0 ? fill : ink, BLACK, weights.medium);
             }
-          } else if (roof === 3) {
-            polygon([[x, topY], [x + w * 0.18, y - unit * 2], [x + w * 0.82, y - unit * 2], [x + w, topY]], main, palette.ink, stroke);
-            rect(x + w * 0.38, y - unit * 3.6, w * 0.24, unit * 1.6, second, palette.ink, stroke * 0.65);
-          } else if (roof === 4) {
-            rect(x, topY - unit * 1.2, w, unit * 1.2, second, palette.ink, stroke);
-            const teeth = 4;
+          } else if (bay.cap === 3) {
+            rect(x, y - capH * 0.42, w, capH * 0.42, fill, BLACK, weights.heavy);
+            const teeth = clamp(Math.floor(w / Math.max(capH * 0.35, 12)), 2, 6);
             for (let i = 0; i < teeth; i += 1) {
-              rect(x + (i * w) / teeth, topY - unit * 2.15, w / teeth * 0.55, unit, main, palette.ink, stroke * 0.45);
+              const tw = w / teeth;
+              rect(x + i * tw, y - capH, tw * 0.56, capH * 0.58, fill, BLACK, weights.medium);
             }
           } else {
-            polygon([[x, topY], [x + w * 0.5, y - unit * 2.6], [x + w, topY], [x + w * 0.72, topY], [x + w * 0.5, y - unit * 0.8], [x + w * 0.28, topY]], second, palette.ink, stroke);
+            polygon([[x, y], [x + w * 0.16, y - capH * 0.62], [x + w * 0.84, y - capH * 0.62], [x + w, y]], fill, BLACK, weights.heavy);
+            rect(x + w * 0.37, y - capH * 1.18, w * 0.26, capH * 0.56, ink, BLACK, weights.medium);
+            rect(x + w * 0.44, y - capH * 1.02, w * 0.12, capH * 0.38, fill);
+          }
+
+          if (bay.finial !== 0) {
+            const fx = x + w * bay.finialX;
+            const capTop = bay.cap === 4 ? y - capH * 1.18 : y - capH;
+            const pole = clamp(height * (0.045 + bay.variant * 0.002), 20, 56);
+            line(fx, capTop, fx, capTop - pole, BLACK, weights.medium);
+
+            if (bay.finial === 1) {
+              circle(fx, capTop - pole, clamp(w * 0.045, 3, 8), BLACK);
+            } else if (bay.finial === 2) {
+              diamond(fx, capTop - pole, clamp(w * 0.11, 7, 15), clamp(w * 0.15, 9, 19), BLACK);
+            } else {
+              const flagW = clamp(w * 0.38, 18, 48);
+              const flagH = clamp(flagW * 0.42, 8, 20);
+              polygon([[fx, capTop - pole], [fx + flagW, capTop - pole], [fx + flagW * 0.72, capTop - pole + flagH * 0.5], [fx + flagW, capTop - pole + flagH], [fx, capTop - pole + flagH]], BLACK);
+            }
           }
         }
 
-        function drawFinial(building, stroke) {
-          const { upperX, upperW, y, unit, finial, main, second, side } = building;
-          const x = upperX + upperW * (side < 0 ? 0.72 : 0.28);
-          const top = y - unit * (finial === 3 ? 5.2 : 3.5);
-          line(x, y - unit * 0.8, x, top, palette.ink, stroke * 0.65);
-          if (finial === 0) {
-            circle(x, top, unit * 0.62, palette.coral, palette.ink, stroke * 0.5);
-          } else if (finial === 1) {
-            polygon([[x, top - unit * 0.8], [x + unit * 0.75, top], [x, top + unit * 0.8], [x - unit * 0.75, top]], second, palette.ink, stroke * 0.48);
-          } else if (finial === 2) {
-            circle(x, top + unit * 0.55, unit * 0.5, main, palette.ink, stroke * 0.45);
-            circle(x, top - unit * 0.4, unit * 0.34, palette.yellow, palette.ink, stroke * 0.4);
-          } else {
-            for (let i = 0; i < 3; i += 1) circle(x, top + i * unit * 0.95, unit * (0.32 + i * 0.08), i === 1 ? second : main, palette.ink, stroke * 0.38);
+        function drawBay(bay) {
+          const boundaries = [bay.top, ...registers.filter(value => value > bay.top + weights.heavy && value < height), height + weights.heavy];
+          let moduleIndex = 0;
+          let i = 0;
+
+          while (i < boundaries.length - 1) {
+            let span = 1;
+            const available = boundaries.length - 1 - i;
+            if (available > 1 && bay.w > width * 0.085 && (bay.variant + i) % 4 === 0) span = 2;
+            const bottom = boundaries[Math.min(i + span, boundaries.length - 1)];
+            drawModule(bay, boundaries[i], bottom, moduleIndex);
+            moduleIndex += 1;
+            i += span;
           }
+
+          drawCap(bay);
         }
 
-        function drawCutout(building, stroke) {
-          const { x, w, base, unit, cutout, main, second, randomValues } = building;
-          const doorW = clamp(w * (0.22 + randomValues[2] * 0.16), unit * 2, w * 0.42);
-          const dx = x + unit + randomValues[3] * Math.max(unit, w - doorW - unit * 2);
-          const doorH = clamp(unit * (3.8 + randomValues[4] * 3), 24, building.h * 0.23);
+        function showDebugCatalog() {
+          const catalog = document.getElementById('debug-catalog');
+          const grid = document.getElementById('debug-grid');
+          const count = document.getElementById('debug-count');
+          const specimens = [];
 
-          if (cutout === 0) {
-            arch(dx, base - doorH, doorW, doorH + stroke, palette.paper, palette.ink, stroke);
-          } else if (cutout === 1) {
-            rect(dx, base - doorH, doorW, doorH, palette.paper, palette.ink, stroke);
-            rect(dx + doorW * 0.24, base - doorH * 0.76, doorW * 0.52, doorH * 0.76, second);
-          } else if (cutout === 2) {
-            const columns = 3;
-            for (let i = 0; i < columns; i += 1) {
-              arch(dx + (i * doorW) / columns, base - doorH, doorW / columns, doorH, i === 1 ? main : palette.paper, palette.ink, stroke * 0.5);
-            }
+          document.documentElement.classList.add('debug-mode');
+          document.body.classList.add('debug-mode');
+          catalog.hidden = false;
+          count.textContent = `${DEBUG_SPECIMENS.length} specimens`;
+
+          DEBUG_SPECIMENS.forEach((spec, index) => {
+            const figure = document.createElement('figure');
+            const specimenCanvas = document.createElement('canvas');
+            const caption = document.createElement('figcaption');
+            const number = document.createElement('span');
+            const copy = document.createElement('span');
+            const name = document.createElement('strong');
+            const group = document.createElement('span');
+            const labelId = `debug-shape-${index + 1}`;
+
+            figure.className = 'debug-specimen';
+            specimenCanvas.className = 'debug-specimen-canvas';
+            specimenCanvas.setAttribute('aria-hidden', 'true');
+            caption.className = 'debug-caption';
+            caption.id = labelId;
+            number.className = 'debug-number';
+            number.textContent = String(index + 1).padStart(2, '0');
+            name.className = 'debug-name';
+            name.textContent = spec.name;
+            group.className = 'debug-group';
+            group.textContent = spec.group;
+            copy.append(name, group);
+            caption.append(number, copy);
+            figure.setAttribute('aria-labelledby', labelId);
+            figure.append(specimenCanvas, caption);
+            grid.append(figure);
+            specimens.push({ canvas: specimenCanvas, spec });
+          });
+
+          let renderFrame = 0;
+          const scheduleRender = () => {
+            cancelAnimationFrame(renderFrame);
+            renderFrame = requestAnimationFrame(() => {
+              specimens.forEach(renderDebugSpecimen);
+            });
+          };
+
+          if ('ResizeObserver' in window) {
+            const observer = new ResizeObserver(scheduleRender);
+            observer.observe(grid);
           } else {
-            polygon([[dx, base], [dx, base - doorH * 0.55], [dx + doorW * 0.5, base - doorH], [dx + doorW, base - doorH * 0.55], [dx + doorW, base]], palette.paper, palette.ink, stroke);
+            addEventListener('resize', scheduleRender, { passive: true });
           }
+          scheduleRender();
         }
 
-        function drawBuilding(building) {
-          const { x, y, w, h, base, unit, motif, secondaryMotif, main, second, side, grammar, randomValues } = building;
-          const stroke = clamp(width * 0.0026, 2.25, 4.5);
-          const inset = unit * 0.78;
-
-          if (grammar !== 2 && grammar !== 4) drawAttachment(building, stroke);
-
-          if (grammar === 0) {
-            const lowerY = base - building.lowerH;
-            rect(x, lowerY, w, building.lowerH, main, palette.ink, stroke);
-            drawPattern(
-              { x: x + inset, y: lowerY + inset, w: w - inset * 2, h: Math.max(unit * 3, building.lowerH - inset * 2 - unit * 2.2) },
-              motif,
-              second,
-              palette.paper,
-              stroke * 0.68
-            );
-
-            const upperBottom = lowerY + unit * (1 + randomValues[5]);
-            const upperY = upperBottom - building.upperH;
-            rect(building.upperX, upperY, building.upperW, building.upperH, second, palette.ink, stroke);
-            const panelW = Math.max(unit * 2.2, building.upperW - unit * 1.6);
-            const panelH = Math.max(unit * 3, building.upperH * (0.34 + randomValues[6] * 0.2));
-            drawPattern(
-              { x: building.upperX + (building.upperW - panelW) * 0.5, y: upperY + unit * 2.1, w: panelW, h: panelH },
-              secondaryMotif,
-              main,
-              palette.paper,
-              stroke * 0.62
-            );
-            const balconyY = upperY + panelH + unit * (3 + randomValues[7]);
-            line(building.upperX - unit * 0.5, balconyY, building.upperX + building.upperW + unit * 0.5, balconyY, palette.ink, stroke * 1.15);
-            const beadCount = clamp(Math.floor(building.upperW / (unit * 1.6)), 2, 6);
-            for (let i = 0; i < beadCount; i += 1) {
-              const bx = building.upperX + ((i + 0.5) * building.upperW) / beadCount;
-              circle(bx, balconyY + unit * 0.75, unit * 0.28, i % 2 ? palette.yellow : palette.coral, palette.ink, stroke * 0.4);
-            }
-            drawRoof({ ...building, y: upperY }, stroke);
-            drawFinial({ ...building, y: upperY }, stroke);
-            drawCutout(building, stroke);
-          } else if (grammar === 1) {
-            const tierHeights = [h * 0.38, h * 0.29, h * 0.23];
-            const tierWidths = [w, w * 0.78, w * 0.53];
-            const shifts = [0, side < 0 ? -unit * 0.45 : w - tierWidths[1] + unit * 0.45, side < 0 ? w * 0.08 : w - tierWidths[2] - w * 0.08];
-            let currentY = base;
-            for (let i = 0; i < 3; i += 1) {
-              currentY -= tierHeights[i];
-              const tx = x + shifts[i];
-              const fill = i === 0 ? main : i === 1 ? second : colors[(building.colorIndex + 2) % 3];
-              rect(tx, currentY, tierWidths[i], tierHeights[i] + stroke, fill, palette.ink, stroke);
-              if (i === 0) {
-                drawPattern({ x: tx + inset, y: currentY + inset, w: tierWidths[i] - inset * 2, h: tierHeights[i] - inset * 2 }, motif, second, palette.paper, stroke * 0.62);
-              } else if (i === 1) {
-                scallopStrip(tx + inset * 0.7, currentY + inset, tierWidths[i] - inset * 1.4, unit * 2.7, main, palette.paper, 4, stroke * 0.56);
-                const slots = 3;
-                for (let slot = 0; slot < slots; slot += 1) {
-                  arch(tx + unit + (slot * (tierWidths[i] - unit * 2)) / slots, currentY + unit * 4.3, (tierWidths[i] - unit * 2.8) / slots, tierHeights[i] - unit * 5, palette.paper, palette.ink, stroke * 0.48);
-                }
-              } else {
-                circle(tx + tierWidths[i] * 0.5, currentY + tierHeights[i] * 0.5, Math.min(tierWidths[i], tierHeights[i]) * 0.23, palette.paper, palette.ink, stroke * 0.7);
-                circle(tx + tierWidths[i] * 0.5, currentY + tierHeights[i] * 0.5, unit * 0.5, main);
-              }
-            }
-            const roofBuilding = { ...building, upperX: x + shifts[2], upperW: tierWidths[2], y: currentY };
-            drawRoof(roofBuilding, stroke);
-            drawFinial(roofBuilding, stroke);
-            drawCutout(building, stroke);
-          } else if (grammar === 2) {
-            const plinthH = h * 0.25;
-            rect(x, base - plinthH, w, plinthH, main, palette.ink, stroke);
-            scallopStrip(x + inset, base - plinthH + inset, w - inset * 2, unit * 2.8, second, palette.paper, 5, stroke * 0.55);
-
-            const gap = unit * 1.25;
-            const leftW = w * (0.43 + randomValues[0] * 0.08);
-            const rightW = w - leftW - gap;
-            const leftH = h * (0.66 + randomValues[1] * 0.18);
-            const rightH = h * (0.52 + randomValues[2] * 0.2);
-            const lx = x;
-            const rx = x + leftW + gap;
-            const ly = base - plinthH - leftH;
-            const ry = base - plinthH - rightH;
-            rect(lx, ly, leftW, leftH, second, palette.ink, stroke);
-            rect(rx, ry, rightW, rightH, colors[(building.colorIndex + 2) % 3], palette.ink, stroke);
-            drawPattern({ x: lx + inset, y: ly + inset * 1.3, w: leftW - inset * 2, h: leftH * 0.48 }, motif, main, palette.paper, stroke * 0.58);
-            drawPattern({ x: rx + inset * 0.7, y: ry + inset * 1.2, w: rightW - inset * 1.4, h: rightH * 0.57 }, secondaryMotif, second, palette.paper, stroke * 0.56);
-
-            const bridgeY = Math.max(ly, ry) + Math.min(leftH, rightH) * 0.36;
-            arch(lx + leftW * 0.58, bridgeY, rx + rightW * 0.42 - (lx + leftW * 0.58), unit * 4.2, palette.yellow, palette.ink, stroke);
-            const leftRoof = { ...building, upperX: lx, upperW: leftW, y: ly, roof: (building.roof + 1) % 6 };
-            const rightRoof = { ...building, upperX: rx, upperW: rightW, y: ry, roof: (building.roof + 4) % 6, finial: (building.finial + 2) % 4 };
-            drawRoof(leftRoof, stroke);
-            drawRoof(rightRoof, stroke);
-            drawFinial(side < 0 ? leftRoof : rightRoof, stroke);
-            drawCutout(building, stroke);
-          } else if (grammar === 3) {
-            const modules = 4;
-            let moduleBottom = base;
-            let previousX = x + w * 0.12;
-            for (let i = 0; i < modules; i += 1) {
-              const mh = h * (i === 0 ? 0.27 : 0.19 + randomValues[i] * 0.035);
-              const mw = w * (i === 0 ? 0.82 : 0.56 + randomValues[i + 4] * 0.28);
-              const drift = (i % 2 === 0 ? -1 : 1) * w * (0.06 + randomValues[i + 7] * 0.06);
-              const mx = clamp(previousX + drift, x - unit * 0.6, x + w - mw + unit * 0.6);
-              moduleBottom -= mh;
-              const fill = colors[(building.colorIndex + i) % 3];
-              rect(mx, moduleBottom, mw, mh + stroke, fill, palette.ink, stroke);
-              if (i === 0 || i === 2) {
-                drawPattern({ x: mx + inset * 0.72, y: moduleBottom + inset * 0.72, w: mw - inset * 1.44, h: mh - inset * 1.44 }, i === 0 ? motif : secondaryMotif, colors[(building.colorIndex + i + 1) % 3], palette.paper, stroke * 0.55);
-              } else {
-                const bloom = Math.min(mw, mh) * 0.2;
-                flower(mx + mw * (i % 3 === 0 ? 0.68 : 0.34), moduleBottom + mh * 0.5, bloom, palette.paper, second, stroke);
-                rect(mx + mw * 0.73, moduleBottom + mh * 0.28, unit * 0.8, unit * 0.8, palette.yellow, palette.ink, stroke * 0.42);
-              }
-              previousX = mx;
-            }
-            const topBuilding = { ...building, upperX: previousX, upperW: w * 0.58, y: moduleBottom };
-            drawRoof(topBuilding, stroke);
-            drawFinial(topBuilding, stroke);
-            drawCutout(building, stroke);
-          } else {
-            const bodyTop = base - h * 0.64;
-            rect(x, bodyTop, w, base - bodyTop, main, palette.ink, stroke);
-            const passageW = w * (0.36 + randomValues[0] * 0.12);
-            const passageX = x + (w - passageW) * (0.38 + randomValues[1] * 0.24);
-            arch(passageX, base - h * 0.34, passageW, h * 0.34 + stroke, palette.paper, palette.ink, stroke);
-
-            const leftPanelW = passageX - x - inset * 1.4;
-            const rightPanelX = passageX + passageW + inset * 0.4;
-            const rightPanelW = x + w - rightPanelX - inset;
-            if (leftPanelW > unit * 2) drawPattern({ x: x + inset, y: bodyTop + inset, w: leftPanelW, h: h * 0.24 }, motif, second, palette.paper, stroke * 0.55);
-            if (rightPanelW > unit * 2) drawPattern({ x: rightPanelX, y: bodyTop + h * 0.14, w: rightPanelW, h: h * 0.27 }, secondaryMotif, palette.yellow, palette.paper, stroke * 0.55);
-
-            const pavilionW = w * (0.48 + randomValues[2] * 0.18);
-            const pavilionX = side < 0 ? x + unit * 0.5 : x + w - pavilionW - unit * 0.5;
-            const pavilionH = h * 0.29;
-            const pavilionY = bodyTop - pavilionH + unit;
-            rect(pavilionX, pavilionY, pavilionW, pavilionH, second, palette.ink, stroke);
-            scallopStrip(pavilionX + inset * 0.7, pavilionY + inset, pavilionW - inset * 1.4, unit * 2.6, main, palette.paper, 4, stroke * 0.52);
-            const roofBuilding = { ...building, upperX: pavilionX, upperW: pavilionW, y: pavilionY };
-            drawRoof(roofBuilding, stroke);
-            drawFinial(roofBuilding, stroke);
-
-            const drumR = clamp(unit * 1.7, 10, 20);
-            const drumX = side < 0 ? x + w - drumR * 0.45 : x + drumR * 0.45;
-            const drumY = bodyTop + h * 0.19;
-            flower(drumX, drumY, drumR * 0.82, palette.yellow, palette.coral, stroke);
-          }
-
-          if (building.index % 3 === 1) {
-            const podR = clamp(unit * 1.25, 7, 14);
-            const podX = side < 0 ? x + w - podR * 1.3 : x + podR * 1.3;
-            const podY = base - h * 0.28;
-            flower(podX, podY, podR * 0.8, palette.yellow, palette.blue, stroke);
-          }
+        function debugBay(x, w, polarity, motifs, cap = 0, finial = 0, variant = 3) {
+          return {
+            index: 0,
+            x,
+            w,
+            top: height * 0.2,
+            polarity,
+            cap,
+            finial,
+            finialX: 0.5,
+            motifs,
+            variant
+          };
         }
 
-        function drawBridge(bridge) {
-          const { left, right, level, style, color } = bridge;
-          const stroke = clamp(width * 0.0022, 2, 4);
-          const x1 = left.x + left.w - left.unit * 0.5;
-          const x2 = right.x + right.unit * 0.5;
-          if (x2 <= x1) return;
-          const y = Math.min(left.base - left.h * level, right.base - right.h * level);
-          const h = clamp(Math.min(left.unit, right.unit) * 1.8, 10, 21);
+        function renderDebugSpecimen(specimen) {
+          const bounds = specimen.canvas.getBoundingClientRect();
+          const cssWidth = Math.max(1, Math.round(bounds.width));
+          const cssHeight = Math.max(1, Math.round(bounds.height));
+          const pixelRatio = Math.min(2, devicePixelRatio || 1);
+          const specimenCtx = specimen.canvas.getContext('2d', { alpha: false });
+          const previous = { ctx, width, height, dpr, weights, registers };
 
-          if (style === 0) {
-            rect(x1, y, x2 - x1, h, color, palette.ink, stroke);
-            const count = Math.max(2, Math.floor((x2 - x1) / (h * 0.8)));
-            for (let i = 0; i < count; i += 1) {
-              circle(x1 + ((i + 0.5) * (x2 - x1)) / count, y + h * 0.5, h * 0.18, palette.paper);
-            }
-          } else if (style === 1) {
-            line(x1, y, x2, y, palette.ink, stroke);
-            line(x1, y + h, x2, y + h, palette.ink, stroke);
-            const count = Math.max(2, Math.floor((x2 - x1) / h));
-            for (let i = 0; i <= count; i += 1) {
-              const x = x1 + (i * (x2 - x1)) / count;
-              line(x, y, x, y + h, i % 2 ? palette.coral : palette.blue, stroke * 1.35);
-            }
-          } else {
+          specimen.canvas.width = Math.round(cssWidth * pixelRatio);
+          specimen.canvas.height = Math.round(cssHeight * pixelRatio);
+          specimenCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+          specimenCtx.fillStyle = WHITE;
+          specimenCtx.fillRect(0, 0, cssWidth, cssHeight);
+          specimenCtx.lineJoin = 'miter';
+          specimenCtx.lineCap = 'butt';
+
+          ctx = specimenCtx;
+          width = cssWidth;
+          height = cssHeight;
+          dpr = pixelRatio;
+          weights = {
+            heavy: clamp(Math.min(width, height) / 75, 3, 5),
+            medium: clamp(Math.min(width, height) / 135, 1.8, 3),
+            fine: clamp(Math.min(width, height) / 250, 1, 1.8)
+          };
+          registers = [0.36, 0.57, 0.77].map(value => Math.round(height * value));
+
+          const pad = clamp(Math.min(width, height) * 0.075, 15, 26);
+          const x = pad;
+          const y = pad;
+          const w = width - pad * 2;
+          const h = height - pad * 2;
+          const cx = width * 0.5;
+          const cy = height * 0.5;
+          const size = Math.min(w, h) * 0.66;
+          const key = specimen.spec.key;
+
+          if (key === 'rectangle') {
+            rect(cx - size * 0.5, cy - size * 0.36, size, size * 0.72, BLACK);
+            frame(cx - size * 0.34, cy - size * 0.22, size * 0.68, size * 0.44, WHITE, weights.medium);
+          } else if (key === 'circle') {
+            circle(cx, cy, size * 0.42, BLACK);
+          } else if (key === 'semicircle') {
             ctx.beginPath();
-            ctx.moveTo(x1, y);
-            ctx.quadraticCurveTo((x1 + x2) * 0.5, y + h * 1.4, x2, y);
-            ctx.strokeStyle = palette.ink;
-            ctx.lineWidth = stroke;
-            ctx.stroke();
-            const count = 3;
-            for (let i = 1; i <= count; i += 1) {
-              const x = x1 + (i * (x2 - x1)) / (count + 1);
-              const drop = h * (0.7 + (i % 2) * 0.55);
-              line(x, y + h * 0.45, x, y + drop, palette.ink, stroke * 0.55);
-              circle(x, y + drop + h * 0.25, h * 0.24, i % 2 ? palette.yellow : color, palette.ink, stroke * 0.4);
-            }
+            ctx.moveTo(cx - size * 0.5, cy + size * 0.18);
+            ctx.arc(cx, cy + size * 0.18, size * 0.5, Math.PI, 0);
+            ctx.closePath();
+            ctx.fillStyle = BLACK;
+            ctx.fill();
+          } else if (key === 'arch') {
+            arch(cx - size * 0.34, cy - size * 0.48, size * 0.68, size * 0.96, BLACK);
+          } else if (key === 'triangle') {
+            polygon([[cx, cy - size * 0.48], [cx + size * 0.5, cy + size * 0.38], [cx - size * 0.5, cy + size * 0.38]], BLACK);
+          } else if (key === 'diamond') {
+            diamond(cx, cy, size, size, BLACK);
+          } else if (key === 'nested-diamond') {
+            drawNestedDiamond(cx, cy, size, BLACK, WHITE, 4);
+          } else if (key.startsWith('roundel-')) {
+            const variant = ['roundel-ring', 'roundel-diamond', 'roundel-flower', 'roundel-star'].indexOf(key);
+            drawRoundel(cx, cy, size * 0.48, BLACK, WHITE, variant);
+          } else if (key === 'nested-arch') {
+            drawArchNest(cx - size * 0.38, cy - size * 0.5, size * 0.76, size, BLACK, WHITE, 4);
+          } else if (key === 'diamond-band') {
+            drawDiamondBand(x, cy - h * 0.14, w, h * 0.28, BLACK, WHITE, 2);
+            frame(x, cy - h * 0.14, w, h * 0.28, BLACK, weights.medium);
+          } else if (key === 'circle-band') {
+            drawCircleBand(x, cy - h * 0.14, w, h * 0.28, BLACK, WHITE, 1);
+            frame(x, cy - h * 0.14, w, h * 0.28, BLACK, weights.medium);
+          } else if (key === 'checker') {
+            drawChecker(x, y, w, h, BLACK, WHITE);
+            frame(x, y, w, h, BLACK, weights.heavy);
+          } else if (key === 'dots') {
+            drawDotField(x, y, w, h, BLACK, WHITE);
+            frame(x, y, w, h, BLACK, weights.heavy);
+          } else if (key === 'colonnade') {
+            drawColonnade(x, y, w, h, BLACK, WHITE, 4);
+            frame(x, y, w, h, BLACK, weights.heavy);
+          } else if (key === 'mini-city') {
+            drawMiniatureCity(x, y, w, h, BLACK, WHITE, 2);
+            frame(x, y, w, h, BLACK, weights.heavy);
+          } else if (key.startsWith('module-')) {
+            const motifByKey = {
+              'module-roundel': 0,
+              'module-roundel-reverse': 0,
+              'module-arch': 1,
+              'module-diamond': 2,
+              'module-checker': 3,
+              'module-dots': 4,
+              'module-city': 5,
+              'module-colonnade': 6,
+              'module-split': 7,
+              'module-jewel-stack': 2
+            };
+            const narrow = key === 'module-jewel-stack';
+            const moduleW = narrow ? w * 0.34 : w;
+            const moduleX = cx - moduleW * 0.5;
+            const polarity = key === 'module-roundel-reverse' ? 1 : 0;
+            const bay = debugBay(moduleX, moduleW, polarity, [motifByKey[key]], 0, 0, 5);
+            drawModule(bay, y, height - pad, 0);
+          } else if (key.startsWith('cap-') || key.startsWith('finial-')) {
+            const capKeys = ['cap-triangle', 'cap-semicircle', 'cap-stepped', 'cap-crenellated', 'cap-pavilion'];
+            const finialKeys = ['finial-ball', 'finial-diamond', 'finial-flag'];
+            const cap = key.startsWith('cap-') ? capKeys.indexOf(key) : 0;
+            const finial = key.startsWith('finial-') ? finialKeys.indexOf(key) + 1 : 0;
+            const bayW = w * 0.64;
+            const bayX = cx - bayW * 0.5;
+            const bay = debugBay(bayX, bayW, 0, [0], cap, finial, 4);
+            bay.top = height * 0.5;
+            rect(bayX, bay.top, bayW, height - bay.top - pad, BLACK, BLACK, weights.heavy);
+            drawCap(bay);
+          } else if (key.startsWith('bay-')) {
+            const needle = key === 'bay-needle';
+            const bayW = needle ? w * 0.3 : w * 0.72;
+            const bayX = cx - bayW * 0.5;
+            const polarity = key === 'bay-reversed' ? 1 : 0;
+            const bay = debugBay(bayX, bayW, polarity, needle ? [2, 0, 1, 2] : [5, 0, 7, 6], needle ? 3 : 1, needle ? 2 : 3, 7);
+            bay.top = height * 0.18;
+            drawBay(bay);
           }
+
+          ctx = previous.ctx;
+          width = previous.width;
+          height = previous.height;
+          dpr = previous.dpr;
+          weights = previous.weights;
+          registers = previous.registers;
+        }
+
+        function makeBays() {
+          const random = randomFactory(seed);
+          const target = width < 520 ? 6 : width < 900 ? 9 : clamp(Math.round(width / 105), 11, 16);
+          const rawWidths = [];
+          const widthChoices = width < 520 ? [5, 7, 9, 12] : [4, 6, 8, 11, 14];
+
+          for (let i = 0; i < target; i += 1) {
+            let value = choose(random, widthChoices);
+            if (i > 0 && rawWidths[i - 1] <= 5) value = choose(random, [8, 11, 14]);
+            if (i > 0 && rawWidths[i - 1] >= 11) value = choose(random, [4, 6, 8]);
+            rawWidths.push(value);
+          }
+
+          const total = rawWidths.reduce((sum, value) => sum + value, 0);
+          const motifPool = Array.from({ length: 8 }, (_, index) => index);
+          bays = [];
+          let x = 0;
+          let previousMotifs = null;
+
+          rawWidths.forEach((raw, index) => {
+            const w = index === rawWidths.length - 1 ? width - x : (raw / total) * width;
+            const topOnRegister = random() < 0.12;
+            const top = topOnRegister
+              ? registers[0]
+              : clamp(height * (0.045 + random() * 0.12), weights.heavy * 1.5, height * 0.18);
+            const motifs = [];
+
+            for (let m = 0; m < 6; m += 1) {
+              if (previousMotifs && random() < 0.54) motifs.push(previousMotifs[(m + index) % previousMotifs.length]);
+              else motifs.push(choose(random, motifPool));
+            }
+
+            const bay = {
+              index,
+              x,
+              w,
+              top,
+              polarity: index === 0 ? Math.floor(random() * 2) : 1 - bays[index - 1].polarity,
+              cap: Math.floor(random() * 5),
+              finial: random() < 0.16 ? 0 : 1 + Math.floor(random() * 3),
+              finialX: random() < 0.72 ? 0.5 : random() < 0.5 ? 0.28 : 0.72,
+              motifs,
+              variant: Math.floor(random() * 17)
+            };
+
+            bays.push(bay);
+            previousMotifs = motifs;
+            x += w;
+          });
+        }
+
+        function build() {
+          weights = {
+            heavy: clamp(Math.min(width, height) / 145, 3.25, 7.5),
+            medium: clamp(Math.min(width, height) / 260, 1.8, 4.2),
+            fine: clamp(Math.min(width, height) / 480, 1, 2.3)
+          };
+          registers = [0.265, 0.455, 0.64, 0.805].map(value => Math.round(height * value));
+          makeBays();
         }
 
         function draw() {
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          const random = randomFactory(seed + 808);
-          drawSky(random);
-          buildings.forEach(drawBuilding);
-          bridges.forEach(drawBridge);
+          ctx.fillStyle = WHITE;
+          ctx.fillRect(0, 0, width, height);
+          ctx.lineJoin = 'miter';
+          ctx.lineCap = 'butt';
+          bays.forEach(drawBay);
         }
 
         function resize() {
@@ -696,26 +899,29 @@
           canvas.height = Math.round(height * dpr);
           canvas.style.width = `${width}px`;
           canvas.style.height = `${height}px`;
-          buildCity();
+          build();
           draw();
         }
 
         function rebuild() {
           seed = Math.floor(Math.random() * 1000000) + 1;
-          buildCity();
+          build();
           draw();
         }
 
-        canvas.addEventListener('click', rebuild);
-        canvas.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            rebuild();
-          }
-        });
-        addEventListener('resize', resize, { passive: true });
-
-        resize();
+        if (DEBUG_MODE) {
+          showDebugCatalog();
+        } else {
+          canvas.addEventListener('click', rebuild);
+          canvas.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              rebuild();
+            }
+          });
+          addEventListener('resize', resize, { passive: true });
+          resize();
+        }
       })();
     </script>
   </body>

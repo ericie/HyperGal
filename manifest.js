@@ -219,7 +219,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A playful city of intricate modular buildings assembled from simple blocks, arches, circles, stairs, domes, tiles, and repeating patterns. Every building is unique while borrowing colors and facade motifs from its neighbors.",
+      "description": "A dense edge-to-edge black-and-white architecture built on a shared grid. Wide chambers and needle-thin towers repeat nested arches, circles, diamonds, miniature buildings, flags, and colonnades through alternating solid mass and carved negative space.",
       "updated": "2026-08-17"
     },
     {
@@ -312,7 +312,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "nature",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "Nine still, finely pixelated fields include zebra, leopard, ocelot, tiger, giraffe, fawn, Gaboon viper, woodland, and desert camouflage. A shuffled cycle leads each palette shift into a hard-edged distance-field morph that splits, merges, expands, and contracts each region into the next pattern.",
+      "description": "Nine still, finely pixelated fields include zebra, leopard, ocelot, tiger, giraffe, fawn, crocodile, woodland, and desert camouflage. A shuffled cycle synchronizes each palette shift with a hard-edged distance-field morph that splits, merges, expands, and contracts each region into the next pattern.",
       "updated": "2026-08-17"
     },
     {
@@ -372,7 +372,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A top-down dry garden arranges five, seven, or nine contour-drawn stones by ma, asymmetry, triangular grouping, natural character, and borrowed scenery, then rakes samon through the open gravel between them."
+      "description": "A reduced top-down dry-garden study surrounds one contour-drawn stone with nested, non-crossing samon."
     }
   ]
 };

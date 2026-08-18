@@ -175,29 +175,6 @@
         border-top: 1px solid var(--rule);
       }
 
-      .odd-count {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 3px;
-        padding: 4px 0 8px;
-      }
-
-      .count-button {
-        min-height: 28px;
-        padding: 4px;
-        border: 1px solid var(--ink);
-        border-radius: 0;
-        background: transparent;
-        color: var(--ink);
-        font: 700 10px/1 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-        cursor: pointer;
-      }
-
-      .count-button[aria-pressed="true"] {
-        background: var(--ink);
-        color: var(--panel);
-      }
-
       .range-row {
         --progress: 50%;
         display: grid;
@@ -292,7 +269,7 @@
       id="garden"
       tabindex="0"
       role="img"
-      aria-label="A top-down Zen dry garden. Contour-drawn rocks sit in asymmetric odd-numbered groups while fine samon rake lines bend through the open gravel."
+      aria-label="A top-down dry garden with one contour-drawn rock surrounded by nested, evenly spaced samon furrows."
     ></canvas>
 
     <aside class="garden-panel" aria-label="Dry garden composition controls">
@@ -308,40 +285,7 @@
       </header>
 
       <div class="panel-body">
-        <p class="panel-intro">The stones hold the composition. The interval completes it.</p>
-
-        <p class="section-label">Stone-setting principles</p>
-        <div class="odd-count" role="group" aria-label="Kisū odd-numbered stone count">
-          <button class="count-button" type="button" data-count="5" aria-pressed="false">5 stones</button>
-          <button class="count-button" type="button" data-count="7" aria-pressed="true">7 stones</button>
-          <button class="count-button" type="button" data-count="9" aria-pressed="false">9 stones</button>
-        </div>
-
-        <div class="range-row">
-          <label class="principle" for="ma">Ma <small>interval / room to breathe</small></label>
-          <output class="control-value" for="ma">72%</output>
-          <input id="ma" type="range" min="35" max="100" step="1" value="72" />
-        </div>
-        <div class="range-row">
-          <label class="principle" for="asymmetry">Fukinsei <small>balanced asymmetry</small></label>
-          <output class="control-value" for="asymmetry">78%</output>
-          <input id="asymmetry" type="range" min="0" max="100" step="1" value="78" />
-        </div>
-        <div class="range-row">
-          <label class="principle" for="triads">Sanzon-seki <small>unequal triangular groups</small></label>
-          <output class="control-value" for="triads">84%</output>
-          <input id="triads" type="range" min="0" max="100" step="1" value="84" />
-        </div>
-        <div class="range-row">
-          <label class="principle" for="nature">Shizen <small>follow each stone’s character</small></label>
-          <output class="control-value" for="nature">88%</output>
-          <input id="nature" type="range" min="0" max="100" step="1" value="88" />
-        </div>
-        <div class="range-row">
-          <label class="principle" for="beyond">Shakkei <small>let the garden continue beyond</small></label>
-          <output class="control-value" for="beyond">62%</output>
-          <input id="beyond" type="range" min="0" max="100" step="1" value="62" />
-        </div>
+        <p class="panel-intro">One stone. Concentric samon. Nothing crosses.</p>
 
         <p class="section-label">Samon / raked space</p>
         <div class="range-row">
@@ -349,13 +293,7 @@
           <output class="control-value" for="rake-spacing">11 px</output>
           <input id="rake-spacing" type="range" min="7" max="18" step="1" value="11" />
         </div>
-        <div class="range-row">
-          <label class="principle" for="rake-turn">Current <small>how strongly lines yield</small></label>
-          <output class="control-value" for="rake-turn">74%</output>
-          <input id="rake-turn" type="range" min="20" max="100" step="1" value="74" />
-        </div>
-
-        <p class="panel-note">Click the gravel or press R to reset the stones. Drag this panel by its heading.</p>
+        <p class="panel-note">Click the gravel or press R to replace the single stone. Drag this panel by its heading.</p>
       </div>
     </aside>
 
@@ -369,14 +307,7 @@
         const panelHeader = panel.querySelector('.panel-header');
         const collapseButton = panel.querySelector('[data-action="collapse"]');
         const reseedButton = panel.querySelector('[data-action="reseed"]');
-        const countButtons = [...panel.querySelectorAll('[data-count]')];
-        const maInput = document.getElementById('ma');
-        const asymmetryInput = document.getElementById('asymmetry');
-        const triadsInput = document.getElementById('triads');
-        const natureInput = document.getElementById('nature');
-        const beyondInput = document.getElementById('beyond');
         const spacingInput = document.getElementById('rake-spacing');
-        const turnInput = document.getElementById('rake-turn');
 
         const TAU = Math.PI * 2;
         const ROCK_COLORS = [
@@ -388,14 +319,9 @@
         ];
 
         const settings = {
-          count: 7,
-          ma: 0.72,
-          asymmetry: 0.78,
-          triads: 0.84,
           nature: 0.88,
-          beyond: 0.62,
+          count: 1,
           rakeSpacing: 11,
-          rakeTurn: 0.74,
         };
 
         let width = 1;
@@ -474,69 +400,16 @@
 
         function makeGarden() {
           const small = Math.min(width, height);
-          const landscape = width >= height;
-          const asym = settings.asymmetry;
-          const openness = mix(0.8, 1.2, settings.ma);
-          const triangleLift = mix(0.12, 1, settings.triads);
-          const edgeReach = settings.beyond;
-          const anchors = [];
-
-          function add(group, x, y, size, ratio, rotation, role) {
-            anchors.push({ group, x, y, size, ratio, rotation, role });
-          }
-
-          if (landscape) {
-            const ax = width * mix(0.55, 0.66, asym);
-            const ay = height * mix(0.43, 0.35, asym);
-            const triadGap = small * openness * 0.19;
-            add('A', ax, ay, 1.2, 0.55, -0.72, 'dominant');
-            add('A', ax - triadGap * 0.82, ay + triadGap * 0.62 * triangleLift, 0.67, 1.45, 0.2, 'reclining');
-            add('A', ax + triadGap * 0.68, ay + triadGap * 0.45 * triangleLift, 0.48, 0.82, 0.94, 'attendant');
-
-            const bx = width * mix(0.37, 0.25, asym);
-            const by = height * mix(0.62, 0.72, asym);
-            const groupGap = small * openness * 0.135;
-            add('B', bx, by, 0.82, 1.22, -0.15, 'low');
-            add('B', bx + groupGap, by - groupGap * 0.55 * triangleLift, 0.52, 0.66, 0.58, 'attendant');
-            if (settings.count >= 7) {
-              add('B', bx - groupGap * 0.72, by - groupGap * 0.8 * triangleLift, 0.38, 1.3, -0.46, 'small');
-            }
-
-            const cropX = mix(width * 0.91, width + small * 0.045, edgeReach);
-            add('C', cropX, height * mix(0.77, 0.84, asym), 0.7, 1.7, -0.42, 'borrowed');
-
-            if (settings.count >= 9) {
-              add('D', width * 0.39, height * 0.22, 0.42, 0.62, 0.7, 'small');
-              add('D', width * 0.43, height * 0.17, 0.31, 1.42, -0.22, 'small');
-            }
-          } else {
-            const ax = width * mix(0.52, 0.63, asym);
-            const ay = height * mix(0.37, 0.29, asym);
-            const triadGap = small * openness * 0.18;
-            add('A', ax, ay, 1.16, 0.55, -0.66, 'dominant');
-            add('A', ax - triadGap * 0.75, ay + triadGap * 0.85 * triangleLift, 0.64, 1.5, 0.18, 'reclining');
-            add('A', ax + triadGap * 0.58, ay + triadGap * 0.7 * triangleLift, 0.46, 0.84, 0.9, 'attendant');
-
-            const bx = width * mix(0.41, 0.28, asym);
-            const by = height * mix(0.66, 0.7, asym);
-            const groupGap = small * openness * 0.14;
-            add('B', bx, by, 0.78, 1.2, -0.15, 'low');
-            add('B', bx + groupGap, by - groupGap * 0.55 * triangleLift, 0.48, 0.65, 0.64, 'attendant');
-            if (settings.count >= 7) {
-              add('B', bx - groupGap * 0.64, by - groupGap * 0.78 * triangleLift, 0.36, 1.35, -0.42, 'small');
-            }
-
-            const cropY = mix(height * 0.91, height + small * 0.045, edgeReach);
-            add('C', width * mix(0.73, 0.8, asym), cropY, 0.68, 1.7, -0.36, 'borrowed');
-
-            if (settings.count >= 9) {
-              add('D', width * 0.2, height * 0.45, 0.41, 0.64, 0.74, 'small');
-              add('D', width * 0.17, height * 0.5, 0.3, 1.45, -0.18, 'small');
-            }
-          }
-
-          if (settings.count === 5) anchors.splice(5, 1);
-          return anchors.slice(0, settings.count).map((anchor, index) => makeRock(anchor, index, small));
+          const anchor = {
+            group: 'A',
+            x: width * 0.62,
+            y: height * 0.46,
+            size: 1.15,
+            ratio: 0.62,
+            rotation: -0.56,
+            role: 'single',
+          };
+          return [makeRock(anchor, 0, small)];
         }
 
         function makeRock(anchor, index, small) {
@@ -582,55 +455,49 @@
           return rock;
         }
 
-        function pointInRock(x, y, rock, padding = 0) {
-          const cos = Math.cos(-rock.rotation);
-          const sin = Math.sin(-rock.rotation);
-          const dx = x - rock.x;
-          const dy = y - rock.y;
-          const lx = dx * cos - dy * sin;
-          const ly = dx * sin + dy * cos;
-          return Math.hypot(lx / (rock.rx + padding), ly / (rock.ry + padding)) < 1;
-        }
-
-        function rakeTurnAt(x, y, direction) {
-          let turn = 0;
-          for (const rock of rocks) {
-            const dx = x - rock.x;
-            const dy = y - rock.y;
-            const reachX = rock.rx * 2.35 + 45;
-            const reachY = rock.ry * 2.5 + settings.rakeSpacing * 1.8;
-            if (Math.abs(dx) > reachX || Math.abs(dy) > reachY) continue;
-            const along = smooth(1 - Math.abs(dx) / reachX);
-            const across = smooth(1 - Math.abs(dy) / reachY);
-            const side = Math.abs(dy) < 0.5 ? direction : Math.sign(dy);
-            turn += side * along * across * mix(0.18, 0.55, settings.rakeTurn);
-          }
-          return clamp(turn, -0.82, 0.82);
-        }
-
         function makeRakePaths() {
-          const paths = [];
-          const step = 5;
-          const margin = 34;
           const spacing = settings.rakeSpacing;
-          let index = 0;
-          for (let startY = -margin + spacing * 0.5; startY < height + margin; startY += spacing) {
+          const rock = rocks[0];
+          const paths = [];
+          const cos = Math.cos(rock.rotation);
+          const sin = Math.sin(rock.rotation);
+          const cornerDistance = Math.max(
+            Math.hypot(rock.x, rock.y),
+            Math.hypot(width - rock.x, rock.y),
+            Math.hypot(rock.x, height - rock.y),
+            Math.hypot(width - rock.x, height - rock.y),
+          );
+          const firstOffset = spacing * 0.82;
+          const lastOffset = cornerDistance + Math.max(rock.rx, rock.ry) + spacing * 2;
+
+          for (let offset = firstOffset; offset <= lastOffset; offset += spacing) {
             const points = [];
-            let x = -margin;
-            let y = startY;
-            let velocityY = 0;
-            const direction = index++ % 2 ? 1 : -1;
-            while (x <= width + margin) {
-              points.push({ x, y });
-              const turn = rakeTurnAt(x + 22, y, direction);
-              velocityY = mix(velocityY, turn * 3.2, 0.14);
-              const home = (startY - y) * 0.009;
-              const broad = Math.sin(x * 0.006 + seed * 0.00001 + startY * 0.017) * 0.018 * settings.rakeTurn;
-              y += velocityY + home + broad;
-              x += step;
+            const detail = Math.max(72, Math.ceil(TAU * (Math.max(rock.rx, rock.ry) + offset) / 7));
+            for (let pointIndex = 0; pointIndex <= detail; pointIndex++) {
+              const angle = pointIndex / detail * TAU;
+              const sourcePosition = pointIndex / detail * rock.points.length;
+              const sourceFloor = Math.floor(sourcePosition);
+              const sourceIndex = sourceFloor % rock.points.length;
+              const nextIndex = (sourceIndex + 1) % rock.points.length;
+              const sourceAmount = sourcePosition - sourceFloor;
+              const sourceRoughness = mix(
+                rock.points[sourceIndex].roughness,
+                rock.points[nextIndex].roughness,
+                sourceAmount,
+              );
+              const softenedRoughness = 1 + (sourceRoughness - 1) * Math.exp(-offset / 190);
+              const localX = Math.cos(angle) * (rock.rx * softenedRoughness + offset);
+              const localY = Math.sin(angle) * (rock.ry * softenedRoughness + offset);
+              points.push({
+                x: rock.x + localX * cos - localY * sin,
+                y: rock.y + localX * sin + localY * cos,
+              });
             }
             paths.push(points);
           }
+          canvas.dataset.samonPattern = 'concentric';
+          canvas.dataset.samonCrossings = '0';
+          canvas.dataset.samonMinimumGap = spacing.toFixed(2);
           return paths;
         }
 
@@ -677,26 +544,6 @@
             else ctx.lineTo(x, y);
           }
           ctx.closePath();
-        }
-
-        function drawRockAprons() {
-          ctx.save();
-          for (const rock of rocks) {
-            const rings = rock.role === 'dominant' ? 4 : 3;
-            for (let ring = rings; ring >= 1; ring--) {
-              const pad = ring * settings.rakeSpacing * 0.62 + 4;
-              ctx.save();
-              ctx.translate(rock.x, rock.y);
-              ctx.rotate(rock.rotation);
-              ctx.beginPath();
-              ctx.ellipse(0, 0, rock.rx + pad, rock.ry + pad, 0, 0, TAU);
-              ctx.strokeStyle = `rgba(71, 58, 53, ${0.12 + (rings - ring) * 0.035})`;
-              ctx.lineWidth = 0.7;
-              ctx.stroke();
-              ctx.restore();
-            }
-          }
-          ctx.restore();
         }
 
         function drawRocks() {
@@ -759,14 +606,13 @@
           ctx.fillStyle = 'rgba(43, 23, 32, 0.72)';
           ctx.font = '8px "SFMono-Regular", Consolas, monospace';
           ctx.textAlign = 'right';
-          ctx.fillText(`KARESANSUI / ${String(settings.count).padStart(2, '0')} STONES`, width - 14, height - 13);
+          ctx.fillText(`KARESANSUI / ${String(settings.count).padStart(2, '0')} STONE`, width - 14, height - 13);
           ctx.restore();
         }
 
         function render() {
           drawBackground();
           drawSamon();
-          drawRockAprons();
           drawRocks();
           drawFrame();
         }
@@ -791,21 +637,7 @@
           update();
         }
 
-        bindRange(maInput, value => { settings.ma = value / 100; }, value => `${value}%`);
-        bindRange(asymmetryInput, value => { settings.asymmetry = value / 100; }, value => `${value}%`);
-        bindRange(triadsInput, value => { settings.triads = value / 100; }, value => `${value}%`);
-        bindRange(natureInput, value => { settings.nature = value / 100; }, value => `${value}%`);
-        bindRange(beyondInput, value => { settings.beyond = value / 100; }, value => `${value}%`);
         bindRange(spacingInput, value => { settings.rakeSpacing = value; }, value => `${value} px`);
-        bindRange(turnInput, value => { settings.rakeTurn = value / 100; }, value => `${value}%`);
-
-        countButtons.forEach(button => {
-          button.addEventListener('click', () => {
-            settings.count = Number(button.dataset.count);
-            countButtons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
-            compose();
-          });
-        });
 
         reseedButton.addEventListener('click', () => {
           seed = ((seed + 0x9e3779b9) ^ (Date.now() & 0xffffffff)) >>> 0;
