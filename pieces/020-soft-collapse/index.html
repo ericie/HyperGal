@@ -115,6 +115,12 @@
         display: block;
         width: 100%;
         height: clamp(230px, 24vw, 320px);
+        cursor: pointer;
+      }
+
+      .debug-specimen-canvas:focus-visible {
+        outline: 3px solid var(--ink);
+        outline-offset: -7px;
       }
 
       .debug-caption {
@@ -193,6 +199,8 @@
         const STRUCTURE_CHANGE_CHANCE = 0.3;
         const EVENT_GAP = 520;
         const SLIDE_DURATION = 2600;
+        const DEBUG_ENTER_DURATION = 1450;
+        const DEBUG_EXIT_DURATION = 1150;
         const DIRECTIONS = [
           [1, 0],
           [-1, 0],
@@ -201,7 +209,7 @@
         ];
         const MOTIF_NAMES = [
           'Half square',
-          'Inward wedges',
+          'Inward edges',
           'Diamond',
           'Square aperture',
           'Broken bars',
@@ -247,11 +255,12 @@
           const grid = document.getElementById('debug-grid');
           const count = document.getElementById('debug-count');
           const specimens = [];
+          const revealStart = performance.now() + 180;
 
           document.documentElement.classList.add('debug-mode');
           document.body.classList.add('debug-mode');
           catalog.hidden = false;
-          count.textContent = `${MOTIF_NAMES.length} motif types`;
+          count.textContent = `${MOTIF_NAMES.length} motif types · click a tile to animate it off`;
 
           for (let motif = 0; motif < MOTIF_NAMES.length; motif += 1) {
             const figure = document.createElement('figure');
@@ -261,7 +270,10 @@
 
             figure.className = 'debug-specimen';
             specimenCanvas.className = 'debug-specimen-canvas';
-            specimenCanvas.setAttribute('aria-hidden', 'true');
+            specimenCanvas.setAttribute('role', 'button');
+            specimenCanvas.setAttribute('tabindex', '0');
+            specimenCanvas.setAttribute('aria-labelledby', labelId);
+            specimenCanvas.setAttribute('aria-pressed', 'true');
             caption.className = 'debug-caption';
             caption.id = labelId;
             caption.innerHTML =
@@ -271,15 +283,55 @@
             figure.setAttribute('aria-labelledby', labelId);
             figure.append(specimenCanvas, caption);
             grid.append(figure);
-            specimens.push({ canvas: specimenCanvas, motif });
+            const specimen = {
+              canvas: specimenCanvas,
+              motif,
+              exitAmount: reducedMotion.matches ? 0 : 1,
+              fromExit: 1,
+              toExit: 0,
+              startedAt: revealStart + motif * 85,
+              duration: DEBUG_ENTER_DURATION,
+              animating: !reducedMotion.matches
+            };
+            const toggleSpecimen = () => {
+              const now = performance.now();
+              advanceDebugSpecimen(specimen, now);
+              const hide = specimen.toExit === 0;
+              specimen.fromExit = specimen.exitAmount;
+              specimen.toExit = hide ? 1 : 0;
+              specimen.startedAt = now;
+              specimen.duration = (hide ? DEBUG_EXIT_DURATION : DEBUG_ENTER_DURATION)
+                * Math.max(0.28, Math.abs(specimen.toExit - specimen.fromExit));
+              specimen.animating = !reducedMotion.matches;
+              if (reducedMotion.matches) {
+                specimen.exitAmount = specimen.toExit;
+                specimen.canvas.setAttribute('aria-pressed', String(specimen.toExit === 0));
+              }
+              scheduleRender();
+            };
+            specimenCanvas.addEventListener('click', toggleSpecimen);
+            specimenCanvas.addEventListener('keydown', (event) => {
+              if (event.code !== 'Enter' && event.code !== 'Space') return;
+              event.preventDefault();
+              toggleSpecimen();
+            });
+            specimens.push(specimen);
           }
 
           let renderFrame = 0;
           const scheduleRender = () => {
-            cancelAnimationFrame(renderFrame);
-            renderFrame = requestAnimationFrame(() => {
-              for (const specimen of specimens) renderDebugSpecimen(specimen);
-            });
+            if (renderFrame) return;
+            renderFrame = requestAnimationFrame(renderCatalogFrame);
+          };
+
+          const renderCatalogFrame = (time) => {
+            renderFrame = 0;
+            let needsAnotherFrame = false;
+            for (const specimen of specimens) {
+              if (advanceDebugSpecimen(specimen, time)) needsAnotherFrame = true;
+              renderDebugSpecimen(specimen);
+            }
+            if (needsAnotherFrame) scheduleRender();
           };
 
           if ('ResizeObserver' in window) {
@@ -289,6 +341,18 @@
             addEventListener('resize', scheduleRender, { passive: true });
           }
           scheduleRender();
+        }
+
+        function advanceDebugSpecimen(specimen, time) {
+          if (!specimen.animating) return false;
+          if (time < specimen.startedAt) return true;
+          const raw = clamp((time - specimen.startedAt) / specimen.duration, 0, 1);
+          specimen.exitAmount = lerp(specimen.fromExit, specimen.toExit, raw);
+          if (raw < 1) return true;
+          specimen.exitAmount = specimen.toExit;
+          specimen.animating = false;
+          specimen.canvas.setAttribute('aria-pressed', String(specimen.toExit === 0));
+          return false;
         }
 
         function renderDebugSpecimen(specimen) {
@@ -309,7 +373,10 @@
           specimenCtx.save();
           specimenCtx.translate(cssWidth * 0.5, cssHeight * 0.5);
           specimenCtx.scale(drawSize, drawSize);
-          drawMotifOn(specimenCtx, specimen.motif);
+          specimenCtx.beginPath();
+          specimenCtx.rect(-0.5, -0.5, 1, 1);
+          specimenCtx.clip();
+          drawDebugMotifOn(specimenCtx, specimen.motif, specimen.exitAmount);
           specimenCtx.restore();
         }
 
@@ -870,6 +937,198 @@
           }
         }
 
+        function drawDebugMotifOn(context, motif, rawExit) {
+          const exit = clamp(rawExit, 0, 1);
+          const glide = smootherStep(exit);
+
+          context.save();
+          context.fillStyle = INK;
+
+          switch (motif) {
+            case 0: {
+              const side = 1 - glide;
+              context.beginPath();
+              polygonOn(context, [
+                [-0.5, -0.5],
+                [-0.5 + side, -0.5],
+                [-0.5, -0.5 + side]
+              ]);
+              context.fill();
+              break;
+            }
+
+            case 1: {
+              const travel = glide * 1.05;
+              context.save();
+              context.translate(-travel, 0);
+              context.beginPath();
+              polygonOn(context, [[-0.5, -0.5], [0, 0], [-0.5, 0.5]]);
+              context.fill();
+              context.restore();
+              context.save();
+              context.translate(travel, 0);
+              context.beginPath();
+              polygonOn(context, [[0.5, -0.5], [0, 0], [0.5, 0.5]]);
+              context.fill();
+              context.restore();
+              break;
+            }
+
+            case 2: {
+              const turnEnd = 0.38;
+              const pauseEnd = 0.56;
+              let rotation = Math.PI * 0.25;
+              let side = Math.SQRT1_2;
+              let shrink = 1;
+              if (exit < turnEnd) {
+                const turn = smootherStep(exit / turnEnd);
+                rotation = lerp(Math.PI * 0.25, 0, turn);
+                side = lerp(Math.SQRT1_2, 1, turn);
+              } else if (exit >= pauseEnd) {
+                shrink = 1 - smootherStep((exit - pauseEnd) / (1 - pauseEnd));
+                side = 1;
+                rotation = 0;
+              } else {
+                side = 1;
+                rotation = 0;
+              }
+              context.rotate(rotation);
+              context.scale(side * shrink, side * shrink);
+              context.fillRect(-0.5, -0.5, 1, 1);
+              break;
+            }
+
+            case 3: {
+              let aperture;
+              if (exit < 0.5) {
+                const spring = springProgress(exit / 0.5);
+                aperture = lerp(0.5, 0.065, spring);
+              } else if (exit < 0.62) {
+                aperture = 0.065;
+              } else {
+                aperture = lerp(0.065, 1.45, easeOutBack((exit - 0.62) / 0.38));
+              }
+              aperture = Math.max(0.035, aperture);
+              context.beginPath();
+              context.rect(-0.5, -0.5, 1, 1);
+              context.rect(-aperture * 0.5, -aperture * 0.5, aperture, aperture);
+              context.fill('evenodd');
+              break;
+            }
+
+            case 4: {
+              const travel = glide * 1.55;
+              context.fillRect(-0.5 + travel, -0.5, 1, 0.19);
+              context.fillRect(-0.5 - travel, -0.095, 0.72, 0.19);
+              context.fillRect(-0.5 + travel, 0.31, 1, 0.19);
+              break;
+            }
+
+            case 5: {
+              const travel = glide * 1.05;
+              context.save();
+              context.translate(0, -travel);
+              context.beginPath();
+              polygonOn(context, [[-0.5, -0.5], [0, 0], [0.5, -0.5]]);
+              context.fill();
+              context.restore();
+              context.save();
+              context.translate(0, travel);
+              context.beginPath();
+              polygonOn(context, [[-0.5, 0.5], [0, 0], [0.5, 0.5]]);
+              context.fill();
+              context.restore();
+              break;
+            }
+
+            case 6: {
+              context.save();
+              context.translate(0, glide * 1.25);
+              context.beginPath();
+              polygonOn(context, [
+                [-0.5, -0.5], [0, 0], [0.5, -0.5],
+                [0.5, -0.18], [0, 0.32], [-0.5, -0.18]
+              ]);
+              context.fill();
+              context.restore();
+              break;
+            }
+
+            case 7: {
+              context.save();
+              context.translate(glide * 1.08, glide * 1.08);
+              context.beginPath();
+              polygonOn(context, [
+                [-0.5, -0.5], [-0.06, -0.5], [0.5, 0.06],
+                [0.5, 0.5], [0.06, 0.5], [-0.5, -0.06]
+              ]);
+              context.fill();
+              context.restore();
+              break;
+            }
+
+            case 8: {
+              const scale = 1 - glide;
+              context.rotate(glide * Math.PI);
+              context.scale(scale, scale);
+              context.beginPath();
+              polygonOn(context, [[0, -0.5], [0.5, 0], [0.2, 0], [0, -0.2]]);
+              polygonOn(context, [[0.5, 0], [0, 0.5], [0, 0.2], [0.2, 0]]);
+              polygonOn(context, [[0, 0.5], [-0.5, 0], [-0.2, 0], [0, 0.2]]);
+              polygonOn(context, [[-0.5, 0], [0, -0.5], [0, -0.2], [-0.2, 0]]);
+              context.fill();
+              break;
+            }
+
+            case 9: {
+              const travel = glide * 1.25;
+              context.fillRect(-0.5, -0.5 + travel, 0.22, 1);
+              context.fillRect(-0.1, -0.5 - travel, 0.22, 0.72);
+              context.fillRect(0.3, -0.5 + travel, 0.2, 1);
+              break;
+            }
+
+            case 10: {
+              const travel = glide * 1.15;
+              context.save();
+              context.translate(-travel, -travel * 0.24);
+              context.beginPath();
+              polygonOn(context, [
+                [-0.5, -0.5], [0, -0.12], [0.5, -0.5],
+                [0.5, -0.18], [0, 0.22], [-0.5, -0.18]
+              ]);
+              context.fill();
+              context.restore();
+              context.save();
+              context.translate(travel, travel * 0.24);
+              context.beginPath();
+              polygonOn(context, [
+                [-0.5, 0.18], [0, 0.5], [0.5, 0.18],
+                [0.5, 0.5], [-0.5, 0.5]
+              ]);
+              context.fill();
+              context.restore();
+              break;
+            }
+
+            default: {
+              const aperture = lerp(0.31, 1.18, easeOutBack(glide));
+              context.save();
+              context.rotate(glide * Math.PI * 0.25);
+              context.beginPath();
+              context.rect(-0.72, -0.72, 1.44, 1.44);
+              polygonOn(context, [
+                [0, -aperture], [aperture, 0],
+                [0, aperture], [-aperture, 0]
+              ]);
+              context.fill('evenodd');
+              context.restore();
+            }
+          }
+
+          context.restore();
+        }
+
         function polygonOn(context, points) {
           context.moveTo(points[0][0], points[0][1]);
           for (let i = 1; i < points.length; i += 1) {
@@ -996,8 +1255,25 @@
           return Math.max(min, Math.min(max, value));
         }
 
+        function lerp(from, to, amount) {
+          return from + (to - from) * amount;
+        }
+
         function smootherStep(value) {
           return value * value * value * (value * (value * 6 - 15) + 10);
+        }
+
+        function springProgress(value) {
+          const progress = clamp(value, 0, 1);
+          return 1 - Math.exp(-7 * progress) * Math.cos(progress * Math.PI * 3.5);
+        }
+
+        function easeOutBack(value) {
+          const progress = clamp(value, 0, 1);
+          const overshoot = 1.70158;
+          const shifted = progress - 1;
+          return 1 + (overshoot + 1) * shifted * shifted * shifted
+            + overshoot * shifted * shifted;
         }
 
       })();

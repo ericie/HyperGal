@@ -201,17 +201,17 @@
           { key: 'checker', name: 'Checker field', group: 'Surface pattern' },
           { key: 'dots', name: 'Offset dot field', group: 'Surface pattern' },
           { key: 'colonnade', name: 'Colonnade', group: 'Architectural module' },
-          { key: 'mini-city', name: 'Miniature city', group: 'Architectural module' },
+          { key: 'stepped-gateway', name: 'Stepped gateway', group: 'Architectural module' },
           { key: 'module-roundel', name: 'Roundel chamber', group: 'Framed chamber' },
           { key: 'module-roundel-reverse', name: 'Roundel chamber, reversed', group: 'Framed chamber' },
           { key: 'module-arch', name: 'Arch chamber', group: 'Framed chamber' },
           { key: 'module-diamond', name: 'Diamond chamber', group: 'Framed chamber' },
           { key: 'module-checker', name: 'Checker chamber', group: 'Framed chamber' },
           { key: 'module-dots', name: 'Dot chamber', group: 'Framed chamber' },
-          { key: 'module-city', name: 'Miniature-city chamber', group: 'Framed chamber' },
+          { key: 'module-gateway', name: 'Stepped-gateway chamber', group: 'Framed chamber' },
           { key: 'module-colonnade', name: 'Colonnade chamber', group: 'Framed chamber' },
           { key: 'module-split', name: 'Split register chamber', group: 'Framed chamber' },
-          { key: 'module-jewel-stack', name: 'Needle-bay jewel stack', group: 'Framed chamber' },
+          { key: 'module-marker-stack', name: 'Needle-bay marker stack', group: 'Framed chamber' },
           { key: 'cap-triangle', name: 'Triangular roof', group: 'Cap' },
           { key: 'cap-semicircle', name: 'Semicircular roof', group: 'Cap' },
           { key: 'cap-stepped', name: 'Stepped roof', group: 'Cap' },
@@ -423,28 +423,60 @@
           }
         }
 
-        function drawMiniatureCity(x, y, w, h, ink, paper, variant) {
+        function drawSteppedGateway(x, y, w, h, ink, paper) {
           rect(x, y, w, h, paper);
-          const count = clamp(Math.floor(w / Math.max(h * 0.22, 16)), 3, 6);
-          const gap = w * 0.025;
-          const cell = (w - gap * (count + 1)) / count;
-          for (let i = 0; i < count; i += 1) {
-            const mh = h * (0.42 + ((i + variant) % 3) * 0.13);
-            const mx = x + gap + i * (cell + gap);
-            const my = y + h - mh;
-            rect(mx, my + cell * 0.18, cell, mh - cell * 0.18, ink);
-            if ((i + variant) % 2 === 0) {
-              polygon([[mx, my + cell * 0.2], [mx + cell * 0.5, my - cell * 0.35], [mx + cell, my + cell * 0.2]], ink);
-            } else {
-              ctx.beginPath();
-              ctx.arc(mx + cell * 0.5, my + cell * 0.22, cell * 0.5, Math.PI, 0);
-              ctx.closePath();
-              ctx.fillStyle = ink;
-              ctx.fill();
+          polygon([
+            [x + w * 0.1, y + h],
+            [x + w * 0.1, y + h * 0.68],
+            [x + w * 0.24, y + h * 0.68],
+            [x + w * 0.24, y + h * 0.44],
+            [x + w * 0.38, y + h * 0.44],
+            [x + w * 0.38, y + h * 0.2],
+            [x + w * 0.62, y + h * 0.2],
+            [x + w * 0.62, y + h * 0.44],
+            [x + w * 0.76, y + h * 0.44],
+            [x + w * 0.76, y + h * 0.68],
+            [x + w * 0.9, y + h * 0.68],
+            [x + w * 0.9, y + h]
+          ], ink);
+          arch(x + w * 0.39, y + h * 0.58, w * 0.22, h * 0.42, paper);
+        }
+
+        function drawCoarseChecker(x, y, w, h, ink, paper) {
+          const columns = 4;
+          const rows = clamp(Math.round((h / w) * columns), 3, 6);
+          const cellW = w / columns;
+          const cellH = h / rows;
+          rect(x, y, w, h, paper);
+          for (let row = 0; row < rows; row += 1) {
+            for (let col = 0; col < columns; col += 1) {
+              if ((row + col) % 2 === 0) rect(x + col * cellW, y + row * cellH, cellW, cellH, ink);
             }
-            arch(mx + cell * 0.32, y + h - mh * 0.38, cell * 0.36, mh * 0.38, paper);
-            circle(mx + cell * 0.5, my - cell * 0.35, Math.max(1.4, cell * 0.08), ink);
           }
+        }
+
+        function drawSparseDots(x, y, w, h, ink, paper) {
+          const columns = 3;
+          const rows = clamp(Math.round((h / w) * columns), 3, 5);
+          const cellW = w / columns;
+          const cellH = h / rows;
+          const radius = Math.min(cellW, cellH) * 0.17;
+          rect(x, y, w, h, paper);
+          for (let row = 0; row < rows; row += 1) {
+            for (let col = 0; col < columns; col += 1) {
+              circle(x + cellW * (col + 0.5), y + cellH * (row + 0.5), radius, ink);
+            }
+          }
+        }
+
+        function drawSplitRegister(x, y, w, h, ink, paper) {
+          const split = h * 0.5;
+          const topSize = Math.min(w, split) * 0.48;
+          const bottomSize = Math.min(w, h - split) * 0.64;
+          rect(x, y, w, h, paper);
+          circle(x + w * 0.5, y + split * 0.5, topSize * 0.5, ink);
+          line(x, y + split, x + w, y + split, ink, weights.medium);
+          diamond(x + w * 0.5, y + split + (h - split) * 0.5, bottomSize, bottomSize, ink);
         }
 
         function drawModule(bay, top, bottom, index) {
@@ -467,7 +499,7 @@
 
           if (inner.w < 9 || inner.h < 9) return;
           const motif = bay.motifs[index % bay.motifs.length];
-          const narrow = w < width * 0.065;
+          const narrow = bay.forceNarrow || w < width * 0.065;
           const shallow = h < height * 0.13;
 
           if (shallow) {
@@ -478,13 +510,13 @@
           }
 
           if (narrow) {
-            const count = clamp(Math.floor(inner.h / Math.max(inner.w * 0.86, 15)), 1, 7);
+            const count = clamp(Math.round(inner.h / Math.max(inner.w * 1.45, 28)), 2, 4);
             const cellH = inner.h / count;
             for (let i = 0; i < count; i += 1) {
               const cy = inner.y + cellH * (i + 0.5);
-              const size = Math.min(inner.w * 0.62, cellH * 0.62);
-              if ((motif + i) % 3 === 0) drawRoundel(inner.x + inner.w * 0.5, cy, size * 0.5, ink, fill, bay.variant + i);
-              else drawNestedDiamond(inner.x + inner.w * 0.5, cy, size, ink, fill, 3);
+              const size = Math.min(inner.w * 0.5, cellH * 0.5);
+              if ((motif + i) % 2 === 0) circle(inner.x + inner.w * 0.5, cy, size * 0.5, ink);
+              else diamond(inner.x + inner.w * 0.5, cy, size, size, ink);
             }
             frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
             return;
@@ -511,26 +543,33 @@
             if (bandH) drawDiamondBand(inner.x, inner.y + fieldH, inner.w, bandH, ink, fill, bay.variant + index);
             frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
           } else if (motif === 3) {
-            drawChecker(inner.x, inner.y, inner.w, inner.h, ink, fill);
+            drawCoarseChecker(inner.x, inner.y, inner.w, inner.h, ink, fill);
             frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
           } else if (motif === 4) {
-            drawDotField(inner.x, inner.y, inner.w, inner.h, ink, fill);
+            drawSparseDots(inner.x, inner.y, inner.w, inner.h, ink, fill);
             frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
           } else if (motif === 5) {
-            const bandH = inner.h > inner.w * 1.05 ? clamp(inner.h * 0.13, 11, 27) : 0;
-            if (bandH) drawDiamondBand(inner.x, inner.y, inner.w, bandH, ink, fill, bay.variant + index);
-            drawMiniatureCity(inner.x, inner.y + bandH, inner.w, inner.h - bandH, ink, fill, bay.variant + index);
+            drawSteppedGateway(inner.x, inner.y, inner.w, inner.h, ink, fill);
             frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
           } else if (motif === 6) {
             const columns = clamp(Math.floor(inner.w / Math.max(inner.h * 0.2, 22)), 2, 5);
             drawColonnade(inner.x, inner.y, inner.w, inner.h, ink, fill, columns);
             frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
           } else {
-            const split = inner.h * 0.38;
-            drawCircleBand(inner.x, inner.y, inner.w, split, ink, fill, bay.variant);
-            drawDiamondBand(inner.x, inner.y + split, inner.w, inner.h - split, ink, fill, bay.variant + 1);
+            drawSplitRegister(inner.x, inner.y, inner.w, inner.h, ink, fill);
             frame(inner.x, inner.y, inner.w, inner.h, ink, weights.medium);
           }
+        }
+
+        function drawTriangleCap(x, y, w, capH, fill, ink) {
+          polygon([[x, y], [x + w * 0.5, y - capH], [x + w, y]], fill);
+          line(x + weights.heavy * 0.5, y, x + w * 0.5, y - capH, BLACK, weights.heavy);
+          line(x + w * 0.5, y - capH, x + w - weights.heavy * 0.5, y, BLACK, weights.heavy);
+          polygon([
+            [x + w * 0.27, y],
+            [x + w * 0.5, y - capH * 0.58],
+            [x + w * 0.73, y]
+          ], ink);
         }
 
         function drawCap(bay) {
@@ -542,8 +581,7 @@
           const ink = opposite(fill);
 
           if (bay.cap === 0) {
-            polygon([[x, y], [x + w * 0.5, y - capH], [x + w, y]], fill, BLACK, weights.heavy);
-            polygon([[x + w * 0.27, y - capH * 0.06], [x + w * 0.5, y - capH * 0.58], [x + w * 0.73, y - capH * 0.06]], ink);
+            drawTriangleCap(x, y, w, capH, fill, ink);
           } else if (bay.cap === 1) {
             ctx.beginPath();
             ctx.moveTo(x, y);
@@ -570,7 +608,7 @@
             const steps = 3;
             for (let i = 0; i < steps; i += 1) {
               const inset = i * w * 0.12;
-              rect(x + inset, y - (i + 1) * capH / steps, w - inset * 2, capH / steps + weights.medium, i % 2 === 0 ? fill : ink, BLACK, weights.medium);
+              rect(x + inset, y - (i + 1) * capH / steps, w - inset * 2, capH / steps + weights.heavy, i % 2 === 0 ? fill : ink, BLACK, weights.heavy);
             }
           } else if (bay.cap === 3) {
             rect(x, y - capH * 0.42, w, capH * 0.42, fill, BLACK, weights.heavy);
@@ -587,9 +625,20 @@
 
           if (bay.finial !== 0) {
             const fx = x + w * bay.finialX;
-            const capTop = bay.cap === 4 ? y - capH * 1.18 : y - capH;
+            let capTop = y - capH;
+            if (bay.cap === 0) {
+              capTop = y - capH * (1 - Math.abs(bay.finialX - 0.5) * 2);
+            } else if (bay.cap === 1) {
+              const radius = w * 0.5;
+              const offset = w * (bay.finialX - 0.5);
+              capTop = y - Math.sqrt(Math.max(0, radius * radius - offset * offset));
+            } else if (bay.cap === 4) {
+              capTop = bay.finialX >= 0.37 && bay.finialX <= 0.63
+                ? y - capH * 1.18
+                : y - capH * 0.62;
+            }
             const pole = clamp(height * (0.045 + bay.variant * 0.002), 20, 56);
-            line(fx, capTop, fx, capTop - pole, BLACK, weights.medium);
+            line(fx, capTop, fx, capTop - pole, BLACK, weights.heavy);
 
             if (bay.finial === 1) {
               circle(fx, capTop - pole, clamp(w * 0.045, 3, 8), BLACK);
@@ -770,8 +819,8 @@
           } else if (key === 'colonnade') {
             drawColonnade(x, y, w, h, BLACK, WHITE, 4);
             frame(x, y, w, h, BLACK, weights.heavy);
-          } else if (key === 'mini-city') {
-            drawMiniatureCity(x, y, w, h, BLACK, WHITE, 2);
+          } else if (key === 'stepped-gateway') {
+            drawSteppedGateway(x, y, w, h, BLACK, WHITE);
             frame(x, y, w, h, BLACK, weights.heavy);
           } else if (key.startsWith('module-')) {
             const motifByKey = {
@@ -781,16 +830,17 @@
               'module-diamond': 2,
               'module-checker': 3,
               'module-dots': 4,
-              'module-city': 5,
+              'module-gateway': 5,
               'module-colonnade': 6,
               'module-split': 7,
-              'module-jewel-stack': 2
+              'module-marker-stack': 2
             };
-            const narrow = key === 'module-jewel-stack';
+            const narrow = key === 'module-marker-stack';
             const moduleW = narrow ? w * 0.34 : w;
             const moduleX = cx - moduleW * 0.5;
             const polarity = key === 'module-roundel-reverse' ? 1 : 0;
             const bay = debugBay(moduleX, moduleW, polarity, [motifByKey[key]], 0, 0, 5);
+            bay.forceNarrow = key === 'module-marker-stack';
             drawModule(bay, y, height - pad, 0);
           } else if (key.startsWith('cap-') || key.startsWith('finial-')) {
             const capKeys = ['cap-triangle', 'cap-semicircle', 'cap-stepped', 'cap-crenellated', 'cap-pavilion'];
@@ -809,7 +859,7 @@
             const bayX = cx - bayW * 0.5;
             const polarity = key === 'bay-reversed' ? 1 : 0;
             const bay = debugBay(bayX, bayW, polarity, needle ? [2, 0, 1, 2] : [5, 0, 7, 6], needle ? 3 : 1, needle ? 2 : 3, 7);
-            bay.top = height * 0.18;
+            bay.top = height * 0.37;
             drawBay(bay);
           }
 

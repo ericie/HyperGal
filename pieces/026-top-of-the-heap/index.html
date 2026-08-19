@@ -69,7 +69,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Top of the Heap. A tall pyramid of equal-size cubes fills the portrait screen. A bright ball character with bouncy legs patrols up and down the pyramid, turning cubes on while defending the summit from waves of wide spring-shaped snakes. Each snake occupies its own cube and waits when both upward squares are claimed. The hunter hunts and squashes whichever snake is closest to the top. The ON side scores by lighting the entire pyramid. The OFF side scores by reaching the summit. Press R to restart the match."
+      aria-label="Top of the Heap. A tall pyramid of equal-size cubes fills the portrait screen. A bright ball character paints cubes yellow while waves of spring-shaped snakes paint every cube they land on green. The score shows the percentage of the heap that is yellow, green, or unclaimed. The hunter chases and squashes whichever snake is closest to the top. Yellow or Green wins by claiming the entire pyramid. Press R to restart the match."
     ></canvas>
     <p id="status" class="status" aria-live="polite"></p>
 
@@ -82,6 +82,11 @@
         const status = document.getElementById('status');
         const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
         const TAU = Math.PI * 2;
+        const TERRITORY = {
+          yellow: { hue: 52, saturation: 94, lightness: 58 },
+          green: { hue: 136, saturation: 72, lightness: 48 },
+        };
+        const MAX_SNAKES = 6;
 
         const palettes = [
           {
@@ -148,9 +153,8 @@
         let stars = [];
         let ball = null;
         let level = 1;
-        let onScore = 0;
-        let offScore = 0;
-        let onCount = 0;
+        let yellowCount = 0;
+        let greenCount = 0;
         let totalCubes = 0;
         let paletteIndex = 0;
         let palette = palettes[0];
@@ -163,7 +167,7 @@
         let waveHue = 112;
         let phase = 'play';
         let blinkStartedAt = 0;
-        let roundWinner = 'off';
+        let roundWinner = 'yellow';
         let reducedMotion = motionQuery.matches;
         let random = mulberry32((Date.now() ^ 0x87a51) >>> 0);
         let raf = 0;
@@ -235,8 +239,6 @@
 
         function restartMatch() {
           level = 1;
-          onScore = 0;
-          offScore = 0;
           paletteIndex = Math.floor(random() * palettes.length);
           palette = palettes[paletteIndex];
           resetLevel(false);
@@ -251,12 +253,13 @@
           }
 
           cubes = [];
-          onCount = 0;
+          yellowCount = 0;
+          greenCount = 0;
           totalCubes = (rows * (rows + 1)) / 2;
           for (let row = 0; row < rows; row += 1) {
             const line = [];
             for (let column = 0; column <= row; column += 1) {
-              line.push({ row, column, on: false, pulse: 0 });
+              line.push({ row, column, owner: 'none', pulse: 0 });
             }
             cubes.push(line);
           }
@@ -299,7 +302,7 @@
         }
 
         function spawnSnake() {
-          if (players.length >= 3 || phase !== 'play') return false;
+          if (players.length >= MAX_SNAKES || phase !== 'play') return false;
           const openColumns = [];
           for (let column = 0; column < rows; column += 1) {
             if (!snakeClaimsSquare(rows - 1, column, null)) openColumns.push(column);
@@ -333,7 +336,7 @@
         function beginWave() {
           waveIndex += 1;
           waveHue = 98 + random() * 38;
-          waveRemaining = 1 + Math.floor(random() * 2);
+          waveRemaining = 3 + Math.floor(random() * 3);
           nextSpawnAt = matchTime;
           status.textContent = `Spring wave ${waveIndex}: ${waveRemaining} snakes.`;
         }
@@ -376,7 +379,7 @@
               waveRemaining -= 1;
               nextSpawnAt = matchTime + 0.34 + random() * 0.2;
               if (waveRemaining === 0) {
-                nextWaveAt = matchTime + 16 + random() * 6;
+                nextWaveAt = matchTime + 6 + random() * 4;
               }
             } else {
               nextSpawnAt = matchTime + 0.5;
@@ -384,7 +387,12 @@
           }
 
           updateBall();
-          for (const player of players) updatePlayer(player);
+          if (phase === 'blink') return;
+          for (const player of players) {
+            updatePlayer(player);
+            if (phase === 'blink') break;
+          }
+          if (phase === 'blink') return;
           checkCrushes();
           players = players.filter((player) => !player.dead);
         }
@@ -449,13 +457,15 @@
               const distance =
                 Math.abs(point.x - targetPoint.x) +
                 Math.abs(point.y - targetPoint.y) * 0.42;
-              const offBonus = cubes[candidate.row][candidate.column].on ? 0 : halfW * 0.82;
+              const yellowBonus = cubes[candidate.row][candidate.column].owner === 'yellow'
+                ? 0
+                : halfW * 0.82;
               const reversal =
                 candidate.row === ball.previousRow &&
                 candidate.column === ball.previousColumn
                   ? halfW * 0.55
                   : 0;
-              return { ...candidate, score: distance - offBonus + reversal };
+              return { ...candidate, score: distance - yellowBonus + reversal };
             });
             scored.sort((a, b) => a.score - b.score);
             if (scored.length === 1) return scored[0];
@@ -465,10 +475,10 @@
             return scored[0];
           }
 
-          return nextStepTowardOffCube(candidates) || candidates[Math.floor(random() * candidates.length)];
+          return nextStepTowardYellowClaim(candidates) || candidates[Math.floor(random() * candidates.length)];
         }
 
-        function nextStepTowardOffCube(initialSteps) {
+        function nextStepTowardYellowClaim(initialSteps) {
           const queue = [];
           const visited = new Set([`${ball.row}:${ball.column}`]);
           for (const step of initialSteps) {
@@ -481,7 +491,7 @@
           while (cursor < queue.length) {
             const current = queue[cursor];
             cursor += 1;
-            if (!cubes[current.row][current.column].on) return current.first;
+            if (cubes[current.row][current.column].owner !== 'yellow') return current.first;
 
             for (const neighbor of ballNeighbors(current.row, current.column)) {
               const key = `${neighbor.row}:${neighbor.column}`;
@@ -519,9 +529,12 @@
             player.column = player.nextColumn;
           }
 
+          claimCube(player.row, player.column, 'green');
+          if (phase === 'blink') return;
+
           if (player.row <= 0) {
-            status.textContent = `Spring-snake took the top. OFF ${offScore + 1}, ON ${onScore}.`;
-            beginBlink('off');
+            player.dead = true;
+            status.textContent = 'Spring-snake crossed the summit. The territory race continues.';
             return;
           }
 
@@ -575,28 +588,34 @@
         function beginBlink(winner) {
           if (phase === 'blink') return;
           roundWinner = winner;
-          if (winner === 'on') onScore += 1;
-          else offScore += 1;
           phase = 'blink';
           blinkStartedAt = matchTime;
-          makeSparks(nodePoint(0, 0), palette.on, 28);
+          makeSparks(nodePoint(0, 0), TERRITORY[winner].hue, 28);
         }
 
         function strikeCube(row, column) {
+          claimCube(row, column, 'yellow');
+        }
+
+        function claimCube(row, column, owner) {
           const cube = cubes[row] && cubes[row][column];
           if (!cube) return;
-          if (!cube.on) {
-            cube.on = true;
-            onCount += 1;
+          if (cube.owner !== owner) {
+            if (cube.owner === 'yellow') yellowCount -= 1;
+            if (cube.owner === 'green') greenCount -= 1;
+            cube.owner = owner;
+            if (owner === 'yellow') yellowCount += 1;
+            if (owner === 'green') greenCount += 1;
             cube.pulse = 1;
-            makeSparks(nodePoint(row, column), palette.on, row === 0 ? 12 : 5);
+            makeSparks(nodePoint(row, column), TERRITORY[owner].hue, row === 0 ? 12 : 5);
           } else {
             cube.pulse = Math.max(cube.pulse, 0.32);
           }
 
-          if (onCount === totalCubes) {
-            status.textContent = `The whole pyramid is on. ON ${onScore + 1}, OFF ${offScore}.`;
-            beginBlink('on');
+          if (yellowCount === totalCubes || greenCount === totalCubes) {
+            const winner = yellowCount === totalCubes ? 'yellow' : 'green';
+            status.textContent = `${winner === 'yellow' ? 'Yellow' : 'Green'} claimed the whole pyramid.`;
+            beginBlink(winner);
           }
         }
 
@@ -616,7 +635,7 @@
             if (ball.targetId === player.id) ball.targetId = null;
             splats.push({ x: pp.x, y: pp.y + halfW * 0.25, hue: player.hue, at: matchTime });
             makeSparks(pp, player.hue, 11);
-            status.textContent = `Spring-snake crushed. ON ${onScore}, OFF ${offScore}.`;
+            status.textContent = 'Spring-snake crushed. The territory race continues.';
           }
         }
 
@@ -747,30 +766,47 @@
         }
 
         function drawScoreboard() {
-          const pad = clamp(width * 0.045, 16, 34);
-          const scoreSize = clamp(width * 0.065, 20, 34);
+          const scoreSize = clamp(width * 0.056, 18, 31);
           const labelSize = clamp(width * 0.026, 10, 13);
           const top = Math.max(24, envSafeTop() + 17);
+          const scores = territoryPercentages();
+          const columns = [width * 0.18, width * 0.5, width * 0.82];
 
           ctx.textBaseline = 'top';
-          ctx.fillStyle = palette.ink;
           ctx.font = `900 ${scoreSize}px Arial, Helvetica, sans-serif`;
-          ctx.textAlign = 'left';
-          ctx.fillText(String(onScore).padStart(2, '0'), pad, top);
-          ctx.textAlign = 'right';
-          ctx.fillText(String(offScore).padStart(2, '0'), width - pad, top);
+          ctx.textAlign = 'center';
+          ctx.fillStyle = `hsl(${TERRITORY.yellow.hue} ${TERRITORY.yellow.saturation}% 66%)`;
+          ctx.fillText(`${scores.yellow}%`, columns[0], top);
+          ctx.fillStyle = `hsl(${TERRITORY.green.hue} ${TERRITORY.green.saturation}% 61%)`;
+          ctx.fillText(`${scores.green}%`, columns[1], top);
+          ctx.fillStyle = palette.ink;
+          ctx.fillText(`${scores.none}%`, columns[2], top);
 
           ctx.globalAlpha = 0.82;
           ctx.font = `800 ${labelSize}px Arial, Helvetica, sans-serif`;
           ctx.letterSpacing = '0.05em';
-          ctx.textAlign = 'left';
-          ctx.fillText('ON', pad, top + scoreSize + 1);
-          ctx.textAlign = 'right';
-          ctx.fillText('OFF', width - pad, top + scoreSize + 1);
           ctx.textAlign = 'center';
-          ctx.fillText(`HEAP ${level}`, width * 0.5, top + scoreSize * 0.52);
+          ctx.fillText('YELLOW', columns[0], top + scoreSize + 1);
+          ctx.fillText('GREEN', columns[1], top + scoreSize + 1);
+          ctx.fillText('NONE', columns[2], top + scoreSize + 1);
           ctx.globalAlpha = 1;
           ctx.letterSpacing = '0px';
+        }
+
+        function territoryPercentages() {
+          const counts = {
+            yellow: yellowCount,
+            green: greenCount,
+            none: totalCubes - yellowCount - greenCount,
+          };
+          const entries = Object.entries(counts).map(([name, count]) => {
+            const exact = totalCubes ? count * 100 / totalCubes : 0;
+            return { name, value: Math.floor(exact), remainder: exact % 1 };
+          });
+          let remaining = 100 - entries.reduce((sum, entry) => sum + entry.value, 0);
+          entries.sort((a, b) => b.remainder - a.remainder);
+          for (let index = 0; index < remaining; index += 1) entries[index].value += 1;
+          return Object.fromEntries(entries.map((entry) => [entry.name, entry.value]));
         }
 
         function drawBoardShadow() {
@@ -790,9 +826,10 @@
 
         function drawCube(cube) {
           const point = nodePoint(cube.row, cube.column);
-          const activeHue = cube.on ? palette.on : palette.inactive.h;
-          const saturation = cube.on ? 84 : palette.inactive.s;
-          const lightness = cube.on ? 59 : palette.inactive.l;
+          const territory = TERRITORY[cube.owner];
+          const activeHue = territory ? territory.hue : palette.inactive.h;
+          const saturation = territory ? territory.saturation : palette.inactive.s;
+          const lightness = territory ? territory.lightness : palette.inactive.l;
           const pulse = cube.pulse * 12;
 
           ctx.beginPath();
@@ -1040,7 +1077,7 @@
           ctx.font = `900 ${clamp(width * 0.082, 26, 46)}px Arial, Helvetica, sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(roundWinner === 'on' ? 'ALL ON!' : 'TOP TAKEN!', width * 0.5, height * 0.5);
+          ctx.fillText(roundWinner === 'yellow' ? 'YELLOW WINS!' : 'GREEN WINS!', width * 0.5, height * 0.5);
         }
 
         function envSafeTop() {

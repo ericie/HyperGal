@@ -6,5 +6,5 @@
   "type": "generative",
   "wip": true,
   "thumbnail": "thumbnail.jpg",
-  "description": "A bright ball character defends a twenty-storey cube pyramid from waves of wide spring-snakes that reserve individual squares, hunting whichever coil is closest to the summit. ON wins by lighting every cube; OFF wins by taking the top."
+  "description": "A bright ball and frequent waves of spring-snakes fight for a twenty-storey cube pyramid, painting every landing yellow or green. The scoreboard tracks Yellow, Green, and unclaimed territory; the first side to claim 100% wins."
 }
