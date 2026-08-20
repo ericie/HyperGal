@@ -58,48 +58,42 @@
         pointer-events: none;
       }
 
-      .magnifier-cursor {
-        --lens-color: var(--green);
+      .knife-cursor {
+        --blade-color: var(--pink);
         position: fixed;
         z-index: 3;
         top: 0;
         left: 0;
-        width: 76px;
-        height: 76px;
+        width: 72px;
+        height: 27px;
         pointer-events: none;
         transform: translate3d(-100px, -100px, 0);
         visibility: hidden;
         will-change: transform;
       }
 
-      .magnifier-cursor::after {
-        position: absolute;
-        z-index: -1;
-        top: 59px;
-        left: 59px;
-        width: 38px;
-        height: 11px;
-        background: var(--ink);
-        content: "";
-        transform: rotate(45deg);
-        transform-origin: 0 50%;
-      }
+      .knife-cursor.is-visible { visibility: visible; }
 
-      .magnifier-cursor.is-visible { visibility: visible; }
-
-      .magnifier-lens {
+      .knife-icon {
         display: block;
-        width: 76px;
-        height: 76px;
-        border: 5px solid var(--ink);
-        border-radius: 50%;
-        background: transparent;
-        box-shadow: inset 0 0 0 15px var(--lens-color);
-        transition: box-shadow 110ms linear;
+        width: 72px;
+        height: 27px;
+        overflow: visible;
       }
 
-      .magnifier-lens.is-triggered {
-        animation: lens-trigger 260ms cubic-bezier(0.16, 1, 0.3, 1);
+      .knife-blade {
+        fill: var(--blade-color);
+        stroke: var(--ink);
+        stroke-linejoin: round;
+        stroke-width: 2.4;
+        transition: fill 100ms linear;
+      }
+
+      .knife-handle { fill: var(--ink); }
+      .knife-rivet { fill: var(--ground); }
+
+      .knife-icon.is-triggered {
+        animation: knife-cut 210ms cubic-bezier(0.16, 1, 0.3, 1);
       }
 
       main {
@@ -188,6 +182,11 @@
       .glyph.is-struck {
         animation: strike 520ms cubic-bezier(0.16, 1, 0.3, 1);
         color: var(--ink);
+      }
+
+      .glyph.is-deleted {
+        visibility: hidden;
+        pointer-events: none;
       }
 
       .instruction,
@@ -299,7 +298,7 @@
       body.is-debug .instruction,
       body.is-debug .meter,
       body.is-debug #announcement,
-      body.is-debug .magnifier-cursor { display: none; }
+      body.is-debug .knife-cursor { display: none; }
 
       @media (pointer: fine) {
         body:not(.is-debug),
@@ -319,10 +318,10 @@
         100% { transform: scale(1); }
       }
 
-      @keyframes lens-trigger {
-        0% { transform: scale(1); }
-        32% { transform: scale(1.16); }
-        100% { transform: scale(1); }
+      @keyframes knife-cut {
+        0% { transform: translate(0, 0) rotate(0); }
+        42% { transform: translate(-5px, 5px) rotate(-8deg); }
+        100% { transform: translate(0, 0) rotate(0); }
       }
 
       @media (max-width: 640px) {
@@ -366,15 +365,20 @@
         .glyph,
         .glyph::after { transition: none; }
         .glyph.is-struck { animation: none; }
-        .magnifier-lens { transition: none; }
-        .magnifier-lens.is-triggered { animation: none; }
+        .knife-blade { transition: none; }
+        .knife-icon.is-triggered { animation: none; }
       }
     </style>
   </head>
   <body>
     <canvas id="field" aria-hidden="true"></canvas>
-    <div class="magnifier-cursor" id="magnifier" aria-hidden="true">
-      <span class="magnifier-lens" id="magnifier-lens"></span>
+    <div class="knife-cursor" id="knife-cursor" aria-hidden="true">
+      <svg class="knife-icon" id="knife-icon" viewBox="0 0 78 28">
+        <path class="knife-blade" d="M1 13 46 3 51 9 46 19Q23 22 7 18Z" />
+        <path class="knife-handle" d="M45 8h30q2 0 2 2v8q0 2-2 2H45Z" />
+        <circle class="knife-rivet" cx="57" cy="14" r="1.5" />
+        <circle class="knife-rivet" cx="68" cy="14" r="1.5" />
+      </svg>
     </div>
     <main>
       <div class="quote-shell">
@@ -384,7 +388,7 @@
         ></blockquote>
       </div>
     </main>
-    <p class="instruction">Roll over any letter</p>
+    <p class="instruction">Cut through any letter</p>
     <p class="meter">Active <output id="active-count">00</output> / 2.5 sec</p>
     <p class="sr-only" id="announcement" aria-live="polite"></p>
     <section class="debug-view" id="debug-view" aria-label="Animation comparison grid" hidden>

@@ -1,0 +1,887 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Forest of Rings - HyperGal</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --field: #dbe6db;
+        --ink: #14251c;
+        --panel: #173a2b;
+        --panel-ink: #f1edcf;
+        --panel-muted: #b8c8ad;
+        --accent: #ffd76e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        overflow: hidden;
+        background: var(--field);
+      }
+
+      body {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        color: var(--ink);
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: var(--field);
+        cursor: crosshair;
+        touch-action: manipulation;
+      }
+
+      .panel {
+        position: fixed;
+        z-index: 2;
+        top: 18px;
+        left: 18px;
+        width: min(278px, calc(100vw - 36px));
+        padding: 18px;
+        background: var(--panel);
+        color: var(--panel-ink);
+        box-shadow: 6px 6px 0 rgba(20, 37, 28, 0.16);
+      }
+
+      .panel__header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        padding-bottom: 13px;
+        border-bottom: 1px solid rgba(241, 237, 207, 0.3);
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 10ch;
+        font: 700 clamp(20px, 2.2vw, 26px) / 0.94 Arial Narrow, Arial, sans-serif;
+        letter-spacing: -0.025em;
+        text-wrap: balance;
+      }
+
+      .count {
+        flex: none;
+        color: var(--accent);
+        font-size: 12px;
+      }
+
+      .mode {
+        min-height: 31px;
+        margin: 13px 0 16px;
+        color: var(--accent);
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
+      .control + .control {
+        margin-top: 16px;
+      }
+
+      .control__line {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+        font-size: 11px;
+        line-height: 1.3;
+      }
+
+      output {
+        min-width: 3ch;
+        color: var(--accent);
+        text-align: right;
+      }
+
+      input[type='range'] {
+        width: 100%;
+        height: 22px;
+        margin: 0;
+        appearance: none;
+        background: transparent;
+        cursor: ew-resize;
+      }
+
+      input[type='range']::-webkit-slider-runnable-track {
+        height: 2px;
+        background: rgba(241, 237, 207, 0.58);
+      }
+
+      input[type='range']::-webkit-slider-thumb {
+        width: 14px;
+        height: 22px;
+        margin-top: -10px;
+        appearance: none;
+        border: 2px solid var(--panel);
+        border-radius: 0;
+        background: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent);
+      }
+
+      input[type='range']::-moz-range-track {
+        height: 2px;
+        background: rgba(241, 237, 207, 0.58);
+      }
+
+      input[type='range']::-moz-range-thumb {
+        width: 12px;
+        height: 20px;
+        border: 2px solid var(--panel);
+        border-radius: 0;
+        background: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent);
+      }
+
+      input[type='range']:focus-visible,
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+      }
+
+      .ends {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 3px;
+        color: var(--panel-muted);
+        font-size: 9px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(241, 237, 207, 0.3);
+      }
+
+      button {
+        flex: 1;
+        min-height: 34px;
+        border: 1px solid rgba(241, 237, 207, 0.65);
+        border-radius: 0;
+        background: transparent;
+        color: var(--panel-ink);
+        font: inherit;
+        font-size: 9px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: var(--panel-ink);
+        color: var(--panel);
+      }
+
+      .hint {
+        margin: 12px 0 0;
+        color: var(--panel-muted);
+        font-size: 9px;
+        line-height: 1.45;
+      }
+
+      @media (max-width: 680px) {
+        .panel {
+          top: auto;
+          bottom: 10px;
+          left: 10px;
+          width: calc(100vw - 20px);
+          padding: 13px 14px;
+          box-shadow: 4px 4px 0 rgba(20, 37, 28, 0.16);
+        }
+
+        .panel__header,
+        .mode,
+        .hint {
+          display: none;
+        }
+
+        .controls {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+
+        .control + .control {
+          margin-top: 0;
+        }
+
+        .control__line {
+          margin-bottom: 3px;
+          font-size: 9px;
+        }
+
+        .ends {
+          display: none;
+        }
+
+        .actions {
+          margin-top: 8px;
+          padding-top: 8px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        canvas {
+          cursor: default;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="stage"
+      tabindex="0"
+      role="img"
+      aria-label="Forest of Rings: twenty animated tree-ring cross sections can be arranged from an irregular mixed-age wild forest to an evenly spaced orchard planted all at once."
+    ></canvas>
+
+    <aside class="panel" aria-label="Forest variables">
+      <div class="panel__header">
+        <h1>FOREST OF RINGS</h1>
+        <span class="count">20 TREES</span>
+      </div>
+      <div id="mode" class="mode" aria-live="polite">MIXED STAND</div>
+      <div class="controls">
+        <div class="control">
+          <div class="control__line">
+            <label for="spacing">SPACING REGULARITY</label>
+            <output id="spacing-value" for="spacing">18</output>
+          </div>
+          <input id="spacing" type="range" min="0" max="100" value="18" />
+          <div class="ends" aria-hidden="true"><span>WILD</span><span>ROWS</span></div>
+        </div>
+        <div class="control">
+          <div class="control__line">
+            <label for="planting">PLANTING REGULARITY</label>
+            <output id="planting-value" for="planting">12</output>
+          </div>
+          <input id="planting" type="range" min="0" max="100" value="12" />
+          <div class="ends" aria-hidden="true"><span>MIXED AGE</span><span>ONE YEAR</span></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="reseed" type="button">NEW FOREST</button>
+        <button id="replay" type="button">REPLAY GROWTH</button>
+      </div>
+      <p class="hint">Point to a trunk to read its record. Arrow keys adjust a focused variable.</p>
+    </aside>
+
+    <script>
+      const canvas = document.getElementById('stage');
+      const ctx = canvas.getContext('2d', { alpha: false });
+      const spacingInput = document.getElementById('spacing');
+      const plantingInput = document.getElementById('planting');
+      const spacingValue = document.getElementById('spacing-value');
+      const plantingValue = document.getElementById('planting-value');
+      const modeLabel = document.getElementById('mode');
+      const TAU = Math.PI * 2;
+      const TREE_COUNT = 20;
+      const MAX_AGE = 96;
+      const SAMPLE_COUNT = 72;
+      const YEAR_MS = 145;
+      const FIELD = '#dbe6db';
+      const INK = '#14251c';
+      const PALETTE = ['#f2dc8f', '#d0a248', '#c26736', '#8c2f37', '#215a4a', '#19382c'];
+      const params = new URLSearchParams(location.search);
+      const reducedMotionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+
+      let width = 1;
+      let height = 1;
+      let dpr = 1;
+      let seed = params.get('seed') || randomSeed();
+      let forest = null;
+      let startTime = performance.now();
+      let heldAge = parseAge(params.get('age'));
+      let hoveredTree = -1;
+      let focusedTree = -1;
+      let pointer = { x: -1000, y: -1000 };
+      let raf = 0;
+
+      spacingInput.value = String(parseControl(params.get('spacing'), 18));
+      plantingInput.value = String(parseControl(params.get('planting'), 12));
+
+      function parseControl(value, fallback) {
+        if (value === null || value === '') return fallback;
+        const number = Number(value);
+        return Number.isFinite(number) ? clamp(Math.round(number), 0, 100) : fallback;
+      }
+
+      function parseAge(value) {
+        if (value === null || value === '') return null;
+        const number = Number(value);
+        return Number.isFinite(number) ? clamp(number, 0, MAX_AGE) : null;
+      }
+
+      function randomSeed() {
+        return Math.random().toString(36).slice(2, 10);
+      }
+
+      function xmur3(value) {
+        let h = 1779033703 ^ value.length;
+        for (let i = 0; i < value.length; i++) {
+          h = Math.imul(h ^ value.charCodeAt(i), 3432918353);
+          h = (h << 13) | (h >>> 19);
+        }
+        return function () {
+          h = Math.imul(h ^ (h >>> 16), 2246822507);
+          h = Math.imul(h ^ (h >>> 13), 3266489909);
+          return (h ^= h >>> 16) >>> 0;
+        };
+      }
+
+      function mulberry32(a) {
+        return function () {
+          let t = (a += 0x6d2b79f5);
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function lerp(a, b, t) {
+        return a + (b - a) * t;
+      }
+
+      function smoothstep(t) {
+        const value = clamp(t, 0, 1);
+        return value * value * (3 - 2 * value);
+      }
+
+      function angleDelta(a, b) {
+        return Math.atan2(Math.sin(a - b), Math.cos(a - b));
+      }
+
+      function makeForest(nextSeed) {
+        const seedFn = xmur3(nextSeed);
+        const random = mulberry32(seedFn());
+        const rainfall = [];
+        let rainMemory = random() * 0.4 - 0.2;
+        for (let year = 0; year <= MAX_AGE; year++) {
+          rainMemory = rainMemory * 0.58 + (random() * 2 - 1) * 0.66;
+          const cycle = Math.sin(year * 0.18 + random() * 0.14) * 0.48;
+          const shock = random() < 0.075 ? (random() < 0.52 ? -1 : 1) * lerp(0.5, 1.2, random()) : 0;
+          rainfall.push(clamp(rainMemory + cycle + shock, -1.5, 1.5));
+        }
+
+        const wildPositions = makeWildPositions(random);
+        const trees = [];
+        for (let i = 0; i < TREE_COUNT; i++) {
+          trees.push(makeTree(random, i, wildPositions[i], rainfall));
+        }
+        return {
+          rainfall,
+          trees,
+          windAngle: random() * TAU,
+          windStrength: lerp(0.2, 0.78, random()),
+          sunAngle: lerp(-Math.PI * 0.82, -Math.PI * 0.18, random()),
+          contourPhase: random() * TAU,
+        };
+      }
+
+      function makeWildPositions(random) {
+        const points = [];
+        for (let i = 0; i < TREE_COUNT; i++) {
+          let best = { x: random(), y: random(), distance: -1 };
+          const candidates = i < 2 ? 1 : 34;
+          for (let c = 0; c < candidates; c++) {
+            const candidate = { x: random(), y: random() };
+            let nearest = Infinity;
+            for (const point of points) {
+              const dx = candidate.x - point.x;
+              const dy = candidate.y - point.y;
+              nearest = Math.min(nearest, dx * dx + dy * dy);
+            }
+            if (nearest > best.distance) best = { ...candidate, distance: nearest };
+          }
+          points.push(best);
+        }
+        return points;
+      }
+
+      function makeTree(random, index, position, rainfall) {
+        const phase = random() * TAU;
+        const sunBias = lerp(0.035, 0.105, random());
+        const windBias = lerp(0.025, 0.095, random());
+        const ovalAngle = random() * TAU;
+        const ovalBias = lerp(0.02, 0.075, random());
+        const localMoisture = lerp(-0.34, 0.34, random());
+        const wildPlantYear = Math.floor(lerp(0, 43, Math.pow(random(), 0.82)));
+        const matureScale = lerp(0.68, 1.18, random());
+        const damageYear = Math.floor(lerp(18, 78, random()));
+        const damageAngle = random() * TAU;
+        const damageSeverity = lerp(0.25, 0.88, Math.pow(random(), 0.7));
+        const boundaries = [new Array(SAMPLE_COUNT).fill(0.035)];
+        const ringColors = [0];
+        const memory = new Array(SAMPLE_COUNT).fill(0);
+
+        for (let year = 1; year <= MAX_AGE; year++) {
+          const previous = boundaries[year - 1];
+          let boundary = new Array(SAMPLE_COUNT);
+          const weather = clamp(1 + rainfall[year] * 0.32 + localMoisture * 0.24, 0.34, 1.72);
+          const ageTaper = lerp(1.28, 0.72, year / MAX_AGE);
+          const injury = Math.abs(year - damageYear) <= 2 ? damageSeverity * (1 - Math.abs(year - damageYear) / 3) : 0;
+
+          for (let sample = 0; sample < SAMPLE_COUNT; sample++) {
+            const angle = (sample / SAMPLE_COUNT) * TAU;
+            const sun = Math.cos(angle - forestSunProxy(index, phase)) * sunBias;
+            const wind = -Math.cos(angle - phase * 0.37) * windBias;
+            const oval = Math.cos((angle - ovalAngle) * 2) * ovalBias;
+            const grain =
+              Math.sin(angle * 3 + phase + year * 0.035) * 0.028 +
+              Math.sin(angle * 7 - phase * 0.7 + year * 0.06) * 0.014;
+            const wound = Math.exp(-Math.pow(angleDelta(angle, damageAngle), 2) / 0.075) * injury * 0.58;
+            memory[sample] = clamp(memory[sample] * 0.96 + (sun + wind + grain) * 0.028 - wound * 0.035, -0.13, 0.13);
+            const increment = Math.max(0.12, ageTaper * weather * (1 + sun + wind + oval + grain + memory[sample] - wound));
+            boundary[sample] = previous[sample] + increment;
+          }
+          boundary = smoothLoop(boundary, year < 18 ? 3 : 1);
+          boundaries.push(boundary);
+          const wet = rainfall[year] > 0.48;
+          const dry = rainfall[year] < -0.48;
+          ringColors.push(wet ? (index + year + 1) % 3 : dry ? 3 + ((index + year) % 2) : (index * 2 + year) % PALETTE.length);
+        }
+
+        const maxRadius = Math.max(...boundaries[MAX_AGE]);
+        for (const boundary of boundaries) {
+          for (let i = 0; i < boundary.length; i++) boundary[i] /= maxRadius;
+        }
+
+        return {
+          id: index + 1,
+          wildX: position.x,
+          wildY: position.y,
+          wildPlantYear,
+          matureScale,
+          boundaries,
+          ringColors,
+          damageYear,
+          damageAngle,
+          damageSeverity,
+          localMoisture,
+          phase,
+          x: 0,
+          y: 0,
+          radius: 1,
+        };
+      }
+
+      function forestSunProxy(index, phase) {
+        return -Math.PI * 0.5 + Math.sin(index * 1.7 + phase) * 0.28;
+      }
+
+      function smoothLoop(values, passes) {
+        let output = values.slice();
+        for (let pass = 0; pass < passes; pass++) {
+          const next = new Array(output.length);
+          for (let i = 0; i < output.length; i++) {
+            next[i] = output[(i - 1 + output.length) % output.length] * 0.22 + output[i] * 0.56 + output[(i + 1) % output.length] * 0.22;
+          }
+          output = next;
+        }
+        return output;
+      }
+
+      function fieldBounds() {
+        if (width >= 681) {
+          return { left: 322, top: 34, right: width - 34, bottom: height - 34 };
+        }
+        return { left: 18, top: 62, right: width - 18, bottom: Math.max(180, height - 190) };
+      }
+
+      function updateLayout() {
+        const bounds = fieldBounds();
+        const fieldWidth = Math.max(100, bounds.right - bounds.left);
+        const fieldHeight = Math.max(100, bounds.bottom - bounds.top);
+        const spacingT = smoothstep(Number(spacingInput.value) / 100);
+        const cellWidth = fieldWidth / 5;
+        const cellHeight = fieldHeight / 4;
+        const baseRadius = clamp(Math.min(cellWidth, cellHeight) * 0.37, 18, 65);
+
+        forest.trees.forEach((tree, index) => {
+          const column = index % 5;
+          const row = Math.floor(index / 5);
+          const gridX = bounds.left + (column + 0.5) * cellWidth;
+          const gridY = bounds.top + (row + 0.5) * cellHeight;
+          const wildInsetX = baseRadius * 0.95;
+          const wildInsetY = baseRadius * 0.95;
+          const wildX = lerp(bounds.left + wildInsetX, bounds.right - wildInsetX, tree.wildX);
+          const wildY = lerp(bounds.top + wildInsetY, bounds.bottom - wildInsetY, tree.wildY);
+          tree.x = lerp(wildX, gridX, spacingT);
+          tree.y = lerp(wildY, gridY, spacingT);
+          tree.radius = baseRadius * lerp(tree.matureScale, 0.94, spacingT);
+        });
+      }
+
+      function forestAge(now) {
+        if (reducedMotionQuery.matches) return MAX_AGE;
+        if (heldAge !== null) return heldAge;
+        return clamp((now - startTime) / YEAR_MS, 0, MAX_AGE);
+      }
+
+      function treeAge(tree, sharedAge) {
+        const plantingT = smoothstep(Number(plantingInput.value) / 100);
+        const plantYear = Math.round(lerp(tree.wildPlantYear, 0, plantingT));
+        return { age: clamp(sharedAge - plantYear, 0, MAX_AGE), plantYear };
+      }
+
+      function draw(now) {
+        const age = forestAge(now);
+        ctx.fillStyle = FIELD;
+        ctx.fillRect(0, 0, width, height);
+        drawSurveyField(age);
+        drawOrchardGuides();
+
+        const drawOrder = [...forest.trees].sort((a, b) => a.y - b.y);
+        for (const tree of drawOrder) drawTree(tree, treeAge(tree, age));
+        drawFieldReadout(age);
+        drawInspector(age);
+
+        if (age < MAX_AGE && heldAge === null && !reducedMotionQuery.matches) {
+          raf = requestAnimationFrame(draw);
+        }
+      }
+
+      function drawSurveyField(age) {
+        const bounds = fieldBounds();
+        const gap = clamp(Math.min(width, height) / 18, 26, 48);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(20, 37, 28, 0.11)';
+        ctx.lineWidth = 1;
+        for (let x = bounds.left; x <= bounds.right; x += gap) {
+          ctx.beginPath();
+          ctx.moveTo(x + 0.5, bounds.top);
+          ctx.lineTo(x + 0.5, bounds.bottom);
+          ctx.stroke();
+        }
+        for (let y = bounds.top; y <= bounds.bottom; y += gap) {
+          ctx.beginPath();
+          ctx.moveTo(bounds.left, y + 0.5);
+          ctx.lineTo(bounds.right, y + 0.5);
+          ctx.stroke();
+        }
+
+        ctx.strokeStyle = 'rgba(33, 90, 74, 0.16)';
+        for (let band = 0; band < 7; band++) {
+          const baseY = lerp(bounds.top, bounds.bottom, (band + 0.6) / 7);
+          ctx.beginPath();
+          for (let step = 0; step <= 80; step++) {
+            const x = lerp(bounds.left, bounds.right, step / 80);
+            const y = baseY + Math.sin(step * 0.18 + forest.contourPhase + band * 0.8) * 10 + Math.sin(step * 0.057 + age * 0.008) * 5;
+            if (step === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawOrchardGuides() {
+        const spacingT = smoothstep((Number(spacingInput.value) - 58) / 42);
+        if (spacingT <= 0) return;
+        const bounds = fieldBounds();
+        const cellWidth = (bounds.right - bounds.left) / 5;
+        const cellHeight = (bounds.bottom - bounds.top) / 4;
+        ctx.save();
+        ctx.globalAlpha = spacingT * 0.65;
+        ctx.strokeStyle = '#215a4a';
+        ctx.setLineDash([4, 7]);
+        for (let row = 0; row < 4; row++) {
+          const y = bounds.top + (row + 0.5) * cellHeight;
+          ctx.beginPath();
+          ctx.moveTo(bounds.left, y);
+          ctx.lineTo(bounds.right, y);
+          ctx.stroke();
+        }
+        for (let column = 0; column < 5; column++) {
+          const x = bounds.left + (column + 0.5) * cellWidth;
+          ctx.beginPath();
+          ctx.moveTo(x, bounds.top);
+          ctx.lineTo(x, bounds.bottom);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawTree(tree, record) {
+        if (record.age <= 0.02) {
+          ctx.fillStyle = INK;
+          ctx.beginPath();
+          ctx.arc(tree.x, tree.y, 1.5, 0, TAU);
+          ctx.fill();
+          return;
+        }
+
+        const wholeAge = Math.floor(record.age);
+        const partial = record.age - wholeAge;
+        ctx.save();
+        ctx.translate(tree.x, tree.y);
+
+        for (let year = 1; year <= wholeAge; year++) {
+          pathBoundary(tree.boundaries[year], tree.radius);
+          ctx.fillStyle = PALETTE[tree.ringColors[year]];
+          ctx.fill();
+        }
+        if (wholeAge < MAX_AGE && partial > 0) {
+          const boundary = interpolateBoundary(tree.boundaries[wholeAge], tree.boundaries[wholeAge + 1], smoothstep(partial));
+          pathBoundary(boundary, tree.radius);
+          ctx.fillStyle = PALETTE[tree.ringColors[wholeAge + 1]];
+          ctx.fill();
+        }
+
+        ctx.strokeStyle = 'rgba(20, 37, 28, 0.48)';
+        ctx.lineWidth = clamp(tree.radius * 0.014, 0.45, 1.1);
+        for (let year = 3; year <= wholeAge; year += wholeAge > 70 ? 3 : 2) {
+          pathBoundary(tree.boundaries[year], tree.radius);
+          ctx.stroke();
+        }
+
+        const outer = tree.boundaries[Math.max(1, wholeAge)];
+        pathBoundary(outer, tree.radius);
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = clamp(tree.radius * 0.075, 1.7, 4.4);
+        ctx.stroke();
+
+        if (wholeAge >= tree.damageYear) drawScar(tree, outer, wholeAge);
+
+        ctx.fillStyle = '#f1edcf';
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(0, 0, clamp(tree.radius * 0.045, 1.8, 3.4), 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        const active = tree.id - 1 === hoveredTree || tree.id - 1 === focusedTree;
+        if (active) {
+          ctx.save();
+          ctx.strokeStyle = INK;
+          ctx.setLineDash([3, 4]);
+          ctx.beginPath();
+          ctx.arc(tree.x, tree.y, tree.radius + 7, 0, TAU);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      function drawScar(tree, boundary, age) {
+        const healed = clamp((age - tree.damageYear) / 18, 0, 1);
+        const radius = radiusAt(boundary, tree.damageAngle) * tree.radius;
+        ctx.save();
+        ctx.rotate(tree.damageAngle);
+        ctx.strokeStyle = `rgba(20, 37, 28, ${lerp(0.9, 0.5, healed)})`;
+        ctx.lineWidth = clamp(tree.radius * lerp(0.07, 0.025, healed) * tree.damageSeverity, 1, 4);
+        ctx.beginPath();
+        ctx.moveTo(radius * lerp(0.64, 0.82, healed), 0);
+        ctx.lineTo(radius * 1.03, 0);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function pathBoundary(boundary, radius) {
+        ctx.beginPath();
+        for (let i = 0; i <= SAMPLE_COUNT; i++) {
+          const index = i % SAMPLE_COUNT;
+          const angle = (index / SAMPLE_COUNT) * TAU;
+          const r = boundary[index] * radius;
+          const x = Math.cos(angle) * r;
+          const y = Math.sin(angle) * r;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+      }
+
+      function interpolateBoundary(from, to, amount) {
+        return from.map((value, index) => lerp(value, to[index], amount));
+      }
+
+      function radiusAt(boundary, angle) {
+        const normalized = ((angle % TAU) + TAU) % TAU;
+        const sample = (normalized / TAU) * SAMPLE_COUNT;
+        const a = Math.floor(sample) % SAMPLE_COUNT;
+        const b = (a + 1) % SAMPLE_COUNT;
+        return lerp(boundary[a], boundary[b], sample - Math.floor(sample));
+      }
+
+      function drawFieldReadout(age) {
+        const bounds = fieldBounds();
+        const mature = forest.trees.filter((tree) => treeAge(tree, age).age > 0).length;
+        ctx.save();
+        ctx.fillStyle = INK;
+        ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`SEASON ${String(Math.floor(age)).padStart(2, '0')} / ${MAX_AGE}`, bounds.left, 18);
+        ctx.textAlign = 'right';
+        ctx.fillText(`${String(mature).padStart(2, '0')} OF 20 EMERGED`, bounds.right, 18);
+        ctx.restore();
+      }
+
+      function drawInspector(sharedAge) {
+        const index = hoveredTree >= 0 ? hoveredTree : focusedTree;
+        if (index < 0) return;
+        const tree = forest.trees[index];
+        const record = treeAge(tree, sharedAge);
+        const lines = [
+          `TREE ${String(tree.id).padStart(2, '0')}`,
+          `AGE ${String(Math.floor(record.age)).padStart(2, '0')}`,
+          `GERMINATED ${String(record.plantYear).padStart(2, '0')}`,
+          `SOIL ${tree.localMoisture >= 0 ? '+' : ''}${tree.localMoisture.toFixed(2)}`,
+        ];
+        const w = 118;
+        const h = 58;
+        let x = tree.x + tree.radius + 12;
+        let y = tree.y - h / 2;
+        if (x + w > width - 8) x = tree.x - tree.radius - w - 12;
+        y = clamp(y, 28, height - h - 8);
+        ctx.save();
+        ctx.fillStyle = '#173a2b';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#f1edcf';
+        ctx.font = '9px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+        ctx.textBaseline = 'top';
+        lines.forEach((line, lineIndex) => ctx.fillText(line, x + 8, y + 7 + lineIndex * 12));
+        ctx.restore();
+      }
+
+      function updateControls() {
+        const spacing = Number(spacingInput.value);
+        const planting = Number(plantingInput.value);
+        spacingValue.textContent = String(spacing);
+        plantingValue.textContent = String(planting);
+        if (spacing <= 4 && planting <= 4) modeLabel.textContent = 'WILD FOREST · MIXED AGES, IRREGULAR GROUND';
+        else if (spacing >= 96 && planting >= 96) modeLabel.textContent = 'ORCHARD · EVEN ROWS, ONE PLANTING YEAR';
+        else if (spacing >= 72 && planting < 40) modeLabel.textContent = 'AGED ROWS · REGULAR GROUND, MIXED YEARS';
+        else if (spacing < 40 && planting >= 72) modeLabel.textContent = 'SAME COHORT · ONE YEAR, IRREGULAR GROUND';
+        else modeLabel.textContent = 'MIXED STAND · PART WILD, PART MANAGED';
+        canvas.setAttribute(
+          'aria-label',
+          `Forest of Rings with twenty trees. Spacing regularity ${spacing} of 100. Planting regularity ${planting} of 100.`
+        );
+        if (forest) {
+          updateLayout();
+          cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(draw);
+        }
+      }
+
+      function reset(nextSeed = randomSeed()) {
+        seed = nextSeed;
+        heldAge = null;
+        startTime = performance.now();
+        hoveredTree = -1;
+        focusedTree = -1;
+        forest = makeForest(seed);
+        updateLayout();
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(draw);
+      }
+
+      function replay() {
+        heldAge = null;
+        startTime = performance.now();
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(draw);
+      }
+
+      function resize() {
+        dpr = Math.min(devicePixelRatio || 1, 2);
+        width = innerWidth;
+        height = innerHeight;
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        if (forest) updateLayout();
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(draw);
+      }
+
+      function nearestTree(x, y) {
+        let nearest = -1;
+        let distance = Infinity;
+        forest.trees.forEach((tree, index) => {
+          const dx = x - tree.x;
+          const dy = y - tree.y;
+          const d = Math.hypot(dx, dy) - tree.radius;
+          if (d < distance) {
+            distance = d;
+            nearest = index;
+          }
+        });
+        return distance < 18 ? nearest : -1;
+      }
+
+      spacingInput.addEventListener('input', updateControls);
+      plantingInput.addEventListener('input', updateControls);
+      document.getElementById('reseed').addEventListener('click', () => {
+        history.replaceState(null, '', location.pathname);
+        reset();
+      });
+      document.getElementById('replay').addEventListener('click', replay);
+
+      canvas.addEventListener('pointermove', (event) => {
+        pointer = { x: event.clientX, y: event.clientY };
+        const next = nearestTree(pointer.x, pointer.y);
+        if (next !== hoveredTree) {
+          hoveredTree = next;
+          canvas.style.cursor = next >= 0 ? 'pointer' : 'crosshair';
+          cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(draw);
+        }
+      });
+      canvas.addEventListener('pointerleave', () => {
+        hoveredTree = -1;
+        canvas.style.cursor = 'crosshair';
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(draw);
+      });
+      canvas.addEventListener('click', (event) => {
+        focusedTree = nearestTree(event.clientX, event.clientY);
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(draw);
+      });
+      canvas.addEventListener('keydown', (event) => {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape'].includes(event.key)) return;
+        event.preventDefault();
+        if (event.key === 'Escape') focusedTree = -1;
+        else {
+          const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
+          focusedTree = (Math.max(0, focusedTree) + step + TREE_COUNT) % TREE_COUNT;
+        }
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(draw);
+      });
+      addEventListener('resize', resize);
+      reducedMotionQuery.addEventListener('change', () => {
+        startTime = performance.now();
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(draw);
+      });
+
+      updateControls();
+      resize();
+      forest = makeForest(seed);
+      updateLayout();
+      startTime = performance.now();
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(draw);
+    </script>
+  </body>
+</html>

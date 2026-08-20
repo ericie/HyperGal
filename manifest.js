@@ -382,6 +382,18 @@ window.HYPERGAL_MANIFEST = {
       "thumbnail": "thumbnail.png",
       "description": "A field of Geist Sans makes every letter active: each rollover releases a 2.5-second abstract composition built only from that glyph, and each composition can overlap the next.",
       "updated": "2026-08-20"
+    },
+    {
+      "slug": "034-forest-of-rings",
+      "title": "Forest of Rings",
+      "year": 2026,
+      "date": "2026-08-20",
+      "category": "nature",
+      "type": "interactive",
+      "wip": true,
+      "thumbnail": "thumbnail.jpg",
+      "description": "Twenty animated trunk records share one climate while two controls move the stand between a mixed-age wild forest and a uniformly spaced orchard planted all at once.",
+      "updated": "2026-08-20"
     }
   ]
 };
