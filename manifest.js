@@ -20,10 +20,9 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-06-18",
       "category": "generative",
       "type": "interactive",
-      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A patterned wall of falling bricks. One color pair and one high-contrast textile tile seed each run; staggered rows scroll downward while new faux-3D bricks tumble in from above, flatten, and join the wall. Click to reshuffle.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "003-unbreakable",
@@ -80,7 +79,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
       "description": "Twenty autonomous snakes hunt one mouse in an 8-bit underground Mega Man palette. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Continuous rounded bodies cross a cavern-dark field; death travels from head to tail, replacing each fading segment with abstract cross-hatching in place. Click to reseed.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "008-vectrex-asteroids",
@@ -100,10 +99,9 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-15",
       "category": "games",
       "type": "interactive",
-      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A two-sided Missile Command riff. A north row and south row of pixel towns and batteries launch paired attacks while their defenses try to erase incoming missiles at roughly the same rate. Each side starts at 1000 points and loses score as cities, batteries, and ground are destroyed; when a side reaches zero, the ruined row is cleared and a fresh set of towns slides in from the side.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "010-obstacles-and-how-to-avoid-them",
@@ -114,7 +112,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
       "description": "A full-window drawing of borderless Hokusai-toned walls, squares, and circles composed by adjustable gestalt forces. Boids sense each obstacle at individual distances, turn through distinct bounded lanes, and leave fine trails that slowly fan back out.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "011-switch-stack",
@@ -220,7 +218,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A dense edge-to-edge black-and-white architecture built on a shared grid. Wide chambers and needle-thin towers repeat nested arches, circles, diamonds, miniature buildings, flags, and colonnades through alternating solid mass and carved negative space.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-19"
     },
     {
       "slug": "020-soft-collapse",
@@ -231,8 +229,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "generative",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A field of black-and-white geometric cells where sixteen small frames merge into four-by-four forms, split apart again, and slide motifs through fixed crops. Click to change a block; press Space to pause and R to recompose.",
-      "updated": "2026-08-17"
+      "description": "A field of black-and-white geometric cells where sixteen small frames merge into four-by-four forms, split apart again, and trade motifs through custom geometric transformations. Click to change a block; press Space to pause and R to recompose.",
+      "updated": "2026-08-20"
     },
     {
       "slug": "021-marbles",
@@ -266,7 +264,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "Large colored ink drops alternate with open-water spaces, building wandering suminagashi rings inside a bounded floating bath. Adjustable disturbances pull the accumulated contours into new patterns.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "024-fuel-seekers",
@@ -278,7 +276,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "Sixty fuel bubbles grow color-shifting vine trails as they travel between four-port diamond stations. Exhausted oil deposits burn out permanently, forcing replacement stations into untouched parts of the field.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "025-cloudcutter",
@@ -287,10 +285,9 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-08-03",
       "category": "games",
       "type": "interactive",
-      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A black-and-white vector Asteroids variant flown against weather instead of rock. Rounds explosively punch broad chunks out of wide, scalloped cumulus, so the only way through a body is to bore a tunnel and fly down it. The ship never targets anything. It holds a wandering course with the guns held down, and where the sky is thick it grinds to a crawl until its own fire has opened the way — an icebreaker, not a hunter. Its hull reams out what the guns began, so it can never wedge itself in a bore too narrow to fly. Sparse cloudscapes pan endlessly left while the ship works up and down through them; the camera follows, keeping it in frame. Bites heal slowly like liquid, and a bore that reaches all the way through leaves the exact same cloud outline divided into two halves.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "026-top-of-the-heap",
@@ -301,8 +298,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "generative",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A bright ball character defends a twenty-storey cube pyramid from waves of wide spring-snakes that reserve individual squares, hunting whichever coil is closest to the summit. ON wins by lighting every cube; OFF wins by taking the top.",
-      "updated": "2026-08-17"
+      "description": "A bright ball and frequent waves of spring-snakes fight for a twenty-storey cube pyramid, painting every landing yellow or green. The scoreboard tracks Yellow, Green, and unclaimed territory; the first side to claim 100% wins.",
+      "updated": "2026-08-19"
     },
     {
       "slug": "027-camouflage",
@@ -313,7 +310,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
       "description": "Nine still, finely pixelated fields include zebra, leopard, ocelot, tiger, giraffe, fawn, crocodile, woodland, and desert camouflage. A shuffled cycle synchronizes each palette shift with a hard-edged distance-field morph that splits, merges, expands, and contracts each region into the next pattern.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "028-overgrowth",
@@ -324,8 +321,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "generative",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A dense, directionless botanical wallpaper on aged rag paper. Dye-pot flowers, green fig and fern foliage, and varied cream rubber tree, Fatsia japonica, palm, and fern leaves unfold through twenty hand-drawn growth stages in every direction.",
-      "updated": "2026-08-17"
+      "description": "A dense, directionless botanical wallpaper on aged rag paper. Dye-pot hibiscus, chrysanthemums, orange daylilies, fringed iris, dwarf quince, Monstera, green palm and fern foliage, and varied cream leaves unfold through twenty hand-drawn growth stages in every direction.",
+      "updated": "2026-08-20"
     },
     {
       "slug": "029-eyes-open",
@@ -334,10 +331,9 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-08-08",
       "category": "generative",
       "type": "generative",
-      "wip": true,
       "thumbnail": "thumbnail.svg",
       "description": "A black field populated by bright graphic eyes. Ten to twenty are open at once on a phone, each arriving independently, holding its gaze, blinking shut, and vanishing before another appears elsewhere.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "030-obstacles-and-how-to-go-around-them",
@@ -349,7 +345,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A top-down field study plots how blossom-pink petals move around flat, contour-drawn rock obstacles through shoals, quick channels, and turbulent wakes.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "031-elevator",
@@ -361,7 +357,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A perfectly ordinary elevator makes its rounds through five still, fantastical office rooms: flooded desks, indoor weather, a midnight orchard, a sky boardroom, and records without end.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-18"
     },
     {
       "slug": "032-obstacles-and-the-space-between",
@@ -372,7 +368,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A reduced top-down dry-garden study surrounds one contour-drawn stone with nested, non-crossing samon."
+      "description": "Black pulses fade as they travel from three contour-drawn stones, then intensify when their nested, non-crossing samon join.",
+      "updated": "2026-08-20"
     },
     {
       "slug": "033-the-greater-whole",
@@ -383,7 +380,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "A field of Geist Sans makes every letter active: each rollover releases a 2.5-second abstract composition built only from that glyph, and each composition can overlap the next."
+      "description": "A field of Geist Sans makes every letter active: each rollover releases a 2.5-second abstract composition built only from that glyph, and each composition can overlap the next.",
+      "updated": "2026-08-20"
     }
   ]
 };

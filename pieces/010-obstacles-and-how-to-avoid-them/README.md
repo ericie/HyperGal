@@ -11,6 +11,9 @@ arc; off-page lets major walls continue beyond the frame. A small control panel
 turns each force on or off and sets its strength, while Count controls how many
 obstacles enter the composition and Lines sets the field-line density. The panel
 can be dragged by its header or collapsed to keep the drawing unobstructed.
+Every new composition gives one gestalt full strength, a different gestalt zero
+strength, and seed-based random strengths to the others. The controls remain
+editable after the composition appears.
 
 Walls vary between vertical, horizontal, and diagonal orientations, with
 independent aspect ratios that range from compact bars to long, thin spans.
@@ -27,15 +30,17 @@ each silhouette's angles. They compress into dense bundles in tight passages,
 retain that displacement downstream, and slowly fan back out when space returns.
 Small colored boids travel each path from left to right, revealing the line in
 their wake at a steady physical speed, including through large vertical detours.
+When a boid leaves the field, it immediately wraps to the opposite edge at the
+same cross-field position and heading, so its route reads as a continuous loop.
 Each boid senses obstacles at its own distance, but that perception remains
 invisible so the moving heads and their trails carry the composition. Boids also
 have individual steering responses, turn radii, bounded lane clearances, route
 choices, and recovery rates. They use distinct local avoidance tracks instead
 of collapsing onto one shared clearance line. Any route the solver cannot keep
 continuous is discarded rather than drawn as an abrupt connector. Every trail
-runs on an independent draw, linger, fade, and rest cadence,
-so paths continually reappear across the field like rain rather than arriving in
-one batch. Reduced motion displays the complete static field.
+runs on an independent loop and fades behind the next lap, so paths continually
+reappear across the field like rain rather than arriving in one batch. Reduced
+motion displays the complete static field.
 
 Click, tap, Space, or Enter to reseed the arrangement. Add `?seed=<value>` to
 the URL for a repeatable starting composition.

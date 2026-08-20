@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="Large, wandering ink drops alternate with open water to build shifting suminagashi rings inside a bounded floating bath."
+      content="Large, wandering ink drops build shifting suminagashi rings until an enormous pale bloom clears the saturated bath into a new background color."
     />
     <title>Marbled Water · HyperGal</title>
     <style>
@@ -325,7 +325,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Marbled Water: large colored ink drops alternate with open-water spaces, expanding into wandering suminagashi rings held inside a visible bath border. Use the panel to adjust the drops or disturb the pattern."
+      aria-label="Marbled Water: colored ink drops expand into wandering suminagashi rings. When the bath stays full, an enormous pale drop clears it into a new background color. Use the panel to adjust the drops or disturb the pattern."
     ></canvas>
 
     <aside class="water-panel is-collapsed" aria-label="Marbled water controls">
@@ -447,11 +447,30 @@
         const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 
         const PAPER = '#f3f1e9';
+        const BATH_BACKGROUNDS = [
+          '#dbe8e7',
+          '#ead8ce',
+          '#dce5d4',
+          '#e3d9e8',
+          '#e8e1c6'
+        ];
         const POINT_COUNT = 144;
         const INITIAL_RING_COUNT = 5;
         const MAX_SHAPES = 220;
         const SUMINAGASHI_PALETTE = 1;
+        const DROP_EXPANSION_SCALE = 3;
+        const DROP_EXPANSION_TIME_SCALE = 10;
+        const MIN_DROPS_BEFORE_BACKGROUND = 30;
+        const FULLNESS_THRESHOLD = 0.92;
+        const FULLNESS_HOLD = 8000;
+        const FULLNESS_CHECK_INTERVAL = 900;
         const TAU = Math.PI * 2;
+
+        const coverageCanvas = document.createElement('canvas');
+        const coverageContext = coverageCanvas.getContext('2d', {
+          alpha: false,
+          willReadFrequently: true
+        });
 
         const PALETTES = [
           ['#b62b59', '#d84c31', '#d4a51f', '#1c4f91', '#1c7562', '#1f1c1d'],
@@ -482,6 +501,10 @@
         let complexity = 0;
         let colorIndex = 0;
         let inkStations = [];
+        let bathColor = PAPER;
+        let fullSince = 0;
+        let nextFullnessCheck = 0;
+        let backgroundDropCooldownUntil = 0;
         let paused = motionPreference.matches;
         let seed = seedFromLocation();
         let random = mulberry32(seed);
@@ -521,6 +544,10 @@
           complexity = 0;
           colorIndex = 0;
           inkStations = [];
+          bathColor = PAPER;
+          fullSince = 0;
+          nextFullnessCheck = performance.now() + FULLNESS_CHECK_INTERVAL;
+          backgroundDropCooldownUntil = 0;
           random = mulberry32(seed);
 
           seedInitialBath();
@@ -560,9 +587,8 @@
                 marginY,
                 height - marginY
               );
-              const sizeJitter = 1 + (random() * 2 - 1) *
-                (0.08 + variation * 0.24);
-              const radius = openingBase * 0.82 * sizeJitter;
+              const sizeScale = sampleDropScale(variation * 0.78);
+              const radius = openingBase * 0.82 * sizeScale;
               placeSettledInk(
                 cursorX,
                 cursorY,
@@ -628,7 +654,7 @@
 
         function placeSuminagashiSpacer(x, y, inkRadius) {
           const spacer = createSuminagashiSpacer(x, y, inkRadius);
-          placeSettledInk(spacer.x, spacer.y, spacer.radius, PAPER, true);
+          placeSettledInk(spacer.x, spacer.y, spacer.radius, bathColor, true);
         }
 
         function createSuminagashiSpacer(x, y, inkRadius) {
@@ -678,6 +704,11 @@
             if (activeComb) {
               updateComb(time);
               needsRender = true;
+            }
+
+            if (time >= nextFullnessCheck && !activeDrop && !activeComb) {
+              nextFullnessCheck = time + FULLNESS_CHECK_INTERVAL;
+              needsRender = updateBathFullness(time) || needsRender;
             }
 
             if (!activeDrop && !activeComb && time >= nextDropAt) {
@@ -741,7 +772,8 @@
           const interval = dropInterval();
           const baseRadius = Math.min(width, height) *
             Number(controls.dropSize.value) / 1000;
-          const bloomScale = clamp(radius / Math.max(1, baseRadius), 0.45, 2.8);
+          const bloomScale = clamp(radius / Math.max(1, baseRadius), 0.16, 4.2);
+          const targetRadius = radius * DROP_EXPANSION_SCALE;
           const form = createDropForm();
           const shape = {
             color,
@@ -749,12 +781,12 @@
             form,
             points: circlePoints(x, y, 0.01, form)
           };
-          const impactDuration = 80 + random() * 75;
+          const impactDuration = 110 + random() * 100;
           const expansionDuration = clamp(
-            interval * (0.5 + bloomScale * 0.2 + random() * 0.12),
-            430,
-            1120
-          );
+            interval * (1.05 + bloomScale * 0.45 + random() * 0.22),
+            1100,
+            3200
+          ) * DROP_EXPANSION_TIME_SCALE;
           const impactRadius = clamp(radius * 0.16, 2.5, 6);
 
           shapes.push(shape);
@@ -762,7 +794,7 @@
             shape,
             x,
             y,
-            targetRadius: radius,
+            targetRadius,
             impactRadius,
             currentRadius: 0.01,
             start: time,
@@ -798,7 +830,7 @@
               0,
               1
             );
-            const easedArea = smootherStep(expansion);
+            const easedArea = easeInOutSine(expansion);
             const impactArea = drop.impactRadius * drop.impactRadius;
             const targetArea = drop.targetRadius * drop.targetRadius;
             radius = Math.sqrt(impactArea + (targetArea - impactArea) * easedArea);
@@ -807,7 +839,7 @@
           applyDropExpansion(drop, radius);
           if (elapsed >= drop.duration) {
             activeDrop = null;
-            if (drop.reservePaper) startSuminagashiSpacer(drop, time);
+            finishDrop(drop, time);
           }
         }
 
@@ -816,6 +848,14 @@
           const drop = activeDrop;
           applyDropExpansion(drop, drop.targetRadius);
           activeDrop = null;
+          finishDrop(drop, performance.now());
+        }
+
+        function finishDrop(drop, time) {
+          if (drop.backgroundDrop) {
+            finishBackgroundDrop(drop, time);
+            return;
+          }
           if (drop.reservePaper) {
             placeSuminagashiSpacer(drop.x, drop.y, drop.targetRadius);
           }
@@ -829,12 +869,12 @@
           );
           const form = createDropForm();
           const shape = {
-            color: PAPER,
+            color: bathColor,
             clearing: true,
             form,
             points: circlePoints(spacer.x, spacer.y, 0.01, form)
           };
-          const duration = 175 + random() * 115;
+          const duration = (175 + random() * 115) * DROP_EXPANSION_TIME_SCALE;
 
           shapes.push(shape);
           activeDrop = {
@@ -850,6 +890,165 @@
             duration,
             reservePaper: false
           };
+        }
+
+        function updateBathFullness(time) {
+          if (
+            complexity < MIN_DROPS_BEFORE_BACKGROUND ||
+            time < backgroundDropCooldownUntil ||
+            (activeDrop && activeDrop.backgroundDrop)
+          ) {
+            fullSince = 0;
+            return false;
+          }
+
+          const coverage = measureBathCoverage();
+          if (coverage < FULLNESS_THRESHOLD) {
+            fullSince = 0;
+            return false;
+          }
+
+          if (!fullSince) fullSince = time;
+          if (
+            time - fullSince >= FULLNESS_HOLD &&
+            !activeDrop &&
+            !activeComb
+          ) {
+            startBackgroundDrop(time);
+            return true;
+          }
+          return false;
+        }
+
+        function measureBathCoverage() {
+          const sampleWidth = 96;
+          const sampleHeight = clamp(
+            Math.round(sampleWidth * height / Math.max(1, width)),
+            48,
+            112
+          );
+          if (
+            coverageCanvas.width !== sampleWidth ||
+            coverageCanvas.height !== sampleHeight
+          ) {
+            coverageCanvas.width = sampleWidth;
+            coverageCanvas.height = sampleHeight;
+            coverageContext.imageSmoothingEnabled = true;
+            coverageContext.imageSmoothingQuality = 'low';
+          }
+
+          coverageContext.drawImage(
+            canvas,
+            0,
+            0,
+            canvas.width,
+            canvas.height,
+            0,
+            0,
+            sampleWidth,
+            sampleHeight
+          );
+          const pixels = coverageContext.getImageData(
+            0,
+            0,
+            sampleWidth,
+            sampleHeight
+          ).data;
+          const background = hexToRgb(bathColor);
+          let covered = 0;
+          let sampled = 0;
+
+          for (let y = 1; y < sampleHeight - 1; y++) {
+            for (let x = 1; x < sampleWidth - 1; x++) {
+              const index = (y * sampleWidth + x) * 4;
+              const difference =
+                Math.abs(pixels[index] - background.r) +
+                Math.abs(pixels[index + 1] - background.g) +
+                Math.abs(pixels[index + 2] - background.b);
+              if (difference > 32) covered++;
+              sampled++;
+            }
+          }
+
+          return sampled ? covered / sampled : 0;
+        }
+
+        function startBackgroundDrop(time) {
+          completeActiveDrop();
+          activeComb = null;
+
+          const inset = bathInset();
+          const x = width * (0.44 + random() * 0.12);
+          const y = height * (0.44 + random() * 0.12);
+          const farthestCorner = Math.max(
+            Math.hypot(x - inset, y - inset),
+            Math.hypot(width - inset - x, y - inset),
+            Math.hypot(x - inset, height - inset - y),
+            Math.hypot(width - inset - x, height - inset - y)
+          );
+          const targetRadius = farthestCorner + Math.min(width, height) * 0.18;
+          const nextColor = nextBathBackground();
+          const form = {
+            stretch: 1,
+            rotation: 0,
+            broadWobble: 0.003,
+            fineWobble: 0,
+            broadPhase: random() * TAU,
+            finePhase: 0
+          };
+          const shape = {
+            color: nextColor,
+            clearing: true,
+            backgroundDrop: true,
+            form,
+            points: circlePoints(x, y, 0.01, form)
+          };
+          const impactDuration = 180;
+          const expansionDuration = (3400 + random() * 1000) *
+            DROP_EXPANSION_TIME_SCALE;
+
+          shapes.push(shape);
+          activeDrop = {
+            shape,
+            x,
+            y,
+            targetRadius,
+            impactRadius: clamp(Math.min(width, height) * 0.026, 9, 20),
+            currentRadius: 0.01,
+            start: time,
+            impactDuration,
+            expansionDuration,
+            duration: impactDuration + expansionDuration,
+            reservePaper: false,
+            backgroundDrop: true
+          };
+
+          fullSince = 0;
+          nextDropAt = time + activeDrop.duration + 900;
+          status.textContent = 'The saturated bath is opening into a new ground.';
+
+          if (motionPreference.matches) {
+            completeActiveDrop();
+            render();
+          }
+        }
+
+        function finishBackgroundDrop(drop, time) {
+          bathColor = drop.shape.color;
+          shapes = [];
+          inkStations = [];
+          complexity = 0;
+          fullSince = 0;
+          backgroundDropCooldownUntil = time + 12000;
+          nextFullnessCheck = time + FULLNESS_CHECK_INTERVAL;
+          nextDropAt = time + 900;
+          updateBathNumber();
+          status.textContent = 'A new bath ground is ready for ink.';
+        }
+
+        function nextBathBackground() {
+          const available = BATH_BACKGROUNDS.filter((color) => color !== bathColor);
+          return available[Math.floor(random() * available.length)];
         }
 
         function applyDropExpansion(drop, radius) {
@@ -1070,7 +1269,7 @@
 
         function render(time = 0) {
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          ctx.fillStyle = PAPER;
+          ctx.fillStyle = bathColor;
           ctx.fillRect(0, 0, width, height);
 
           for (const shape of shapes) drawShape(shape);
@@ -1099,14 +1298,20 @@
           ctx.beginPath();
           const lastPoint = points[points.length - 1];
           const firstPoint = points[0];
-          const first = midpoint(lastPoint, firstPoint);
-          ctx.moveTo(first.x, first.y);
+          ctx.moveTo(
+            (lastPoint.x + firstPoint.x) * 0.5,
+            (lastPoint.y + firstPoint.y) * 0.5
+          );
 
           for (let i = 0; i < points.length; i++) {
             const point = points[i];
             const next = points[(i + 1) % points.length];
-            const middle = midpoint(point, next);
-            ctx.quadraticCurveTo(point.x, point.y, middle.x, middle.y);
+            ctx.quadraticCurveTo(
+              point.x,
+              point.y,
+              (point.x + next.x) * 0.5,
+              (point.y + next.y) * 0.5
+            );
           }
 
           ctx.closePath();
@@ -1160,17 +1365,19 @@
         }
 
         function sampleDropScale(variation) {
-          const separation = Math.pow(clamp(variation, 0, 1), 0.65);
+          const separation = Math.pow(clamp(variation, 0, 1), 0.42);
           const family = random();
           let sampledScale;
 
-          if (family < 0.17) {
-            // Occasional broad blooms provide the large expansion moments.
-            sampledScale = 1.65 + random() * 1.15;
-          } else if (family < 0.43) {
-            sampledScale = 0.38 + random() * 0.4;
+          if (family < 0.12) {
+            sampledScale = 0.16 + random() * 0.18;
+          } else if (family < 0.34) {
+            sampledScale = 0.42 + random() * 0.32;
+          } else if (family < 0.8) {
+            sampledScale = 0.82 + random() * 0.58;
           } else {
-            sampledScale = 0.82 + random() * 0.46;
+            // One in five drops becomes an unmistakably large bloom.
+            sampledScale = 2 + random() * 2.2;
           }
 
           return 1 + (sampledScale - 1) * separation;
@@ -1184,10 +1391,13 @@
         }
 
         function setCirclePoints(points, cx, cy, radius, form) {
+          const stretch = form ? form.stretch : 1;
+          const rotation = form ? form.rotation : 0;
+          const rotationCosine = Math.cos(rotation);
+          const rotationSine = Math.sin(rotation);
+
           for (let i = 0; i < points.length; i++) {
             const angle = i / points.length * TAU;
-            const stretch = form ? form.stretch : 1;
-            const rotation = form ? form.rotation : 0;
             const irregularity = form
               ? 1 +
                 Math.sin(angle * 3 + form.broadPhase) * form.broadWobble +
@@ -1195,8 +1405,8 @@
               : 1;
             const localX = Math.cos(angle) * radius * irregularity * stretch;
             const localY = Math.sin(angle) * radius * irregularity / stretch;
-            points[i].x = cx + localX * Math.cos(rotation) - localY * Math.sin(rotation);
-            points[i].y = cy + localX * Math.sin(rotation) + localY * Math.cos(rotation);
+            points[i].x = cx + localX * rotationCosine - localY * rotationSine;
+            points[i].y = cy + localX * rotationSine + localY * rotationCosine;
             constrainPoint(points[i]);
           }
         }
@@ -1273,7 +1483,10 @@
           const inset = bathInset();
           const x = clamp(event.clientX - rect.left, inset, width - inset);
           const y = clamp(event.clientY - rect.top, inset, height - inset);
-          const radius = Math.min(width, height) * Number(controls.dropSize.value) / 1000;
+          const base = Math.min(width, height) *
+            Number(controls.dropSize.value) / 1000;
+          const variation = Number(controls.sizeVariation.value) / 100;
+          const radius = base * sampleDropScale(variation);
           startDrop(x, y, Math.max(4, radius), nextInkColor(), performance.now());
           status.textContent = 'Ink dropped into the bath.';
         }
@@ -1433,6 +1646,15 @@
           return hash >>> 0;
         }
 
+        function hexToRgb(value) {
+          const number = parseInt(value.replace('#', ''), 16);
+          return {
+            r: number >> 16 & 255,
+            g: number >> 8 & 255,
+            b: number & 255
+          };
+        }
+
         function mulberry32(value) {
           return () => {
             let t = (value += 0x6d2b79f5);
@@ -1440,10 +1662,6 @@
             t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
             return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
           };
-        }
-
-        function midpoint(a, b) {
-          return { x: (a.x + b.x) * 0.5, y: (a.y + b.y) * 0.5 };
         }
 
         function mod(value, divisor) {
@@ -1456,6 +1674,10 @@
 
         function smootherStep(value) {
           return value * value * value * (value * (value * 6 - 15) + 10);
+        }
+
+        function easeInOutSine(value) {
+          return (1 - Math.cos(Math.PI * value)) * 0.5;
         }
 
         function clamp(value, min, max) {

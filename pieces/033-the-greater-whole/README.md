@@ -24,10 +24,9 @@ Most motion unfolds gradually across the full lifespan. A single conveyor row,
 rain streak, dial ring, or small set of wave cells occasionally moves quickly,
 making speed an accent within the slower field.
 
-Most background systems live between Geist 100 and 600, moving through clearly
-separated light, regular, and mid-weight roles. The dedicated register and
-matrix systems alone reach 800–900 because weight comparison is their subject.
-The foreground statement remains fixed at 900.
+Every background system stays between Geist 100 and 700, moving through clearly
+separated light, regular, and mid-weight roles. No canvas animation uses 900;
+that weight belongs exclusively to the foreground statement.
 
 The sentence is set large, black, and bold above the canvas. Background glyphs
 are always opaque and use the assertive colors sampled from GT Mechanik: hot

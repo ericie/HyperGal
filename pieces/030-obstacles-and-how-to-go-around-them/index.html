@@ -865,17 +865,34 @@
         function placeUpstream(petal) {
           const basis = flowBasis();
           const margin = 36;
-          if (Math.abs(basis.dy) >= Math.abs(basis.dx)) {
-            petal.x = rand(-margin, width + margin);
-            petal.y = basis.dy > 0 ? -margin : height + margin;
-          } else {
-            petal.x = basis.dx > 0 ? -margin : width + margin;
-            petal.y = rand(-margin, height + margin);
-          }
-          petal.vx = basis.dx * settings.flow * petal.speedScale;
-          petal.vy = basis.dy * settings.flow * petal.speedScale;
+          const targetX = rand(0, width);
+          const targetY = rand(0, height);
+          const distanceToVerticalEdge = basis.dx > 0.0001
+            ? targetX / basis.dx
+            : basis.dx < -0.0001
+              ? (width - targetX) / -basis.dx
+              : Infinity;
+          const distanceToHorizontalEdge = basis.dy > 0.0001
+            ? targetY / basis.dy
+            : basis.dy < -0.0001
+              ? (height - targetY) / -basis.dy
+              : Infinity;
+          const distanceUpstream = Math.min(distanceToVerticalEdge, distanceToHorizontalEdge) + margin;
+          const speedScale = petal.speedScale ?? 1;
+          petal.x = targetX - basis.dx * distanceUpstream;
+          petal.y = targetY - basis.dy * distanceUpstream;
+          petal.vx = basis.dx * settings.flow * speedScale;
+          petal.vy = basis.dy * settings.flow * speedScale;
           petal.submerge = 0;
           petal.submergeTarget = 0;
+        }
+
+        function resetFlowParticles() {
+          for (const petal of petals) placeUpstream(petal);
+          for (const thread of threads) {
+            placeUpstream(thread);
+            thread.age = 0;
+          }
         }
 
         function makeThreads() {
@@ -1313,6 +1330,7 @@
         bindRange(directionInput, value => {
           settings.direction = value;
           computeFlowGaps();
+          resetFlowParticles();
           scheduleMapBuild();
         }, directionLabel);
         bindRange(flowInput, value => {

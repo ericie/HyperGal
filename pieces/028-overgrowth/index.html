@@ -184,7 +184,7 @@
       id="garden"
       tabindex="0"
       role="img"
-      aria-label="Overgrowth. A dense, directionless botanical wallpaper on aged rag paper that continually fills with new hand-inked plants. Roses, peonies, poppies, lilies, daisies, anemones, mophead hydrangeas, honeysuckle, acanthus, green fig and fern foliage, and large cream rubber tree, Fatsia japonica, palm, and fern leaves grow in every direction on sinuous curving stems. Click or press R to begin a new arrangement."
+      aria-label="Overgrowth. A dense, directionless botanical wallpaper on aged rag paper that continually fills with new hand-inked plants. Roses, peonies, poppies, lilies, daylilies, irises, hibiscus, chrysanthemums, dwarf quince, hydrangeas, honeysuckle, acanthus, Monstera, green palm and fern foliage, plus large cream rubber tree, Fatsia japonica, standalone palm fronds, and fern leaves grow in every direction. Click or press R to begin a new arrangement."
     ></canvas>
     <canvas id="new-growth" aria-hidden="true"></canvas>
     <p id="status" class="sr-only" aria-live="polite"></p>
@@ -270,16 +270,21 @@
           { key: 'poppy', name: 'Poppy', latin: 'Papaver rhoeas', leaf: 'fine', blooms: [1, 3], scale: [0.78, 1.12], weight: 11, height: [140, 235] },
           { key: 'daisy', name: 'Daisy', latin: 'Leucanthemum vulgare', leaf: 'small', blooms: [2, 5], scale: [0.64, 0.98], weight: 12, height: [120, 200] },
           { key: 'lily', name: 'Lily', latin: 'Lilium lancifolium', leaf: 'lance', blooms: [1, 3], scale: [0.74, 1.08], weight: 8, height: [150, 240] },
+          { key: 'orange-daylily', name: 'Orange daylily', latin: 'Hemerocallis fulva', leaf: 'daylily', blooms: [2, 5], scale: [0.72, 1.04], weight: 8, height: [145, 225], branches: [2, 4] },
+          { key: 'hibiscus', name: 'Hibiscus', latin: 'Hibiscus rosa-sinensis', leaf: 'hibiscus', blooms: [1, 3], scale: [0.78, 1.08], weight: 7, height: [125, 205], branches: [2, 4] },
+          { key: 'chrysanthemum', name: 'Chrysanthemum', latin: 'Chrysanthemum × morifolium', leaf: 'mum', blooms: [2, 5], scale: [0.72, 1.02], weight: 8, height: [105, 175], branches: [3, 5] },
           { key: 'hydrangea', name: 'Hydrangea', latin: 'Hydrangea macrophylla', leaf: 'round', blooms: [1, 2], scale: [0.78, 1.14], weight: 7, height: [115, 185] },
           { key: 'anemone', name: 'Anemone', latin: 'Anemone coronaria', leaf: 'small', blooms: [1, 4], scale: [0.66, 1.0], weight: 9, height: [120, 195] },
           { key: 'honeysuckle', name: 'Honeysuckle', latin: 'Lonicera periclymenum', leaf: 'ovate', blooms: [2, 4], scale: [0.72, 1.08], weight: 10, height: [260, 400], vine: true },
-          { key: 'iris-japonica', name: 'Fringed iris', latin: 'Iris japonica', leaf: 'iris', blooms: [2, 4], scale: [0.74, 1.06], weight: 8, height: [125, 205], branches: [2, 4] },
+          { key: 'iris-japonica', name: 'Fringed iris', latin: 'Iris japonica', leaf: 'iris', blooms: [2, 4], scale: [0.7, 1.0], weight: 8, height: [185, 275], branches: [3, 5], vine: true },
+          { key: 'dwarf-quince', name: 'Dwarf quince', latin: 'Chaenomeles japonica', leaf: 'quince', blooms: [2, 5], scale: [0.72, 1.04], weight: 8, height: [90, 155], branches: [4, 6] },
           { key: 'none', name: 'Acanthus', latin: 'Acanthus mollis', leaf: 'acanthus', blooms: [0, 0], scale: [0.88, 1.32], weight: 12, height: [110, 195], scroll: true },
           { key: 'rubber', name: 'Rubber tree', latin: 'Ficus elastica', leaf: 'rubber', blooms: [0, 0], scale: [0.84, 1.18], weight: 2, height: [120, 195], branches: [3, 5], pale: true },
           { key: 'fatsia', name: 'Fatsia', latin: 'Fatsia japonica', leaf: 'fatsia', blooms: [0, 0], scale: [0.8, 1.14], weight: 2, height: [115, 185], branches: [3, 5], pale: true },
-          { key: 'palm', name: 'Palm', latin: 'Howea forsteriana', leaf: 'palm', blooms: [0, 0], scale: [0.74, 1.04], weight: 2, height: [145, 225], branches: [2, 4], pale: true },
+          { key: 'palm', name: 'Palm', latin: 'Howea forsteriana', leaf: 'palm', blooms: [0, 0], scale: [0.74, 0.96], weight: 2, height: [24, 34], branches: [0, 0], pale: true },
+          { key: 'green-palm', name: 'Green palm frond', latin: 'Howea forsteriana', leaf: 'palm', blooms: [0, 0], scale: [0.72, 0.96], weight: 4, height: [24, 34], branches: [0, 0] },
           { key: 'fern', name: 'Fern', latin: 'Dryopteris filix-mas', leaf: 'fern', blooms: [0, 0], scale: [0.76, 1.08], weight: 2, height: [105, 175], branches: [3, 5], pale: true },
-          { key: 'green-fig', name: 'Green fig', latin: 'Ficus carica', leaf: 'fig', blooms: [0, 0], scale: [0.78, 1.1], weight: 5, height: [110, 180], branches: [3, 5] },
+          { key: 'monstera', name: 'Monstera', latin: 'Monstera deliciosa', leaf: 'monstera', blooms: [0, 0], scale: [0.84, 1.1], weight: 5, height: [90, 140], branches: [1, 2] },
           { key: 'green-fern', name: 'Green fern', latin: 'Dryopteris filix-mas', leaf: 'fern', blooms: [0, 0], scale: [0.72, 1.04], weight: 5, height: [100, 170], branches: [3, 5] },
         ];
 
@@ -291,11 +296,15 @@
           ovate: { profile: 'ovate', size: [13, 23], width: [0.58, 0.76], teeth: 0, serr: 0, sharp: false, pair: true },
           fine: { profile: 'lance', size: [15, 26], width: [0.34, 0.5], teeth: 0, serr: 0, sharp: false, pinnate: true },
           iris: { profile: 'lance', size: [48, 78], width: [0.16, 0.24], teeth: 0, serr: 0, sharp: false },
+          daylily: { profile: 'lance', size: [54, 88], width: [0.12, 0.19], teeth: 0, serr: 0, sharp: false },
+          hibiscus: { profile: 'ovate', size: [18, 29], width: [0.66, 0.84], teeth: 9, serr: 0.14, sharp: true },
+          mum: { profile: 'acanthus', size: [17, 28], width: [0.66, 0.86], teeth: 8, serr: 0.1, sharp: true },
+          quince: { profile: 'round', size: [13, 22], width: [0.56, 0.72], teeth: 7, serr: 0.1, sharp: true },
           acanthus: { profile: 'acanthus', size: [26, 48], width: [0.62, 0.86], teeth: 0, serr: 0, sharp: false },
           rubber: { profile: 'round', size: [42, 66], width: [0.56, 0.72], teeth: 0, serr: 0, sharp: false },
           fatsia: { profile: 'round', size: [52, 78], width: [0.88, 1.04], teeth: 0, serr: 0, sharp: false, fatsia: true },
-          fig: { profile: 'round', size: [46, 72], width: [0.68, 0.86], teeth: 0, serr: 0, sharp: false, fig: true },
-          palm: { profile: 'lance', size: [72, 108], width: [0.58, 0.76], teeth: 0, serr: 0, sharp: false, palm: true },
+          monstera: { profile: 'round', size: [82, 114], width: [0.9, 1.06], teeth: 0, serr: 0, sharp: false, monstera: true },
+          palm: { profile: 'lance', size: [105, 148], width: [0.9, 1.04], teeth: 0, serr: 0, sharp: true, palm: true },
           fern: { profile: 'lance', size: [62, 92], width: [0.5, 0.68], teeth: 0, serr: 0, sharp: false, fern: true },
         };
 
@@ -542,7 +551,7 @@
             const plant = createPlant(
               random() * width,
               random() * height,
-              i % SPECIES.length,
+              null,
               unit,
               { census: false }
             );
@@ -550,8 +559,10 @@
             ghostPlants.push(plant);
           }
 
-          // The main growth, on a jittered grid so the repeat stays even.
-          const count = clamp(Math.round(area / 13500), 38, 96);
+          // The main growth uses weighted selection rather than forcing a
+          // checklist pass through every species. A denser grid gives the
+          // opening frame the already-established fullness of the garden.
+          const count = clamp(Math.round(area / 10500), 48, 120);
           const cols = Math.max(4, Math.round(Math.sqrt((count * width) / height)));
           const rows = Math.ceil(count / cols);
           const cellW = width / cols;
@@ -562,8 +573,9 @@
             const row = Math.floor(i / cols);
             const x = (col + 0.2 + random() * 0.66) * cellW;
             const y = (row + 0.2 + random() * 0.66) * cellH;
-            const forced = i < SPECIES.length ? i : null;
-            const plant = createPlant(x, y, forced, unit, { bloomBoost: 1 });
+            const plant = createPlant(x, y, weightedSpecies(random(), false), unit, {
+              bloomBoost: 1,
+            });
             plant.depth = i + random();
             plants.push(plant);
           }
@@ -628,12 +640,12 @@
             if (spec.pale) indices.push(index);
             return indices;
           }, []);
-          const creamPlants = Math.round(clamp(area / 155000, 5, 9));
+          const creamPlants = Math.round(clamp(area / 450000, 2, 3));
           for (let i = 0; i < creamPlants; i += 1) {
             const plant = createPlant(
               lerp(width * 0.06, width * 0.94, random()),
               lerp(height * 0.06, height * 0.94, random()),
-              creamSpecies[i % creamSpecies.length],
+              creamSpecies[Math.floor(random() * creamSpecies.length)],
               unit
             );
             plant.scale *= lerp(1.08, 1.44, random());
@@ -1200,7 +1212,13 @@
             forcedSpecies == null ? weightedSpecies(random()) : forcedSpecies % SPECIES.length;
           const spec = SPECIES[typeIndex];
           const isFern = spec.leaf === 'fern';
+          const isPalm = spec.leaf === 'palm';
+          const isMonstera = spec.leaf === 'monstera';
           const isIris = spec.key === 'iris-japonica';
+          const isDaylily = spec.key === 'orange-daylily';
+          // Daylily keeps a clean upright scape. The intentionally stylized
+          // Fringed iris is allowed to meander like the other flowering vines.
+          const cleanScape = isDaylily;
           if (!opts || opts.census !== false) census[typeIndex] += 1;
 
           const localSeed = (Math.floor(random() * 0xffffffff) ^ (nextId * 2654435761)) >>> 0;
@@ -1221,9 +1239,9 @@
               })
             : makeCurve(r, {
                 length: stemLength,
-                startAngle: -Math.PI / 2 + lerp(isIris ? -0.14 : -0.3, isIris ? 0.14 : 0.3, r()),
-                sweep: isIris ? [0.18, 0.52] : spec.scroll ? [1.5, 2.8] : [1.05, 2.15],
-                sway: isIris ? 0.42 : spec.scroll ? 1 : 1.35,
+                startAngle: -Math.PI / 2 + lerp(cleanScape ? -0.14 : -0.3, cleanScape ? 0.14 : 0.3, r()),
+                sweep: cleanScape ? [0.18, 0.52] : spec.scroll ? [1.5, 2.8] : [1.05, 2.15],
+                sway: cleanScape ? 0.42 : spec.scroll ? 1 : 1.35,
                 dir,
                 segments: 30,
                 bias: 1.28,
@@ -1236,7 +1254,7 @@
           const branchRange = spec.branches || [3, flowering ? 5 : 6];
           // A fern frond is its own branching system. It must not inherit the
           // woody/vining branch scaffold used by the other plants.
-          const branchCount = isFern
+          const branchCount = isFern || isPalm || isMonstera
             ? 0
             : Math.max(bloomCount, randInt(r, branchRange[0], branchRange[1]));
           const branches = [];
@@ -1248,24 +1266,25 @@
             const at = curveAt(stem, t);
             const branchLength =
               stemLength *
-              lerp(isIris ? 0.11 : 0.16, isIris ? 0.23 : 0.4, r()) *
+              lerp(cleanScape ? 0.11 : 0.16, cleanScape ? 0.23 : 0.4, r()) *
               (0.62 + t * 0.6);
             const curve = makeCurve(r, {
               x: at.x,
               y: at.y,
               length: branchLength,
-              startAngle: at.angle + side * lerp(isIris ? 0.48 : 0.55, isIris ? 0.78 : 1.15, r()),
+              startAngle: at.angle + side * lerp(cleanScape ? 0.48 : 0.55, cleanScape ? 0.78 : 1.15, r()),
               // Curving back toward the light gives the branch its C-sweep.
-              sweep: isIris ? [0.18, 0.52] : [1.0, 2.15],
+              sweep: cleanScape ? [0.18, 0.52] : [1.0, 2.15],
               dir: -side,
-              sway: isIris ? 0.38 : 1.05,
+              sway: cleanScape ? 0.38 : 1.05,
               segments: 16,
               bias: 1.5,
             });
             const tip = curveAt(curve, 1);
             const leaves = [];
-            if (!isIris && r() > 0.28) {
-              const leafT = lerp(0.3, 0.55, r());
+            const branchEndsInLeaf = spec.leaf === 'acanthus';
+            if (!cleanScape && (branchEndsInLeaf || r() > 0.28)) {
+              const leafT = branchEndsInLeaf ? 1 : lerp(0.3, 0.55, r());
               leaves.push(
                 makeLeaf(r, spec.leaf, {
                   at: curveAt(curve, leafT),
@@ -1283,12 +1302,16 @@
               width: lerp(1.7, 3.1, r()),
               bud: flowering && r() > 0.66,
               budSize: lerp(4.5, 9, r()),
-              tendril: !spec.pale && ((spec.vine && r() > 0.4) || r() > 0.9),
+              tendril:
+                !spec.pale &&
+                spec.leaf !== 'monstera' &&
+                spec.leaf !== 'acanthus' &&
+                ((spec.vine && r() > 0.4) || r() > 0.9),
               tendrilDir: side,
               tendrilSize: lerp(9, 20, r()),
             });
 
-            if (!isIris) {
+            if (!cleanScape) {
               const stemAt = curveAt(stem, clamp(t - 0.07, 0.06, 0.92));
               stemLeaves.push(
                 makeLeaf(r, spec.leaf, {
@@ -1318,6 +1341,56 @@
                 branchIndex,
               });
             }
+          } else if (isMonstera) {
+            // Monstera rises from a compact crown. Each blade owns a long
+            // petiole; there is no woody trunk, vine, or generic branch grid.
+            const leafCount = r() < 0.58 ? 1 : 2;
+            const spread = leafCount === 1 ? 0 : lerp(0.9, 1.22, r());
+            const monsteraLeaves = [];
+            for (let i = 0; i < leafCount; i += 1) {
+              const side = leafCount === 1 ? dir : i === 0 ? -1 : 1;
+              const leaf = makeLeaf(r, spec.leaf, {
+                at: { x: side * i * 2.2, y: Math.abs(i) * 1.2, angle: -Math.PI / 2 },
+                side,
+                t: 1,
+                tone: 'green',
+              });
+              leaf.x = side * i * 2.2;
+              leaf.y = i * 1.2;
+              leaf.angle = -Math.PI / 2 + side * (leafCount === 1 ? lerp(-0.16, 0.16, r()) : spread * 0.5);
+              leaf.length = lerp(LEAF_KIND.monstera.size[0], LEAF_KIND.monstera.size[1], r()) *
+                (i === 0 ? 1 : lerp(0.78, 0.9, r()));
+              leaf.width = lerp(0.9, 1.05, r());
+              leaf.petioleRatio = lerp(0.58, 0.76, r());
+              leaf.morphSeed = Math.floor(r() * 0xffffffff) >>> 0;
+              leaf.curl = side * lerp(0.08, 0.2, r());
+              leaf.shade = i === 0 ? lerp(0.18, 0.38, r()) : lerp(0.3, 0.52, r());
+              leaf.turnover = false;
+              leaf.anchorT = i * 0.12;
+              monsteraLeaves.push(leaf);
+            }
+            // The smaller leaf sits behind the primary mature blade instead
+            // of pasting over and obscuring its basal sinus.
+            monsteraLeaves.sort((a, b) => a.length - b.length);
+            stemLeaves.push(...monsteraLeaves);
+          } else if (isPalm) {
+            // A palm specimen is one complete frond, not foliage attached to
+            // the generic woody/vining scaffold. Its rachis is drawn inside
+            // drawCompoundFrond, starting directly at the plant origin.
+            const palmLeaf = makeLeaf(r, spec.leaf, {
+              at: { x: 0, y: 0, angle: -Math.PI / 2 },
+              side: dir,
+              t: 1,
+              tone: spec.pale ? 'cream' : 'green',
+            });
+            palmLeaf.x = 0;
+            palmLeaf.y = 0;
+            palmLeaf.angle = -1.34 + lerp(-0.1, 0.1, r());
+            palmLeaf.length = lerp(LEAF_KIND.palm.size[0], LEAF_KIND.palm.size[1], r());
+            palmLeaf.width = lerp(LEAF_KIND.palm.width[0], LEAF_KIND.palm.width[1], r());
+            palmLeaf.curl = dir * lerp(0.18, 0.28, r());
+            palmLeaf.turnover = false;
+            stemLeaves.push(palmLeaf);
           } else if (!isFern) {
             // Non-flowering plants finish in one broad terminal leaf.
             const tip = curveAt(stem, 1);
@@ -1346,13 +1419,24 @@
                 : r() * TAU,
             stem,
             stemWidth: lerp(2.4, 4.4, r()),
-            stemColor: spec.pale
-              ? P.leafCreamVein
-              : [P.stem, P.stemDeep, '#6e7440', '#7b6c3e', P.leafMid][Math.floor(r() * 5)],
-            branchColor: spec.pale ? P.leafCreamVein : P.stemDeep,
+            stemColor:
+              spec.key === 'dwarf-quince'
+                ? P.umber
+                : spec.pale
+                  ? P.leafCreamVein
+                  : [P.stem, P.stemDeep, '#6e7440', '#7b6c3e', P.leafMid][Math.floor(r() * 5)],
+            branchColor:
+              spec.key === 'dwarf-quince'
+                ? P.umber
+                : spec.pale
+                  ? P.leafCreamVein
+                  : P.stemDeep,
             fern: isFern,
+            palm: isPalm,
+            monstera: isMonstera,
             iris: isIris,
-            thorns: spec.key === 'rose',
+            daylily: isDaylily,
+            thorns: spec.key === 'rose' || spec.key === 'dwarf-quince',
             branches,
             stemLeaves,
             blooms,
@@ -1374,10 +1458,18 @@
             width: lerp(conf.width[0], conf.width[1], r()),
             // The curl is clamped away from zero: a leaf blade always bows.
             curl: (o.side > 0 ? 1 : -1) * lerp(0.16, 0.42, r()),
-            shade: r(),
+            shade: kind === 'palm' ? 0.55 : r(),
             tone: o.tone || 'green',
             anchorT: o.t || 0,
-            turnover: r() > 0.86 && conf.size[1] > 22,
+            // Reflected tip folds create hard triangular flaps. They work on
+            // darker inked foliage, but break the clean negative-space read
+            // of cream leaves—especially the broad Rubber tree blades.
+            turnover:
+              kind !== 'rubber' &&
+              kind !== 'acanthus' &&
+              o.tone !== 'cream' &&
+              r() > 0.86 &&
+              conf.size[1] > 22,
             fold: lerp(0.68, 0.84, r()),
             foldTilt: lerp(-0.2, 0.2, r()),
           };
@@ -1392,18 +1484,26 @@
               poppy: 26,
               daisy: 18,
               lily: 28,
+              'orange-daylily': 29,
+              hibiscus: 31,
+              chrysanthemum: 27,
               hydrangea: 33,
               anemone: 20,
               honeysuckle: 22,
               'iris-japonica': 27,
+              'dwarf-quince': 22,
             }[kind] || 20
           );
         }
 
-        function weightedSpecies(value) {
-          const total = SPECIES.reduce((sum, s) => sum + s.weight, 0);
+        function weightedSpecies(value, includePale = true) {
+          const total = SPECIES.reduce(
+            (sum, species) => sum + (includePale || !species.pale ? species.weight : 0),
+            0
+          );
           let v = value * total;
           for (let i = 0; i < SPECIES.length; i += 1) {
+            if (!includePale && SPECIES[i].pale) continue;
             v -= SPECIES[i].weight;
             if (v <= 0) return i;
           }
@@ -1423,7 +1523,22 @@
             ctx.restore();
             return;
           }
+          if (plant.palm) {
+            const frondGrowth = growing ? smoothstep(clamp(p / 0.9, 0, 1)) : 1;
+            for (const leaf of plant.stemLeaves) drawLeaf(leaf, frondGrowth);
+            ctx.restore();
+            return;
+          }
+          if (plant.monstera) {
+            for (let i = 0; i < plant.stemLeaves.length; i += 1) {
+              const leafGrowth = growing ? stagedGrowth(p, i * 0.12) : 1;
+              if (leafGrowth > 0) drawLeaf(plant.stemLeaves[i], leafGrowth);
+            }
+            ctx.restore();
+            return;
+          }
           if (plant.iris) drawIrisFoliage(plant, p, growing);
+          if (plant.daylily) drawDaylilyFoliage(plant, p, growing);
           const stemProgress = growing ? smoothstep(clamp(p / 0.62, 0, 1)) : 1;
           const visibleStem = partialCurve(plant.stem, stemProgress);
 
@@ -1497,8 +1612,8 @@
         }
 
         // Iris japonica keeps its glossy sword leaves at the base in a broad
-        // fan. The flowering stem rises cleanly above them instead of carrying
-        // generic foliage at every branch node.
+        // fan, even as this ornamental interpretation sends its flowering
+        // stem wandering outward through the surrounding foliage.
         function drawIrisFoliage(plant, growth, growing) {
           const r = mulberry32((plant.seed ^ 0x1a15f4a7) >>> 0);
           const baseAngle = curveAt(plant.stem, 0).angle;
@@ -1530,6 +1645,44 @@
                 anchorT: 0,
                 turnover: false,
                 fold: 0.78,
+                foldTilt: 0,
+              },
+              leafGrowth
+            );
+          }
+        }
+
+        // Daylily foliage is a basal fountain: long, narrow leaves arch from
+        // the crown while the flower scape remains leafless above it.
+        function drawDaylilyFoliage(plant, growth, growing) {
+          const r = mulberry32((plant.seed ^ 0xd4a11eaf) >>> 0);
+          const baseAngle = curveAt(plant.stem, 0).angle;
+          const conf = LEAF_KIND.daylily;
+          const order = [0, 8, 1, 7, 2, 6, 3, 5, 4];
+
+          for (let n = 0; n < order.length; n += 1) {
+            const i = order[n];
+            const centred = i - 4;
+            const outer = Math.abs(centred) / 4;
+            const side = centred === 0 ? (n % 2 ? 1 : -1) : Math.sign(centred);
+            const leafGrowth = growing ? stagedGrowth(growth, n * 0.018) : 1;
+            if (leafGrowth <= 0) continue;
+
+            drawLeaf(
+              {
+                x: centred * plant.stemWidth * 0.24,
+                y: Math.abs(centred) * 0.42,
+                angle: baseAngle + centred * 0.19 + side * lerp(-0.025, 0.04, r()),
+                kind: 'daylily',
+                conf,
+                length: lerp(conf.size[0], conf.size[1], r()) * lerp(1.06, 0.82, outer),
+                width: lerp(conf.width[0], conf.width[1], r()),
+                curl: side * lerp(0.24, 0.5, r()),
+                shade: lerp(0.12, 0.68, r()),
+                tone: 'green',
+                anchorT: 0,
+                turnover: false,
+                fold: 0.8,
                 foldTilt: 0,
               },
               leafGrowth
@@ -1610,7 +1763,8 @@
                 pinnaLength *
                 (0.115 + profile * 0.14) *
                 (0.18 + pinnuleGrowth * 0.82);
-              const shade = (i * 7 + j * 11) % 17 / 16;
+              const accent = (i * 3 + j) % 7 === 0;
+              const shade = cream ? (accent ? 0.82 : 0.56) : accent ? 0.48 : 0.34;
               const fill = leafFill({ tone: cream ? 'cream' : 'green', shade });
 
               ctx.save();
@@ -1632,7 +1786,10 @@
             drawFrondLeaflet(
               pinnaLength * 0.18 * branchGrowth,
               pinnaLength * 0.038 * branchGrowth,
-              leafFill({ tone: cream ? 'cream' : 'green', shade: (i % 5) / 5 }),
+              leafFill({
+                tone: cream ? 'cream' : 'green',
+                shade: cream ? (i % 6 === 0 ? 0.82 : 0.56) : i % 6 === 0 ? 0.48 : 0.34,
+              }),
               true,
               cream
             );
@@ -1651,7 +1808,7 @@
             drawFrondLeaflet(
               plant.stem.length * 0.1 * tipGrowth,
               plant.stem.length * 0.021 * tipGrowth,
-              leafFill({ tone: cream ? 'cream' : 'green', shade: 0.74 }),
+              leafFill({ tone: cream ? 'cream' : 'green', shade: cream ? 0.56 : 0.34 }),
               true,
               cream
             );
@@ -1796,6 +1953,8 @@
 
           if (leaf.conf.fatsia) {
             drawFatsiaLeaf(developLeaf(leaf, unfurl));
+          } else if (leaf.conf.monstera) {
+            drawMonsteraLeaf(developLeaf(leaf, unfurl));
           } else if (leaf.conf.fig) {
             drawFigLeaf(developLeaf(leaf, unfurl));
           } else if (leaf.conf.palm) {
@@ -1952,6 +2111,20 @@
             ctx.globalAlpha = 0.62;
             ctx.strokeStyle = P.ink;
             ctx.lineWidth = 0.85;
+            // The current path after the clipped hatch pass is its final
+            // shading stroke, not the blade perimeter. Rebuild the outline
+            // before stroking or that hatch escapes the clip as a hooked
+            // projection beyond the leaf tip.
+            ctx.beginPath();
+            if (leaf.conf.sharp) {
+              ctx.moveTo(upper[0].x, upper[0].y);
+              for (let i = 1; i < upper.length; i += 1) ctx.lineTo(upper[i].x, upper[i].y);
+              for (let i = lower.length - 1; i >= 0; i -= 1) ctx.lineTo(lower[i].x, lower[i].y);
+            } else {
+              traceSmooth(upper, true);
+              traceSmooth(lower.slice().reverse(), false);
+            }
+            ctx.closePath();
             ctx.stroke();
           }
 
@@ -2179,6 +2352,294 @@
           ctx.restore();
         }
 
+        // Each Monstera blade has its own generated anatomy. The two sides do
+        // not mirror one another: lobe count, split depth, shoulder fullness,
+        // and fenestration placement all come from the leaf's morphology seed.
+        function drawMonsteraLeaf(leaf) {
+          const L = leaf.length;
+          const W = leaf.length * leaf.width * 0.61;
+          const fill = leafFill(leaf);
+          const morph = makeMonsteraMorphology(leaf.morphSeed || 1);
+          const petioleLength = L * (leaf.petioleRatio || 0.48);
+          const petioleY = -L * leaf.curl * 0.24;
+
+          ctx.save();
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+
+          // A separate, substantial petiole carries every blade from the
+          // crown. It bows gently before entering the heart-shaped sinus.
+          ctx.strokeStyle = P.stemDeep;
+          ctx.lineWidth = Math.max(1.45, L * 0.019);
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.quadraticCurveTo(petioleLength * 0.52, petioleY * 0.18, petioleLength, petioleY);
+          ctx.stroke();
+          ctx.translate(petioleLength, petioleY);
+
+          ctx.beginPath();
+          traceMonsteraOutline(L, W, morph);
+          addMonsteraFenestrations(L, W, morph);
+          ctx.fillStyle = fill;
+          ctx.fill('evenodd');
+
+          ctx.globalAlpha = 0.46;
+          ctx.strokeStyle = P.ink;
+          ctx.lineWidth = 0.76;
+          ctx.beginPath();
+          traceMonsteraOutline(L, W, morph);
+          ctx.stroke();
+
+          // Veins are clipped to the solid tissue so they stop naturally at
+          // every fenestration rather than drawing across empty space.
+          ctx.save();
+          ctx.beginPath();
+          traceMonsteraOutline(L, W, morph);
+          addMonsteraFenestrations(L, W, morph);
+          ctx.clip('evenodd');
+          ctx.globalAlpha = 0.42;
+          ctx.strokeStyle = P.leafPale;
+          ctx.lineWidth = 0.7;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.quadraticCurveTo(L * 0.48, -L * leaf.curl * 0.05, L * 0.96, 0);
+          ctx.stroke();
+
+          for (const side of [morph.upper, morph.lower]) {
+            for (let i = 0; i < side.veins.length; i += 1) {
+              const vein = side.veins[i];
+              ctx.beginPath();
+              ctx.moveTo(L * vein.x * 0.34, 0);
+              ctx.quadraticCurveTo(
+                L * vein.x * 0.68,
+                W * vein.y * 0.4,
+                L * vein.x,
+                W * vein.y
+              );
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
+
+          ctx.globalAlpha = 0.68;
+          ctx.fillStyle = P.stemDeep;
+          ctx.beginPath();
+          ctx.arc(0, 0, Math.max(0.9, L * 0.014), 0, TAU);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        function makeMonsteraMorphology(seed) {
+          const r = mulberry32((seed ^ 0x6d0f57a1) >>> 0);
+
+          function side(sign) {
+            const fullness = lerp(0.93, 1.06, r());
+            // Deliberately different counts keep the two halves from reading
+            // as a mirrored emblem.
+            const splitCount = sign < 0 ? 5 : 4;
+            const splits = [];
+            for (let i = 0; i < splitCount; i += 1) {
+              const t = splitCount === 1 ? 0.5 : i / (splitCount - 1);
+              const x = lerp(0.28, 0.84, t) + lerp(-0.032, 0.032, r());
+              const edgeY = sign * monsteraEnvelope(x, fullness);
+              const mouth = lerp(0.017, 0.029, r());
+              splits.push({
+                entry: { x: x - mouth, y: edgeY * lerp(0.96, 1.02, r()) },
+                exit: { x: x + mouth, y: edgeY * lerp(0.96, 1.02, r()) },
+                root: {
+                  x: x - lerp(0.015, 0.07, r()),
+                  y: edgeY * lerp(0.16, 0.3, r()),
+                },
+              });
+            }
+
+            const boundaries = [0.13, ...splits.map((split) => split.entry.x), 0.91];
+            const veins = [];
+            for (let i = 0; i < boundaries.length - 1; i += 1) {
+              const x = lerp(boundaries[i], boundaries[i + 1], 0.5);
+              veins.push({
+                x,
+                y: sign * monsteraEnvelope(x, fullness) * lerp(0.82, 0.94, r()),
+              });
+            }
+            return {
+              sign,
+              fullness,
+              baseReach: lerp(-0.23, -0.16, r()),
+              splits,
+              veins,
+            };
+          }
+
+          function holes(side) {
+            const count = side.sign < 0 ? 4 : 3;
+            const out = [];
+            for (let i = 0; i < count; i += 1) {
+              const t = count === 1 ? 0.5 : i / (count - 1);
+              out.push({
+                x: lerp(0.32, 0.7, t) + lerp(-0.018, 0.018, r()),
+                y: side.sign * lerp(0.075, 0.135, r()),
+                rx: lerp(0.032, 0.052, r()),
+                ry: lerp(0.058, 0.092, r()),
+                turn: side.sign * lerp(0.28, 0.48, r()),
+                skew: lerp(-0.26, 0.26, r()),
+              });
+            }
+            return out;
+          }
+
+          const upper = side(-1);
+          const lower = side(1);
+          return {
+            upper,
+            lower,
+            holes: [...holes(upper), ...holes(lower)],
+          };
+        }
+
+        function monsteraEnvelope(x, fullness) {
+          const t = clamp((x - 0.08) / 0.96, 0, 1);
+          return Math.pow(Math.max(0, 1 - Math.pow(t, 1.62)), 0.58) * fullness;
+        }
+
+        function traceMonsteraOutline(L, W, morph) {
+          // One broad cordate envelope is interrupted by narrow margin cuts.
+          // The leaf remains a single continuous shield instead of a stack of
+          // separate paddles joined along the midrib.
+          ctx.moveTo(0, 0);
+          traceMonsteraSide(L, W, morph.upper, false);
+          traceMonsteraSide(L, W, morph.lower, true);
+          ctx.closePath();
+        }
+
+        function traceMonsteraSide(L, W, side, reverse) {
+          const base = {
+            x: side.baseReach,
+            y: side.sign * monsteraEnvelope(0.13, side.fullness) * 0.9,
+          };
+          const tip = { x: 1.04, y: 0 };
+
+          if (!reverse) {
+            ctx.bezierCurveTo(
+              -L * 0.055,
+              base.y * W * 0.18,
+              base.x * L,
+              base.y * W * 0.82,
+              base.x * L,
+              base.y * W
+            );
+            let current = base;
+            for (const split of side.splits) {
+              traceMonsteraMargin(L, W, current, split.entry, side.sign);
+              traceMonsteraSplit(L, W, split.entry, split.root, split.exit);
+              current = split.exit;
+            }
+            traceMonsteraMargin(L, W, current, tip, side.sign);
+            return;
+          }
+
+          let current = tip;
+          for (let i = side.splits.length - 1; i >= 0; i -= 1) {
+            const split = side.splits[i];
+            traceMonsteraMargin(L, W, current, split.exit, side.sign);
+            traceMonsteraSplit(L, W, split.exit, split.root, split.entry);
+            current = split.entry;
+          }
+          traceMonsteraMargin(L, W, current, base, side.sign);
+          ctx.bezierCurveTo(
+            base.x * L,
+            base.y * W * 0.82,
+            -L * 0.055,
+            base.y * W * 0.18,
+            0,
+            0
+          );
+        }
+
+        function traceMonsteraMargin(L, W, from, to, sign) {
+          const outer = sign * Math.max(Math.abs(from.y), Math.abs(to.y)) * 1.055;
+          ctx.quadraticCurveTo(
+            L * lerp(from.x, to.x, 0.5),
+            W * outer,
+            L * to.x,
+            W * to.y
+          );
+        }
+
+        function traceMonsteraSplit(L, W, from, root, to) {
+          ctx.bezierCurveTo(
+            L * lerp(from.x, root.x, 0.34),
+            W * lerp(from.y, root.y, 0.38),
+            L * lerp(from.x, root.x, 0.82),
+            W * lerp(from.y, root.y, 0.9),
+            L * root.x,
+            W * root.y
+          );
+          ctx.bezierCurveTo(
+            L * lerp(root.x, to.x, 0.18),
+            W * lerp(root.y, to.y, 0.1),
+            L * lerp(root.x, to.x, 0.66),
+            W * lerp(root.y, to.y, 0.62),
+            L * to.x,
+            W * to.y
+          );
+        }
+
+        function addMonsteraFenestrations(L, W, morph) {
+          for (const hole of morph.holes) traceMonsteraHole(L, W, hole);
+        }
+
+        function traceMonsteraHole(L, W, hole) {
+          const cx = L * hole.x;
+          const cy = W * hole.y;
+          const rx = W * hole.rx;
+          const ry = L * hole.ry;
+          const c = Math.cos(hole.turn);
+          const s = Math.sin(hole.turn);
+          const point = (dx, dy) => ({
+            x: cx + dx * c - dy * s,
+            y: cy + dx * s + dy * c,
+          });
+          const top = point(hole.skew * rx * 0.2, -ry);
+          const right = point(rx, hole.skew * ry * 0.24);
+          const bottom = point(-hole.skew * rx * 0.28, ry * 0.88);
+          const left = point(-rx * 0.82, -hole.skew * ry * 0.18);
+          ctx.moveTo(top.x, top.y);
+          ctx.bezierCurveTo(
+            point(rx * 0.64, -ry * 0.72).x,
+            point(rx * 0.64, -ry * 0.72).y,
+            point(rx * 1.02, -ry * 0.12).x,
+            point(rx * 1.02, -ry * 0.12).y,
+            right.x,
+            right.y
+          );
+          ctx.bezierCurveTo(
+            point(rx * 0.84, ry * 0.62).x,
+            point(rx * 0.84, ry * 0.62).y,
+            point(rx * 0.24, ry).x,
+            point(rx * 0.24, ry).y,
+            bottom.x,
+            bottom.y
+          );
+          ctx.bezierCurveTo(
+            point(-rx * 0.66, ry * 0.72).x,
+            point(-rx * 0.66, ry * 0.72).y,
+            point(-rx, ry * 0.1).x,
+            point(-rx, ry * 0.1).y,
+            left.x,
+            left.y
+          );
+          ctx.bezierCurveTo(
+            point(-rx * 0.72, -ry * 0.6).x,
+            point(-rx * 0.72, -ry * 0.6).y,
+            point(-rx * 0.18, -ry).x,
+            point(-rx * 0.18, -ry).y,
+            top.x,
+            top.y
+          );
+          ctx.closePath();
+        }
+
         // A common fig leaf is palmate rather than merely broad. Five lobes
         // radiate from the petiole, with deep bays that keep the silhouette
         // distinct even when the pale foliage overlaps other plants.
@@ -2241,12 +2702,12 @@
         }
 
         // Palm and fern fronds share a curved rachis, but not a silhouette.
-        // Palm pinnae are long, spare ribbons; fern pinnae are short, dense,
-        // and toothed, tapering steadily toward the crozier-like tip.
+        // The palm is a single, oversized feather frond: many long blades
+        // sweep from one central rib and end in emphatically sharp points.
         function drawCompoundFrond(leaf, kind) {
           const palm = kind === 'palm';
           const cream = leaf.tone === 'cream';
-          const pairs = palm ? 7 : 10;
+          const pairs = palm ? 13 : 10;
           const fill = leafFill(leaf);
           const rachis = [];
           for (let i = 0; i <= 18; i += 1) rachis.push(leafRib(leaf, i / 18));
@@ -2254,24 +2715,24 @@
           ctx.save();
           ctx.lineCap = 'round';
           ctx.strokeStyle = cream ? P.leafCreamVein : P.stemDeep;
-          ctx.lineWidth = palm ? 1.45 : 1.1;
+          ctx.lineWidth = palm ? 2.05 : 1.1;
           ctx.beginPath();
           traceSmooth(rachis, true);
           ctx.stroke();
 
           for (let i = 1; i <= pairs; i += 1) {
-            const t = lerp(palm ? 0.14 : 0.1, palm ? 0.88 : 0.91, i / (pairs + 1));
+            const t = lerp(palm ? 0.075 : 0.1, palm ? 0.94 : 0.91, i / (pairs + 1));
             const p = leafRib(leaf, t);
             const q = leafRib(leaf, Math.min(1, t + 0.016));
             const tangent = Math.atan2(q.y - p.y, q.x - p.x);
-            const leafletGrowth = stagedGrowth(leaf.development || 1, i * (palm ? 0.045 : 0.03));
+            const leafletGrowth = stagedGrowth(leaf.development || 1, i * 0.03);
             if (leafletGrowth <= 0) continue;
 
-            const crown = Math.pow(Math.sin(Math.PI * t), palm ? 0.48 : 0.62);
+            const crown = Math.pow(Math.sin(Math.PI * t), palm ? 0.38 : 0.62);
             const leafletLength =
               leaf.length *
               crown *
-              (palm ? lerp(0.42, 0.28, t) : lerp(0.3, 0.17, t)) *
+              (palm ? lerp(0.54, 0.29, t) : lerp(0.3, 0.17, t)) *
               (0.16 + smoothstep(leafletGrowth) * 0.84);
 
             for (const side of [-1, 1]) {
@@ -2279,15 +2740,13 @@
               ctx.translate(p.x, p.y);
               ctx.rotate(
                 tangent +
-                side * (palm ? lerp(1.34, 0.68, t) : lerp(1.18, 0.82, t))
+                side * (palm ? lerp(1.3, 0.56, t) : lerp(1.18, 0.82, t))
               );
-              drawFrondLeaflet(
-                leafletLength,
-                leafletLength * (palm ? 0.12 : 0.22),
-                fill,
-                !palm,
-                cream
-              );
+              if (palm) {
+                drawPalmPinna(leafletLength, leafletLength * 0.12, fill, cream);
+              } else {
+                drawFrondLeaflet(leafletLength, leafletLength * 0.22, fill, true, cream);
+              }
               ctx.restore();
             }
           }
@@ -2297,15 +2756,53 @@
           ctx.save();
           ctx.translate(tip.x, tip.y);
           ctx.rotate(Math.atan2(tipAhead.y - tip.y, tipAhead.x - tip.x));
-          drawFrondLeaflet(
-            leaf.length * (palm ? 0.24 : 0.15),
-            leaf.length * (palm ? 0.03 : 0.032),
-            fill,
-            !palm,
-            cream
+          if (palm) {
+            drawPalmPinna(leaf.length * 0.3, leaf.length * 0.012, fill, cream);
+          } else {
+            drawFrondLeaflet(leaf.length * 0.15, leaf.length * 0.032, fill, true, cream);
+          }
+          ctx.restore();
+          ctx.restore();
+        }
+
+        function drawPalmPinna(length, halfWidth, fill, cream) {
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.bezierCurveTo(
+            length * 0.18,
+            -halfWidth * 0.92,
+            length * 0.7,
+            -halfWidth * 0.55,
+            length,
+            -length * 0.025
           );
-          ctx.restore();
-          ctx.restore();
+          // Both edges converge directly on the same acute point.
+          ctx.bezierCurveTo(
+            length * 0.68,
+            halfWidth * 0.58,
+            length * 0.18,
+            halfWidth * 0.92,
+            0,
+            0
+          );
+          ctx.closePath();
+          ctx.fillStyle = fill;
+          ctx.fill();
+          if (!cream) {
+            ctx.globalAlpha = 0.42;
+            ctx.strokeStyle = P.ink;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          }
+
+          ctx.globalAlpha = cream ? 0.36 : 0.3;
+          ctx.strokeStyle = cream ? P.leafCreamVein : P.leafPale;
+          ctx.lineWidth = 0.42;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.quadraticCurveTo(length * 0.54, -length * 0.008, length, -length * 0.025);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
         }
 
         function drawFrondLeaflet(length, halfWidth, fill, toothed, cream) {
@@ -2403,7 +2900,7 @@
           const size = branch.budSize * (0.2 + smoothstep(emerge) * 0.8);
           const angle = branch.tip.angle + Math.PI / 2;
           const petalColor =
-            kind === 'lily' || kind === 'cosmos'
+            kind === 'lily' || kind === 'cosmos' || kind === 'orange-daylily'
               ? P.ochre
               : kind === 'daisy'
                 ? P.cream
@@ -2413,6 +2910,8 @@
                   ? P.weld
                   : kind === 'iris-japonica'
                     ? P.irisLavender
+                    : kind === 'dwarf-quince'
+                      ? '#c85336'
                     : P.madder;
 
           ctx.save();
@@ -2470,10 +2969,14 @@
             case 'poppy': drawPoppy(bloom, opening); break;
             case 'daisy': drawDaisy(bloom, opening); break;
             case 'lily': drawLily(bloom, opening); break;
+            case 'orange-daylily': drawOrangeDaylily(bloom, opening); break;
+            case 'hibiscus': drawHibiscus(bloom, opening); break;
+            case 'chrysanthemum': drawChrysanthemum(bloom, plantSeed, opening); break;
             case 'hydrangea': drawHydrangea(bloom, plantSeed, opening); break;
             case 'anemone': drawAnemone(bloom, opening); break;
             case 'honeysuckle': drawHoneysuckle(bloom, plantSeed, opening); break;
             case 'iris-japonica': drawIrisJaponica(bloom, opening); break;
+            case 'dwarf-quince': drawDwarfQuince(bloom, plantSeed, opening); break;
             default: break;
           }
         }
@@ -2555,11 +3058,19 @@
         }
 
         function flowerBudColor(kind) {
-          if (kind === 'lily' || kind === 'cosmos' || kind === 'honeysuckle') return P.ochre;
+          if (
+            kind === 'lily' ||
+            kind === 'cosmos' ||
+            kind === 'honeysuckle' ||
+            kind === 'orange-daylily'
+          ) return P.ochre;
           if (kind === 'daisy') return P.cream;
+          if (kind === 'hibiscus') return P.madder;
+          if (kind === 'chrysanthemum') return P.ochre;
           if (kind === 'anemone') return P.indigo;
           if (kind === 'hydrangea') return P.woad;
           if (kind === 'iris-japonica') return P.irisLavender;
+          if (kind === 'dwarf-quince') return '#c85336';
           return P.madder;
         }
 
@@ -2917,6 +3428,204 @@
           });
         }
 
+        // Hemerocallis fulva has six broad, unspotted orange-red tepals with a
+        // lighter midrib and throat. Its open funnel is flatter and fuller
+        // than the narrow, reflexed, spotted tiger lily above.
+        function drawOrangeDaylily(bloom, opening) {
+          const r = bloom.r;
+
+          // Three slightly narrower outer tepals establish the funnel.
+          for (let i = 0; i < 3; i += 1) {
+            ctx.save();
+            const pose = posePetal((i * TAU) / 3 + 0.08, r * 0.25, opening, i * 0.028);
+            drawDaylilyTepal(
+              petalLength(r * 1.08, pose),
+              petalWidth(r * 0.3, pose),
+              i % 2 ? '#c9692f' : '#bc5830'
+            );
+            ctx.restore();
+          }
+
+          // The inner three are broader and offset between the outer tepals.
+          for (let i = 0; i < 3; i += 1) {
+            ctx.save();
+            const pose = posePetal(
+              (i * TAU) / 3 + Math.PI / 3 + 0.08,
+              r * 0.22,
+              opening,
+              0.11 + i * 0.028
+            );
+            drawDaylilyTepal(
+              petalLength(r, pose),
+              petalWidth(r * 0.4, pose),
+              i % 2 ? '#df8431' : '#d9762c'
+            );
+            ctx.restore();
+          }
+
+          drawFlowerCenter(opening, () => {
+            ctx.save();
+            ctx.fillStyle = P.gold;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.2, 0, TAU);
+            ctx.fill();
+
+            ctx.strokeStyle = '#d7a43e';
+            ctx.fillStyle = P.umber;
+            ctx.lineWidth = 0.8;
+            ctx.lineCap = 'round';
+            for (let i = 0; i < 6; i += 1) {
+              const angle = -0.92 + i * 0.34;
+              const side = Math.sin(angle);
+              const tipX = side * r * 0.58;
+              const tipY = -r * 0.58 - Math.cos(angle) * r * 0.09;
+              ctx.beginPath();
+              ctx.moveTo(0, r * 0.03);
+              ctx.quadraticCurveTo(side * r * 0.34, -r * 0.2, tipX, tipY);
+              ctx.stroke();
+              ctx.beginPath();
+              ctx.ellipse(tipX, tipY, r * 0.075, r * 0.026, angle, 0, TAU);
+              ctx.fill();
+            }
+            ctx.restore();
+          });
+        }
+
+        function drawDaylilyTepal(length, width, fill) {
+          inkPetal(length, width, 0.32, fill, {
+            veins: true,
+            inkAlpha: 0.46,
+            hatchAlpha: 0.1,
+          });
+
+          // The species' pale orange stripe runs from the throat toward the
+          // tip and is intentionally clean—there are no tiger-lily spots.
+          ctx.save();
+          ctx.globalAlpha = 0.42;
+          ctx.strokeStyle = P.gold;
+          ctx.lineWidth = Math.max(1, width * 0.1);
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(0, length * 0.38);
+          ctx.quadraticCurveTo(0, -length * 0.02, 0, -length * 0.38);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Hibiscus is kept graphically simple and unmistakable: five broad
+        // petals surround a dark throat, then the long fused staminal column
+        // projects beyond the corolla with yellow anthers and red stigmas.
+        function drawHibiscus(bloom, opening) {
+          const r = bloom.r;
+          const palette = bloom.variant > 0.5
+            ? [P.madder, '#c85344', P.rose]
+            : [P.wine, P.madderDeep, P.madder];
+
+          ctx.save();
+          for (let i = 0; i < 5; i += 1) {
+            ctx.save();
+            const pose = posePetal((i * TAU) / 5 + 0.08, r * 0.36, opening, i * 0.026);
+            inkPetal(
+              petalLength(r * 1.04, pose),
+              petalWidth(r * 0.58, pose),
+              0.72,
+              palette[i % palette.length],
+              { veins: true, inkAlpha: 0.42, hatchAlpha: 0.12 }
+            );
+            ctx.restore();
+          }
+
+          drawFlowerCenter(opening, () => {
+            ctx.fillStyle = P.wine;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.23, 0, TAU);
+            ctx.fill();
+
+            const columnLength = r * 0.96;
+            ctx.strokeStyle = P.rosePale;
+            ctx.lineWidth = Math.max(1.2, r * 0.075);
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(0, r * 0.03);
+            ctx.quadraticCurveTo(r * 0.05, -r * 0.42, 0, -columnLength);
+            ctx.stroke();
+
+            ctx.fillStyle = P.gold;
+            for (let i = 0; i < 12; i += 1) {
+              const t = 0.38 + i / 18;
+              const side = i % 2 ? 1 : -1;
+              ctx.beginPath();
+              ctx.ellipse(
+                side * r * (0.08 + (i % 3) * 0.012),
+                -columnLength * t,
+                r * 0.045,
+                r * 0.025,
+                side * 0.45,
+                0,
+                TAU
+              );
+              ctx.fill();
+            }
+
+            ctx.strokeStyle = P.madderDeep;
+            ctx.fillStyle = P.madder;
+            ctx.lineWidth = 0.65;
+            for (let i = 0; i < 5; i += 1) {
+              const angle = -Math.PI / 2 + lerp(-0.62, 0.62, i / 4);
+              const x = Math.cos(angle) * r * 0.2;
+              const y = -columnLength + Math.sin(angle) * r * 0.16;
+              ctx.beginPath();
+              ctx.moveTo(0, -columnLength * 0.93);
+              ctx.lineTo(x, y);
+              ctx.stroke();
+              ctx.beginPath();
+              ctx.arc(x, y, r * 0.045, 0, TAU);
+              ctx.fill();
+            }
+          });
+          ctx.restore();
+        }
+
+        // A garden chrysanthemum is a dense mass of ray florets. Four tight
+        // rings and a nearly hidden disc make it read as a mum, not a daisy.
+        function drawChrysanthemum(bloom, plantSeed, opening) {
+          const r = bloom.r;
+          const rng = mulberry32((plantSeed + Math.floor(bloom.phase * 53000)) >>> 0);
+          const palette = bloom.variant > 0.5
+            ? ['#b55f2f', P.ochre, P.weld, P.gold]
+            : [P.madder, '#c76b42', P.ochre, P.weld];
+          const rows = [
+            { count: 16, radius: 0.42, length: 0.82, width: 0.14, delay: 0 },
+            { count: 14, radius: 0.31, length: 0.65, width: 0.13, delay: 0.1 },
+            { count: 12, radius: 0.21, length: 0.5, width: 0.12, delay: 0.2 },
+            { count: 10, radius: 0.12, length: 0.35, width: 0.1, delay: 0.3 },
+          ];
+
+          ctx.save();
+          for (let row = 0; row < rows.length; row += 1) {
+            const conf = rows[row];
+            for (let i = 0; i < conf.count; i += 1) {
+              ctx.save();
+              const pose = posePetal(
+                (i / conf.count) * TAU + row * 0.31 + lerp(-0.08, 0.08, rng()),
+                r * conf.radius,
+                opening,
+                conf.delay + i * 0.004
+              );
+              inkPetal(
+                petalLength(r * conf.length * lerp(0.88, 1.08, rng()), pose),
+                petalWidth(r * conf.width * lerp(0.88, 1.1, rng()), pose),
+                0.22,
+                palette[(row + i) % palette.length],
+                { inkAlpha: 0.36, hatchAlpha: 0.06 }
+              );
+              ctx.restore();
+            }
+          }
+          drawFlowerCenter(opening, () => discCenter(r * 0.1, P.umber, P.gold, 9));
+          ctx.restore();
+        }
+
         // Iris japonica is the fringed iris: three broad falls carry violet
         // blotches and a yellow-orange crest, alternating with three lighter,
         // narrower inner segments. It is deliberately unlike the tall,
@@ -3051,6 +3760,75 @@
           fringedIrisPetalPath(length, width, crest);
           ctx.stroke();
           ctx.restore();
+        }
+
+        // The dwarf Japanese quince flowers directly on short, thorny wood.
+        // Its corolla is a single cup of five rounded scarlet petals around a
+        // conspicuously dense boss of pale filaments and gold anthers.
+        function drawDwarfQuince(bloom, plantSeed, opening) {
+          const r = bloom.r;
+          const rng = mulberry32((plantSeed ^ Math.floor(bloom.phase * 48163)) >>> 0);
+          const warm = bloom.variant > 0.48;
+          const palette = warm ? ['#d45b35', '#c74b31'] : [P.madder, '#bd4439'];
+
+          for (let i = 0; i < 5; i += 1) {
+            ctx.save();
+            const pose = posePetal(
+              (i * TAU) / 5 + 0.12 + lerp(-0.045, 0.045, rng()),
+              r * 0.31,
+              opening,
+              i * 0.022
+            );
+            const length = petalLength(r * lerp(0.82, 0.9, rng()), pose);
+            const width = petalWidth(r * lerp(0.46, 0.52, rng()), pose);
+            inkPetal(length, width, 0.92, palette[i % palette.length], {
+              veins: true,
+              hatchAlpha: 0.11,
+              inkAlpha: 0.42,
+            });
+
+            // A wine-dark wash at the petal base deepens the cupped centre.
+            ctx.globalAlpha = 0.28 * smoothstep(pose);
+            ctx.fillStyle = P.madderDeep;
+            ctx.beginPath();
+            ctx.ellipse(0, length * 0.34, width * 0.32, length * 0.1, 0, 0, TAU);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          drawFlowerCenter(opening, () => {
+            ctx.save();
+            ctx.fillStyle = P.madderDeep;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.15, 0, TAU);
+            ctx.fill();
+
+            const stamens = 42;
+            const tips = [];
+            ctx.strokeStyle = P.cream;
+            ctx.lineWidth = 0.52;
+            ctx.globalAlpha = 0.88;
+            for (let i = 0; i < stamens; i += 1) {
+              const angle = i * GOLDEN * TAU + lerp(-0.035, 0.035, rng());
+              const distance = Math.sqrt((i + 1) / stamens) * r * lerp(0.3, 0.43, rng());
+              const x = Math.cos(angle) * distance;
+              const y = Math.sin(angle) * distance;
+              ctx.beginPath();
+              ctx.moveTo(Math.cos(angle) * r * 0.07, Math.sin(angle) * r * 0.07);
+              ctx.quadraticCurveTo(x * 0.62, y * 0.62, x, y);
+              ctx.stroke();
+              tips.push({ x, y, angle });
+            }
+
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = P.gold;
+            for (const tip of tips) {
+              ctx.beginPath();
+              ctx.ellipse(tip.x, tip.y, r * 0.027, r * 0.017, tip.angle, 0, TAU);
+              ctx.fill();
+            }
+            ctx.restore();
+          });
         }
 
         function drawHydrangea(bloom, plantSeed, opening) {

@@ -14,6 +14,11 @@ the Suminagashi palette alone preserves paper-colored water between ink bands.
 A visible bath border contains every displaced contour and lets the pattern
 accumulate against the edge.
 
+Once ink has covered nearly the entire bath and held there for several seconds,
+one enormous pale drop expands beyond every edge. Its color becomes the next
+bath ground, clearing the saturated field so a new cycle can accumulate on a
+visibly different surface.
+
 The comb tools move a visible row of individual teeth through the bath. Each
 tooth lightly entrains the contour it crosses and pulls a narrow filament from
 the downstream edge of that pigment. Adjust tine spacing, direction, and pull,

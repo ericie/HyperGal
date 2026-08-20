@@ -26,7 +26,9 @@ rise again.
 
 Use the control panel to inspect Depth or Current independently; set obstacle
 amount, overall rock size, grouping, and spacing; change the flow direction and
-base rate; or adjust petal count and turbulence. Layout controls deterministically
+base rate; or adjust petal count and turbulence. Changing direction immediately
+releases the petals and vector traces from the newly upstream edges, including
+both contributing edges for diagonal currents. Layout controls deterministically
 rebuild the field from the active seed, while the round arrow or `R` creates a
 new seed. Click or tap the water to make a temporary eddy. Add `?seed=<value>`
 to the URL for a repeatable starting composition.

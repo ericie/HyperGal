@@ -269,7 +269,7 @@
       id="garden"
       tabindex="0"
       role="img"
-      aria-label="A top-down dry garden with one contour-drawn rock surrounded by nested, evenly spaced samon furrows."
+      aria-label="A top-down dry garden where black pulses fade as they travel outward from three contour-drawn rocks, then intensify when their nested samon furrows join."
     ></canvas>
 
     <aside class="garden-panel" aria-label="Dry garden composition controls">
@@ -285,7 +285,7 @@
       </header>
 
       <div class="panel-body">
-        <p class="panel-intro">One stone. Concentric samon. Nothing crosses.</p>
+        <p class="panel-intro">Distance fades. Contact amplifies.</p>
 
         <p class="section-label">Samon / raked space</p>
         <div class="range-row">
@@ -293,7 +293,7 @@
           <output class="control-value" for="rake-spacing">11 px</output>
           <input id="rake-spacing" type="range" min="7" max="18" step="1" value="11" />
         </div>
-        <p class="panel-note">Click the gravel or press R to replace the single stone. Drag this panel by its heading.</p>
+        <p class="panel-note">Click the gravel or press R to replace the stone trio. Drag this panel by its heading.</p>
       </div>
     </aside>
 
@@ -303,6 +303,8 @@
 
         const canvas = document.getElementById('garden');
         const ctx = canvas.getContext('2d', { alpha: false });
+        const baseCanvas = document.createElement('canvas');
+        const baseCtx = baseCanvas.getContext('2d', { alpha: false });
         const panel = document.querySelector('.garden-panel');
         const panelHeader = panel.querySelector('.panel-header');
         const collapseButton = panel.querySelector('[data-action="collapse"]');
@@ -317,10 +319,12 @@
           ['#cfc6b0', '#342a2d'],
           ['#d6cfbd', '#342a2d'],
         ];
+        const PULSE_PERIOD = 7200;
+        const reducedMotionQuery = matchMedia('(prefers-reduced-motion: reduce)');
 
         const settings = {
           nature: 0.88,
-          count: 1,
+          count: 3,
           rakeSpacing: 11,
         };
 
@@ -332,6 +336,13 @@
         let rocks = [];
         let rakePaths = [];
         let gravelPattern = null;
+        let maximumRakeDistance = 1;
+        let pulseContactDistances = [];
+        let pulseStillDistance = 1;
+        let pulseStartedAt = performance.now();
+        let animationFrame = 0;
+        let lastAnimationRender = 0;
+        let prefersReducedMotion = reducedMotionQuery.matches;
         let panelDrag = null;
         let resizeTimer = 0;
         let composeTimer = 0;
@@ -365,11 +376,16 @@
           dpr = Math.min(2, devicePixelRatio || 1);
           canvas.width = Math.round(width * dpr);
           canvas.height = Math.round(height * dpr);
+          baseCanvas.width = canvas.width;
+          baseCanvas.height = canvas.height;
           canvas.style.width = `${width}px`;
           canvas.style.height = `${height}px`;
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          baseCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
+          baseCtx.lineCap = 'round';
+          baseCtx.lineJoin = 'round';
           compose();
         }
 
@@ -378,7 +394,9 @@
           gravelPattern = makeGravelPattern();
           rocks = makeGarden();
           rakePaths = makeRakePaths();
-          render();
+          renderBase();
+          pulseStartedAt = performance.now();
+          render(pulseStartedAt);
         }
 
         function makeGravelPattern() {
@@ -400,16 +418,36 @@
 
         function makeGarden() {
           const small = Math.min(width, height);
-          const anchor = {
-            group: 'A',
-            x: width * 0.62,
-            y: height * 0.46,
-            size: 1.15,
-            ratio: 0.62,
-            rotation: -0.56,
-            role: 'single',
-          };
-          return [makeRock(anchor, 0, small)];
+          const anchors = [
+            {
+              group: 'A',
+              x: width * 0.68,
+              y: height * 0.33,
+              size: 1,
+              ratio: 0.64,
+              rotation: -0.56,
+              role: 'primary',
+            },
+            {
+              group: 'A',
+              x: width * 0.34,
+              y: height * 0.7,
+              size: 0.75,
+              ratio: 0.76,
+              rotation: 0.38,
+              role: 'companion',
+            },
+            {
+              group: 'A',
+              x: width * 0.72,
+              y: height * 0.72,
+              size: 0.9,
+              ratio: 1.22,
+              rotation: -0.16,
+              role: 'counterweight',
+            },
+          ];
+          return anchors.map((anchor, index) => makeRock(anchor, index, small));
         }
 
         function makeRock(anchor, index, small) {
@@ -455,81 +493,350 @@
           return rock;
         }
 
-        function makeRakePaths() {
-          const spacing = settings.rakeSpacing;
-          const rock = rocks[0];
-          const paths = [];
+        function rockOutlinePoints(rock) {
           const cos = Math.cos(rock.rotation);
           const sin = Math.sin(rock.rotation);
-          const cornerDistance = Math.max(
-            Math.hypot(rock.x, rock.y),
-            Math.hypot(width - rock.x, rock.y),
-            Math.hypot(rock.x, height - rock.y),
-            Math.hypot(width - rock.x, height - rock.y),
-          );
-          const firstOffset = spacing * 0.82;
-          const lastOffset = cornerDistance + Math.max(rock.rx, rock.ry) + spacing * 2;
+          return rock.points.map(point => {
+            const localX = Math.cos(point.angle) * rock.rx * point.roughness;
+            const localY = Math.sin(point.angle) * rock.ry * point.roughness;
+            return {
+              x: rock.x + localX * cos - localY * sin,
+              y: rock.y + localX * sin + localY * cos,
+            };
+          });
+        }
 
-          for (let offset = firstOffset; offset <= lastOffset; offset += spacing) {
-            const points = [];
-            const detail = Math.max(72, Math.ceil(TAU * (Math.max(rock.rx, rock.ry) + offset) / 7));
-            for (let pointIndex = 0; pointIndex <= detail; pointIndex++) {
-              const angle = pointIndex / detail * TAU;
-              const sourcePosition = pointIndex / detail * rock.points.length;
-              const sourceFloor = Math.floor(sourcePosition);
-              const sourceIndex = sourceFloor % rock.points.length;
-              const nextIndex = (sourceIndex + 1) % rock.points.length;
-              const sourceAmount = sourcePosition - sourceFloor;
-              const sourceRoughness = mix(
-                rock.points[sourceIndex].roughness,
-                rock.points[nextIndex].roughness,
-                sourceAmount,
-              );
-              const softenedRoughness = 1 + (sourceRoughness - 1) * Math.exp(-offset / 190);
-              const localX = Math.cos(angle) * (rock.rx * softenedRoughness + offset);
-              const localY = Math.sin(angle) * (rock.ry * softenedRoughness + offset);
-              points.push({
-                x: rock.x + localX * cos - localY * sin,
-                y: rock.y + localX * sin + localY * cos,
-              });
-            }
-            paths.push(points);
+        function pointSegmentDistance(x, y, a, b) {
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const lengthSquared = dx * dx + dy * dy || 1;
+          const amount = clamp(((x - a.x) * dx + (y - a.y) * dy) / lengthSquared, 0, 1);
+          return Math.hypot(x - (a.x + dx * amount), y - (a.y + dy * amount));
+        }
+
+        function distanceToOutline(x, y, outline) {
+          let nearest = Infinity;
+          for (let i = 0; i < outline.length; i++) {
+            nearest = Math.min(
+              nearest,
+              pointSegmentDistance(x, y, outline[i], outline[(i + 1) % outline.length]),
+            );
           }
-          canvas.dataset.samonPattern = 'concentric';
+          return nearest;
+        }
+
+        function interpolateContour(a, b, level) {
+          const amount = Math.abs(b.value - a.value) < 0.00001
+            ? 0.5
+            : clamp((level - a.value) / (b.value - a.value), 0, 1);
+          return {
+            x: mix(a.x, b.x, amount),
+            y: mix(a.y, b.y, amount),
+          };
+        }
+
+        function makeRakePaths() {
+          const spacing = settings.rakeSpacing;
+          const paths = [];
+          const outlines = rocks.map(rockOutlinePoints);
+          const gridStep = clamp(Math.min(width, height) / 150, 4.5, 9);
+          const columns = Math.ceil(width / gridStep) + 1;
+          const rows = Math.ceil(height / gridStep) + 1;
+          const values = new Float32Array(columns * rows);
+          const rockValues = outlines.map(() => new Float32Array(columns * rows));
+          let maximumDistance = 0;
+
+          pulseContactDistances = [];
+          for (let first = 0; first < outlines.length; first++) {
+            for (let second = first + 1; second < outlines.length; second++) {
+              let minimumGap = Infinity;
+              for (const point of outlines[first]) {
+                minimumGap = Math.min(
+                  minimumGap,
+                  distanceToOutline(point.x, point.y, outlines[second]),
+                );
+              }
+              for (const point of outlines[second]) {
+                minimumGap = Math.min(
+                  minimumGap,
+                  distanceToOutline(point.x, point.y, outlines[first]),
+                );
+              }
+              pulseContactDistances.push({ first, second, distance: minimumGap * 0.5 });
+            }
+          }
+          pulseStillDistance = connectedPulseThreshold(pulseContactDistances, outlines.length);
+
+          for (let row = 0; row < rows; row++) {
+            const y = Math.min(height, row * gridStep);
+            for (let column = 0; column < columns; column++) {
+              const x = Math.min(width, column * gridStep);
+              const gridIndex = row * columns + column;
+              for (let rockIndex = 0; rockIndex < outlines.length; rockIndex++) {
+                rockValues[rockIndex][gridIndex] = distanceToOutline(x, y, outlines[rockIndex]);
+              }
+              values[gridIndex] = Math.min(...rockValues.map(field => field[gridIndex]));
+              maximumDistance = Math.max(maximumDistance, values[gridIndex]);
+            }
+          }
+
+          const firstOffset = spacing * 0.82;
+          const segmentTable = {
+            1: [[3, 0]], 2: [[0, 1]], 3: [[3, 1]], 4: [[1, 2]],
+            6: [[0, 2]], 7: [[3, 2]], 8: [[2, 3]], 9: [[0, 2]],
+            11: [[1, 2]], 12: [[1, 3]], 13: [[0, 1]], 14: [[3, 0]],
+          };
+
+          for (let level = firstOffset; level <= maximumDistance; level += spacing) {
+            const path = [];
+            for (let row = 0; row < rows - 1; row++) {
+              const y0 = Math.min(height, row * gridStep);
+              const y1 = Math.min(height, (row + 1) * gridStep);
+              for (let column = 0; column < columns - 1; column++) {
+                const x0 = Math.min(width, column * gridStep);
+                const x1 = Math.min(width, (column + 1) * gridStep);
+                const topLeft = { x: x0, y: y0, value: values[row * columns + column] };
+                const topRight = { x: x1, y: y0, value: values[row * columns + column + 1] };
+                const bottomRight = { x: x1, y: y1, value: values[(row + 1) * columns + column + 1] };
+                const bottomLeft = { x: x0, y: y1, value: values[(row + 1) * columns + column] };
+                const index =
+                  (topLeft.value > level ? 1 : 0) |
+                  (topRight.value > level ? 2 : 0) |
+                  (bottomRight.value > level ? 4 : 0) |
+                  (bottomLeft.value > level ? 8 : 0);
+                if (index === 0 || index === 15) continue;
+
+                const edges = [
+                  interpolateContour(topLeft, topRight, level),
+                  interpolateContour(topRight, bottomRight, level),
+                  interpolateContour(bottomLeft, bottomRight, level),
+                  interpolateContour(topLeft, bottomLeft, level),
+                ];
+                const centerIsOutside =
+                  (topLeft.value + topRight.value + bottomRight.value + bottomLeft.value) * 0.25 > level;
+                let segments = segmentTable[index];
+                if (index === 5) {
+                  segments = centerIsOutside
+                    ? [[0, 1], [2, 3]]
+                    : [[3, 0], [1, 2]];
+                } else if (index === 10) {
+                  segments = centerIsOutside
+                    ? [[3, 0], [1, 2]]
+                    : [[0, 1], [2, 3]];
+                }
+                for (const [start, end] of segments) {
+                  const midpoint = {
+                    x: (edges[start].x + edges[end].x) * 0.5,
+                    y: (edges[start].y + edges[end].y) * 0.5,
+                  };
+                  const horizontalAmount = (midpoint.x - x0) / Math.max(0.0001, x1 - x0);
+                  const verticalAmount = (midpoint.y - y0) / Math.max(0.0001, y1 - y0);
+                  const rockDistances = rockValues.map(field => {
+                    const top = mix(
+                      field[row * columns + column],
+                      field[row * columns + column + 1],
+                      horizontalAmount,
+                    );
+                    const bottom = mix(
+                      field[(row + 1) * columns + column],
+                      field[(row + 1) * columns + column + 1],
+                      horizontalAmount,
+                    );
+                    return mix(top, bottom, verticalAmount);
+                  });
+                  path.push({
+                    ...edges[start],
+                    move: true,
+                    rakeDistance: level,
+                    rockDistances,
+                  }, edges[end]);
+                }
+              }
+            }
+            if (path.length) paths.push(path);
+          }
+          maximumRakeDistance = maximumDistance;
+          canvas.dataset.samonPattern = 'nested-distance';
           canvas.dataset.samonCrossings = '0';
           canvas.dataset.samonMinimumGap = spacing.toFixed(2);
+          canvas.dataset.pulsePalette = 'black';
+          canvas.dataset.pulsePath = 'samon-only';
+          canvas.dataset.pulseResponse = 'contact-amplification';
+          canvas.dataset.pulseVariables = 'travel-fade,connection-boost';
           return paths;
         }
 
-        function drawBackground() {
-          ctx.fillStyle = '#eee9d8';
-          ctx.fillRect(0, 0, width, height);
+        function drawBackground(target) {
+          target.fillStyle = '#eee9d8';
+          target.fillRect(0, 0, width, height);
           if (gravelPattern) {
-            ctx.fillStyle = gravelPattern;
-            ctx.fillRect(0, 0, width, height);
+            target.fillStyle = gravelPattern;
+            target.fillRect(0, 0, width, height);
           }
         }
 
-        function drawRakeStroke(points, offsetY, color, lineWidth) {
-          ctx.beginPath();
+        function drawRakeStroke(target, points, offsetY, color, lineWidth) {
+          target.beginPath();
           for (let i = 0; i < points.length; i++) {
             const point = points[i];
-            if (i === 0) ctx.moveTo(point.x, point.y + offsetY);
-            else ctx.lineTo(point.x, point.y + offsetY);
+            if (i === 0 || point.move) target.moveTo(point.x, point.y + offsetY);
+            else target.lineTo(point.x, point.y + offsetY);
           }
-          ctx.strokeStyle = color;
-          ctx.lineWidth = lineWidth;
-          ctx.stroke();
+          target.strokeStyle = color;
+          target.lineWidth = lineWidth;
+          target.stroke();
         }
 
-        function drawSamon() {
+        function drawSamon(target) {
+          target.save();
+          target.beginPath();
+          target.rect(4, 4, width - 8, height - 8);
+          target.clip();
+          for (const path of rakePaths) {
+            drawRakeStroke(target, path, 0.7, 'rgba(255, 253, 241, 0.72)', 1.15);
+            drawRakeStroke(target, path, 0, 'rgba(71, 58, 53, 0.29)', 0.82);
+          }
+          target.restore();
+        }
+
+        function renderBase() {
+          drawBackground(baseCtx);
+          drawSamon(baseCtx);
+        }
+
+        function pulseStrength(distance, radius) {
+          const band = Math.max(9, settings.rakeSpacing * 1.08);
+          const delta = (distance - radius) / band;
+          return Math.exp(-delta * delta * 2.4);
+        }
+
+        function connectedPulseThreshold(contacts, count) {
+          const parent = Array.from({ length: count }, (_, index) => index);
+          const find = index => {
+            while (parent[index] !== index) {
+              parent[index] = parent[parent[index]];
+              index = parent[index];
+            }
+            return index;
+          };
+          for (const contact of [...contacts].sort((a, b) => a.distance - b.distance)) {
+            parent[find(contact.second)] = find(contact.first);
+            if (new Set(parent.map((_, index) => find(index))).size === 1) return contact.distance;
+          }
+          return 1;
+        }
+
+        function pulseComponents(radius) {
+          const parent = rocks.map((_, index) => index);
+          const find = index => {
+            while (parent[index] !== index) {
+              parent[index] = parent[parent[index]];
+              index = parent[index];
+            }
+            return index;
+          };
+          for (const contact of pulseContactDistances) {
+            if (radius >= contact.distance) parent[find(contact.second)] = find(contact.first);
+          }
+          const members = new Map();
+          for (let index = 0; index < rocks.length; index++) {
+            const root = find(index);
+            if (!members.has(root)) members.set(root, []);
+            members.get(root).push(index);
+          }
+          return rocks.map((_, index) => members.get(find(index)));
+        }
+
+        function pulseTravelFade(distance, travelDistance) {
+          const firstFurrow = settings.rakeSpacing * 0.82;
+          const progress = smooth(
+            (distance - firstFurrow) / Math.max(1, travelDistance - firstFurrow),
+          );
+          return mix(1, 0.24, progress);
+        }
+
+        function pulseConnectionBoost(component, radius) {
+          if (component.length === 1) return 0;
+          if (prefersReducedMotion && component.length === rocks.length) return 1;
+          const previous = (component.length - 2) / Math.max(1, rocks.length - 1);
+          const target = (component.length - 1) / Math.max(1, rocks.length - 1);
+          let contactDistance = pulseStillDistance;
+          if (component.length < rocks.length) {
+            const componentContacts = pulseContactDistances.filter(
+              contact => component.includes(contact.first) && component.includes(contact.second),
+            );
+            contactDistance = Math.min(...componentContacts.map(contact => contact.distance));
+          }
+          const progress = smooth(
+            (radius - contactDistance) / Math.max(1, settings.rakeSpacing * 3),
+          );
+          return mix(previous, target, progress);
+        }
+
+        function drawPulses(time) {
+          const travelDistance = maximumRakeDistance + settings.rakeSpacing * 4;
+          const elapsed = ((time - pulseStartedAt) % PULSE_PERIOD + PULSE_PERIOD) % PULSE_PERIOD;
+          const radius = prefersReducedMotion
+            ? pulseStillDistance
+            : elapsed / PULSE_PERIOD * travelDistance;
+          const components = pulseComponents(radius);
+          const buckets = new Map();
+
+          for (const path of rakePaths) {
+            for (let i = 0; i < path.length; i += 2) {
+              const start = path[i];
+              const end = path[i + 1];
+              const peak = pulseStrength(start.rakeDistance, radius);
+              if (peak < 0.035) continue;
+
+              let owningRock = 0;
+              for (let rockIndex = 1; rockIndex < start.rockDistances.length; rockIndex++) {
+                if (start.rockDistances[rockIndex] < start.rockDistances[owningRock]) {
+                  owningRock = rockIndex;
+                }
+              }
+              const component = components[owningRock];
+              const travelFade = pulseTravelFade(start.rakeDistance, travelDistance);
+              const connectionBoost = pulseConnectionBoost(component, radius);
+              const fadeBucket = Math.round(travelFade * 8);
+              const boostBucket = Math.round(connectionBoost * 8);
+              const alphaBucket = Math.max(1, Math.round(peak * 5));
+              const key = `${fadeBucket}:${boostBucket}:${alphaBucket}`;
+              let bucket = buckets.get(key);
+              if (!bucket) {
+                const bucketFade = fadeBucket / 8;
+                const bucketBoost = boostBucket / 8;
+                const connectionGain = mix(1, 4.2, bucketBoost);
+                bucket = {
+                  alpha: Math.min(
+                    0.92,
+                    0.035 + alphaBucket / 5 * 0.21 * bucketFade * connectionGain,
+                  ),
+                  lineWidth: 0.82 + bucketBoost * 1.85,
+                  segments: [],
+                };
+                buckets.set(key, bucket);
+              }
+              bucket.segments.push(start, end);
+            }
+          }
+
           ctx.save();
           ctx.beginPath();
           ctx.rect(4, 4, width - 8, height - 8);
           ctx.clip();
-          for (const path of rakePaths) {
-            drawRakeStroke(path, 0.7, 'rgba(255, 253, 241, 0.72)', 1.15);
-            drawRakeStroke(path, 0, 'rgba(71, 58, 53, 0.29)', 0.82);
+          ctx.lineCap = 'round';
+          for (const bucket of buckets.values()) {
+            ctx.beginPath();
+            for (let i = 0; i < bucket.segments.length; i += 2) {
+              const start = bucket.segments[i];
+              const end = bucket.segments[i + 1];
+              ctx.moveTo(start.x, start.y);
+              ctx.lineTo(end.x, end.y);
+            }
+            ctx.lineWidth = bucket.lineWidth;
+            ctx.strokeStyle = `rgba(0, 0, 0, ${bucket.alpha})`;
+            ctx.stroke();
           }
           ctx.restore();
         }
@@ -606,15 +913,34 @@
           ctx.fillStyle = 'rgba(43, 23, 32, 0.72)';
           ctx.font = '8px "SFMono-Regular", Consolas, monospace';
           ctx.textAlign = 'right';
-          ctx.fillText(`KARESANSUI / ${String(settings.count).padStart(2, '0')} STONE`, width - 14, height - 13);
+          const stoneLabel = settings.count === 1 ? 'STONE' : 'STONES';
+          ctx.fillText(`KARESANSUI / ${String(settings.count).padStart(2, '0')} ${stoneLabel}`, width - 14, height - 13);
           ctx.restore();
         }
 
-        function render() {
-          drawBackground();
-          drawSamon();
+        function render(time = performance.now()) {
+          ctx.drawImage(baseCanvas, 0, 0, width, height);
+          drawPulses(time);
           drawRocks();
           drawFrame();
+        }
+
+        function animate(time) {
+          if (time - lastAnimationRender >= 1000 / 30) {
+            render(time);
+            lastAnimationRender = time;
+          }
+          animationFrame = requestAnimationFrame(animate);
+        }
+
+        function syncAnimation() {
+          cancelAnimationFrame(animationFrame);
+          animationFrame = 0;
+          if (prefersReducedMotion || document.hidden) {
+            render(pulseStartedAt);
+            return;
+          }
+          animationFrame = requestAnimationFrame(animate);
         }
 
         function scheduleCompose() {
@@ -697,7 +1023,15 @@
           resizeTimer = setTimeout(resize, 120);
         });
 
+        reducedMotionQuery.addEventListener('change', event => {
+          prefersReducedMotion = event.matches;
+          syncAnimation();
+        });
+
+        document.addEventListener('visibilitychange', syncAnimation);
+
         resize();
+        syncAnimation();
       })();
     </script>
   </body>

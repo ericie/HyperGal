@@ -522,6 +522,23 @@
         return GESTALTS[name].enabled ? GESTALTS[name].strength : 0;
       }
 
+      function randomizeGestaltStrengths() {
+        const names = Object.keys(GESTALTS);
+        const gestaltRandom = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+
+        for (const name of names) {
+          GESTALTS[name].enabled = true;
+          GESTALTS[name].strength = 0.08 + gestaltRandom() * 0.84;
+        }
+
+        const maximumIndex = Math.floor(gestaltRandom() * names.length);
+        const minimumIndex =
+          (maximumIndex + 1 + Math.floor(gestaltRandom() * (names.length - 1))) %
+          names.length;
+        GESTALTS[names[maximumIndex]].strength = 1;
+        GESTALTS[names[minimumIndex]].strength = 0;
+      }
+
       function smootherStep(value) {
         const t = clamp(value, 0, 1);
         return t * t * t * (t * (t * 6 - 15) + 10);
@@ -1456,6 +1473,7 @@
           }
 
           relaxAndConstrain(points, baseY, template, lineGap, activeObstacles);
+          closeWrappedPath(points, xStep, clearance, activeObstacles);
           if (pathHasDiscontinuity(points, xStep)) continue;
           const curves = makeLineCurves(points, activeObstacles, clearance);
           for (const point of points) {
@@ -1469,11 +1487,7 @@
           const pathLength = curves.totalLength;
           const drawDuration =
             template.drawDuration * (pathLength / Math.max(1, width));
-          const cycleDuration =
-            drawDuration +
-            template.holdDuration +
-            template.fadeDuration +
-            template.restDuration;
+          const cycleDuration = drawDuration;
           made.push({
             baseY,
             index: i,
@@ -1494,6 +1508,47 @@
         }
 
         return made;
+      }
+
+      function closeWrappedPath(points, xStep, clearance, activeObstacles) {
+        if (points.length < 4) return;
+
+        const lastIndex = points.length - 1;
+        const exitStepY = points[lastIndex].y - points[lastIndex - 1].y;
+        const entryStepY = points[1].y - points[0].y;
+        const positionCorrection = points[lastIndex].y - points[0].y;
+        const slopeCorrection = (exitStepY - entryStepY) / Math.max(0.001, xStep);
+        const blendDistance = clamp(width * 0.1, 56, 112);
+        const blendCount = Math.min(
+          lastIndex - 1,
+          Math.max(3, Math.round(blendDistance / Math.max(0.001, xStep)))
+        );
+        const corrected = [];
+
+        for (let i = 0; i <= blendCount; i++) {
+          const u = i / blendCount;
+          const u2 = u * u;
+          const u3 = u2 * u;
+          const positionBlend = 2 * u3 - 3 * u2 + 1;
+          const slopeBlend = u3 - 2 * u2 + u;
+          const correction =
+            positionBlend * positionCorrection +
+            slopeBlend * blendDistance * slopeCorrection;
+          corrected.push(points[i].y + correction);
+        }
+
+        corrected[0] = points[lastIndex].y;
+        corrected[1] = corrected[0] + exitStepY;
+
+        for (let i = 0; i < corrected.length; i++) {
+          if (!pointIsClear(points[i].x, corrected[i], clearance, activeObstacles)) {
+            return;
+          }
+        }
+
+        for (let i = 0; i < corrected.length; i++) {
+          points[i].y = corrected[i];
+        }
       }
 
       function pathHasDiscontinuity(points, xStep) {
@@ -1942,29 +1997,25 @@
           if (!prefersReducedMotion) {
             const cycleTime =
               (elapsed + line.cycleOffset) % line.cycleDuration;
-            const drawEnd = line.drawDuration;
-            const holdEnd = drawEnd + line.holdDuration;
-            const fadeEnd = holdEnd + line.fadeDuration;
+            progress = cycleTime / line.drawDuration;
+            isDrawing = true;
 
-            if (cycleTime < drawEnd) {
-              progress = cycleTime / drawEnd;
-              alpha = smootherStep(clamp(cycleTime / 0.24, 0, 1));
-              isDrawing = true;
-            } else if (cycleTime < holdEnd) {
-              progress = 1;
-            } else if (cycleTime < fadeEnd) {
-              progress = 1;
-              alpha =
-                1 -
-                smootherStep(
-                  (cycleTime - holdEnd) / Math.max(0.001, line.fadeDuration)
-                );
-            } else {
-              continue;
+            const wrapFadeDuration = Math.min(
+              line.fadeDuration,
+              line.drawDuration * 0.72
+            );
+            if (cycleTime < wrapFadeDuration) {
+              ctx.beginPath();
+              ctx.globalAlpha =
+                1 - smootherStep(cycleTime / Math.max(0.001, wrapFadeDuration));
+              ctx.lineWidth = line.stroke;
+              ctx.strokeStyle = line.color;
+              drawSmoothLine(line, 1);
+              ctx.stroke();
             }
           }
 
-          if (progress <= 0 || alpha <= 0.001) continue;
+          if (progress < 0 || alpha <= 0.001) continue;
 
           ctx.beginPath();
           ctx.globalAlpha = alpha;
@@ -2297,16 +2348,14 @@
       }
 
       function bindGestaltControls() {
+        syncGestaltControls();
+
         document.querySelectorAll('[data-gestalt]').forEach((control) => {
           const name = control.dataset.gestalt;
           const toggle = control.querySelector('.gestalt-toggle');
           const slider = control.querySelector('.gestalt-strength');
           const output = control.querySelector('.gestalt-value');
           const setting = GESTALTS[name];
-
-          toggle.checked = setting.enabled;
-          slider.value = Math.round(setting.strength * 100);
-          updateControl(control, toggle, slider, output, setting);
 
           toggle.addEventListener('change', () => {
             setting.enabled = toggle.checked;
@@ -2319,6 +2368,18 @@
             updateControl(control, toggle, slider, output, setting);
             scheduleCompose();
           });
+        });
+      }
+
+      function syncGestaltControls() {
+        document.querySelectorAll('[data-gestalt]').forEach((control) => {
+          const setting = GESTALTS[control.dataset.gestalt];
+          const toggle = control.querySelector('.gestalt-toggle');
+          const slider = control.querySelector('.gestalt-strength');
+          const output = control.querySelector('.gestalt-value');
+          toggle.checked = setting.enabled;
+          slider.value = Math.round(setting.strength * 100);
+          updateControl(control, toggle, slider, output, setting);
         });
       }
 
@@ -2367,6 +2428,8 @@
 
       function reseed() {
         seed = ((Date.now() * 1664525) ^ (Math.random() * 0xffffffff)) >>> 0;
+        randomizeGestaltStrengths();
+        syncGestaltControls();
         compose();
       }
 
@@ -2464,6 +2527,7 @@
       bindCountControl();
       bindLineControl();
       bindLineAngleControl();
+      randomizeGestaltStrengths();
       bindGestaltControls();
       bindCompositionPanel();
       resize();

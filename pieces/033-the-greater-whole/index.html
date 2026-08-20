@@ -726,13 +726,13 @@
           const centerY = Math.max(height * 0.34, Math.min(height * 0.66, event.y));
           const separation = width * (0.025 + progress * 0.075);
           const bigSize = Math.max(width, height) * 1.08;
-          const weights = [100, 200, 300, 400, 500, 600, 700, 800, 900];
+          const weights = [100, 175, 250, 325, 400, 475, 550, 625, 700];
 
           ctx.save();
           ctx.beginPath();
           ctx.rect(0, 0, splitX, height);
           ctx.clip();
-          ctx.font = `720 ${bigSize}px Geist`;
+          ctx.font = `700 ${bigSize}px Geist`;
           stamp(event.character, splitX - separation, centerY, 0.82, 1);
           ctx.restore();
 
@@ -885,7 +885,7 @@
           for (let row = 0; row < rows; row++) {
             for (let column = 0; column < columns; column++) {
               const size = Math.min(cellWidth, cellHeight) * (0.56 + row * 0.055);
-              const weight = 100 + column * 100;
+              const weight = 100 + column * 75;
               const x = event.x + (column - (columns - 1) / 2) * cellWidth * spread;
               const y = event.y + (row - (rows - 1) / 2) * cellHeight * spread;
               const scaleX = 0.52 + row * 0.22 + (column === accentColumn ? accent * 0.5 : 0);
