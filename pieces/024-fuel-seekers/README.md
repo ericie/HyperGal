@@ -19,8 +19,8 @@ orange to dark brown. Every diamond has four attachment points, one at each
 corner, so as many as four bubbles can refuel there at once.
 The pump's own amber reserve is a vertical level with a flat surface that falls
 as fuel transfers. The accumulated ribbons fade slowly over time. When a bubble
-runs dry, a soft pale burst whites out the nearby trail before its replacement
-enters. A station port is not reserved while a bubble travels, so several
+runs dry, a soft pale burst whites out the nearby trail and the bubble is gone
+for good. A station port is not reserved while a bubble travels, so several
 low-fuel bubbles can converge and late arrivals may have to divert. Bubbles
 exchange momentum when they meet, and both travelers and docked bubbles remain
 clear of one another and the station bodies.
@@ -30,8 +30,7 @@ When a station reaches zero, its diamond body bursts and the spent area is
 permanently removed from the resource map. A replacement can grow only over a
 different untouched deposit. Once the remaining field has no viable deposit,
 the station population begins to thin instead of recycling old locations. A
-bubble that reaches zero also pops. Its replacement starts just outside one of
-the four edges with a partial tank.
+bubble that reaches zero also pops, permanently reducing the population.
 
 Press `R` to generate a new oil field, relocate the stations to its deposits,
 and restart the population. Add `?seed=anything` to the URL to revisit a field.

@@ -1,0 +1,1056 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="A typographic field in which every letter releases a 2.5-second composition made only from itself."
+    />
+    <title>The Greater Whole · HyperGal</title>
+    <style>
+      @font-face {
+        font-family: "Geist";
+        src: url("Geist-Variable.woff2") format("woff2-variations");
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+      }
+
+      :root {
+        color-scheme: light;
+        --ground: #f8f8f6;
+        --ink: #000;
+        --muted: #0b6b00;
+        --pink: #ff4ab0;
+        --acid: #e8f80d;
+        --olive: #90991a;
+        --green: #0b6b00;
+        --quote-size: clamp(2.5rem, 6.15vw, 6rem);
+      }
+
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: var(--ground);
+      }
+
+      body {
+        min-width: 320px;
+        color: var(--ink);
+        font-family: "Geist", Arial, sans-serif;
+        font-synthesis: none;
+        font-optical-sizing: auto;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      .magnifier-cursor {
+        --lens-color: var(--green);
+        position: fixed;
+        z-index: 3;
+        top: 0;
+        left: 0;
+        width: 76px;
+        height: 76px;
+        pointer-events: none;
+        transform: translate3d(-100px, -100px, 0);
+        visibility: hidden;
+        will-change: transform;
+      }
+
+      .magnifier-cursor::after {
+        position: absolute;
+        z-index: -1;
+        top: 59px;
+        left: 59px;
+        width: 38px;
+        height: 11px;
+        background: var(--ink);
+        content: "";
+        transform: rotate(45deg);
+        transform-origin: 0 50%;
+      }
+
+      .magnifier-cursor.is-visible { visibility: visible; }
+
+      .magnifier-lens {
+        display: block;
+        width: 76px;
+        height: 76px;
+        border: 5px solid var(--ink);
+        border-radius: 50%;
+        background: transparent;
+        box-shadow: inset 0 0 0 15px var(--lens-color);
+        transition: box-shadow 110ms linear;
+      }
+
+      .magnifier-lens.is-triggered {
+        animation: lens-trigger 260ms cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      main {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        width: 100%;
+        height: 100%;
+        padding:
+          max(48px, calc(env(safe-area-inset-top) + 28px))
+          clamp(18px, 3.2vw, 52px)
+          max(48px, calc(env(safe-area-inset-bottom) + 28px));
+        place-items: center;
+      }
+
+      .quote-shell {
+        display: grid;
+        width: min(100%, 1510px);
+        height: 100%;
+        place-items: center;
+      }
+
+      blockquote {
+        width: 100%;
+        margin: 0;
+        color: var(--ink);
+        font-size: var(--quote-size);
+        font-weight: 900;
+        letter-spacing: -0.035em;
+        line-height: 0.91;
+        text-wrap: pretty;
+      }
+
+      .word {
+        display: inline-flex;
+        margin-right: 0.21em;
+        white-space: nowrap;
+      }
+
+      .glyph,
+      .mark {
+        display: inline-block;
+        font: inherit;
+        letter-spacing: inherit;
+        line-height: inherit;
+      }
+
+      .glyph {
+        position: relative;
+        min-width: 0;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: inherit;
+        cursor: crosshair;
+        outline: none;
+        touch-action: manipulation;
+        transform-origin: 50% 62%;
+        transition: color 110ms linear;
+      }
+
+      .glyph::after {
+        position: absolute;
+        right: 0.04em;
+        bottom: -0.08em;
+        left: 0.04em;
+        height: max(1px, 0.018em);
+        background: currentColor;
+        content: "";
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      .glyph:hover::after,
+      .glyph:focus-visible::after {
+        transform: scaleX(1);
+      }
+
+      .glyph:focus-visible {
+        color: var(--green);
+      }
+
+      .glyph.is-struck {
+        animation: strike 520ms cubic-bezier(0.16, 1, 0.3, 1);
+        color: var(--ink);
+      }
+
+      .instruction,
+      .meter {
+        position: fixed;
+        z-index: 2;
+        bottom: max(16px, env(safe-area-inset-bottom));
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 620;
+        letter-spacing: 0.06em;
+        line-height: 1;
+        text-transform: uppercase;
+        user-select: none;
+      }
+
+      .instruction { left: max(18px, env(safe-area-inset-left)); }
+      .meter { right: max(18px, env(safe-area-inset-right)); }
+
+      .meter output {
+        min-width: 2ch;
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .debug-view {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        width: 100%;
+        height: 100%;
+        padding: 16px;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 12px;
+      }
+
+      .debug-view[hidden] { display: none; }
+
+      .debug-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 24px;
+      }
+
+      .debug-header h1,
+      .debug-header p { margin: 0; }
+
+      .debug-header h1 {
+        font-size: 16px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+
+      .debug-header p {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 620;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .debug-grid {
+        display: grid;
+        min-height: 0;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .debug-cell {
+        position: relative;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        border: 1px solid var(--ink);
+      }
+
+      .debug-label {
+        position: absolute;
+        z-index: 2;
+        top: 8px;
+        left: 8px;
+        padding: 5px 7px;
+        border: 1px solid var(--ink);
+        background: var(--ground);
+        color: var(--ink);
+        font-size: 10px;
+        font-weight: 720;
+        letter-spacing: 0.04em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      body.is-debug main,
+      body.is-debug .instruction,
+      body.is-debug .meter,
+      body.is-debug #announcement,
+      body.is-debug .magnifier-cursor { display: none; }
+
+      @media (pointer: fine) {
+        body:not(.is-debug),
+        body:not(.is-debug) * { cursor: none !important; }
+      }
+
+      @media (max-width: 1050px) and (min-width: 641px) {
+        .debug-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-rows: repeat(4, minmax(0, 1fr));
+        }
+      }
+
+      @keyframes strike {
+        0% { transform: scale(1); }
+        22% { transform: scale(0.9, 1.05); }
+        100% { transform: scale(1); }
+      }
+
+      @keyframes lens-trigger {
+        0% { transform: scale(1); }
+        32% { transform: scale(1.16); }
+        100% { transform: scale(1); }
+      }
+
+      @media (max-width: 640px) {
+        :root { --quote-size: clamp(2.125rem, 10.6vw, 3.625rem); }
+
+        main {
+          padding-right: 18px;
+          padding-left: 18px;
+        }
+
+        blockquote {
+          font-weight: 900;
+          letter-spacing: -0.035em;
+          line-height: 0.93;
+        }
+
+        .instruction,
+        .meter { font-size: 9px; }
+
+        .debug-view {
+          padding: 8px;
+          gap: 8px;
+        }
+
+        .debug-header p { display: none; }
+
+        .debug-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-rows: repeat(6, minmax(0, 1fr));
+        }
+
+        .debug-label {
+          top: 5px;
+          left: 5px;
+          padding: 4px 5px;
+          font-size: 8px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .glyph,
+        .glyph::after { transition: none; }
+        .glyph.is-struck { animation: none; }
+        .magnifier-lens { transition: none; }
+        .magnifier-lens.is-triggered { animation: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="field" aria-hidden="true"></canvas>
+    <div class="magnifier-cursor" id="magnifier" aria-hidden="true">
+      <span class="magnifier-lens" id="magnifier-lens"></span>
+    </div>
+    <main>
+      <div class="quote-shell">
+        <blockquote
+          id="quote"
+          aria-label="The greater whole is an illusion. Really it's nothing other than a collection of smaller pieces, joined together in such a way as to encourage the human tendency to see wholes."
+        ></blockquote>
+      </div>
+    </main>
+    <p class="instruction">Roll over any letter</p>
+    <p class="meter">Active <output id="active-count">00</output> / 2.5 sec</p>
+    <p class="sr-only" id="announcement" aria-live="polite"></p>
+    <section class="debug-view" id="debug-view" aria-label="Animation comparison grid" hidden>
+      <header class="debug-header">
+        <h1>Animation debug</h1>
+        <p>Same glyph · synchronized 2.5 second loop · production motion</p>
+      </header>
+      <div class="debug-grid">
+        <article class="debug-cell" data-mode="0">
+          <span class="debug-label">01 · Dial / radial expansion</span>
+        </article>
+        <article class="debug-cell" data-mode="1">
+          <span class="debug-label">02 · Register / opposing weights</span>
+        </article>
+        <article class="debug-cell" data-mode="2">
+          <span class="debug-label">03 · Edge / oversized crops</span>
+        </article>
+        <article class="debug-cell" data-mode="3">
+          <span class="debug-label">04 · Conveyor / horizontal bands</span>
+        </article>
+        <article class="debug-cell" data-mode="4">
+          <span class="debug-label">05 · Rain / falling glyphs</span>
+        </article>
+        <article class="debug-cell" data-mode="5">
+          <span class="debug-label">06 · Wave / modular field</span>
+        </article>
+        <article class="debug-cell" data-mode="6">
+          <span class="debug-label">07 · Stack / scale progression</span>
+        </article>
+        <article class="debug-cell" data-mode="7">
+          <span class="debug-label">08 · Matrix / weight gradient</span>
+        </article>
+        <article class="debug-cell" data-mode="8">
+          <span class="debug-label">09 · Shutter / vertical slices</span>
+        </article>
+        <article class="debug-cell" data-mode="9">
+          <span class="debug-label">10 · Ledger / measured rows</span>
+        </article>
+        <article class="debug-cell" data-mode="10">
+          <span class="debug-label">11 · Compression / width cycle</span>
+        </article>
+        <article class="debug-cell" data-mode="11">
+          <span class="debug-label">12 · Cascade / stepped field</span>
+        </article>
+      </div>
+    </section>
+
+    <script>
+      (() => {
+        'use strict';
+
+        const TEXT = "The greater whole is an illusion. Really it's nothing other than a collection of smaller pieces, joined together in such a way as to encourage the human tendency to see wholes.";
+        const LIFE = 2500;
+        const MODE_COUNT = 12;
+        const DEBUG = new URLSearchParams(window.location.search).get('debug') === 'true';
+        const GROUND_COLOR = [248, 248, 246];
+        const COLORS = [
+          [255, 74, 176],
+          [232, 248, 13],
+          [144, 153, 26],
+          [11, 107, 0]
+        ];
+        const quote = document.querySelector('#quote');
+        const shell = document.querySelector('.quote-shell');
+        const canvas = document.querySelector('#field');
+        const ctx = canvas.getContext('2d', { alpha: true });
+        const magnifier = document.querySelector('#magnifier');
+        const magnifierLens = document.querySelector('#magnifier-lens');
+        const countOutput = document.querySelector('#active-count');
+        const announcement = document.querySelector('#announcement');
+        const debugView = document.querySelector('#debug-view');
+        const debugCells = Array.from(document.querySelectorAll('.debug-cell'));
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+        const finePointer = window.matchMedia('(pointer: fine)');
+        const events = [];
+        const debugStart = performance.now();
+        let width = 0;
+        let height = 0;
+        let dpr = 1;
+        let serial = 0;
+        let frame = 0;
+
+        if (DEBUG) {
+          document.body.classList.add('is-debug');
+          debugView.hidden = false;
+        } else {
+          buildQuote();
+        }
+        resize();
+        document.fonts.ready.then(() => {
+          if (!DEBUG) fitQuote();
+          resize();
+          if (DEBUG && !frame) frame = requestAnimationFrame(drawDebug);
+        });
+
+        window.addEventListener('resize', resize, { passive: true });
+        window.addEventListener('pointermove', moveMagnifier, { passive: true });
+        window.addEventListener('pointerout', (event) => {
+          if (!event.relatedTarget) magnifier.classList.remove('is-visible');
+        }, { passive: true });
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) cancelAnimationFrame(frame);
+          else if (DEBUG) frame = requestAnimationFrame(drawDebug);
+          else if (events.length) frame = requestAnimationFrame(draw);
+        });
+
+        function buildQuote() {
+          const words = TEXT.split(' ');
+          words.forEach((word, wordIndex) => {
+            const group = document.createElement('span');
+            group.className = 'word';
+
+            Array.from(word).forEach((character) => {
+              if (/\p{L}/u.test(character)) {
+                const button = document.createElement('button');
+                let lastActivation = -Infinity;
+                button.type = 'button';
+                button.className = 'glyph';
+                button.textContent = character;
+                button.setAttribute('aria-label', `Animate letter ${character}`);
+
+                const activate = () => {
+                  const now = performance.now();
+                  if (now - lastActivation < 120) return;
+                  lastActivation = now;
+                  trigger(button, character);
+                };
+
+                button.addEventListener('pointerenter', (event) => {
+                  if (event.pointerType !== 'touch') activate();
+                });
+                button.addEventListener('pointerdown', (event) => {
+                  if (event.pointerType === 'touch') activate();
+                });
+                button.addEventListener('keydown', (event) => {
+                  if (event.repeat || (event.key !== 'Enter' && event.key !== ' ')) return;
+                  event.preventDefault();
+                  activate();
+                });
+                group.append(button);
+              } else {
+                const mark = document.createElement('span');
+                mark.className = 'mark';
+                mark.textContent = character;
+                mark.setAttribute('aria-hidden', 'true');
+                group.append(mark);
+              }
+            });
+
+            quote.append(group);
+            if (wordIndex < words.length - 1) {
+              quote.append(document.createTextNode(' '));
+            }
+          });
+        }
+
+        function fitQuote() {
+          const viewportWidth = window.innerWidth;
+          const preferred = Math.min(
+            viewportWidth <= 640 ? viewportWidth * 0.106 : viewportWidth * 0.0615,
+            viewportWidth <= 640 ? 58 : 96
+          );
+          let size = Math.max(34, preferred);
+          const available = shell.clientHeight - 4;
+          document.documentElement.style.setProperty('--quote-size', `${size}px`);
+
+          while (quote.scrollHeight > available && size > 25) {
+            size -= 1;
+            document.documentElement.style.setProperty('--quote-size', `${size}px`);
+          }
+        }
+
+        function resize() {
+          width = window.innerWidth;
+          height = window.innerHeight;
+          dpr = Math.min(window.devicePixelRatio || 1, 2);
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          if (!DEBUG) fitQuote();
+        }
+
+        function trigger(button, character) {
+          const rect = button.getBoundingClientRect();
+          const id = serial++;
+          const color = COLORS[(character.toLowerCase().charCodeAt(0) + id) % COLORS.length];
+          const event = {
+            character,
+            color,
+            id,
+            mode: (character.toLowerCase().charCodeAt(0) + id) % MODE_COUNT,
+            start: performance.now(),
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+            seed: hash(`${character}-${id}`)
+          };
+
+          events.push(event);
+          setMagnifierColor(color);
+          countOutput.value = String(events.length).padStart(2, '0');
+          announcement.textContent = `Letter ${character} activated for two and a half seconds.`;
+          button.classList.remove('is-struck');
+          void button.offsetWidth;
+          button.classList.add('is-struck');
+          window.setTimeout(() => button.classList.remove('is-struck'), 540);
+
+          if (!frame) frame = requestAnimationFrame(draw);
+        }
+
+        function moveMagnifier(event) {
+          if (DEBUG || !finePointer.matches || event.pointerType === 'touch') return;
+          magnifier.style.transform = `translate3d(${event.clientX - 38}px, ${event.clientY - 38}px, 0)`;
+          magnifier.classList.add('is-visible');
+        }
+
+        function setMagnifierColor(color) {
+          magnifier.style.setProperty('--lens-color', `rgb(${color.join(' ')})`);
+          magnifierLens.classList.remove('is-triggered');
+          void magnifierLens.offsetWidth;
+          magnifierLens.classList.add('is-triggered');
+        }
+
+        function draw(now) {
+          frame = 0;
+          ctx.clearRect(0, 0, width, height);
+
+          for (let i = events.length - 1; i >= 0; i--) {
+            const age = now - events[i].start;
+            if (age >= LIFE) events.splice(i, 1);
+          }
+
+          for (const event of events) {
+            const t = Math.min(1, (now - event.start) / LIFE);
+            const envelope = colorEnvelope(t);
+            const eventColor = interpolateColor(GROUND_COLOR, event.color, envelope);
+            ctx.save();
+            ctx.fillStyle = eventColor;
+            ctx.strokeStyle = eventColor;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fontKerning = 'none';
+            drawMode(event, reducedMotion.matches ? 0.58 : t);
+            ctx.restore();
+          }
+
+          countOutput.value = String(events.length).padStart(2, '0');
+          if (events.length && !document.hidden) frame = requestAnimationFrame(draw);
+        }
+
+        function drawDebug(now) {
+          frame = 0;
+          ctx.clearRect(0, 0, width, height);
+
+          const pageWidth = width;
+          const pageHeight = height;
+          const cycle = ((now - debugStart) % LIFE) / LIFE;
+          const motionTime = reducedMotion.matches ? 0.58 : cycle;
+          const envelope = colorEnvelope(cycle);
+
+          debugCells.forEach((cell, index) => {
+            const rect = cell.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) return;
+
+            const event = {
+              character: 'a',
+              color: COLORS[index % COLORS.length],
+              id: index,
+              mode: index,
+              x: rect.width / 2,
+              y: rect.height / 2,
+              seed: hash(`debug-${index}`)
+            };
+            const eventColor = interpolateColor(GROUND_COLOR, event.color, envelope);
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(rect.left, rect.top, rect.width, rect.height);
+            ctx.clip();
+            ctx.translate(rect.left, rect.top);
+            ctx.fillStyle = eventColor;
+            ctx.strokeStyle = eventColor;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fontKerning = 'none';
+
+            width = rect.width;
+            height = rect.height;
+            drawMode(event, motionTime);
+            width = pageWidth;
+            height = pageHeight;
+            ctx.restore();
+          });
+
+          width = pageWidth;
+          height = pageHeight;
+          if (!document.hidden) frame = requestAnimationFrame(drawDebug);
+        }
+
+        function drawMode(event, t) {
+          if (event.mode === 0) drawDial(event, t);
+          else if (event.mode === 1) drawRegister(event, t);
+          else if (event.mode === 2) drawEdgeCrop(event, t);
+          else if (event.mode === 3) drawConveyor(event, t);
+          else if (event.mode === 4) drawRain(event, t);
+          else if (event.mode === 5) drawWave(event, t);
+          else if (event.mode === 6) drawScaleStack(event, t);
+          else if (event.mode === 7) drawMatrix(event, t);
+          else if (event.mode === 8) drawShutter(event, t);
+          else if (event.mode === 9) drawLedger(event, t);
+          else if (event.mode === 10) drawCompression(event, t);
+          else drawCascade(event, t);
+        }
+
+        function drawDial(event, t) {
+          const diagonal = Math.hypot(width, height);
+          const progress = smootherstep(t);
+          for (let ring = 0; ring < 4; ring++) {
+            const count = 7 + ring * 5;
+            const accent = ring === event.id % 4
+              ? quickPulse(t, 0.58, 0.035) * 0.018
+              : 0;
+            const radius = (0.04 + ring * 0.075 + progress * 0.11 + accent) * diagonal;
+            const size = Math.max(22, diagonal * (0.035 + ring * 0.006));
+            ctx.font = `${100 + ring * 200} ${size}px Geist`;
+            for (let i = 0; i < count; i++) {
+              const angle = (i / count) * Math.PI * 2 + ring * 0.17;
+              const x = event.x + Math.cos(angle) * radius;
+              const y = event.y + Math.sin(angle) * radius;
+              stamp(event.character, x, y, 1, 1);
+            }
+          }
+        }
+
+        function drawRegister(event, t) {
+          const progress = smootherstep(t);
+          const splitX = Math.max(width * 0.22, Math.min(width * 0.78, event.x));
+          const centerY = Math.max(height * 0.34, Math.min(height * 0.66, event.y));
+          const separation = width * (0.025 + progress * 0.075);
+          const bigSize = Math.max(width, height) * 1.08;
+          const weights = [100, 200, 300, 400, 500, 600, 700, 800, 900];
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, 0, splitX, height);
+          ctx.clip();
+          ctx.font = `720 ${bigSize}px Geist`;
+          stamp(event.character, splitX - separation, centerY, 0.82, 1);
+          ctx.restore();
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(splitX, 0, width - splitX, height);
+          ctx.clip();
+          ctx.font = `250 ${bigSize}px Geist`;
+          stamp(event.character, splitX + separation, centerY, 1.36, 1);
+          ctx.restore();
+
+          const step = width / weights.length;
+          const registerSize = Math.max(10, Math.min(step * 0.56, height * 0.075));
+          const accentIndex = event.id % weights.length;
+          const accent = quickPulse(t, 0.64, 0.035);
+
+          for (let index = 0; index < weights.length; index++) {
+            const targetX = (index + 0.5) * step;
+            const x = splitX + (targetX - splitX) * progress;
+            const scaleAccent = index === accentIndex ? 1 + accent * 0.7 : 1;
+
+            ctx.font = `${weights[index]} ${registerSize}px Geist`;
+            stamp(event.character, x, height * 0.14, scaleAccent, 1);
+
+            ctx.font = `${weights[weights.length - 1 - index]} ${registerSize}px Geist`;
+            stamp(event.character, x, height * 0.86, 0.54 + index * 0.12, 1);
+          }
+        }
+
+        function drawEdgeCrop(event, t) {
+          const progress = smootherstep(t);
+          const minimum = Math.min(width, height);
+          const coreSize = minimum * (0.54 + progress * 0.18);
+          const edgeSize = minimum * 0.92;
+          const pulse = quickPulse(t, 0.62, 0.035);
+          const accentEdge = event.id % 4;
+          const edges = [
+            { x: -width * 0.04 + progress * width * 0.055, y: height * 0.24, dx: 1, dy: 0, weight: 700, scaleX: 0.82 },
+            { x: width * 1.04 - progress * width * 0.055, y: height * 0.32, dx: -1, dy: 0, weight: 600, scaleX: 1.22 },
+            { x: width * 0.27, y: -height * 0.05 + progress * height * 0.065, dx: 0, dy: 1, weight: 400, scaleX: 0.68 },
+            { x: width * 0.73, y: height * 1.05 - progress * height * 0.065, dx: 0, dy: -1, weight: 200, scaleX: 1.38 }
+          ];
+
+          ctx.font = `350 ${coreSize}px Geist`;
+          stamp(event.character, width / 2, height / 2, 1, 1);
+
+          edges.forEach((edge, index) => {
+            const accentDistance = index === accentEdge ? pulse * minimum * 0.08 : 0;
+            ctx.font = `${edge.weight} ${edgeSize}px Geist`;
+            stamp(
+              event.character,
+              edge.x + edge.dx * accentDistance,
+              edge.y + edge.dy * accentDistance,
+              edge.scaleX,
+              1
+            );
+          });
+        }
+
+        function drawConveyor(event, t) {
+          const bands = 7;
+          const size = Math.max(52, width / 8.5);
+          const weights = [100, 200, 300, 400, 500, 600, 700];
+          for (let row = 0; row < bands; row++) {
+            const y = (row + 0.5) * height / bands;
+            const direction = row % 2 ? -1 : 1;
+            const accentRow = row === event.id % bands;
+            const speed = accentRow ? 1.35 : 0.32 + row * 0.035;
+            const offset = ((t * width * speed * direction) + event.x + row * size * 0.43) % (size * 1.2);
+            ctx.font = `${weights[row]} ${size}px Geist`;
+            for (let x = -size * 1.5; x < width + size * 1.5; x += size * 1.2) {
+              stamp(event.character, x + offset, y, 0.92, 1.1);
+            }
+          }
+        }
+
+        function drawRain(event, t) {
+          const random = mulberry32(event.seed);
+          const columns = Math.max(18, Math.ceil(width / 40));
+          const gutter = width / columns;
+
+          for (let column = 0; column < columns; column++) {
+            const x = (column + 0.5) * gutter + (random() - 0.5) * gutter * 0.56;
+            const drops = 5 + Math.floor(random() * 4);
+            const accentColumn = (column + event.id) % 11 === 0;
+            const speed = accentColumn
+              ? 1.75 + random() * 0.45
+              : 0.48 + random() * 0.58;
+            const phase = random();
+            const wind = (random() - 0.5) * gutter * 0.5;
+
+            for (let drop = 0; drop < drops; drop++) {
+              const size = Math.max(10, Math.min(30, gutter * (0.38 + random() * 0.42)));
+              const weight = 100 + Math.floor(random() * 420);
+              const position = (phase + drop / drops + t * speed) % 1;
+              const y = -size * 2 + position * (height + size * 4);
+              const driftedX = x + wind * (position - 0.5);
+              ctx.font = `${weight} ${size}px Geist`;
+              stamp(event.character, driftedX, y, 1, 1);
+            }
+          }
+        }
+
+        function drawWave(event, t) {
+          const cell = Math.max(44, Math.min(width, height) / 7.2);
+          const amplitude = cell * (0.5 + Math.sin(t * Math.PI) * 1.6);
+          const accent = quickPulse(t, 0.34, 0.045) + quickPulse(t, 0.72, 0.035);
+          const weights = [100, 250, 400, 550];
+          let row = 0;
+          for (let y = -cell; y < height + cell; y += cell) {
+            ctx.font = `${weights[row % weights.length]} ${cell * 0.78}px Geist`;
+            let column = 0;
+            for (let x = -cell; x < width + cell; x += cell) {
+              const distance = Math.hypot(x - event.x, y - event.y);
+              const wave = Math.sin(distance / cell - t * Math.PI * 3.2);
+              const isAccent = (row + column + event.id) % 11 === 0;
+              const scale = 0.45 + (wave + 1) * 0.38 + (isAccent ? accent * 0.62 : 0);
+              stamp(event.character, x, y + wave * amplitude, scale, scale);
+              column++;
+            }
+            row++;
+          }
+        }
+
+        function drawScaleStack(event, t) {
+          const progress = smootherstep(t);
+          const copies = 11;
+          const maximum = Math.max(width, height);
+
+          for (let copy = 0; copy < copies; copy++) {
+            const ratio = copy / (copies - 1);
+            const size = 18 + Math.pow(ratio, 1.7) * maximum * 1.42;
+            const x = event.x + (ratio - 0.5) * width * 1.08 * progress;
+            const y = event.y + (0.5 - ratio) * height * 0.9 * progress;
+            const weight = 100 + Math.round(ratio * 600);
+            ctx.font = `${weight} ${size}px Geist`;
+            stamp(event.character, x, y, 0.68 + ratio * 0.72, 1);
+          }
+        }
+
+        function drawMatrix(event, t) {
+          const rows = 5;
+          const columns = 9;
+          const cellWidth = width / columns;
+          const cellHeight = height / rows;
+          const spread = 0.54 + smootherstep(t) * 0.46;
+          const accentColumn = event.id % columns;
+          const accent = quickPulse(t, 0.62, 0.04);
+
+          for (let row = 0; row < rows; row++) {
+            for (let column = 0; column < columns; column++) {
+              const size = Math.min(cellWidth, cellHeight) * (0.56 + row * 0.055);
+              const weight = 100 + column * 100;
+              const x = event.x + (column - (columns - 1) / 2) * cellWidth * spread;
+              const y = event.y + (row - (rows - 1) / 2) * cellHeight * spread;
+              const scaleX = 0.52 + row * 0.22 + (column === accentColumn ? accent * 0.5 : 0);
+              ctx.font = `${weight} ${size}px Geist`;
+              stamp(event.character, x, y, scaleX, 1);
+            }
+          }
+        }
+
+        function drawShutter(event, t) {
+          const progress = smootherstep(t);
+          const slices = 9;
+          const sliceWidth = width / slices;
+          const baseSize = Math.max(width, height) * 1.48;
+          const accentSlice = event.id % slices;
+          const heights = [0.72, 1.34, 0.88, 1.58];
+
+          for (let slice = 0; slice < slices; slice++) {
+            const centerOffset = slice - (slices - 1) / 2;
+            const direction = slice % 2 ? -1 : 1;
+            const drift = direction * progress * height * (0.035 + Math.abs(centerOffset) * 0.008);
+            const accent = slice === accentSlice
+              ? direction * quickPulse(t, 0.56, 0.035) * height * 0.14
+              : 0;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(slice * sliceWidth - 1, 0, sliceWidth + 2, height);
+            ctx.clip();
+            ctx.font = `${100 + slice * 75} ${baseSize}px Geist`;
+            stamp(
+              event.character,
+              event.x + centerOffset * width * 0.007,
+              event.y + drift + accent,
+              1,
+              heights[(slice + event.id) % heights.length]
+            );
+            ctx.restore();
+          }
+        }
+
+        function drawLedger(event, t) {
+          const rows = 8;
+          const rowHeight = height / rows;
+          const progress = smootherstep(t);
+          const accentRow = event.id % rows;
+
+          for (let row = 0; row < rows; row++) {
+            const count = 4 + row * 2;
+            const step = width / (count + 1);
+            const size = Math.max(10, Math.min(rowHeight * 0.56, step * 0.72));
+            const spread = 0.62 + progress * 0.38;
+            const direction = row % 2 ? -1 : 1;
+            const accent = row === accentRow
+              ? direction * quickPulse(t, 0.66, 0.035) * step * 1.4
+              : 0;
+            ctx.font = `${100 + row * 80} ${size}px Geist`;
+
+            for (let item = 0; item < count; item++) {
+              const x = event.x + (item - (count - 1) / 2) * step * spread + accent;
+              const y = (row + 0.5) * rowHeight;
+              stamp(event.character, x, y, 1, 1);
+            }
+          }
+        }
+
+        function drawCompression(event, t) {
+          const rows = 6;
+          const columns = 8;
+          const cellWidth = width / columns;
+          const cellHeight = height / rows;
+          const size = Math.min(cellWidth, cellHeight) * 0.68;
+          const accent = quickPulse(t, 0.58, 0.04);
+          const weights = [100, 220, 340, 460, 580, 700];
+
+          for (let row = 0; row < rows; row++) {
+            ctx.font = `${weights[row]} ${size}px Geist`;
+            for (let column = 0; column < columns; column++) {
+              const phase = t * Math.PI * 2 + row * 0.42 + column * 0.31;
+              const wave = Math.sin(phase);
+              const isAccent = (row * columns + column + event.id) % 17 === 0;
+              const scaleX = 0.38 + (wave + 1) * 0.54 + (isAccent ? accent * 0.55 : 0);
+              const scaleY = 1.46 - (scaleX - 0.38) * 0.18;
+              stamp(
+                event.character,
+                (column + 0.5) * cellWidth,
+                (row + 0.5) * cellHeight,
+                scaleX,
+                scaleY
+              );
+            }
+          }
+        }
+
+        function drawCascade(event, t) {
+          const lanes = 6;
+          const steps = 11;
+          const cellWidth = width / steps;
+          const cellHeight = height / lanes;
+          const accentLane = event.id % lanes;
+
+          for (let lane = 0; lane < lanes; lane++) {
+            const speed = lane === accentLane ? 1.9 : 0.32 + lane * 0.055;
+            const size = Math.min(cellWidth, cellHeight) * (0.52 + lane * 0.035);
+            ctx.font = `${150 + lane * 100} ${size}px Geist`;
+
+            for (let step = 0; step < steps; step++) {
+              const position = (step + lane * 0.42 + t * speed) % steps;
+              const x = (position + 0.5) * cellWidth;
+              const y = (lane + 0.5) * cellHeight
+                + (position / steps - 0.5) * cellHeight * 0.72;
+              stamp(event.character, x, y, 1, 1);
+            }
+          }
+        }
+
+        function stamp(character, x, y, scaleX, scaleY) {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.scale(scaleX, scaleY);
+          ctx.fillText(character, 0, 0);
+          ctx.restore();
+        }
+
+        function colorEnvelope(t) {
+          if (t < 0.08) return t / 0.08;
+          if (t > 0.82) return (1 - t) / 0.18;
+          return 1;
+        }
+
+        function interpolateColor(from, to, amount) {
+          const red = Math.round(from[0] + (to[0] - from[0]) * amount);
+          const green = Math.round(from[1] + (to[1] - from[1]) * amount);
+          const blue = Math.round(from[2] + (to[2] - from[2]) * amount);
+          return `rgb(${red} ${green} ${blue})`;
+        }
+
+        function smootherstep(t) {
+          return t * t * t * (t * (t * 6 - 15) + 10);
+        }
+
+        function quickPulse(t, center, width) {
+          const distance = Math.abs(t - center) / width;
+          if (distance >= 1) return 0;
+          return 1 - distance * distance;
+        }
+
+        function hash(value) {
+          let result = 2166136261;
+          for (let i = 0; i < value.length; i++) {
+            result ^= value.charCodeAt(i);
+            result = Math.imul(result, 16777619);
+          }
+          return result >>> 0;
+        }
+
+        function mulberry32(seed) {
+          return function random() {
+            let n = seed += 0x6d2b79f5;
+            n = Math.imul(n ^ n >>> 15, n | 1);
+            n ^= n + Math.imul(n ^ n >>> 7, n | 61);
+            return ((n ^ n >>> 14) >>> 0) / 4294967296;
+          };
+        }
+      })();
+    </script>
+  </body>
+</html>

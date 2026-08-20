@@ -251,6 +251,9 @@
           indigo: '#2f4a63',
           indigoDeep: '#1e3247',
           woad: '#5b7f93',
+          irisLight: '#eeeaf1',
+          irisLavender: '#c9bfd8',
+          irisViolet: '#77698f',
 
           ochre: '#c6963a',
           weld: '#ddb95c',
@@ -270,6 +273,7 @@
           { key: 'hydrangea', name: 'Hydrangea', latin: 'Hydrangea macrophylla', leaf: 'round', blooms: [1, 2], scale: [0.78, 1.14], weight: 7, height: [115, 185] },
           { key: 'anemone', name: 'Anemone', latin: 'Anemone coronaria', leaf: 'small', blooms: [1, 4], scale: [0.66, 1.0], weight: 9, height: [120, 195] },
           { key: 'honeysuckle', name: 'Honeysuckle', latin: 'Lonicera periclymenum', leaf: 'ovate', blooms: [2, 4], scale: [0.72, 1.08], weight: 10, height: [260, 400], vine: true },
+          { key: 'iris-japonica', name: 'Fringed iris', latin: 'Iris japonica', leaf: 'iris', blooms: [2, 4], scale: [0.74, 1.06], weight: 8, height: [125, 205], branches: [2, 4] },
           { key: 'none', name: 'Acanthus', latin: 'Acanthus mollis', leaf: 'acanthus', blooms: [0, 0], scale: [0.88, 1.32], weight: 12, height: [110, 195], scroll: true },
           { key: 'rubber', name: 'Rubber tree', latin: 'Ficus elastica', leaf: 'rubber', blooms: [0, 0], scale: [0.84, 1.18], weight: 2, height: [120, 195], branches: [3, 5], pale: true },
           { key: 'fatsia', name: 'Fatsia', latin: 'Fatsia japonica', leaf: 'fatsia', blooms: [0, 0], scale: [0.8, 1.14], weight: 2, height: [115, 185], branches: [3, 5], pale: true },
@@ -286,6 +290,7 @@
           lance: { profile: 'lance', size: [16, 30], width: [0.22, 0.32], teeth: 0, serr: 0, sharp: false },
           ovate: { profile: 'ovate', size: [13, 23], width: [0.58, 0.76], teeth: 0, serr: 0, sharp: false, pair: true },
           fine: { profile: 'lance', size: [15, 26], width: [0.34, 0.5], teeth: 0, serr: 0, sharp: false, pinnate: true },
+          iris: { profile: 'lance', size: [48, 78], width: [0.16, 0.24], teeth: 0, serr: 0, sharp: false },
           acanthus: { profile: 'acanthus', size: [26, 48], width: [0.62, 0.86], teeth: 0, serr: 0, sharp: false },
           rubber: { profile: 'round', size: [42, 66], width: [0.56, 0.72], teeth: 0, serr: 0, sharp: false },
           fatsia: { profile: 'round', size: [52, 78], width: [0.88, 1.04], teeth: 0, serr: 0, sharp: false, fatsia: true },
@@ -1194,6 +1199,8 @@
           const typeIndex =
             forcedSpecies == null ? weightedSpecies(random()) : forcedSpecies % SPECIES.length;
           const spec = SPECIES[typeIndex];
+          const isFern = spec.leaf === 'fern';
+          const isIris = spec.key === 'iris-japonica';
           if (!opts || opts.census !== false) census[typeIndex] += 1;
 
           const localSeed = (Math.floor(random() * 0xffffffff) ^ (nextId * 2654435761)) >>> 0;
@@ -1214,9 +1221,9 @@
               })
             : makeCurve(r, {
                 length: stemLength,
-                startAngle: -Math.PI / 2 + lerp(-0.3, 0.3, r()),
-                sweep: spec.scroll ? [1.5, 2.8] : [1.05, 2.15],
-                sway: spec.scroll ? 1 : 1.35,
+                startAngle: -Math.PI / 2 + lerp(isIris ? -0.14 : -0.3, isIris ? 0.14 : 0.3, r()),
+                sweep: isIris ? [0.18, 0.52] : spec.scroll ? [1.5, 2.8] : [1.05, 2.15],
+                sway: isIris ? 0.42 : spec.scroll ? 1 : 1.35,
                 dir,
                 segments: 30,
                 bias: 1.28,
@@ -1227,7 +1234,11 @@
           const bloomCount =
             flowering ? randInt(r, spec.blooms[0], spec.blooms[1]) + bloomBoost : 0;
           const branchRange = spec.branches || [3, flowering ? 5 : 6];
-          const branchCount = Math.max(bloomCount, randInt(r, branchRange[0], branchRange[1]));
+          // A fern frond is its own branching system. It must not inherit the
+          // woody/vining branch scaffold used by the other plants.
+          const branchCount = isFern
+            ? 0
+            : Math.max(bloomCount, randInt(r, branchRange[0], branchRange[1]));
           const branches = [];
           const stemLeaves = [];
 
@@ -1235,22 +1246,25 @@
             const t = clamp(0.16 + ((i + lerp(0.1, 0.7, r())) / (branchCount + 0.4)) * 0.82, 0.12, 0.94);
             const side = i % 2 ? 1 : -1;
             const at = curveAt(stem, t);
-            const branchLength = stemLength * lerp(0.16, 0.4, r()) * (0.62 + t * 0.6);
+            const branchLength =
+              stemLength *
+              lerp(isIris ? 0.11 : 0.16, isIris ? 0.23 : 0.4, r()) *
+              (0.62 + t * 0.6);
             const curve = makeCurve(r, {
               x: at.x,
               y: at.y,
               length: branchLength,
-              startAngle: at.angle + side * lerp(0.55, 1.15, r()),
+              startAngle: at.angle + side * lerp(isIris ? 0.48 : 0.55, isIris ? 0.78 : 1.15, r()),
               // Curving back toward the light gives the branch its C-sweep.
-              sweep: [1.0, 2.15],
+              sweep: isIris ? [0.18, 0.52] : [1.0, 2.15],
               dir: -side,
-              sway: 1.05,
+              sway: isIris ? 0.38 : 1.05,
               segments: 16,
               bias: 1.5,
             });
             const tip = curveAt(curve, 1);
             const leaves = [];
-            if (r() > 0.28) {
+            if (!isIris && r() > 0.28) {
               const leafT = lerp(0.3, 0.55, r());
               leaves.push(
                 makeLeaf(r, spec.leaf, {
@@ -1274,16 +1288,18 @@
               tendrilSize: lerp(9, 20, r()),
             });
 
-            const stemAt = curveAt(stem, clamp(t - 0.07, 0.06, 0.92));
-            stemLeaves.push(
-              makeLeaf(r, spec.leaf, {
-                at: stemAt,
-                side,
-                t,
-                big: !flowering,
-                tone: spec.pale ? 'cream' : 'green',
-              })
-            );
+            if (!isIris) {
+              const stemAt = curveAt(stem, clamp(t - 0.07, 0.06, 0.92));
+              stemLeaves.push(
+                makeLeaf(r, spec.leaf, {
+                  at: stemAt,
+                  side,
+                  t,
+                  big: !flowering,
+                  tone: spec.pale ? 'cream' : 'green',
+                })
+              );
+            }
           }
 
           const blooms = [];
@@ -1302,7 +1318,7 @@
                 branchIndex,
               });
             }
-          } else {
+          } else if (!isFern) {
             // Non-flowering plants finish in one broad terminal leaf.
             const tip = curveAt(stem, 1);
             stemLeaves.push(
@@ -1334,6 +1350,8 @@
               ? P.leafCreamVein
               : [P.stem, P.stemDeep, '#6e7440', '#7b6c3e', P.leafMid][Math.floor(r() * 5)],
             branchColor: spec.pale ? P.leafCreamVein : P.stemDeep,
+            fern: isFern,
+            iris: isIris,
             thorns: spec.key === 'rose',
             branches,
             stemLeaves,
@@ -1377,6 +1395,7 @@
               hydrangea: 33,
               anemone: 20,
               honeysuckle: 22,
+              'iris-japonica': 27,
             }[kind] || 20
           );
         }
@@ -1399,6 +1418,12 @@
 
           const growing = growthProgress !== undefined && growthProgress < 1;
           const p = growing ? clamp(growthProgress, 0, 1) : 1;
+          if (plant.fern) {
+            drawFernPlant(plant, p, growing);
+            ctx.restore();
+            return;
+          }
+          if (plant.iris) drawIrisFoliage(plant, p, growing);
           const stemProgress = growing ? smoothstep(clamp(p / 0.62, 0, 1)) : 1;
           const visibleStem = partialCurve(plant.stem, stemProgress);
 
@@ -1469,6 +1494,169 @@
           }
 
           ctx.restore();
+        }
+
+        // Iris japonica keeps its glossy sword leaves at the base in a broad
+        // fan. The flowering stem rises cleanly above them instead of carrying
+        // generic foliage at every branch node.
+        function drawIrisFoliage(plant, growth, growing) {
+          const r = mulberry32((plant.seed ^ 0x1a15f4a7) >>> 0);
+          const baseAngle = curveAt(plant.stem, 0).angle;
+          const conf = LEAF_KIND.iris;
+          const count = 7;
+
+          for (let i = 0; i < count; i += 1) {
+            const centred = i - (count - 1) * 0.5;
+            const delay = Math.abs(centred) * 0.025 + i * 0.012;
+            const leafGrowth = growing ? stagedGrowth(growth, delay) : 1;
+            if (leafGrowth <= 0) continue;
+            const outer = Math.abs(centred) / ((count - 1) * 0.5);
+            const side = centred === 0 ? (i % 2 ? 1 : -1) : Math.sign(centred);
+            const spread = centred * 0.22 + side * lerp(0.02, 0.08, r());
+            const length = lerp(conf.size[0], conf.size[1], r()) * lerp(1.08, 0.78, outer);
+
+            drawLeaf(
+              {
+                x: centred * plant.stemWidth * 0.28,
+                y: Math.abs(centred) * 0.35,
+                angle: baseAngle + spread,
+                kind: 'iris',
+                conf,
+                length,
+                width: lerp(conf.width[0], conf.width[1], r()),
+                curl: side * lerp(0.08, 0.2, r()),
+                shade: lerp(0.16, 0.74, r()),
+                tone: 'green',
+                anchorT: 0,
+                turnover: false,
+                fold: 0.78,
+                foldTilt: 0,
+              },
+              leafGrowth
+            );
+          }
+        }
+
+        // Ferns are a hierarchy, not leaves hung from a vine. A single rachis
+        // carries alternating pinnae; every pinna then carries its own row of
+        // alternating pinnules. Both the cream and green specimens use this
+        // same botanical structure.
+        function drawFernPlant(plant, growth, growing) {
+          const cream = plant.spec.pale;
+          const stemProgress = growing ? smoothstep(clamp(growth / 0.7, 0, 1)) : 1;
+          const visibleRachis = partialCurve(plant.stem, stemProgress);
+          drawStemRibbon(
+            visibleRachis,
+            plant.stemWidth * 0.72,
+            plant.stemWidth * 0.16,
+            plant.stemColor
+          );
+
+          const r = mulberry32((plant.seed ^ 0x51f15e5d) >>> 0);
+          const pinnaCount = 19;
+          for (let i = 0; i < pinnaCount; i += 1) {
+            const row = i / (pinnaCount - 1);
+            const t = lerp(0.1, 0.91, row);
+            const side = i % 2 === 0 ? -1 : 1;
+            const branchStart = stemArrival(t);
+            const branchGrowth = growing
+              ? smoothstep(clamp((growth - branchStart) / 0.2, 0, 1))
+              : 1;
+            if (branchGrowth <= 0) continue;
+
+            const at = curveAt(plant.stem, t);
+            const crown = Math.pow(Math.sin(Math.PI * Math.pow(row, 0.86)), 0.48);
+            const pinnaLength =
+              plant.stem.length *
+              (0.105 + crown * 0.235) *
+              lerp(1.04, 0.68, row) *
+              lerp(0.94, 1.06, r());
+            const pinna = makeCurve(r, {
+              x: at.x,
+              y: at.y,
+              length: pinnaLength,
+              startAngle: at.angle + side * lerp(1.24, 0.72, row),
+              sweep: [0.18, 0.46],
+              dir: -side,
+              sway: 0.32,
+              segments: 12,
+              bias: 1.08,
+            });
+
+            drawStemRibbon(
+              partialCurve(pinna, branchGrowth),
+              Math.max(0.62, plant.stemWidth * 0.24),
+              0.18,
+              plant.branchColor
+            );
+
+            // Each side-branch has an alternating sequence of individual
+            // pinnules. The slight left/right offset is the fern's rhythm;
+            // no mirrored pairs are stamped at the same point.
+            const pinnuleCount = 15;
+            for (let j = 0; j < pinnuleCount; j += 1) {
+              const along = j / (pinnuleCount - 1);
+              const leafT = lerp(0.1, 0.84, along);
+              const arrival = lerp(0.08, 0.82, leafT);
+              const pinnuleGrowth = smoothstep(
+                clamp((branchGrowth - arrival) / 0.22, 0, 1)
+              );
+              if (pinnuleGrowth <= 0) continue;
+
+              const point = curveAt(pinna, leafT);
+              const pinnuleSide = j % 2 === 0 ? -1 : 1;
+              const profile = Math.pow(Math.sin(Math.PI * Math.pow(along, 0.8)), 0.5);
+              const length =
+                pinnaLength *
+                (0.115 + profile * 0.14) *
+                (0.18 + pinnuleGrowth * 0.82);
+              const shade = (i * 7 + j * 11) % 17 / 16;
+              const fill = leafFill({ tone: cream ? 'cream' : 'green', shade });
+
+              ctx.save();
+              ctx.translate(point.x, point.y);
+              ctx.rotate(
+                point.angle +
+                pinnuleSide * lerp(1.02, 0.7, along) +
+                side * 0.05
+              );
+              drawFrondLeaflet(length, length * 0.24, fill, true, cream);
+              ctx.restore();
+            }
+
+            const pinnaTip = curveAt(pinna, 0.88);
+            const pinnaAhead = curveAt(pinna, 1);
+            ctx.save();
+            ctx.translate(pinnaTip.x, pinnaTip.y);
+            ctx.rotate(Math.atan2(pinnaAhead.y - pinnaTip.y, pinnaAhead.x - pinnaTip.x));
+            drawFrondLeaflet(
+              pinnaLength * 0.18 * branchGrowth,
+              pinnaLength * 0.038 * branchGrowth,
+              leafFill({ tone: cream ? 'cream' : 'green', shade: (i % 5) / 5 }),
+              true,
+              cream
+            );
+            ctx.restore();
+          }
+
+          // The final pinnae collapse into a narrow terminal blade instead of
+          // ending in a bare stalk.
+          if (stemProgress > 0.78) {
+            const tipBase = curveAt(plant.stem, 0.91);
+            const tip = curveAt(plant.stem, 1);
+            const tipGrowth = smoothstep(clamp((stemProgress - 0.78) / 0.22, 0, 1));
+            ctx.save();
+            ctx.translate(tipBase.x, tipBase.y);
+            ctx.rotate(Math.atan2(tip.y - tipBase.y, tip.x - tipBase.x));
+            drawFrondLeaflet(
+              plant.stem.length * 0.1 * tipGrowth,
+              plant.stem.length * 0.021 * tipGrowth,
+              leafFill({ tone: cream ? 'cream' : 'green', shade: 0.74 }),
+              true,
+              cream
+            );
+            ctx.restore();
+          }
         }
 
         function partialCurve(curve, progress) {
@@ -1760,10 +1948,12 @@
             ctx.restore();
           }
 
-          ctx.globalAlpha = isCream ? 0.42 : 0.62;
-          ctx.strokeStyle = isCream ? P.umber : P.ink;
-          ctx.lineWidth = isCream ? 0.75 : 0.85;
-          ctx.stroke();
+          if (!isCream) {
+            ctx.globalAlpha = 0.62;
+            ctx.strokeStyle = P.ink;
+            ctx.lineWidth = 0.85;
+            ctx.stroke();
+          }
 
           // Midrib and side veins, all of them curved with the blade.
           ctx.globalAlpha = isCream ? 0.5 : 0.42;
@@ -1828,10 +2018,12 @@
                 ? P.leafPale
                 : P.sage;
           ctx.fill();
-          ctx.globalAlpha = 0.55;
-          ctx.strokeStyle = P.ink;
-          ctx.lineWidth = 0.7;
-          ctx.stroke();
+          if (leaf.tone !== 'cream') {
+            ctx.globalAlpha = 0.55;
+            ctx.strokeStyle = P.ink;
+            ctx.lineWidth = 0.7;
+            ctx.stroke();
+          }
 
           ctx.globalAlpha = 0.3;
           ctx.strokeStyle = leaf.tone === 'cream' ? P.leafCreamVein : P.leafDark;
@@ -1845,8 +2037,8 @@
           ctx.stroke();
 
           // The crease itself, pressed a little deeper than the outline.
-          ctx.globalAlpha = 0.6;
-          ctx.strokeStyle = P.ink;
+          ctx.globalAlpha = leaf.tone === 'cream' ? 0.42 : 0.6;
+          ctx.strokeStyle = leaf.tone === 'cream' ? P.leafCreamVein : P.ink;
           ctx.lineWidth = 0.85;
           ctx.beginPath();
           ctx.moveTo(upper[start].x, upper[start].y);
@@ -1862,67 +2054,79 @@
           return { x: F.x + 2 * d * ux - vx, y: F.y + 2 * d * uy - vy };
         }
 
-        // Fatsia carries one broad, radial blade on a distinct petiole. Seven
-        // deep lobes spread from a single palm, each with its own strong vein.
+        // Fatsia is a broad hand, not a radial star: seven long lobes fan
+        // forward from the petiole, with deep rounded sinuses between them.
         function drawFatsiaLeaf(leaf) {
           const L = leaf.length;
           const cream = leaf.tone === 'cream';
           const fill = leafFill(leaf);
-          const centre = {
-            x: L * 0.22,
-            y: -L * leaf.curl * 0.08,
-          };
-          const lobes = 7;
-          const step = TAU / lobes;
-          const baseRadius = L * 0.49 * leaf.width;
-          const tips = [];
+          const palm = { x: L * 0.16, y: -L * leaf.curl * 0.08 };
+          const angles = [-1.34, -0.91, -0.46, 0, 0.46, 0.91, 1.34];
+          const lengths = [0.72, 0.86, 0.96, 1, 0.96, 0.86, 0.72];
+          const reach = L * 0.82 * leaf.width;
+          const tips = angles.map((angle, index) => ({
+            x: palm.x + Math.cos(angle) * reach * lengths[index],
+            y: palm.y + Math.sin(angle) * reach * lengths[index],
+            angle,
+            radius: reach * lengths[index],
+          }));
+          const valleys = angles.slice(0, -1).map((angle, index) => {
+            const nextAngle = angles[index + 1];
+            // Fatsia has deep cuts, but the lobes remain joined by a generous
+            // palm. Keeping the valley beyond halfway makes the silhouette
+            // read as one broad leaf instead of seven separate fingers.
+            const radius = Math.min(tips[index].radius, tips[index + 1].radius) * 0.56;
+            const valleyAngle = (angle + nextAngle) * 0.5;
+            return {
+              x: palm.x + Math.cos(valleyAngle) * radius,
+              y: palm.y + Math.sin(valleyAngle) * radius,
+            };
+          });
 
           ctx.save();
+          ctx.lineCap = 'round';
           ctx.strokeStyle = cream ? P.leafCreamVein : P.stemDeep;
           ctx.lineWidth = 1.25;
-          ctx.lineCap = 'round';
           ctx.beginPath();
           ctx.moveTo(0, 0);
-          ctx.quadraticCurveTo(
-            centre.x * 0.48,
-            centre.y - L * leaf.curl * 0.08,
-            centre.x,
-            centre.y
-          );
+          ctx.quadraticCurveTo(palm.x * 0.46, palm.y - L * leaf.curl * 0.08, palm.x, palm.y);
           ctx.stroke();
 
-          const polar = (angle, radius) => ({
-            x: centre.x + Math.cos(angle) * radius,
-            y: centre.y + Math.sin(angle) * radius,
-          });
-          const firstValley = polar(-step * 0.5, baseRadius * 0.61);
           ctx.beginPath();
-          ctx.moveTo(firstValley.x, firstValley.y);
-          for (let i = 0; i < lobes; i += 1) {
-            const angle = i * step;
-            const tipRadius = baseRadius * (0.86 + 0.06 * Math.cos(angle));
-            const valleyRadius = baseRadius * (0.61 + 0.025 * Math.cos(angle + step * 0.5));
-            const tip = polar(angle, tipRadius);
-            const leftShoulder = polar(angle - step * 0.32, tipRadius * 0.78);
-            const leftTip = polar(angle - step * 0.1, tipRadius * 0.95);
-            const rightTip = polar(angle + step * 0.1, tipRadius * 0.95);
-            const rightShoulder = polar(angle + step * 0.32, tipRadius * 0.78);
-            const valley = polar(angle + step * 0.5, valleyRadius);
-            tips.push(tip);
+          ctx.moveTo(palm.x, palm.y);
+          for (let i = 0; i < tips.length; i += 1) {
+            const tip = tips[i];
+            const capBefore = {
+              x: palm.x + Math.cos(tip.angle - 0.095) * tip.radius * 0.975,
+              y: palm.y + Math.sin(tip.angle - 0.095) * tip.radius * 0.975,
+            };
+            const capAfter = {
+              x: palm.x + Math.cos(tip.angle + 0.095) * tip.radius * 0.975,
+              y: palm.y + Math.sin(tip.angle + 0.095) * tip.radius * 0.975,
+            };
+            const shoulderBefore = {
+              x: palm.x + Math.cos(tip.angle - 0.25) * tip.radius * 0.73,
+              y: palm.y + Math.sin(tip.angle - 0.25) * tip.radius * 0.73,
+            };
+            const shoulderAfter = {
+              x: palm.x + Math.cos(tip.angle + 0.25) * tip.radius * 0.73,
+              y: palm.y + Math.sin(tip.angle + 0.25) * tip.radius * 0.73,
+            };
+            const valley = i < valleys.length ? valleys[i] : palm;
             ctx.bezierCurveTo(
-              leftShoulder.x,
-              leftShoulder.y,
-              leftTip.x,
-              leftTip.y,
-              leftTip.x,
-              leftTip.y
+              shoulderBefore.x,
+              shoulderBefore.y,
+              capBefore.x,
+              capBefore.y,
+              capBefore.x,
+              capBefore.y
             );
-            ctx.quadraticCurveTo(tip.x, tip.y, rightTip.x, rightTip.y);
+            ctx.quadraticCurveTo(tip.x, tip.y, capAfter.x, capAfter.y);
             ctx.bezierCurveTo(
-              rightTip.x,
-              rightTip.y,
-              rightShoulder.x,
-              rightShoulder.y,
+              capAfter.x,
+              capAfter.y,
+              shoulderAfter.x,
+              shoulderAfter.y,
               valley.x,
               valley.y
             );
@@ -1930,29 +2134,47 @@
           ctx.closePath();
           ctx.fillStyle = fill;
           ctx.fill();
-          ctx.globalAlpha = 0.5;
-          ctx.strokeStyle = cream ? P.umber : P.ink;
-          ctx.lineWidth = 0.8;
-          ctx.stroke();
+          if (!cream) {
+            ctx.globalAlpha = 0.52;
+            ctx.strokeStyle = P.ink;
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          }
 
           ctx.globalAlpha = cream ? 0.5 : 0.4;
           ctx.strokeStyle = cream ? P.leafCreamVein : P.leafPale;
           ctx.lineWidth = 0.72;
           for (const tip of tips) {
             ctx.beginPath();
-            ctx.moveTo(centre.x, centre.y);
+            ctx.moveTo(palm.x, palm.y);
             ctx.quadraticCurveTo(
-              lerp(centre.x, tip.x, 0.45),
-              lerp(centre.y, tip.y, 0.45),
-              lerp(centre.x, tip.x, 0.91),
-              lerp(centre.y, tip.y, 0.91)
+              lerp(palm.x, tip.x, 0.48),
+              lerp(palm.y, tip.y, 0.48),
+              lerp(palm.x, tip.x, 0.92),
+              lerp(palm.y, tip.y, 0.92)
             );
             ctx.stroke();
+
+            const dx = tip.x - palm.x;
+            const dy = tip.y - palm.y;
+            const normalX = -dy / Math.max(1, tip.radius);
+            const normalY = dx / Math.max(1, tip.radius);
+            for (const side of [-1, 1]) {
+              ctx.beginPath();
+              ctx.moveTo(palm.x + dx * 0.58, palm.y + dy * 0.58);
+              ctx.quadraticCurveTo(
+                palm.x + dx * 0.68 + normalX * tip.radius * 0.06 * side,
+                palm.y + dy * 0.68 + normalY * tip.radius * 0.06 * side,
+                palm.x + dx * 0.75 + normalX * tip.radius * 0.11 * side,
+                palm.y + dy * 0.75 + normalY * tip.radius * 0.11 * side
+              );
+              ctx.stroke();
+            }
           }
           ctx.globalAlpha = 0.55;
           ctx.fillStyle = cream ? P.leafCreamVein : P.stemDeep;
           ctx.beginPath();
-          ctx.arc(centre.x, centre.y, Math.max(0.8, L * 0.018), 0, TAU);
+          ctx.arc(palm.x, palm.y, Math.max(0.8, L * 0.018), 0, TAU);
           ctx.fill();
           ctx.restore();
         }
@@ -1991,10 +2213,12 @@
           ctx.fillStyle = fill;
           ctx.fill();
 
-          ctx.globalAlpha = 0.48;
-          ctx.strokeStyle = cream ? P.umber : P.ink;
-          ctx.lineWidth = 0.8;
-          ctx.stroke();
+          if (!cream) {
+            ctx.globalAlpha = 0.48;
+            ctx.strokeStyle = P.ink;
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          }
 
           ctx.globalAlpha = 0.48;
           ctx.strokeStyle = cream ? P.leafCreamVein : P.leafPale;
@@ -2111,10 +2335,12 @@
           ctx.closePath();
           ctx.fillStyle = fill;
           ctx.fill();
-          ctx.globalAlpha = 0.44;
-          ctx.strokeStyle = cream ? P.umber : P.ink;
-          ctx.lineWidth = 0.55;
-          ctx.stroke();
+          if (!cream) {
+            ctx.globalAlpha = 0.44;
+            ctx.strokeStyle = P.ink;
+            ctx.lineWidth = 0.55;
+            ctx.stroke();
+          }
           ctx.globalAlpha = 0.34;
           ctx.strokeStyle = cream ? P.leafCreamVein : P.leafPale;
           ctx.lineWidth = 0.45;
@@ -2182,9 +2408,11 @@
               : kind === 'daisy'
                 ? P.cream
                 : kind === 'anemone'
-                  ? P.indigo
-                  : kind === 'honeysuckle'
-                    ? P.weld
+                ? P.indigo
+                : kind === 'honeysuckle'
+                  ? P.weld
+                  : kind === 'iris-japonica'
+                    ? P.irisLavender
                     : P.madder;
 
           ctx.save();
@@ -2245,6 +2473,7 @@
             case 'hydrangea': drawHydrangea(bloom, plantSeed, opening); break;
             case 'anemone': drawAnemone(bloom, opening); break;
             case 'honeysuckle': drawHoneysuckle(bloom, plantSeed, opening); break;
+            case 'iris-japonica': drawIrisJaponica(bloom, opening); break;
             default: break;
           }
         }
@@ -2330,6 +2559,7 @@
           if (kind === 'daisy') return P.cream;
           if (kind === 'anemone') return P.indigo;
           if (kind === 'hydrangea') return P.woad;
+          if (kind === 'iris-japonica') return P.irisLavender;
           return P.madder;
         }
 
@@ -2685,6 +2915,142 @@
             }
             ctx.restore();
           });
+        }
+
+        // Iris japonica is the fringed iris: three broad falls carry violet
+        // blotches and a yellow-orange crest, alternating with three lighter,
+        // narrower inner segments. It is deliberately unlike the tall,
+        // upright silhouette of a bearded iris.
+        function drawIrisJaponica(bloom, opening) {
+          const r = bloom.r;
+          const fallPalette = [P.irisLight, '#e2ddea', P.irisLavender];
+
+          for (let i = 0; i < 3; i += 1) {
+            ctx.save();
+            const pose = posePetal((i * TAU) / 3 + 0.08, r * 0.34, opening, i * 0.035);
+            drawFringedIrisPetal(
+              petalLength(r * 1.18, pose),
+              petalWidth(r * 0.35, pose),
+              fallPalette[(i + (bloom.variant > 0.5 ? 1 : 0)) % fallPalette.length],
+              true
+            );
+            ctx.restore();
+          }
+
+          for (let i = 0; i < 3; i += 1) {
+            ctx.save();
+            const pose = posePetal(
+              (i * TAU) / 3 + Math.PI / 3 + 0.08,
+              r * 0.1,
+              opening,
+              0.16 + i * 0.035
+            );
+            drawFringedIrisPetal(
+              petalLength(r * 0.56, pose),
+              petalWidth(r * 0.2, pose),
+              i % 2 ? P.irisLight : '#ddd5e5',
+              false
+            );
+            ctx.restore();
+          }
+
+          drawFlowerCenter(opening, () => {
+            ctx.save();
+            ctx.fillStyle = P.irisViolet;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.115, 0, TAU);
+            ctx.fill();
+            ctx.fillStyle = P.gold;
+            for (let i = 0; i < 6; i += 1) {
+              const angle = (i * TAU) / 6;
+              ctx.beginPath();
+              ctx.arc(Math.cos(angle) * r * 0.075, Math.sin(angle) * r * 0.075, r * 0.018, 0, TAU);
+              ctx.fill();
+            }
+            ctx.restore();
+          });
+        }
+
+        function fringedIrisPetalPath(length, width, fringed) {
+          const steps = 14;
+          ctx.beginPath();
+          ctx.moveTo(0, length * 0.42);
+          for (let i = 1; i < steps; i += 1) {
+            const t = i / steps;
+            const profile = Math.pow(Math.sin(Math.PI * t), 0.64);
+            const ripple = fringed ? 1 + (i % 2 ? 0.13 : -0.035) : 1 + Math.sin(i * 2.4) * 0.035;
+            ctx.lineTo(-width * profile * ripple, lerp(length * 0.36, -length * 0.5, t));
+          }
+          ctx.lineTo(-width * 0.14, -length * 0.51);
+          ctx.quadraticCurveTo(0, -length * 0.43, width * 0.14, -length * 0.51);
+          for (let i = steps - 1; i >= 1; i -= 1) {
+            const t = i / steps;
+            const profile = Math.pow(Math.sin(Math.PI * t), 0.64);
+            const ripple = fringed ? 1 + (i % 2 ? 0.13 : -0.035) : 1 + Math.sin(i * 2.4) * 0.035;
+            ctx.lineTo(width * profile * ripple, lerp(length * 0.36, -length * 0.5, t));
+          }
+          ctx.closePath();
+        }
+
+        function drawFringedIrisPetal(length, width, fill, crest) {
+          fringedIrisPetalPath(length, width, crest);
+          ctx.fillStyle = fill;
+          ctx.fill();
+
+          ctx.save();
+          fringedIrisPetalPath(length, width, crest);
+          ctx.clip();
+
+          ctx.globalAlpha = crest ? 0.5 : 0.28;
+          ctx.strokeStyle = P.irisViolet;
+          ctx.lineWidth = 0.55;
+          for (let i = -2; i <= 2; i += 1) {
+            ctx.beginPath();
+            ctx.moveTo(i * width * 0.08, length * 0.34);
+            ctx.quadraticCurveTo(
+              i * width * 0.2,
+              -length * 0.02,
+              i * width * 0.34,
+              -length * (crest ? 0.35 : 0.42)
+            );
+            ctx.stroke();
+          }
+
+          if (crest) {
+            ctx.globalAlpha = 0.82;
+            ctx.strokeStyle = P.ochre;
+            ctx.lineWidth = Math.max(1.2, width * 0.12);
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(0, length * 0.2);
+            ctx.quadraticCurveTo(width * 0.025, -length * 0.02, 0, -length * 0.25);
+            ctx.stroke();
+
+            ctx.fillStyle = P.irisViolet;
+            for (let i = 0; i < 7; i += 1) {
+              const side = i % 2 ? -1 : 1;
+              ctx.beginPath();
+              ctx.ellipse(
+                side * width * (0.12 + (i % 3) * 0.08),
+                length * (0.15 - i * 0.052),
+                Math.max(0.55, width * 0.035),
+                Math.max(0.45, width * 0.025),
+                0,
+                0,
+                TAU
+              );
+              ctx.fill();
+            }
+          }
+          ctx.restore();
+
+          ctx.save();
+          ctx.globalAlpha = 0.38;
+          ctx.strokeStyle = P.ink;
+          ctx.lineWidth = 0.5;
+          fringedIrisPetalPath(length, width, crest);
+          ctx.stroke();
+          ctx.restore();
         }
 
         function drawHydrangea(bloom, plantSeed, opening) {

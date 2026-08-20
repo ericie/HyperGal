@@ -16,7 +16,7 @@ Every marking uses a hard boundary and a small flat-color palette; there is no
 edge smoothing or ordered dithering between pixels.
 
 Every camouflage field is completely still. The piece holds each pattern for
-4.2 seconds, drawing from a shuffled bag so all nine appear once before the
+2.2 seconds, drawing from a shuffled bag so all nine appear once before the
 order is reshuffled without an immediate repeat. During each transition, every
 color region becomes a two-dimensional distance field while its palette shifts
 over the same interval. Interpolating those fields lets boundaries flow across

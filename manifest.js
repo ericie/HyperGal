@@ -79,7 +79,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "Five autonomous snakes hunt one mouse in an 8-bit underground Mega Man palette. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Continuous rounded bodies cross a cavern-dark field; dead snakes remain as translucent watercolor gestures that bloom and blend into a shared mural. Click to reseed.",
+      "description": "Twenty autonomous snakes hunt one mouse in an 8-bit underground Mega Man palette. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Continuous rounded bodies cross a cavern-dark field; death travels from head to tail, replacing each fading segment with abstract cross-hatching in place. Click to reseed.",
       "updated": "2026-08-17"
     },
     {
@@ -373,6 +373,17 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A reduced top-down dry-garden study surrounds one contour-drawn stone with nested, non-crossing samon."
+    },
+    {
+      "slug": "033-the-greater-whole",
+      "title": "The Greater Whole",
+      "year": 2026,
+      "date": "2026-08-20",
+      "category": "generative",
+      "type": "interactive",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "A field of Geist Sans makes every letter active: each rollover releases a 2.5-second abstract composition built only from that glyph, and each composition can overlap the next."
     }
   ]
 };

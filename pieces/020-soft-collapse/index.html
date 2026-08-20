@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="A field of black-and-white geometric cells whose one-unit frames merge into four-by-four forms, split apart again, and slide motifs in four cardinal directions."
+      content="A field of black-and-white geometric cells whose one-unit frames merge into four-by-four forms, split apart again, and trade motifs through custom geometric transformations."
     />
     <title>Soft Collapse · HyperGal</title>
     <style>
@@ -169,7 +169,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Soft Collapse: an edge-to-edge black-and-white geometric field where groups of small cells merge into large four-by-four forms and split apart again. Motifs also slide out of cropped frames while new motifs enter from the opposite side. Click to change a block, press Space to pause, and R to recompose."
+      aria-label="Soft Collapse: an edge-to-edge black-and-white geometric field where groups of small cells merge into large four-by-four forms and split apart again. Each motif uses its own geometric motion to disappear before a new motif returns. Click to change a block, press Space to pause, and R to recompose."
     ></canvas>
     <p id="status" class="status" aria-live="polite"></p>
     <main id="debug-catalog" class="debug-catalog" hidden>
@@ -198,15 +198,10 @@
         const LARGE_CELL_AREA = LARGE_CELL_SPAN * LARGE_CELL_SPAN;
         const STRUCTURE_CHANGE_CHANCE = 0.3;
         const EVENT_GAP = 520;
-        const SLIDE_DURATION = 2600;
+        const TRANSITION_DURATION = 2600;
         const DEBUG_ENTER_DURATION = 1450;
         const DEBUG_EXIT_DURATION = 1150;
-        const DIRECTIONS = [
-          [1, 0],
-          [-1, 0],
-          [0, 1],
-          [0, -1]
-        ];
+        const EXIT_PHASE = DEBUG_EXIT_DURATION / (DEBUG_EXIT_DURATION + DEBUG_ENTER_DURATION);
         const MOTIF_NAMES = [
           'Half square',
           'Inward edges',
@@ -376,7 +371,7 @@
           specimenCtx.beginPath();
           specimenCtx.rect(-0.5, -0.5, 1, 1);
           specimenCtx.clip();
-          drawDebugMotifOn(specimenCtx, specimen.motif, specimen.exitAmount);
+          drawAnimatedMotifOn(specimenCtx, specimen.motif, specimen.exitAmount);
           specimenCtx.restore();
         }
 
@@ -554,7 +549,7 @@
 
           if (!paused) {
             if (time >= nextEventAt) {
-              beginRandomSlide(time);
+              beginRandomTransition(time);
               nextEventAt = time + EVENT_GAP + random() * 180;
             }
             settleFinishedEvents(time);
@@ -564,15 +559,15 @@
           requestAnimationFrame(frame);
         }
 
-        function beginRandomSlide(time) {
+        function beginRandomTransition(time) {
           for (let attempt = 0; attempt < 18; attempt += 1) {
             const x = 1 + Math.floor(random() * Math.max(1, cols - 2));
             const y = 1 + Math.floor(random() * Math.max(1, rows - 2));
-            if (beginSlide(x, y, time, false)) return;
+            if (beginTransition(x, y, time, false)) return;
           }
         }
 
-        function beginSlide(x, y, time, forced) {
+        function beginTransition(x, y, time, forced) {
           if (x < 0 || x >= cols || y < 0 || y >= rows) return false;
           let cell = cellAt[y * cols + x];
           if (cell.event && !forced) return false;
@@ -590,14 +585,11 @@
             if (region && beginMerge(region, time)) return true;
           }
 
-          const direction = DIRECTIONS[Math.floor(random() * DIRECTIONS.length)];
           const event = {
             kind: 'motif',
             start: time,
-            duration: (SLIDE_DURATION + random() * 600) * (cell.span > 1 ? 1.45 : 1),
-            cell,
-            dx: direction[0],
-            dy: direction[1]
+            duration: (TRANSITION_DURATION + random() * 600) * (cell.span > 1 ? 1.45 : 1),
+            cell
           };
 
           cell.event = event;
@@ -638,7 +630,6 @@
         }
 
         function beginSplit(cell, time) {
-          const direction = DIRECTIONS[Math.floor(random() * DIRECTIONS.length)];
           const nextCells = [];
 
           for (let y = cell.y; y < cell.y + LARGE_CELL_SPAN; y += 1) {
@@ -654,11 +645,10 @@
             }
           }
 
-          return beginStructureEvent('split', [cell], nextCells, cell.x, cell.y, time, direction);
+          return beginStructureEvent('split', [cell], nextCells, time);
         }
 
         function beginMerge(region, time) {
-          const direction = DIRECTIONS[Math.floor(random() * DIRECTIONS.length)];
           const largeCell = {
             x: region.x,
             y: region.y,
@@ -672,25 +662,17 @@
             'merge',
             region.cells,
             [largeCell],
-            region.x,
-            region.y,
-            time,
-            direction
+            time
           );
         }
 
-        function beginStructureEvent(kind, fromCells, toCells, x, y, time, direction) {
+        function beginStructureEvent(kind, fromCells, toCells, time) {
           const event = {
             kind,
             start: time,
-            duration: (SLIDE_DURATION + random() * 600) * 1.45,
+            duration: (TRANSITION_DURATION + random() * 600) * 1.45,
             fromCells,
-            toCells,
-            x,
-            y,
-            span: LARGE_CELL_SPAN,
-            dx: direction[0],
-            dy: direction[1]
+            toCells
           };
 
           for (const cell of fromCells) cell.event = event;
@@ -758,20 +740,39 @@
           }
 
           if (!paused) {
-            for (const event of events) drawSlideEvent(event, time);
+            for (const event of events) drawTransitionEvent(event, time);
           }
         }
 
-        function drawSlideEvent(event, time) {
+        function drawTransitionEvent(event, time) {
           const raw = clamp((time - event.start) / event.duration, 0, 1);
+          const exitAmount = clamp(raw / EXIT_PHASE, 0, 1);
+          const enterAmount = 1 - clamp((raw - EXIT_PHASE) / (1 - EXIT_PHASE), 0, 1);
+
           if (event.kind === 'split' || event.kind === 'merge') {
-            drawStructureEvent(event, raw);
+            drawStructureEvent(event, exitAmount, enterAmount);
             return;
           }
 
           const cell = event.cell;
+          drawTransitionCell(cell, cell.motif, cell.quarter, exitAmount);
+          drawTransitionCell(cell, cell.nextMotif, cell.quarter, enterAmount);
+        }
+
+        function drawStructureEvent(event, exitAmount, enterAmount) {
+          drawTransitionCellGroup(event.fromCells, exitAmount);
+          drawTransitionCellGroup(event.toCells, enterAmount);
+        }
+
+        function drawTransitionCellGroup(group, exitAmount) {
+          for (const cell of group) {
+            drawTransitionCell(cell, cell.motif, cell.quarter, exitAmount);
+          }
+        }
+
+        function drawTransitionCell(cell, motif, quarter, exitAmount) {
+          if (exitAmount >= 1) return;
           const cellSize = size * cell.span;
-          const travel = smootherStep(raw) * cellSize;
           const frameX = offsetX + cell.x * size;
           const frameY = offsetY + cell.y * size;
           const centerX = frameX + cellSize * 0.5;
@@ -781,51 +782,11 @@
           ctx.beginPath();
           ctx.rect(frameX, frameY, cellSize, cellSize);
           ctx.clip();
-
-          drawCellAt(
-            centerX + event.dx * travel,
-            centerY + event.dy * travel,
-            cell.motif,
-            cell.quarter,
-            cellSize
-          );
-          drawCellAt(
-            centerX + event.dx * (travel - cellSize),
-            centerY + event.dy * (travel - cellSize),
-            cell.nextMotif,
-            cell.quarter,
-            cellSize
-          );
+          ctx.translate(centerX, centerY);
+          ctx.rotate(quarter * Math.PI * 0.5);
+          ctx.scale(cellSize, cellSize);
+          drawAnimatedMotifOn(ctx, motif, exitAmount);
           ctx.restore();
-        }
-
-        function drawStructureEvent(event, raw) {
-          const cellSize = size * event.span;
-          const travel = smootherStep(raw) * cellSize;
-          const frameX = offsetX + event.x * size;
-          const frameY = offsetY + event.y * size;
-
-          ctx.save();
-          ctx.beginPath();
-          ctx.rect(frameX, frameY, cellSize, cellSize);
-          ctx.clip();
-
-          drawCellGroup(event.fromCells, event.dx * travel, event.dy * travel);
-          drawCellGroup(
-            event.toCells,
-            event.dx * (travel - cellSize),
-            event.dy * (travel - cellSize)
-          );
-          ctx.restore();
-        }
-
-        function drawCellGroup(group, translateX, translateY) {
-          for (const cell of group) {
-            const drawSize = size * cell.span;
-            const x = offsetX + cell.x * size + drawSize * 0.5 + translateX;
-            const y = offsetY + cell.y * size + drawSize * 0.5 + translateY;
-            drawCellAt(x, y, cell.motif, cell.quarter, drawSize);
-          }
         }
 
         function drawCell(cell, motif, quarter) {
@@ -937,7 +898,7 @@
           }
         }
 
-        function drawDebugMotifOn(context, motif, rawExit) {
+        function drawAnimatedMotifOn(context, motif, rawExit) {
           const exit = clamp(rawExit, 0, 1);
           const glide = smootherStep(exit);
 
@@ -1147,7 +1108,7 @@
             changeImmediately(x, y);
             status.textContent = 'A block changed form.';
           } else {
-            beginSlide(x, y, performance.now(), true);
+            beginTransition(x, y, performance.now(), true);
             paused = false;
             nextEventAt = performance.now() + EVENT_GAP;
             status.textContent = 'A block is changing.';

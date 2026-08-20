@@ -29,15 +29,16 @@
     <script>
       // hydra — autonomous traditional Snake, rendered as a flooded cavern mural.
       //
-      // Five contenders hunt one mouse. Snakes enter from beyond the arena with
+      // Twenty contenders hunt one mouse. Snakes enter from beyond the arena with
       // varied length and aggression, which tilt each one between chasing the
       // mouse and preserving room around bodies. The leaders compound their
       // advantage, but also become increasingly careful about future escape space.
       // Edge, self, and other-snake contact kill one snake; a bright extinction
-      // front travels from head to tail before the body settles into bones.
+      // front travels from head to tail, exposing abstract hatchwork one segment
+      // at a time as the living pigment recedes.
       //
       // The look borrows the electric indigo, cyan, violet, and mineral pink of
-      // an 8-bit Mega Man underground stage, haunted by dim skeletal remains.
+      // an 8-bit Mega Man underground stage, haunted by dim woven remains.
 
       const canvas = document.getElementById('stage');
       const ctx = canvas.getContext('2d');
@@ -53,10 +54,10 @@
       const START_LEN_MIN = 4;
       const START_LEN_MAX = 9;
       const MAX_POOLS = 64;
-      const DEATH_FADE_BASE = 0.9;
-      const DEATH_FADE_PER_SEG = 0.012;
-      const DEATH_FADE_MAX = 2.6;
-      const DEATH_FADE_WIDTH = 5;
+      const DEATH_FADE_BASE = 0.28;
+      const DEATH_FADE_PER_SEG = 0.003;
+      const DEATH_FADE_MAX = 0.72;
+      const DEATH_FADE_WIDTH = 3.2;
       const AGGRESSION_MIN = 0.42, AGGRESSION_MAX = 0.88;
       const AGGRESSION_PER_SEG = 0.045;
       const AGGRESSION_CAP = 0.97;
@@ -73,8 +74,11 @@
       const OFF_ROUTE_TURN_MARGIN = 0.75;
       const EDGE_RELIEF_WEIGHT = 6;
       const SAFE_BODY_BUFFER = 6;
-      const LEADER_SMART_AT = 8;
-      const LEADER_SMART_SPAN = 12;
+      const LEADER_SMART_AT = 5;
+      const LEADER_SMART_SPAN = 10;
+      const LEADER_VETERAN_SPAN = 45;
+      const SMART_LOOKAHEAD_MIN = 2;
+      const SMART_LOOKAHEAD_MAX = 7;
       const DENSIFY_AT = 36;
       const DENSIFY_SPAN = 28;
       const DENSITY_RADIUS = 4;
@@ -85,6 +89,8 @@
       const PACKING_CYCLE_SPAN_RATIO = 0.04;
       const PACKING_CYCLE_REWARD = 3200;
       const PACKING_SHORTCUT_REWARD = 0.9;
+      const VICTORY_DURATION = 2.8;
+      const VICTORY_REDUCED_DURATION = 0.7;
 
       // Mega Man underground: near-black navy, tile indigo, electric cobalt,
       // water cyan, mineral violet and the small amber energy pickup.
@@ -92,9 +98,17 @@
       const C_MOUSE = '#ffd35a';
       const C_BORDER = '#3267c8';
       const C_CLOT = '6,9,29';
-      const C_BONE = '112,130,154';
-      const C_BONE_HIGHLIGHT = '164,177,194';
+      const C_HATCH = '112,130,154';
+      const C_HATCH_LIGHT = '164,177,194';
       const GLOW = '#27a4ff';
+      const WINNER_COLORS = {
+        body: '#d99a00',
+        head: '#fff3a0',
+        glow: '#ffc928',
+        ring: '217,154,0',
+        accent: '255,243,160',
+        dark: '92,51,0',
+      };
       const SNAKE_PALETTE = [
         { body: '#086bc1', head: '#8bd9ff', glow: '#27a4ff', ring: '8,107,193', accent: '139,217,255', dark: '20,38,100' },
         { body: '#5933a8', head: '#bfa4ff', glow: '#815bd6', ring: '89,51,168', accent: '191,164,255', dark: '36,20,84' },
@@ -114,6 +128,7 @@
       let packingCycle = [], packingRank = new Map();
       let brainOwners = null;
       let last = 0, frame = 0, colorCursor = 0;
+      const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
       const DIRS = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
       const rand = (a, b) => a + Math.random() * (b - a);
@@ -127,7 +142,44 @@
       const sameCell = (a, b) => !!a && !!b && a.x === b.x && a.y === b.y;
       const sameDir = (a, b) => a.x === b.x && a.y === b.y;
       const copyBody = (b) => b.map(p => ({ x: p.x, y: p.y }));
-      const snakeColor = (s) => SNAKE_PALETTE[s.colorIndex % SNAKE_PALETTE.length] || SNAKE_PALETTE[0];
+      const baseSnakeColor = (s) => SNAKE_PALETTE[s.colorIndex % SNAKE_PALETTE.length] || SNAKE_PALETTE[0];
+      const parseHex = (hex) => {
+        const value = Number.parseInt(hex.slice(1), 16);
+        return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+      };
+      const mixChannel = (a, b, amount) => Math.round(a + (b - a) * amount);
+      const mixHex = (from, to, amount) => {
+        const a = parseHex(from), b = parseHex(to);
+        return `rgb(${mixChannel(a[0], b[0], amount)},${mixChannel(a[1], b[1], amount)},${mixChannel(a[2], b[2], amount)})`;
+      };
+      const mixRgb = (from, to, amount) => {
+        const a = from.split(',').map(Number), b = to.split(',').map(Number);
+        return `${mixChannel(a[0], b[0], amount)},${mixChannel(a[1], b[1], amount)},${mixChannel(a[2], b[2], amount)}`;
+      };
+      const victoryDuration = () => reducedMotion ? VICTORY_REDUCED_DURATION : VICTORY_DURATION;
+      const winnerGoldAmount = (s) => {
+        if (!s.winner) return 0;
+        if (!s.victoryActive || reducedMotion) return 1;
+        const progress = Math.min(1, (s.victoryAge || 0) / victoryDuration());
+        const blink = Math.pow(0.5 - 0.5 * Math.cos(progress * Math.PI * 12), 2.2);
+        const settleProgress = Math.max(0, Math.min(1, (progress - 0.7) / 0.3));
+        const settle = 1 - Math.pow(1 - settleProgress, 4);
+        return Math.max(blink, settle);
+      };
+      const mixedWinnerColor = (base, gold) => {
+        return {
+          body: mixHex(base.body, WINNER_COLORS.body, gold),
+          head: mixHex(base.head, WINNER_COLORS.head, gold),
+          glow: mixHex(base.glow, WINNER_COLORS.glow, gold),
+          ring: mixRgb(base.ring, WINNER_COLORS.ring, gold),
+          accent: mixRgb(base.accent, WINNER_COLORS.accent, gold),
+          dark: mixRgb(base.dark, WINNER_COLORS.dark, gold),
+        };
+      };
+      const snakeColor = (s) => s.golden
+        ? mixedWinnerColor(baseSnakeColor(s), 1)
+        : baseSnakeColor(s);
+      const winnerHeadColor = (s, gold = winnerGoldAmount(s)) => mixedWinnerColor(baseSnakeColor(s), gold);
       const nextColorIndex = () => colorCursor++ % SNAKE_PALETTE.length;
       const newStartLength = () => START_LEN_MIN + ((Math.random() * (START_LEN_MAX - START_LEN_MIN + 1)) | 0);
       const newAggression = () => rand(AGGRESSION_MIN, AGGRESSION_MAX);
@@ -136,7 +188,18 @@
       const growthForStreak = (streak, length = START_LEN_MIN) => GROW + (streak * (streak + 1)) / 2 + Math.floor(Math.max(0, length - START_LEN_MIN) / 7);
       const growthForNextMouse = (s) => growthForStreak(nextEatStreak(s), s.body.length);
       const effectiveAggression = (s) => Math.min(AGGRESSION_CAP, s.aggression + Math.max(0, s.body.length - START_LEN_MIN) * AGGRESSION_PER_SEG);
-      const leaderIntelligence = (s) => Math.min(1, Math.max(0, (s.body.length - LEADER_SMART_AT) / LEADER_SMART_SPAN) + (s.eatStreak || 0) * 0.12);
+      const leaderIntelligence = (s) => {
+        const growth = Math.max(0, s.body.length - LEADER_SMART_AT);
+        const trained = Math.min(1, growth / LEADER_SMART_SPAN);
+        const veteran = Math.min(1, Math.max(0, growth - LEADER_SMART_SPAN) / LEADER_VETERAN_SPAN);
+        return trained + veteran;
+      };
+      const smartLookaheadDepth = (intelligence) => {
+        if (intelligence <= 0.05) return 0;
+        const trainedDepth = SMART_LOOKAHEAD_MIN + Math.floor(Math.min(1, intelligence) * 3 + 1e-6);
+        const veteranDepth = Math.floor(Math.max(0, intelligence - 1) * 2 + 1e-6);
+        return Math.min(SMART_LOOKAHEAD_MAX, trainedDepth + veteranDepth);
+      };
       const densifyDrive = (s) => Math.min(1, Math.max(0, (s.body.length - DENSIFY_AT) / DENSIFY_SPAN));
       const hungerDrive = (s) => 1 + densifyDrive(s) * 8;
       const packingCycleDrive = (s) => {
@@ -265,6 +328,58 @@
         while (list.length < START_SNAKES) list.push(makeEntrySnake(list, reserved));
       }
 
+      function fragmentDirection(source, start, fragment, fallback) {
+        if (fragment.length > 1) {
+          return {
+            x: fragment[0].x - fragment[1].x,
+            y: fragment[0].y - fragment[1].y,
+          };
+        }
+        const current = fragment[0];
+        const towardHead = source[start - 1];
+        const towardTail = source[start + 1];
+        if (towardHead) return { x: towardHead.x - current.x, y: towardHead.y - current.y };
+        if (towardTail) return { x: current.x - towardTail.x, y: current.y - towardTail.y };
+        return { x: fallback.x, y: fallback.y };
+      }
+
+      function winnerFragment(winner, source, start, end, golden = false) {
+        const body = copyBody(source.slice(start, end));
+        const colorIndex = golden ? winner.colorIndex : nextColorIndex();
+        return {
+          body,
+          dir: fragmentDirection(source, start, body, winner.dir),
+          grow: Math.max(0, START_LEN_MIN - body.length),
+          prev: copyBody(body),
+          colorIndex,
+          aggression: golden ? winner.aggression : newAggression(),
+          moveAcc: 0,
+          eatStreak: 0,
+          golden,
+        };
+      }
+
+      function splitWinner(winner) {
+        const source = copyBody(winner.body);
+        if (!source.length) return;
+        const goldenLength = Math.min(2, source.length);
+        const offspring = [winnerFragment(winner, source, 0, goldenLength, true)];
+        const remainder = source.length - goldenLength;
+        const fragmentCount = Math.min(START_SNAKES - 1, remainder);
+
+        for (let i = 0; i < fragmentCount; i++) {
+          const start = goldenLength + Math.floor(i * remainder / fragmentCount);
+          const end = goldenLength + Math.floor((i + 1) * remainder / fragmentCount);
+          offspring.push(winnerFragment(winner, source, start, end));
+        }
+
+        for (let i = 0; i < offspring.length; i++) {
+          offspring[i].moveAcc = STEP * (i / Math.max(1, offspring.length));
+        }
+        lastEater = null;
+        snakes = offspring;
+      }
+
       function spawnMouse(list = snakes) {
         mouse = randomFreeCell(list);
       }
@@ -275,17 +390,41 @@
         spawnMouse();
       }
 
+      function beginVictory(s) {
+        s.winner = true;
+        s.victoryActive = true;
+        s.victoryAge = 0;
+        s.moveAcc = 0;
+      }
+
+      function updateVictory(dt) {
+        if (snakes.length !== 1 || !snakes[0].victoryActive) return false;
+        const winner = snakes[0];
+        winner.victoryAge = Math.min(victoryDuration(), (winner.victoryAge || 0) + dt);
+        winner.moveAcc = 0;
+        if (winner.victoryAge >= victoryDuration()) {
+          winner.victoryActive = false;
+          splitWinner(winner);
+        }
+        return true;
+      }
+
       // ---- snake brain ----------------------------------------------------
       function chooseDir(s) {
         const h = s.body[0];
         const opts = DIRS.filter(d => !(d.x === -s.dir.x && d.y === -s.dir.y));
+        const intelligence = leaderIntelligence(s);
         // Hunger is absolute: if the mouse is one legal step away, bite it even
-        // when that step leaves the mature snake's preferred packing cycle.
+        // when that step leaves a young snake's preferred route. Leaders still
+        // evaluate the bite so food cannot lure them into a sealed pocket.
         const bite = opts.find(d => {
           const p = { x: h.x + d.x, y: h.y + d.y };
           return sameCell(p, mouse) && inB(p.x, p.y) && !hitSelf(s, p) && !hitOtherSnake(s, p);
         });
-        if (bite) { s.dir = bite; return; }
+        if (bite && intelligence < 0.2) {
+          s.dir = bite;
+          return;
+        }
         choosePackingDirection(s);
         const choices = [];
         for (const d of opts) {
@@ -294,6 +433,36 @@
         }
 
         let contenders = choices.filter(choice => choice.legal);
+        // A corner has fewer nominal exits, so the general safety tiers can
+        // otherwise make a snake orbit a perfectly reachable mouse forever.
+        // Lock onto the shortest approach only when it includes a legal exit
+        // after the bite; a genuinely sealed corner still falls back to safety.
+        if (isCornerCell(mouse) && contenders.length) {
+          const cornerHunters = contenders.filter(choice => choice.huntSafe && Number.isFinite(choice.cornerPath));
+          if (cornerHunters.length) {
+            const shortestCornerPath = Math.min(...cornerHunters.map(choice => choice.cornerPath));
+            contenders = cornerHunters.filter(choice => choice.cornerPath === shortestCornerPath);
+          }
+        }
+        // Intelligence is lexicographic before it is numeric: a mature snake
+        // first discards moves with a meaningfully worse survival class, then
+        // chooses among the remaining routes. This prevents a food bonus or a
+        // tiny distance gain from buying entry into an obvious cul-de-sac.
+        if (intelligence > 0.05 && contenders.length) {
+          const bestSafety = Math.max(...contenders.map(choice => choice.safetyTier));
+          const toleratedDrop = intelligence < 0.35 ? 2 : intelligence < 0.7 ? 1 : 0;
+          const safer = contenders.filter(choice => choice.safetyTier >= bestSafety - toleratedDrop);
+          if (safer.length) contenders = safer;
+        }
+        // Veteran leaders compare the full survival horizon inside the best
+        // safety class. The longest snakes stop accepting a route that fails
+        // even one move earlier when a deeper escape remains available.
+        if (intelligence > 1 && contenders.length) {
+          const bestHorizon = Math.max(...contenders.map(choice => choice.horizon));
+          const toleratedShortfall = intelligence < 1.5 ? 1 : 0;
+          const farsighted = contenders.filter(choice => choice.horizon >= bestHorizon - toleratedShortfall);
+          if (farsighted.length) contenders = farsighted;
+        }
         // Once packing activates, hunger becomes lexicographic: first take the
         // shortest available mouse route, then let survival and density break
         // ties. If the static body blocks every computed route, direct distance
@@ -446,6 +615,41 @@
         return Infinity;
       }
 
+      function isCornerCell(p) {
+        return !!p
+          && (p.x === 0 || p.x === GW - 1)
+          && (p.y === 0 || p.y === GH - 1);
+      }
+
+      function safeCornerPathDistance(s, start, body, arrivalDir) {
+        if (!isCornerCell(mouse)) return Infinity;
+        const blocked = blockedCells(s, body, start);
+        const seen = new Set([`${key(start)}|${arrivalDir.x},${arrivalDir.y}`]);
+        const q = [{ p: start, dir: arrivalDir, dist: 0 }];
+
+        const hasExit = (p, dir) => DIRS.some(d => {
+          if (d.x === -dir.x && d.y === -dir.y) return false;
+          const n = { x: p.x + d.x, y: p.y + d.y };
+          return inB(n.x, n.y)
+            && !blocked.has(key(n))
+            && !rivalCanClaim(s, n);
+        });
+
+        for (let qi = 0; qi < q.length; qi++) {
+          const cur = q[qi];
+          if (sameCell(cur.p, mouse) && hasExit(cur.p, cur.dir)) return cur.dist;
+          for (const d of DIRS) {
+            if (d.x === -cur.dir.x && d.y === -cur.dir.y) continue;
+            const n = { x: cur.p.x + d.x, y: cur.p.y + d.y };
+            const stateKey = `${key(n)}|${d.x},${d.y}`;
+            if (!inB(n.x, n.y) || blocked.has(key(n)) || seen.has(stateKey) || rivalCanClaim(s, n)) continue;
+            seen.add(stateKey);
+            q.push({ p: n, dir: d, dist: cur.dist + 1 });
+          }
+        }
+        return Infinity;
+      }
+
       function reachabilityProfile(s, start, body) {
         const tail = body[body.length - 1];
         const blocked = blockedCells(s, body, start);
@@ -573,6 +777,28 @@
         return { exits, safeExits, bestArea };
       }
 
+      function survivalHorizon(s, start, body, arrivalDir, depth, growthLeft) {
+        if (depth <= 0) return 0;
+        let best = 0;
+        for (const d of DIRS) {
+          if (d.x === -arrivalDir.x && d.y === -arrivalDir.y) continue;
+          const n = { x: start.x + d.x, y: start.y + d.y };
+          if (!inB(n.x, n.y) || hitOtherSnake(s, n)) continue;
+
+          const tailVacates = growthLeft <= 0;
+          const ownEnd = tailVacates ? Math.max(1, body.length - 1) : body.length;
+          if (body.slice(0, ownEnd).some(p => sameCell(p, n))) continue;
+
+          const after = [n, ...body];
+          const nextGrowth = Math.max(0, growthLeft - 1);
+          if (growthLeft <= 0) after.pop();
+          const survived = 1 + survivalHorizon(s, n, after, d, depth - 1, nextGrowth);
+          best = Math.max(best, survived);
+          if (best >= depth) break;
+        }
+        return best;
+      }
+
       function opponentEscapeArea(s, future, other, limit = Infinity, futureKeys = null) {
         const start = other.body[0];
         const startKey = key(start);
@@ -653,8 +879,9 @@
         const intelligence = leaderIntelligence(s);
         const reachability = reachabilityProfile(s, nx, future);
         const area = reachability.area;
-        const path = reachability.path;
-        if (detail) Object.assign(detail, { legal: true, path, mouseDist });
+        const cornerPath = isCornerCell(mouse) ? safeCornerPathDistance(s, nx, future, d) : Infinity;
+        const path = isCornerCell(mouse) ? cornerPath : reachability.path;
+        if (detail) Object.assign(detail, { legal: true, path, cornerPath, mouseDist });
         // Requiring one free cell for every body segment imposes a permanent
         // 50% density ceiling. A mature snake instead follows its tail through
         // a much smaller reserve, letting it occupy most of the arena.
@@ -666,7 +893,28 @@
         const crampedPenalty = Math.max(0, safeNeed - area) * (55 + intelligence * 150);
         const escape = futureEscapeProfile(s, nx, future, d, intelligence);
         const tailReachable = reachability.tailReachable;
-        if (detail) detail.huntSafe = tailReachable && area >= safeNeed && escape.exits > 0;
+        const lookaheadDepth = smartLookaheadDepth(intelligence);
+        const growthLeft = ate
+          ? Math.max(0, s.grow + eatGrowth - 1)
+          : Math.max(0, s.grow - 1);
+        const horizon = lookaheadDepth > 0
+          ? survivalHorizon(s, nx, future, d, lookaheadDepth, growthLeft)
+          : 0;
+        const horizonShortfall = Math.max(0, lookaheadDepth - horizon);
+        let safetyTier = 0;
+        if (escape.exits > 0) safetyTier += 2;
+        if (escape.safeExits > 0) safetyTier += 1;
+        if (escape.safeExits >= 2) safetyTier += 1;
+        if (tailReachable) safetyTier += 2;
+        if (area >= safeNeed) safetyTier += 2;
+        if (area >= safeNeed * 1.5) safetyTier += 1;
+        if (horizonShortfall === 0) safetyTier += 2;
+        else safetyTier -= horizonShortfall * 2;
+        if (detail) Object.assign(detail, {
+          huntSafe: tailReachable && area >= safeNeed && escape.safeExits > 0 && horizonShortfall === 0,
+          safetyTier,
+          horizon,
+        });
         const headRisk = rivalHeadRisk(s, nx);
         const pathScore = Number.isFinite(path)
           ? 180 - path * HUNT_DISTANCE_WEIGHT
@@ -700,12 +948,13 @@
               ? DOUBLE_EXIT_PENALTY
               : 0;
         const contestedPenalty = Math.max(0, escape.exits - escape.safeExits) * CONTESTED_EXIT_PENALTY;
+        const horizonPenalty = horizonShortfall * (700 + intelligence * 1300);
         // Aggression must remain a real tradeoff. Leader intelligence still
         // rejects sealed traps, but no longer overwhelms every step toward food.
         const survivalWeight = 0.14 + (1 - aggression) * 0.7 + intelligence * 0.55;
         return huntScore * aggression * hungerDrive(s) + dangerScore * survivalWeight + densityScore + cycleScore
           + trapScore * (0.12 + aggression * 0.1) * (1 - densify * 0.9)
-          + edgeScore - mobilityPenalty - contestedPenalty + Math.random() * 0.01;
+          + edgeScore - mobilityPenalty - contestedPenalty - horizonPenalty + Math.random() * 0.01;
       }
 
       function hitSelf(s, p) {
@@ -815,7 +1064,8 @@
           beginDeath(s);
         }
 
-        if (next.length <= 1) bringContenders(next);
+        if (next.length === 1 && next[0].body.length >= START_LEN_MIN) beginVictory(next[0]);
+        else if (next.length === 0) bringContenders(next);
         snakes = next.slice(0, START_SNAKES);
         if (mouseEaten && !dead.size) spawnMouse(snakes);
       }
@@ -833,13 +1083,32 @@
         ctx.beginPath();
         ctx.moveTo(points[0].x, points[0].y);
         if (points.length === 1) return;
-        if (points.length === 2) {
-          ctx.lineTo(points[1].x, points[1].y);
-          return;
-        }
+
         for (let i = 1; i < points.length - 1; i++) {
-          const p = points[i], n = points[i + 1];
-          ctx.quadraticCurveTo(p.x, p.y, (p.x + n.x) / 2, (p.y + n.y) / 2);
+          const previous = points[i - 1], corner = points[i], next = points[i + 1];
+          const inX = corner.x - previous.x, inY = corner.y - previous.y;
+          const outX = next.x - corner.x, outY = next.y - corner.y;
+          const inLength = Math.hypot(inX, inY), outLength = Math.hypot(outX, outY);
+          const cross = inX * outY - inY * outX;
+
+          // Keep long runs truly straight. Only the immediate neighborhood of a
+          // bend is rounded, so a turn never reads as a diagonal shortcut.
+          if (inLength < 0.01 || outLength < 0.01 || Math.abs(cross) < 0.01) {
+            ctx.lineTo(corner.x, corner.y);
+            continue;
+          }
+
+          const radius = Math.min(CELL * 0.22, inLength * 0.42, outLength * 0.42);
+          ctx.lineTo(
+            corner.x - inX / inLength * radius,
+            corner.y - inY / inLength * radius
+          );
+          ctx.quadraticCurveTo(
+            corner.x,
+            corner.y,
+            corner.x + outX / outLength * radius,
+            corner.y + outY / outLength * radius
+          );
         }
         const last = points[points.length - 1];
         ctx.lineTo(last.x, last.y);
@@ -871,13 +1140,159 @@
         return { x: OX + p.x * CELL + CELL / 2, y: OY + p.y * CELL + CELL / 2 };
       }
 
+      function orthogonalSnakePath(points, body) {
+        if (!points.length) return [];
+        const route = [];
+        const pushDistinct = point => {
+          const previous = route[route.length - 1];
+          if (!previous || Math.hypot(previous.x - point.x, previous.y - point.y) > 0.01) {
+            route.push(point);
+          }
+        };
+
+        pushDistinct(points[points.length - 1]);
+        for (let i = points.length - 2; i >= 0; i--) {
+          const from = route[route.length - 1];
+          const to = points[i];
+          if (Math.abs(from.x - to.x) > 0.01 && Math.abs(from.y - to.y) > 0.01) {
+            // Neighboring segments can occupy different halves of a 90-degree
+            // turn during a tween. Route through the nearer Manhattan elbow,
+            // using the trailing segment's grid cell to preserve the real turn.
+            const horizontalFirst = { x: to.x, y: from.y };
+            const verticalFirst = { x: from.x, y: to.y };
+            const hint = cellCenter(body[i + 1]);
+            const horizontalDistance = (horizontalFirst.x - hint.x) ** 2 + (horizontalFirst.y - hint.y) ** 2;
+            const verticalDistance = (verticalFirst.x - hint.x) ** 2 + (verticalFirst.y - hint.y) ** 2;
+            pushDistinct(horizontalDistance <= verticalDistance ? horizontalFirst : verticalFirst);
+          }
+          pushDistinct(to);
+        }
+        return route;
+      }
+
       function hash01(seed, n) {
         const x = Math.sin(seed * 12.9898 + n * 78.233) * 43758.5453;
         return x - Math.floor(x);
       }
 
-      function drawSkeleton(pool, points, depth) {
-        if (!points.length) return;
+      function revealedCenterline(points, revealAt) {
+        if (!revealAt) return points.slice();
+        if (points.length === 1) return revealAt(0) > 0.01 ? points.slice() : [];
+        const line = [];
+        for (let i = 0; i < points.length - 1; i++) {
+          const reveal = Math.max(0, Math.min(1, revealAt(i)));
+          if (reveal <= 0.01) break;
+          if (!line.length) line.push(points[i]);
+          const next = points[i + 1];
+          line.push({
+            x: points[i].x + (next.x - points[i].x) * reveal,
+            y: points[i].y + (next.y - points[i].y) * reveal,
+          });
+          if (reveal < 0.99) break;
+        }
+        return line;
+      }
+
+      function smoothCenterline(points, passes = 2) {
+        let line = points.slice();
+        for (let pass = 0; pass < passes && line.length > 1; pass++) {
+          const softened = [line[0]];
+          for (let i = 0; i < line.length - 1; i++) {
+            const a = line[i], b = line[i + 1];
+            softened.push(
+              { x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 },
+              { x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 },
+            );
+          }
+          softened.push(line[line.length - 1]);
+          line = softened;
+        }
+        return line;
+      }
+
+      function ribbonMask(line, radius) {
+        const path = new Path2D();
+        if (!line.length) return path;
+        if (line.length === 1) {
+          path.arc(line[0].x, line[0].y, radius, 0, Math.PI * 2);
+          return path;
+        }
+
+        const left = [], right = [];
+        for (let i = 0; i < line.length; i++) {
+          const prev = line[Math.max(0, i - 1)];
+          const next = line[Math.min(line.length - 1, i + 1)];
+          const dx = next.x - prev.x, dy = next.y - prev.y;
+          const length = Math.hypot(dx, dy) || 1;
+          const nx = -dy / length * radius, ny = dx / length * radius;
+          left.push({ x: line[i].x + nx, y: line[i].y + ny });
+          right.push({ x: line[i].x - nx, y: line[i].y - ny });
+        }
+
+        path.moveTo(left[0].x, left[0].y);
+        for (let i = 1; i < left.length; i++) path.lineTo(left[i].x, left[i].y);
+        for (let i = right.length - 1; i >= 0; i--) path.lineTo(right[i].x, right[i].y);
+        path.closePath();
+        const first = line[0], last = line[line.length - 1];
+        path.moveTo(first.x + radius, first.y);
+        path.arc(first.x, first.y, radius, 0, Math.PI * 2);
+        path.moveTo(last.x + radius, last.y);
+        path.arc(last.x, last.y, radius, 0, Math.PI * 2);
+        return path;
+      }
+
+      const hatchStamp = () => `${W}:${H}:${CELL}:${OX}:${OY}`;
+
+      function hatchGeometry(mark, points, revealAt) {
+        const stamp = hatchStamp();
+        if (!revealAt && mark._hatchGeometry && mark._hatchGeometry.stamp === stamp) {
+          return mark._hatchGeometry;
+        }
+
+        const centerline = smoothCenterline(revealedCenterline(points, revealAt));
+        if (!centerline.length) return null;
+        const outerMask = ribbonMask(centerline, CELL * 0.39);
+        const innerMask = ribbonMask(centerline, CELL * 0.25);
+        const xs = centerline.map(p => p.x), ys = centerline.map(p => p.y);
+        const minX = Math.min(...xs) - CELL, maxX = Math.max(...xs) + CELL;
+        const minY = Math.min(...ys) - CELL, maxY = Math.max(...ys) + CELL;
+        const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+        const span = Math.hypot(maxX - minX, maxY - minY) + CELL * 2;
+        const hatchFamilies = [];
+
+        // Bucket hundreds of individual hatch lines into three widths for each
+        // angle family. Completed marks cache these six Path2D objects, turning
+        // the permanent mural into a handful of strokes per frame.
+        for (const family of [-1, 1]) {
+          const buckets = [new Path2D(), new Path2D(), new Path2D()];
+          const angleJitter = (hash01(mark.seed + 113, family + 2) - 0.5) * 0.12;
+          const angle = family * Math.PI * 0.24 + angleJitter;
+          const cos = Math.cos(angle), sin = Math.sin(angle);
+          let lane = -span;
+          let lineIndex = 0;
+          while (lane <= span) {
+            const sample = lineIndex + (family > 0 ? 300 : 100);
+            const localX = lane + (hash01(mark.seed + 127, sample) - 0.5) * CELL * 0.1;
+            const bucket = Math.min(2, Math.floor(hash01(mark.seed + 151, sample) * 3));
+            const path = buckets[bucket];
+            path.moveTo(cx + localX * cos + span * sin, cy + localX * sin - span * cos);
+            path.lineTo(cx + localX * cos - span * sin, cy + localX * sin + span * cos);
+            lane += CELL * (0.2 + hash01(mark.seed + 163, sample) * 0.1);
+            lineIndex++;
+          }
+          hatchFamilies.push({ family, buckets });
+        }
+
+        const geometry = { stamp, outerMask, innerMask, hatchFamilies };
+        if (!revealAt) mark._hatchGeometry = geometry;
+        return geometry;
+      }
+
+      function drawCrossHatching(mark, points, depth, revealAt = null) {
+        const hasCachedGeometry = !revealAt
+          && mark._hatchGeometry
+          && mark._hatchGeometry.stamp === hatchStamp();
+        if ((!points || !points.length) && !hasCachedGeometry) return;
         const presence = 0.68 + depth * 0.32;
         ctx.save();
         ctx.filter = 'none';
@@ -885,65 +1300,34 @@
         ctx.shadowBlur = 0;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-
-        // A dim body-shaped stain anchors the bones without reviving the old
-        // colorful watercolor corpse treatment.
-        if (points.length > 1) {
-          ctx.strokeStyle = rgba(C_CLOT, 0.42 * presence);
-          ctx.lineWidth = CELL * 0.46;
-          traceSmoothPath(points);
-          ctx.stroke();
-
-          ctx.strokeStyle = rgba(C_BONE, 0.34 * presence);
-          ctx.lineWidth = Math.max(1.2, CELL * 0.1);
-          traceSmoothPath(points);
-          ctx.stroke();
-        }
-
-        // Paired ribs and vertebrae make the remains read as a skeleton even
-        // where a long corpse overlaps another one.
-        for (let i = 2; i < points.length - 1; i += 2) {
-          const p = points[i];
-          const prev = points[i - 1], next = points[i + 1];
-          const dx = next.x - prev.x, dy = next.y - prev.y;
-          const len = Math.hypot(dx, dy) || 1;
-          const tx = dx / len, ty = dy / len;
-          const nx = -ty, ny = tx;
-          const ribLength = CELL * (0.24 + hash01(pool.seed, i) * 0.09);
-          const sweep = CELL * (0.07 + hash01(pool.seed + 17, i) * 0.05);
-          ctx.strokeStyle = rgba(C_BONE, (0.24 + hash01(pool.seed + 31, i) * 0.08) * presence);
-          ctx.lineWidth = Math.max(1, CELL * 0.055);
-          ctx.beginPath();
-          ctx.moveTo(p.x, p.y);
-          ctx.quadraticCurveTo(p.x + nx * ribLength * 0.65, p.y + ny * ribLength * 0.65, p.x + nx * ribLength - tx * sweep, p.y + ny * ribLength - ty * sweep);
-          ctx.moveTo(p.x, p.y);
-          ctx.quadraticCurveTo(p.x - nx * ribLength * 0.65, p.y - ny * ribLength * 0.65, p.x - nx * ribLength - tx * sweep, p.y - ny * ribLength - ty * sweep);
-          ctx.stroke();
-          circleAt(p.x, p.y, Math.max(1.1, CELL * 0.072), rgba(C_BONE_HIGHLIGHT, 0.34 * presence));
-        }
-
-        // A broad skull, paired eye sockets, and a small jaw cap the head end.
-        const head = points[0];
-        const neck = points[Math.min(1, points.length - 1)];
-        const angle = Math.atan2(head.y - neck.y, head.x - neck.x);
-        ctx.translate(head.x, head.y);
-        ctx.rotate(angle);
-        ctx.fillStyle = rgba(C_BONE_HIGHLIGHT, 0.32 * presence);
-        ctx.strokeStyle = rgba(C_BONE, 0.46 * presence);
-        ctx.lineWidth = Math.max(1, CELL * 0.055);
         ctx.beginPath();
-        ctx.ellipse(0, 0, CELL * 0.31, CELL * 0.25, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        circleAt(CELL * 0.08, -CELL * 0.1, CELL * 0.065, rgba(C_CLOT, 0.82));
-        circleAt(CELL * 0.08, CELL * 0.1, CELL * 0.065, rgba(C_CLOT, 0.82));
-        ctx.strokeStyle = rgba(C_BONE, 0.38 * presence);
-        ctx.beginPath();
-        ctx.moveTo(CELL * 0.12, -CELL * 0.18);
-        ctx.lineTo(CELL * 0.3, -CELL * 0.12);
-        ctx.lineTo(CELL * 0.3, CELL * 0.12);
-        ctx.lineTo(CELL * 0.12, CELL * 0.18);
-        ctx.stroke();
+        ctx.rect(OX, OY, GW * CELL, GH * CELL);
+        ctx.clip();
+
+        // One softened centerline produces one continuous ribbon. Unlike the
+        // previous capsule union, this shape has no joint at each grid segment
+        // and cannot retain a dotted or beaded rhythm through its bends.
+        const geometry = hatchGeometry(mark, points, revealAt);
+        if (!geometry) { ctx.restore(); return; }
+        const { outerMask, innerMask, hatchFamilies } = geometry;
+        ctx.fillStyle = rgba(C_HATCH, 0.18 * presence);
+        ctx.fill(outerMask);
+        ctx.fillStyle = rgba(C_CLOT, 0.34 * presence);
+        ctx.fill(innerMask);
+
+        ctx.save();
+        ctx.clip(outerMask);
+        for (const { family, buckets } of hatchFamilies) {
+          for (let bucket = 0; bucket < buckets.length; bucket++) {
+            ctx.strokeStyle = rgba(
+              family > 0 ? C_HATCH_LIGHT : C_HATCH,
+              (0.2 + bucket * 0.055) * presence,
+            );
+            ctx.lineWidth = Math.max(0.75, CELL * (0.025 + bucket * 0.012));
+            ctx.stroke(buckets[bucket]);
+          }
+        }
+        ctx.restore();
         ctx.restore();
       }
 
@@ -958,19 +1342,39 @@
           const progress = Math.min(1, death.age / death.duration);
           const sweep = progress * (points.length + DEATH_FADE_WIDTH);
           const colors = death.colors;
+
+          // The permanent mark is revealed by the same per-segment mask that
+          // removes the living body. There is never a whole-corpse swap.
+          drawCrossHatching(death, points, 1, index => 1 - deathVisibility(index, sweep));
+
           ctx.save();
           ctx.filter = 'none';
           ctx.globalCompositeOperation = 'source-over';
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
 
-          // Each segment dims only after the extinction front reaches it, so
-          // the body visibly dies in order instead of disappearing at once.
-          for (let i = points.length - 1; i >= 0; i--) {
+          // Draw the untouched remainder as one continuous stroke. Only the
+          // narrow transition band needs per-segment opacity, avoiding hundreds
+          // of glowing stroke calls for a long dying leader.
+          const solidStart = Math.min(points.length, Math.max(0, Math.ceil(sweep)));
+          if (solidStart < points.length) {
+            ctx.globalAlpha = 1;
+            ctx.shadowColor = colors.glow;
+            ctx.shadowBlur = 10;
+            ctx.strokeStyle = colors.body;
+            ctx.lineWidth = CELL * 0.64;
+            const remainder = points.slice(solidStart);
+            traceSmoothPath(remainder);
+            if (remainder.length === 1) ctx.lineTo(remainder[0].x + 0.01, remainder[0].y);
+            ctx.stroke();
+          }
+
+          const transitionStart = Math.max(0, Math.floor(sweep - DEATH_FADE_WIDTH));
+          const transitionEnd = Math.min(points.length - 1, solidStart - 1);
+          for (let i = transitionStart; i <= transitionEnd; i++) {
             const visibility = deathVisibility(i, sweep);
             if (visibility <= 0) continue;
-            const a = visibility * (0.76 + 0.24 * (i / Math.max(1, points.length - 1)));
-            ctx.globalAlpha = a;
+            ctx.globalAlpha = visibility;
             ctx.shadowColor = colors.glow;
             ctx.shadowBlur = 10 * visibility;
             ctx.strokeStyle = colors.body;
@@ -983,16 +1387,16 @@
           }
 
           // A hot, sparking front supplies the dramatic beat and travels from
-          // the skull all the way through the final tail segment.
-          const frontIndex = Math.min(points.length - 1, Math.floor(progress * points.length));
+          // the head all the way through the final tail segment.
+          const frontIndex = Math.min(points.length - 1, Math.max(0, Math.floor(sweep - DEATH_FADE_WIDTH)));
           const front = points[frontIndex];
           const pulse = 0.72 + Math.sin(death.age * 28) * 0.18;
           ctx.globalAlpha = Math.max(0, 1 - progress * 0.35);
           circleAt(front.x, front.y, CELL * (0.28 + pulse * 0.1), rgba(colors.accent || colors.ring, 0.55), 18, colors.glow);
           ctx.strokeStyle = rgba(colors.accent || colors.ring, 0.62);
           ctx.lineWidth = Math.max(1, CELL * 0.045);
-          for (let ray = 0; ray < 8; ray++) {
-            const angle = ray * Math.PI / 4 + death.age * (ray % 2 ? -2.2 : 2.8) + hash01(death.seed, ray) * 0.45;
+          for (let ray = 0; ray < 5; ray++) {
+            const angle = ray * Math.PI * 2 / 5 + death.age * (ray % 2 ? -2.2 : 2.8) + hash01(death.seed, ray) * 0.45;
             const inner = CELL * 0.22;
             const outer = CELL * (0.42 + hash01(death.seed + 13, ray) * 0.42) * pulse;
             ctx.beginPath();
@@ -1008,8 +1412,9 @@
         for (let i = 0; i < pools.length; i++) {
           const pool = pools[i];
           const depth = pools.length <= 1 ? 1 : i / (pools.length - 1);
-          const points = pool.body.map(cellCenter);
-          drawSkeleton(pool, points, depth);
+          const cached = pool._hatchGeometry && pool._hatchGeometry.stamp === hatchStamp();
+          const points = cached ? null : pool.body.map(cellCenter);
+          drawCrossHatching(pool, points, depth);
         }
         ctx.filter = 'none';
         ctx.shadowBlur = 0;
@@ -1044,6 +1449,7 @@
         for (const s of snakes) {
           const alpha = Math.min(1, (s.moveAcc || 0) / moveInterval(s));
           const colors = snakeColor(s);
+          const gold = winnerGoldAmount(s);
           const points = [];
           for (let i = 0; i < s.body.length; i++) {
             const cur = s.body[i], pre = (s.prev && s.prev[i]) || cur;
@@ -1052,11 +1458,20 @@
               y: OY + (pre.y + (cur.y - pre.y) * alpha) * CELL + CELL / 2,
             });
           }
-          const path = points.slice().reverse();
+          const path = orthogonalSnakePath(points, s.body);
           strokePath(path, colors.head, CELL * 0.92, 12, colors.glow);
           strokePath(path, colors.body, CELL * 0.62, 5, colors.glow);
           const head = points[0];
           circleAt(head.x, head.y, CELL * 0.38, colors.head, 14, colors.glow);
+          if (gold > 0) {
+            const heirColors = winnerHeadColor(s, gold);
+            const heirBody = s.body.slice(0, Math.min(2, s.body.length));
+            const heirPoints = points.slice(0, heirBody.length);
+            const heirPath = orthogonalSnakePath(heirPoints, heirBody);
+            strokePath(heirPath, heirColors.head, CELL * 0.94, 12 + gold * 10, heirColors.glow);
+            strokePath(heirPath, heirColors.body, CELL * 0.64, 5 + gold * 5, heirColors.glow);
+            circleAt(head.x, head.y, CELL * 0.39, heirColors.head, 14 + gold * 10, heirColors.glow);
+          }
           ctx.shadowBlur = 0;                                  // two dark eyes facing travel
           const ex = head.x + s.dir.x * CELL * 0.18, ey = head.y + s.dir.y * CELL * 0.18, e = Math.max(1, CELL * 0.1);
           circleAt(ex - s.dir.y * CELL * 0.15, ey - s.dir.x * CELL * 0.15, e * 0.52, C_BG);
@@ -1076,12 +1491,15 @@
       function tick(t) {
         const dt = Math.min(0.1, (t - last) / 1000 || 0); last = t; frame++;
         updateDeaths(dt);
-        for (const s of snakes) s.moveAcc = (s.moveAcc || 0) + dt;
-        for (let guard = 0; guard < 8; guard++) {
-          const movers = snakes.filter(s => (s.moveAcc || 0) >= moveInterval(s));
-          if (!movers.length) break;
-          for (const s of movers) s.moveAcc -= moveInterval(s);
-          step(movers);
+        const celebrating = updateVictory(dt);
+        if (!celebrating) {
+          for (const s of snakes) s.moveAcc = (s.moveAcc || 0) + dt;
+          for (let guard = 0; guard < 8; guard++) {
+            const movers = snakes.filter(s => (s.moveAcc || 0) >= moveInterval(s));
+            if (!movers.length) break;
+            for (const s of movers) s.moveAcc -= moveInterval(s);
+            step(movers);
+          }
         }
         render();
         requestAnimationFrame(tick);
