@@ -455,8 +455,8 @@
         const shell = document.querySelector('.quote-shell');
         const canvas = document.querySelector('#field');
         const ctx = canvas.getContext('2d', { alpha: true });
-        const magnifier = document.querySelector('#magnifier');
-        const magnifierLens = document.querySelector('#magnifier-lens');
+        const knifeCursor = document.querySelector('#knife-cursor');
+        const knifeIcon = document.querySelector('#knife-icon');
         const countOutput = document.querySelector('#active-count');
         const announcement = document.querySelector('#announcement');
         const debugView = document.querySelector('#debug-view');
@@ -485,9 +485,9 @@
         });
 
         window.addEventListener('resize', resize, { passive: true });
-        window.addEventListener('pointermove', moveMagnifier, { passive: true });
+        window.addEventListener('pointermove', moveKnife, { passive: true });
         window.addEventListener('pointerout', (event) => {
-          if (!event.relatedTarget) magnifier.classList.remove('is-visible');
+          if (!event.relatedTarget) knifeCursor.classList.remove('is-visible');
         }, { passive: true });
         document.addEventListener('visibilitychange', () => {
           if (document.hidden) cancelAnimationFrame(frame);
@@ -508,13 +508,14 @@
                 button.type = 'button';
                 button.className = 'glyph';
                 button.textContent = character;
-                button.setAttribute('aria-label', `Animate letter ${character}`);
+                button.setAttribute('aria-label', `Cut away letter ${character}`);
 
                 const activate = () => {
                   const now = performance.now();
                   if (now - lastActivation < 120) return;
                   lastActivation = now;
                   trigger(button, character);
+                  deleteLetter(button, character);
                 };
 
                 button.addEventListener('pointerenter', (event) => {
@@ -589,9 +590,8 @@
           };
 
           events.push(event);
-          setMagnifierColor(color);
+          setKnifeColor(color);
           countOutput.value = String(events.length).padStart(2, '0');
-          announcement.textContent = `Letter ${character} activated for two and a half seconds.`;
           button.classList.remove('is-struck');
           void button.offsetWidth;
           button.classList.add('is-struck');
@@ -600,17 +600,32 @@
           if (!frame) frame = requestAnimationFrame(draw);
         }
 
-        function moveMagnifier(event) {
-          if (DEBUG || !finePointer.matches || event.pointerType === 'touch') return;
-          magnifier.style.transform = `translate3d(${event.clientX - 38}px, ${event.clientY - 38}px, 0)`;
-          magnifier.classList.add('is-visible');
+        function deleteLetter(button, character) {
+          const wasFocused = document.activeElement === button;
+          const remaining = Array.from(quote.querySelectorAll('.glyph:not(.is-deleted)'));
+          const index = remaining.indexOf(button);
+          const next = remaining[index + 1] || remaining[index - 1];
+
+          button.classList.add('is-deleted');
+          button.disabled = true;
+          button.tabIndex = -1;
+          button.setAttribute('aria-hidden', 'true');
+          announcement.textContent = `Letter ${character} cut away into a two and a half second animation.`;
+
+          if (wasFocused && next) next.focus();
         }
 
-        function setMagnifierColor(color) {
-          magnifier.style.setProperty('--lens-color', `rgb(${color.join(' ')})`);
-          magnifierLens.classList.remove('is-triggered');
-          void magnifierLens.offsetWidth;
-          magnifierLens.classList.add('is-triggered');
+        function moveKnife(event) {
+          if (DEBUG || !finePointer.matches || event.pointerType === 'touch') return;
+          knifeCursor.style.transform = `translate3d(${event.clientX}px, ${event.clientY - 14}px, 0) rotate(-18deg)`;
+          knifeCursor.classList.add('is-visible');
+        }
+
+        function setKnifeColor(color) {
+          knifeCursor.style.setProperty('--blade-color', `rgb(${color.join(' ')})`);
+          knifeIcon.classList.remove('is-triggered');
+          void knifeIcon.getBoundingClientRect();
+          knifeIcon.classList.add('is-triggered');
         }
 
         function draw(now) {

@@ -2,12 +2,12 @@
 
 An interactive typographic piece about the way many small, independent forms
 are read as a single statement. Every letter in the sentence is a control.
-Rolling over one releases a composition made only from that letterform. Touch
-contact and keyboard activation provide equivalents where rollover is not
-available.
+Crossing one with the knife cursor cuts it from the statement and releases a
+composition made only from that letterform. Its place remains fixed so the
+sentence erodes without reflowing. Touch contact and keyboard activation
+provide equivalents where rollover is not available.
 
-On fine-pointer devices, the native cursor becomes an oversized magnifying
-glass. Its open center preserves the sentence beneath it, while its lens ring
+On fine-pointer devices, the native cursor becomes a compact knife whose blade
 switches to the exact color assigned to the newly triggered animation.
 
 ## Motion

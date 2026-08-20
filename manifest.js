@@ -380,7 +380,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "A field of Geist Sans makes every letter active: each rollover releases a 2.5-second abstract composition built only from that glyph, and each composition can overlap the next.",
+      "description": "A field of Geist Sans makes every letter active: crossing one with the knife cursor cuts it from the statement and releases a 2.5-second abstract composition built only from that glyph; each composition can overlap the next.",
       "updated": "2026-08-20"
     },
     {
