@@ -2465,7 +2465,10 @@
             return {
               sign,
               fullness,
-              baseReach: lerp(-0.23, -0.16, r()),
+              shoulderX: lerp(0.12, 0.17, r()),
+              shoulderY: sign * lerp(0.94, 1.04, r()) * fullness,
+              rearX: lerp(-0.22, -0.16, r()),
+              rearY: sign * lerp(0.56, 0.7, r()) * fullness,
               splits,
               veins,
             };
@@ -2476,12 +2479,14 @@
             const out = [];
             for (let i = 0; i < count; i += 1) {
               const t = count === 1 ? 0.5 : i / (count - 1);
+              const vein = side.veins[Math.min(side.veins.length - 1, i + 1)];
+              const outerRow = (i + (side.sign < 0 ? 1 : 0)) % 2 === 0;
               out.push({
-                x: lerp(0.32, 0.7, t) + lerp(-0.018, 0.018, r()),
-                y: side.sign * lerp(0.075, 0.135, r()),
-                rx: lerp(0.032, 0.052, r()),
-                ry: lerp(0.058, 0.092, r()),
-                turn: side.sign * lerp(0.28, 0.48, r()),
+                x: vein ? vein.x + lerp(-0.018, 0.018, r()) : lerp(0.34, 0.69, t),
+                y: side.sign * (outerRow ? lerp(0.32, 0.43, r()) : lerp(0.2, 0.29, r())),
+                rx: lerp(0.045, 0.072, r()),
+                ry: lerp(0.068, 0.112, r()),
+                turn: side.sign * lerp(0.18, 0.36, r()),
                 skew: lerp(-0.26, 0.26, r()),
               });
             }
@@ -2513,22 +2518,28 @@
         }
 
         function traceMonsteraSide(L, W, side, reverse) {
-          const base = {
-            x: side.baseReach,
-            y: side.sign * monsteraEnvelope(0.13, side.fullness) * 0.9,
-          };
+          const shoulder = { x: side.shoulderX, y: side.shoulderY };
+          const rear = { x: side.rearX, y: side.rearY };
           const tip = { x: 1.04, y: 0 };
 
           if (!reverse) {
             ctx.bezierCurveTo(
-              -L * 0.055,
-              base.y * W * 0.18,
-              base.x * L,
-              base.y * W * 0.82,
-              base.x * L,
-              base.y * W
+              -L * 0.09,
+              rear.y * W * 0.12,
+              rear.x * L,
+              rear.y * W * 0.72,
+              rear.x * L,
+              rear.y * W
             );
-            let current = base;
+            ctx.bezierCurveTo(
+              (rear.x + 0.015) * L,
+              side.sign * W * side.fullness * 0.9,
+              (shoulder.x - 0.065) * L,
+              shoulder.y * W * 1.035,
+              shoulder.x * L,
+              shoulder.y * W
+            );
+            let current = shoulder;
             for (const split of side.splits) {
               traceMonsteraMargin(L, W, current, split.entry, side.sign);
               traceMonsteraSplit(L, W, split.entry, split.root, split.exit);
@@ -2545,12 +2556,20 @@
             traceMonsteraSplit(L, W, split.exit, split.root, split.entry);
             current = split.entry;
           }
-          traceMonsteraMargin(L, W, current, base, side.sign);
+          traceMonsteraMargin(L, W, current, shoulder, side.sign);
           ctx.bezierCurveTo(
-            base.x * L,
-            base.y * W * 0.82,
-            -L * 0.055,
-            base.y * W * 0.18,
+            (shoulder.x - 0.065) * L,
+            shoulder.y * W * 1.035,
+            (rear.x + 0.015) * L,
+            side.sign * W * side.fullness * 0.9,
+            rear.x * L,
+            rear.y * W
+          );
+          ctx.bezierCurveTo(
+            rear.x * L,
+            rear.y * W * 0.72,
+            -L * 0.09,
+            rear.y * W * 0.12,
             0,
             0
           );
