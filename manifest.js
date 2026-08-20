@@ -319,7 +319,6 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-08-07",
       "category": "nature",
       "type": "generative",
-      "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A dense, directionless botanical wallpaper on aged rag paper. Dye-pot hibiscus, chrysanthemums, orange daylilies, fringed iris, dwarf quince, Monstera, green palm and fern foliage, and varied cream leaves unfold through twenty hand-drawn growth stages in every direction.",
       "updated": "2026-08-20"
