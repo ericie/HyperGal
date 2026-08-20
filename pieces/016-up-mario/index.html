@@ -52,7 +52,6 @@
         padding: 5px 7px;
         color: #fff;
         background: #49385f;
-        border-radius: 6px;
         font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         pointer-events: none;
         white-space: pre;
@@ -72,7 +71,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Many Mario: a family of tiny chibi Marios climbs through a pastel sky on smiling rosy-cheeked clouds. Every Mario jumps toward higher clouds, and anyone still riding a crumbling cloud falls with the fluff."
+      aria-label="Many Mario: tiny chibi Marios jump between persistent white clouds and use physical shoves to push one another over the edges."
     ></canvas>
     <pre id="debug" class="debug" hidden></pre>
 
@@ -100,7 +99,6 @@
         const MIN_TARGET_GAP = 30;
         const MAX_TARGET_GAP = 156;
         const STALL_SECONDS = 2.35;
-        const NO_ROUTE_SECONDS = 1.05;
         const BOX_ATTEMPT_SECONDS = 1.75;
         const BOX_SIZE = 26;
         const BOX_BOTTOM_OFFSET = 60;
@@ -109,15 +107,17 @@
           ladder: 112,
           stairs: 148,
         };
-        const CLOUD_VANISH_SECONDS = 0.64;
-        const CLOUD_CLEANSE_SECONDS = 0.32;
-        const RAIN_STEP_SECONDS = 0.055;
+        const CLOUD_PULSE_SECONDS = 0.32;
         const BUDDY_JUMP_SPEED = 690;
-        const BUDDY_AIR_SPEED = 225;
+        const BUDDY_AIR_SPEED = 278;
+        const BUDDY_RUN_SPEED = 176;
+        const MARIO_CONTACT_GAP = 21;
+        const MARIO_EDGE_GRACE = 13;
+        const STALEMATE_SECONDS = 0.82;
 
         /* A candy-shop palette: blue-sky paper, strawberry pink, lemon,
-           mint and a soft grape outline. The cloud characters stay mostly
-           white so their tiny faces remain the star. */
+           mint and grape details. The clouds stay quiet and borderless so
+           the physical contest between the figures remains the focus. */
         const C = {
           white: '#FFFDFC',
           sky: '#A9E4FF',
@@ -203,7 +203,8 @@
         let lastProgressAt = 0;
         let lastProgressHeight = 0;
         let skippedBoxes = 0;
-        let recoveryCount = 0;
+        let stalemateCount = 0;
+        let shoveOutCount = 0;
 
         debugEl.hidden = !DEBUG;
         resize();
@@ -271,7 +272,8 @@
           ladderTrips = 0;
           stairTrips = 0;
           skippedBoxes = 0;
-          recoveryCount = 0;
+          stalemateCount = 0;
+          shoveOutCount = 0;
           targetPlatformId = null;
           targetBoxId = null;
           targetLinkId = null;
@@ -288,6 +290,7 @@
           while (highestPlatformY < height * 1.75) addPlatform();
           seedMarioBuddies();
           hero = {
+            id: 0,
             x: lastPlatform.x + lastPlatform.w * 0.5,
             y: lastPlatform.y,
             previousY: lastPlatform.y,
@@ -322,8 +325,12 @@
             nextBlinkAt: 1.8,
             blinkEndsAt: 0,
             blinkCount: 0,
+            forcedDir: 0,
+            yieldUntil: 0,
+            clashWith: null,
+            clashSince: 0,
           };
-          activateCloud(lastPlatform);
+          pulseCloud(lastPlatform);
           lastProgressAt = 0;
           lastProgressHeight = 0;
           const warmSeconds = Math.max(0, Number(params.get('warm') || 0) || 0);
@@ -363,11 +370,10 @@
           extendWorld();
           updateControls(dt);
           updateHero(dt);
-          updateCloudRain();
-          updateVanishingClouds();
           updateBarrels(dt);
           updateQuestionBoxes();
           updateMarioBuddies(dt);
+          resolveMarioPhysics();
           updateParticles(dt);
           updateCamera(dt);
           rescueIfNeeded();
@@ -461,6 +467,24 @@
             return;
           }
 
+          if (hero.yieldUntil > simTime) {
+            targetPlatformId = current.id;
+            hero.facing = hero.forcedDir || hero.facing;
+            hero.autoVx = hero.facing * RUN_SPEED * 0.56;
+            return;
+          }
+
+          const shoveTarget = nearestMarioOpponent(current.id, hero);
+          if (shoveTarget) {
+            const dx = shoveTarget.x - hero.x;
+            targetPlatformId = current.id;
+            hero.noRouteSince = 0;
+            hero.autoVx = Math.abs(dx) < MARIO_CONTACT_GAP + 2
+              ? Math.sign(dx || hero.facing) * RUN_SPEED * 0.72
+              : clamp(dx * 5.2, -RUN_SPEED, RUN_SPEED);
+            return;
+          }
+
           const localBox = chooseLocalQuestionBox(current);
           if (localBox) {
             planQuestionBox(current, localBox);
@@ -487,13 +511,6 @@
           if (!route) {
             if (!hero.noRouteSince) hero.noRouteSince = simTime;
             hero.autoVx = clamp((platformCenter(current) - hero.x) * 2.8, -RUN_SPEED, RUN_SPEED);
-            if (simTime - hero.noRouteSince > NO_ROUTE_SECONDS && simTime > (current.recoveryCooldownUntil || 0)) {
-              if (addRecoveryPlatform(current)) {
-                current.recoveryCooldownUntil = simTime + 2.4;
-                hero.noRouteSince = simTime;
-                lastProgressAt = simTime;
-              }
-            }
             return;
           }
           hero.noRouteSince = 0;
@@ -572,7 +589,6 @@
         function chooseAirLandingTarget() {
           let best = null;
           for (const platform of platforms) {
-            if (platform.vanishStartedAt != null) continue;
             if (platform.y > hero.y + 34 || platform.y < hero.y - 210) continue;
             const left = platformLeft(platform) + landingMargin(platform);
             const right = platformLeft(platform) + platform.w - landingMargin(platform);
@@ -703,7 +719,7 @@
           clearRouteAttempt();
           platform.visited = true;
           platform.pulseUntil = simTime + 0.18;
-          activateCloud(platform);
+          pulseCloud(platform);
           if (dir > 0 && hero.revisitPlatformId === platform.id) hero.revisitPlatformId = null;
           spawnDust(hero.x, hero.y, 8, COLORS.smoke);
         }
@@ -722,13 +738,21 @@
           let best = null;
           for (const platform of platforms) {
             if (platform.id === current.id) continue;
-            if (platform.vanishStartedAt != null) continue;
             if (platform.avoidUntil && platform.avoidUntil > simTime) continue;
             const route = routeToPlatform(current, platform, jumpSpeed);
             if (!route) continue;
             const widthBonus = Math.min(44, platform.w * 0.24);
             const motionCost = platform.moving ? 28 : 0;
-            route.score = route.gap * 2.4 + route.dx * 0.9 + motionCost - widthBonus + platform.id * 0.0001;
+            const sideways = Math.abs(platformCenter(platform) - platformCenter(current));
+            const occupied = marioOccupants(platform.id, hero).length;
+            route.score =
+              route.gap * 1.75 +
+              route.dx * 0.32 +
+              motionCost -
+              widthBonus -
+              Math.min(210, sideways) * 0.62 -
+              occupied * 72 +
+              platform.id * 0.0001;
             if (!best || route.score < best.score) best = route;
           }
           return best;
@@ -815,9 +839,6 @@
         function jump(superJump, route) {
           hero.vy = superJump ? SPRING_SPEED : JUMP_SPEED;
           const fromId = hero.groundId;
-          const isTraversalJump = Boolean(route && route.target.id !== fromId);
-          const isManualJump = manualActive();
-          if (fromId && (isTraversalJump || isManualJump)) startCloudVanish(fromId, true);
           hero.grounded = false;
           hero.groundId = null;
           hero.autoTargetId = route ? route.target.id : null;
@@ -849,7 +870,6 @@
           if (hero.vy <= 0) {
             const half = HERO_W * 0.42;
             for (const platform of platforms) {
-              if (platform.vanishStartedAt != null) continue;
               const left = platformLeft(platform);
               const right = left + platform.w;
               if (hero.x + half < left || hero.x - half > right) continue;
@@ -869,7 +889,7 @@
           hero.lastGroundedAt = simTime;
           if (isNewLanding) {
             markRouteAttemptResult(landed);
-            activateCloud(landed);
+            pulseCloud(landed);
             hero.landedAt = simTime;
             hero.groundedSince = simTime;
             hero.autoTargetId = null;
@@ -918,10 +938,9 @@
         function rescueIfNeeded() {
           if (hero.y > cameraY - 210) return;
           const platform = platforms
-            .filter((p) => p.vanishStartedAt == null)
             .filter((p) => p.y > cameraY + height * 0.18 && p.y < cameraY + height * 0.78)
             .sort((a, b) => a.y - b.y)[0];
-          const landing = platform || [...platforms].reverse().find((p) => p.vanishStartedAt == null);
+          const landing = platform || platforms[platforms.length - 1];
           if (!landing) return;
           const left = platformLeft(landing);
           hero.x = left + landing.w * 0.5;
@@ -955,28 +974,30 @@
             hero.lastGroundedAt = simTime;
             hero.landedAt = simTime;
             hero.groundedSince = simTime;
-            activateCloud(landing);
+            pulseCloud(landing);
             hero.autoTargetId = null;
             hero.autoLaunchX = null;
             hero.autoLandingX = null;
             clearRouteAttempt();
             lastProgressAt = simTime;
-            addRecoveryPlatform(landing);
             spawnDust(hero.x, hero.y, 16, COLORS.ink);
             return;
           }
           const current = platformById(hero.groundId);
           if (!current) return;
-          if (addRecoveryPlatform(current)) {
-            current.recoveryCooldownUntil = simTime + 2.4;
-            lastProgressAt = simTime;
+          const route = chooseTargetRoute(current);
+          if (route) {
+            jump(false, route);
+          } else {
+            hero.autoVx = clamp((platformCenter(current) - hero.x) * 3.2, -RUN_SPEED, RUN_SPEED);
+            if (Math.abs(platformCenter(current) - hero.x) < 16) jump(false);
           }
+          lastProgressAt = simTime;
         }
 
         function nearestLowerPlatform() {
           let best = null;
           for (const platform of platforms) {
-            if (platform.vanishStartedAt != null) continue;
             if (platform.y > hero.y + 28 || platform.y < cameraY - 120) continue;
             const x = safeLandingX(platform, hero.x);
             const score = Math.abs(x - hero.x) * 1.4 + Math.abs(hero.y - platform.y) * 0.3 - platform.y * 0.015;
@@ -1056,14 +1077,13 @@
             particle.age += dt;
             particle.x += particle.vx * dt;
             particle.y += particle.vy * dt;
-            particle.vy += GRAVITY * (particle.kind === 'rain' ? 0.34 : 0.18) * dt;
+            particle.vy += GRAVITY * 0.18 * dt;
           }
           particles = particles.filter((particle) => particle.age < particle.life);
         }
 
         function seedMarioBuddies() {
           const ordered = [...platforms]
-            .filter((platform) => platform.vanishStartedAt == null)
             .sort((a, b) => a.y - b.y);
           const picks = [ordered[0], ordered[2], ordered[4], ordered[6]].filter(Boolean);
           for (let i = 0; i < picks.length; i += 1) addMarioBuddy(picks[i], i);
@@ -1091,6 +1111,10 @@
             landedAt: simTime,
             phase: hash01(platform.id * 883 + variant * 67) * TAU,
             pose: variant % 3,
+            forcedDir: 0,
+            yieldUntil: 0,
+            clashWith: null,
+            clashSince: 0,
           });
         }
 
@@ -1099,12 +1123,12 @@
             buddy.previousY = buddy.y;
             if (buddy.grounded) {
               const platform = platformById(buddy.platformId);
-              if (!platform || platform.vanishStartedAt != null) {
+              if (!platform) {
                 dropMarioBuddy(buddy);
               } else {
-                buddy.x = platformLeft(platform) + clamp(buddy.localX, 18, platform.w - 18);
+                buddy.x = platformLeft(platform) + buddy.localX;
                 buddy.y = platform.y;
-                if (simTime >= buddy.jumpAt) launchMarioBuddy(buddy, platform);
+                updateGroundedMarioBuddy(buddy, platform, dt);
               }
             } else {
               buddy.vy += GRAVITY * dt;
@@ -1118,16 +1142,46 @@
           }
         }
 
+        function updateGroundedMarioBuddy(buddy, platform, dt) {
+          const rival = nearestMarioOpponent(platform.id, buddy);
+          if (!rival && simTime >= buddy.jumpAt) {
+            launchMarioBuddy(buddy, platform);
+            return;
+          }
+
+          let desired = 0;
+          if (buddy.yieldUntil > simTime) {
+            buddy.facing = buddy.forcedDir || buddy.facing;
+            desired = buddy.facing * BUDDY_RUN_SPEED * 0.58;
+          } else if (rival) {
+            const dx = rival.x - buddy.x;
+            const dir = Math.sign(dx || buddy.facing);
+            desired = dir * BUDDY_RUN_SPEED;
+            if (Math.abs(dx) > MARIO_CONTACT_GAP * 0.65) buddy.facing = dir;
+            buddy.jumpAt = Math.max(buddy.jumpAt, simTime + 0.45);
+          }
+
+          const accel = rival ? 15 : 8;
+          buddy.vx += (desired - buddy.vx) * (1 - Math.exp(-accel * dt));
+          buddy.vx = clamp(buddy.vx, -BUDDY_RUN_SPEED, BUDDY_RUN_SPEED);
+          buddy.localX += buddy.vx * dt;
+          buddy.x = platformLeft(platform) + buddy.localX;
+          if (!marioHasFooting(buddy, platform)) dropMarioBuddy(buddy, Math.sign(buddy.vx), Math.abs(buddy.vx));
+        }
+
         function chooseMarioBuddyTarget(current, buddy) {
           const candidates = [];
           for (const platform of platforms) {
-            if (platform.id === current.id || platform.vanishStartedAt != null) continue;
+            if (platform.id === current.id) continue;
             const route = routeToPlatform(current, platform, BUDDY_JUMP_SPEED);
             if (!route) continue;
             if (route.gap < 58 || route.gap > 148) continue;
             const sideways = Math.abs(platformCenter(platform) - platformCenter(current));
-            const occupied = buddies.filter((other) => other !== buddy && other.platformId === platform.id).length;
-            route.score = Math.abs(route.gap - 102) * 0.55 - Math.min(180, sideways) * 0.7 + occupied * 34;
+            const occupied = marioOccupants(platform.id, buddy).length;
+            route.score =
+              Math.abs(route.gap - 102) * 0.42 -
+              Math.min(220, sideways) * 1.05 -
+              occupied * 86;
             candidates.push(route);
           }
           candidates.sort((a, b) => a.score - b.score);
@@ -1153,7 +1207,7 @@
 
         function steerMarioBuddy(buddy, dt) {
           const target = platformById(buddy.targetId);
-          if (!target || target.vanishStartedAt != null) {
+          if (!target) {
             buddy.targetId = null;
             buddy.falling = true;
             return;
@@ -1165,9 +1219,8 @@
         }
 
         function collideMarioBuddy(buddy) {
-          if (buddy.falling || buddy.vy > 0) return;
+          if (buddy.vy > 0) return;
           const candidates = platforms
-            .filter((platform) => platform.vanishStartedAt == null)
             .filter((platform) => buddy.x > platformLeft(platform) + 10 && buddy.x < platformLeft(platform) + platform.w - 10)
             .filter((platform) => buddy.previousY >= platform.y && buddy.y <= platform.y + 2)
             .sort((a, b) => b.y - a.y);
@@ -1183,25 +1236,167 @@
           buddy.grounded = true;
           buddy.falling = false;
           buddy.landedAt = simTime;
-          buddy.jumpAt = simTime + 0.35 + hash01(buddy.id * 1301 + landed.id * 17) * 0.7;
-          activateCloud(landed);
+          buddy.jumpAt = simTime + 1.1 + hash01(buddy.id * 1301 + landed.id * 17) * 1.15;
+          pulseCloud(landed);
           spawnDust(buddy.x, buddy.y, 5, C.mint);
         }
 
-        function dropMarioBuddy(buddy) {
+        function dropMarioBuddy(buddy, direction = 0, speed = 0) {
           if (buddy.falling) return;
           buddy.platformId = null;
           buddy.targetId = null;
           buddy.grounded = false;
           buddy.falling = true;
-          buddy.vx = (hash01(buddy.id * 613) - 0.5) * 72;
-          buddy.vy = -55 - hash01(buddy.id * 977) * 55;
+          buddy.vx = direction
+            ? direction * Math.max(96, speed)
+            : (hash01(buddy.id * 613) - 0.5) * 72;
+          buddy.vy = -38 - hash01(buddy.id * 977) * 38;
           buddy.spin = 0;
+        }
+
+        function marioOccupants(platformId, exclude = null) {
+          const occupants = [];
+          if (hero && hero !== exclude && hero.grounded && !hero.onLink && hero.groundId === platformId) occupants.push(hero);
+          for (const buddy of buddies) {
+            if (buddy !== exclude && buddy.grounded && buddy.platformId === platformId) occupants.push(buddy);
+          }
+          return occupants;
+        }
+
+        function nearestMarioOpponent(platformId, body) {
+          const occupants = marioOccupants(platformId, body);
+          occupants.sort((a, b) => Math.abs(a.x - body.x) - Math.abs(b.x - body.x));
+          return occupants[0] || null;
+        }
+
+        function marioHasFooting(body, platform) {
+          const left = platformLeft(platform) - MARIO_EDGE_GRACE;
+          const right = platformLeft(platform) + platform.w + MARIO_EDGE_GRACE;
+          return body.x >= left && body.x <= right;
+        }
+
+        function syncMarioLocalX(body) {
+          if (body === hero || !body.grounded) return;
+          const platform = platformById(body.platformId);
+          if (platform) body.localX = body.x - platformLeft(platform);
+        }
+
+        function resolveMarioPhysics() {
+          const grounded = [];
+          if (hero.grounded && !hero.onLink) grounded.push(hero);
+          for (const buddy of buddies) if (buddy.grounded) grounded.push(buddy);
+
+          for (let i = 0; i < grounded.length; i += 1) {
+            for (let j = i + 1; j < grounded.length; j += 1) {
+              const a = grounded[i];
+              const b = grounded[j];
+              const aPlatform = a === hero ? a.groundId : a.platformId;
+              const bPlatform = b === hero ? b.groundId : b.platformId;
+              if (aPlatform !== bPlatform || Math.abs(a.y - b.y) > 8) continue;
+
+              const left = a.x < b.x || (a.x === b.x && a.id < b.id) ? a : b;
+              const right = left === a ? b : a;
+              const distance = right.x - left.x;
+              if (distance >= MARIO_CONTACT_GAP) {
+                clearMarioClash(a, b);
+                continue;
+              }
+
+              const overlap = MARIO_CONTACT_GAP - distance;
+              const leftPressing = left.facing === 1;
+              const rightPressing = right.facing === -1;
+              if (leftPressing && rightPressing) {
+                resolveStalemate(left, right, overlap, aPlatform);
+              } else if (leftPressing) {
+                shoveMario(left, right, 1, overlap, aPlatform);
+              } else if (rightPressing) {
+                shoveMario(right, left, -1, overlap, aPlatform);
+              } else {
+                left.x -= overlap * 0.5;
+                right.x += overlap * 0.5;
+                syncMarioLocalX(left);
+                syncMarioLocalX(right);
+              }
+            }
+          }
+        }
+
+        function resolveStalemate(left, right, overlap, platformId) {
+          const platform = platformById(platformId);
+          if (!platform) return;
+          left.x -= overlap * 0.5;
+          right.x += overlap * 0.5;
+          left.vx = Math.min(0, left.vx) * 0.18;
+          right.vx = Math.max(0, right.vx) * 0.18;
+          keepStalemateOnCloud(left, platform);
+          keepStalemateOnCloud(right, platform);
+          syncMarioLocalX(left);
+          syncMarioLocalX(right);
+
+          if (left.clashWith !== right.id) {
+            stalemateCount += 1;
+            left.clashWith = right.id;
+            right.clashWith = left.id;
+            left.clashSince = simTime;
+            right.clashSince = simTime;
+            return;
+          }
+
+          if (simTime - left.clashSince < STALEMATE_SECONDS) return;
+          const clashRound = Math.floor((simTime + left.id + right.id) / 3);
+          const leftWins = hash01((left.id + 17) * 2081 + (right.id + 31) * 1597 + clashRound * 97) < 0.5;
+          const loser = leftWins ? right : left;
+          const pushDir = leftWins ? 1 : -1;
+          loser.forcedDir = pushDir;
+          loser.facing = pushDir;
+          loser.yieldUntil = simTime + 0.9;
+          loser.vx = pushDir * 42;
+          clearMarioClash(left, right);
+        }
+
+        function keepStalemateOnCloud(body, platform) {
+          const left = platformLeft(platform) + MARIO_EDGE_GRACE;
+          const right = platformLeft(platform) + platform.w - MARIO_EDGE_GRACE;
+          body.x = clamp(body.x, left, right);
+        }
+
+        function clearMarioClash(a, b) {
+          if (a.clashWith === b.id) {
+            a.clashWith = null;
+            a.clashSince = 0;
+          }
+          if (b.clashWith === a.id) {
+            b.clashWith = null;
+            b.clashSince = 0;
+          }
+        }
+
+        function shoveMario(attacker, defender, direction, overlap, platformId) {
+          clearMarioClash(attacker, defender);
+          defender.x += direction * (overlap + 1.25);
+          defender.vx = direction * Math.max(92, Math.abs(defender.vx), Math.abs(attacker.vx) * 0.84);
+          attacker.vx *= 0.82;
+          syncMarioLocalX(attacker);
+          syncMarioLocalX(defender);
+
+          const platform = platformById(platformId);
+          if (!platform || marioHasFooting(defender, platform)) return;
+          shoveOutCount += 1;
+          if (defender === hero) {
+            hero.grounded = false;
+            hero.groundId = null;
+            hero.vx = direction * Math.max(118, Math.abs(hero.vx));
+            hero.vy = -42;
+            hero.stumbleUntil = simTime + 0.48;
+            clearRouteAttempt();
+          } else {
+            dropMarioBuddy(defender, direction, Math.abs(defender.vx));
+          }
+          spawnDust(defender.x, defender.y, 12, C.lemon);
         }
 
         function respawnMarioBuddy(buddy) {
           const candidates = platforms
-            .filter((platform) => platform.vanishStartedAt == null)
             .filter((platform) => platform.y > cameraY + height * 0.35 && platform.y < cameraY + height * 0.9)
             .filter((platform) => !buddies.some((other) => other !== buddy && other.platformId === platform.id));
           const platform = candidates[Math.floor(hash01(buddy.id * 1597 + Math.floor(simTime)) * candidates.length)];
@@ -1221,111 +1416,9 @@
           spawnDust(buddy.x, buddy.y, 10, C.lemon);
         }
 
-        function updateCloudRain() {
-          if (!hero.grounded) return;
-          const platform = platformById(hero.groundId);
-          if (!platform || platform.cleansedAt == null || platform.vanishStartedAt != null) return;
-          if (
-            platform.nextRainAt == null ||
-            simTime - platform.nextRainAt > RAIN_STEP_SECONDS * 3
-          ) {
-            platform.nextRainAt = simTime;
-          }
-          while (platform.nextRainAt <= simTime) {
-            spawnCloudRain(platform);
-            platform.nextRainAt += prefersReducedMotion ? RAIN_STEP_SECONDS * 2 : RAIN_STEP_SECONDS;
-          }
-        }
-
-        function activateCloud(platform) {
-          if (!platform || platform.cleansedAt != null) return;
-          platform.cleansedAt = simTime;
-          platform.pulseUntil = simTime + CLOUD_CLEANSE_SECONDS;
-          platform.nextRainAt = simTime;
-          platform.crumbleAt = simTime + 2.6 + hash01(platform.id * 1237) * 1.2;
-          const burstCount = prefersReducedMotion ? 2 : 5;
-          for (let i = 0; i < burstCount; i += 1) spawnCloudRain(platform);
-        }
-
-        function spawnCloudRain(platform) {
-          const count = prefersReducedMotion ? 1 : 2;
-          const left = platformLeft(platform);
-          platform.rainCount = (platform.rainCount || 0) + 1;
-          for (let i = 0; i < count; i += 1) {
-            const n = platform.id * 1009 + platform.rainCount * 37 + i * 131;
-            const edge = Math.min(18, platform.w * 0.18);
-            particles.push({
-              kind: 'rain',
-              x: left + edge + hash01(n) * Math.max(1, platform.w - edge * 2),
-              y: platform.y - 25 - hash01(n + 17) * 8,
-              vx: (hash01(n + 29) - 0.5) * 18,
-              vy: -180 - hash01(n + 43) * 105,
-              r: 1.25 + hash01(n + 59) * 0.75,
-              age: 0,
-              life: 0.42 + hash01(n + 71) * 0.22,
-              color: C.mid,
-            });
-          }
-        }
-
-        function startCloudVanish(platformId, leadMarioHasLaunched = false) {
-          const platform = platformById(platformId);
-          if (!platform || platform.vanishStartedAt != null) return;
-          platform.vanishStartedAt = simTime;
-          for (const buddy of buddies) {
-            if (buddy.platformId === platformId) dropMarioBuddy(buddy);
-          }
-          if (!leadMarioHasLaunched && hero.grounded && hero.groundId === platformId) {
-            hero.grounded = false;
-            hero.groundId = null;
-            hero.vy = -85;
-            hero.stumbleUntil = simTime + 0.5;
-            clearRouteAttempt();
-          }
-          spawnCloudExplosion(platform);
-          boxes = boxes.filter((box) => box.platformId !== platformId);
-          barrels = barrels.filter((barrel) => barrel.platformId !== platformId);
-          links = links.filter((link) => link.lowerId !== platformId && link.upperId !== platformId);
-        }
-
-        function spawnCloudExplosion(platform) {
-          const left = platformLeft(platform);
-          const count = prefersReducedMotion ? 7 : clamp(Math.round(platform.w / 9), 12, 24);
-          for (let i = 0; i < count; i += 1) {
-            const n = platform.id * 1877 + i * 277;
-            const speed = 38 + hash01(n + 23) * 82;
-            particles.push({
-              kind: 'cloudBurst',
-              x: left + platform.w * (0.08 + hash01(n + 37) * 0.84),
-              y: platform.y - 8 + (hash01(n + 41) - 0.5) * 30,
-              vx: (hash01(n + 11) - 0.5) * speed,
-              vy: -35 - hash01(n + 23) * 115,
-              r: 5 + hash01(n + 53) * 9,
-              age: 0,
-              life: 0.42 + hash01(n + 67) * 0.34,
-              color: i % 4 === 0 ? C.mist : C.white,
-            });
-          }
-        }
-
-        function updateVanishingClouds() {
-          for (const platform of platforms) {
-            if (platform.vanishStartedAt == null && platform.crumbleAt != null && simTime >= platform.crumbleAt) {
-              startCloudVanish(platform.id, false);
-            }
-          }
-          const expiredIds = new Set(
-            platforms
-              .filter(
-                (platform) =>
-                  platform.vanishStartedAt != null &&
-                  simTime - platform.vanishStartedAt >= (prefersReducedMotion ? 0.01 : CLOUD_VANISH_SECONDS),
-              )
-              .map((platform) => platform.id),
-          );
-          if (!expiredIds.size) return;
-          platforms = platforms.filter((platform) => !expiredIds.has(platform.id));
-          links = links.filter((link) => !expiredIds.has(link.lowerId) && !expiredIds.has(link.upperId));
+        function pulseCloud(platform) {
+          if (!platform) return;
+          platform.pulseUntil = Math.max(platform.pulseUntil || 0, simTime + CLOUD_PULSE_SECONDS);
         }
 
         function extendWorld() {
@@ -1358,7 +1451,7 @@
           const preferredSide = platformCount % 2 === 0 ? 1 : -1;
           for (let attempt = 0; attempt < 28; attempt += 1) {
             const side = attempt < 18 ? preferredSide : rng() < 0.5 ? -1 : 1;
-            const candidateCenter = clamp(previousCenter + side * rand(maxShift * 0.44, maxShift), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+            const candidateCenter = clamp(previousCenter + side * rand(maxShift * 0.58, maxShift), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
             const candidate = { x: candidateCenter - w * 0.5, y, w, h: 18, moving: false, travel: 0 };
             center = candidateCenter;
             if (routeToPlatform(previous, candidate) && canPlacePlatform(candidate)) {
@@ -1390,44 +1483,6 @@
           addQuestionBoxesForPlatform(platform);
           addBranchPlatforms(previous, platform);
           if (y > 520 && !platform.moving && rng() < 0.08) addBarrel(platform);
-        }
-
-        function addRecoveryPlatform(current) {
-          const w = clamp(worldWidth * 0.34, 118, 184);
-          let platform = null;
-          for (const relaxed of [false, true]) {
-            for (let attempt = 0; attempt < 28; attempt += 1) {
-              const y = current.y + rand(98, 150);
-              const center = clamp(platformCenter(current) + rand(-82, 82), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
-              const candidate = { x: center - w * 0.5, y, w, h: 18, moving: false, travel: 0 };
-              if (routeToPlatform(current, candidate) && canPlacePlatform(candidate, relaxed ? 'relaxed' : 'strict')) {
-                platform = makePlatform(center, y, w, 'brick', false);
-                break;
-              }
-            }
-            if (platform) break;
-          }
-          if (!platform) {
-            const y = current.y + 150;
-            const center = clamp(platformCenter(current), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
-            const candidate = { x: center - w * 0.5, y, w, h: 18, moving: false, travel: 0 };
-            if (routeToPlatform(current, candidate) && canPlacePlatform(candidate, 'relaxed')) {
-              platform = makePlatform(center, y, w, 'brick', false);
-            }
-          }
-          if (!platform) return false;
-          platform.pulseUntil = simTime + 0.55;
-          platforms.push(platform);
-          platforms.sort((a, b) => a.y - b.y);
-          recoveryCount += 1;
-          if (platform.y > highestPlatformY) {
-            lastPlatform = platform;
-            highestPlatformY = platform.y;
-          }
-          maybeAddLink(current, platform, 'ladder');
-          addQuestionBoxesForPlatform(platform, true);
-          spawnDust(platformCenter(platform), platform.y, 18, COLORS.coin);
-          return true;
         }
 
         function addBranchPlatforms(previous, trunk) {
@@ -1516,11 +1571,6 @@
             visited: false,
             pulseUntil: 0,
             spring: false,
-            cleansedAt: null,
-            vanishStartedAt: null,
-            nextRainAt: null,
-            rainCount: 0,
-            crumbleAt: null,
           };
         }
 
@@ -1713,7 +1763,8 @@
               `ladders ${ladderTrips}`,
               `stairs ${stairTrips}`,
               `rescues ${rescueCount}`,
-              `recoveries ${recoveryCount}`,
+              `stalemates ${stalemateCount}`,
+              `shove outs ${shoveOutCount}`,
               `skips ${skippedBoxes}`,
               `manual ${manualActive() ? 'yes' : 'no'}`,
             ].join('\n');
@@ -1721,10 +1772,9 @@
         }
 
         /* ====================================================
-           RENDER -- pastel kawaii sticker world
-           White cloud characters and tiny red-capped figures stay readable
-           against a saturated blue sky; grape outlines bind the candy
-           palette together.
+           RENDER -- pastel kinetic toy world
+           Quiet, borderless clouds keep the red-capped figures readable
+           against the saturated blue sky.
            ==================================================== */
 
         function render() {
@@ -2013,36 +2063,14 @@
         function drawCloudPlatform(platform, sx, sy, pulse) {
           const w = platform.w;
           const cx = sx + w * 0.5;
-          const seed = platform.id | 0;
-          const cleanse =
-            platform.cleansedAt == null
-              ? 0
-              : clamp((simTime - platform.cleansedAt) / CLOUD_CLEANSE_SECONDS, 0, 1);
-          const body = mixColor('#F6F0FF', C.white, cleanse);
-          const underside = mixColor('#DACBF3', '#EEDFFF', cleanse);
-          const vanish =
-            platform.vanishStartedAt == null
-              ? 0
-              : clamp(
-                  (simTime - platform.vanishStartedAt) /
-                    (prefersReducedMotion ? 0.01 : CLOUD_VANISH_SECONDS),
-                  0,
-                  1,
-                );
+          const body = C.white;
+          const underside = '#EEDFFF';
 
           ctx.save();
-          if (pulse > 0 && vanish === 0) {
+          if (pulse > 0) {
             ctx.translate(cx, sy + 8);
             ctx.scale(1 + pulse * 0.035, 1 - pulse * 0.055);
             ctx.translate(-cx, -(sy + 8));
-          }
-          if (vanish > 0) {
-            const blast = Math.sin(vanish * Math.PI);
-            ctx.globalAlpha = 1 - Math.pow(vanish, 0.62);
-            ctx.translate(cx, sy + 10);
-            ctx.rotate((hash01(seed * 97) - 0.5) * vanish * 0.16);
-            ctx.scale(1 + blast * 0.24, 1 + blast * 0.15);
-            ctx.translate(-cx, -(sy + 10));
           }
 
           cloudPath(cx + 4, sy + 9, w * 0.97, 0.94);
@@ -2060,13 +2088,6 @@
           fillOval(cx - w * 0.18, sy - 8, w * 0.23, 7, C.white);
           ctx.restore();
 
-          cloudPath(cx, sy, w, 1);
-          ctx.strokeStyle = C.ink;
-          ctx.lineWidth = Math.max(2.4, Math.min(4, w / 45));
-          ctx.lineJoin = 'round';
-          ctx.stroke();
-
-          drawKawaiiCloudFace(cx, sy + 3, seed, cleanse, vanish);
           ctx.restore();
         }
 
@@ -2089,45 +2110,6 @@
           ctx.bezierCurveTo(left + w * 0.29, topY + h * 0.58, left + w * 0.15, topY + h * 0.48, left + w * 0.16, topY + h * 0.29);
           ctx.bezierCurveTo(left + w * 0.06, topY + h * 0.35, left - w * 0.01, topY + h * 0.22, left + w * 0.08, topY + h * 0.08);
           ctx.closePath();
-        }
-
-        function drawKawaiiCloudFace(cx, cy, seed, awake, vanish) {
-          const gap = 13 + Math.min(4, awake * 3);
-          const blink = mod(simTime + seed * 0.73, 4.6) < 0.12;
-          ctx.save();
-          ctx.globalAlpha *= 1 - vanish * 0.5;
-          fillOval(cx - gap - 8, cy + 6, 5.5, 3.4, C.blush);
-          fillOval(cx + gap + 8, cy + 6, 5.5, 3.4, C.blush);
-
-          ctx.strokeStyle = C.night;
-          ctx.lineWidth = 2.2;
-          ctx.lineCap = 'round';
-          if (blink) {
-            for (const side of [-1, 1]) {
-              ctx.beginPath();
-              ctx.arc(cx + side * gap, cy, 3.1, Math.PI * 0.08, Math.PI * 0.92);
-              ctx.stroke();
-            }
-          } else {
-            for (const side of [-1, 1]) {
-              fillOval(cx + side * gap, cy, 4, 4.8, C.night);
-              fillCircle(cx + side * gap + 1.2, cy - 1.5, 1.3, C.white);
-            }
-          }
-
-          ctx.beginPath();
-          if (vanish > 0.15) {
-            ctx.arc(cx, cy + 10, 4.4, 0, TAU);
-          } else {
-            ctx.arc(cx, cy + 5, 6.4, Math.PI * 0.12, Math.PI * 0.88);
-          }
-          ctx.stroke();
-
-          if (awake > 0.1 && vanish === 0) {
-            const twinkle = 2.2 + Math.sin(simTime * 3 + seed) * 0.6;
-            sparkle(cx + gap + 18, cy - 12, twinkle, C.lemon);
-          }
-          ctx.restore();
         }
 
         function drawSpring(cx, sy) {
@@ -2323,17 +2305,7 @@
             const sx = worldLeft + particle.x;
             const sy = screenY(particle.y);
             ctx.globalAlpha = (1 - age) * 0.85;
-            if (particle.kind === 'rain') {
-              const length = 5 + Math.min(7, Math.abs(particle.vy) * 0.018);
-              capsule(sx, sy - length * 0.5, sx, sy + length * 0.5, particle.r * 1.5, particle.color || C.mid);
-            } else if (particle.kind === 'cloudBurst') {
-              const puff = particle.r * (0.82 + age * 0.5);
-              fillCircle(sx, sy, puff, particle.color || C.white);
-              fillCircle(sx - puff * 0.6, sy + puff * 0.15, puff * 0.55, particle.color || C.white);
-              fillCircle(sx + puff * 0.58, sy + puff * 0.12, puff * 0.62, particle.color || C.white);
-            } else {
-              fillCircle(sx, sy, Math.max(1, particle.r * (1 - age * 0.5)), particle.color || C.pale);
-            }
+            fillCircle(sx, sy, Math.max(1, particle.r * (1 - age * 0.5)), particle.color || C.pale);
           }
           ctx.globalAlpha = 1;
         }
@@ -2782,23 +2754,6 @@
           return ((value % amount) + amount) % amount;
         }
 
-        function mixColor(a, b, t) {
-          const ca = hexToRgb(a);
-          const cb = hexToRgb(b);
-          const r = Math.round(lerp(ca.r, cb.r, t));
-          const g = Math.round(lerp(ca.g, cb.g, t));
-          const bl = Math.round(lerp(ca.b, cb.b, t));
-          return `rgb(${r}, ${g}, ${bl})`;
-        }
-
-        function hexToRgb(value) {
-          const hex = value.replace('#', '');
-          return {
-            r: Number.parseInt(hex.slice(0, 2), 16),
-            g: Number.parseInt(hex.slice(2, 4), 16),
-            b: Number.parseInt(hex.slice(4, 6), 16),
-          };
-        }
       })();
     </script>
   </body>

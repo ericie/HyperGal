@@ -169,7 +169,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A family of tiny chibi Marios races upward through a pastel candy sky, making horizontal leaps between smiling clouds and falling with any cloud that crumbles beneath them.",
+      "description": "Tiny chibi Marios make broad horizontal leaps between persistent pastel clouds, bracing face-to-face and shoving exposed backs over the edge.",
       "updated": "2026-08-20"
     },
     {
@@ -380,6 +380,17 @@ window.HYPERGAL_MANIFEST = {
       "thumbnail": "thumbnail.jpg",
       "description": "Twenty colored trunk records fill a shared terrain: latitude, sun, and wind shape every tree, a broad directional fire crosses the stand, insects visit individual trunks, and two controls move the forest toward a synchronized orchard.",
       "updated": "2026-08-20"
+    },
+    {
+      "slug": "035-alphabet",
+      "title": "Alphabet",
+      "year": 2026,
+      "date": "2026-08-20",
+      "category": "typography",
+      "type": "interactive",
+      "wip": true,
+      "thumbnail": "thumbnail.svg",
+      "description": "Ten colorful geometric letters fall, settle, sprout legs, and run along a single ground line."
     }
   ]
 };

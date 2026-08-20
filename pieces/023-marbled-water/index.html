@@ -112,8 +112,7 @@
         gap: 4px;
       }
 
-      .panel-button,
-      .tool-button {
+      .panel-button {
         display: grid;
         place-items: center;
         border: 1px solid var(--panel-ink);
@@ -136,14 +135,12 @@
         font-size: 18px;
       }
 
-      .panel-button:hover,
-      .tool-button:hover {
+      .panel-button:hover {
         background: #fff;
         color: #000;
       }
 
       .panel-button:focus-visible,
-      .tool-button:focus-visible,
       input:focus-visible,
       select:focus-visible {
         outline: 2px solid var(--focus);
@@ -165,12 +162,6 @@
         min-height: 0;
         padding: 7px 10px 9px;
         overflow-y: auto;
-      }
-
-      .control-group + .control-group {
-        margin-top: 6px;
-        padding-top: 7px;
-        border-top: 1px solid var(--panel-ink);
       }
 
       .group-title {
@@ -270,19 +261,6 @@
         background: var(--panel);
       }
 
-      .tool-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 5px;
-        margin-top: 6px;
-      }
-
-      .tool-button {
-        min-height: 30px;
-        padding: 5px 7px;
-        font: 700 10px/1.1 "Helvetica Neue", Helvetica, Arial, sans-serif;
-      }
-
       .panel-note {
         flex: 0 0 auto;
         margin: 0;
@@ -329,7 +307,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Marbled Water: colored ink drops expand into wandering suminagashi rings. When the bath stays full, an enormous pale drop clears it into a new background color. Use the panel to adjust the drops or disturb the pattern."
+      aria-label="Marbled Water: colored ink drops expand into wandering suminagashi rings. When the bath stays full, an enormous pale drop clears it into a new background color. Use the panel to adjust the drops or click the bath to place ink."
     ></canvas>
 
     <aside class="water-panel is-collapsed" aria-label="Marbled water controls">
@@ -383,8 +361,8 @@
 
           <div class="range-row">
             <label for="drop-size">Drop size</label>
-            <output class="control-value" for="drop-size">6.4%</output>
-            <input id="drop-size" type="range" min="15" max="100" value="64" />
+            <output class="control-value" for="drop-size">5.8%</output>
+            <input id="drop-size" type="range" min="15" max="100" value="58" />
           </div>
 
           <div class="range-row">
@@ -399,33 +377,6 @@
             <input id="repulsion" type="range" min="50" max="160" value="100" />
           </div>
 
-        </section>
-
-        <section class="control-group" aria-labelledby="comb-title">
-          <h2 class="group-title" id="comb-title">Comb</h2>
-
-          <div class="range-row">
-            <label for="comb-spacing">Tine spacing</label>
-            <output class="control-value" for="comb-spacing">34px</output>
-            <input id="comb-spacing" type="range" min="10" max="90" value="34" />
-          </div>
-
-          <div class="range-row">
-            <label for="comb-direction">Direction</label>
-            <output class="control-value" for="comb-direction">0°</output>
-            <input id="comb-direction" type="range" min="0" max="359" value="0" />
-          </div>
-
-          <div class="range-row">
-            <label for="comb-pull">Pull</label>
-            <output class="control-value" for="comb-pull">58%</output>
-            <input id="comb-pull" type="range" min="10" max="100" value="58" />
-          </div>
-
-          <div class="tool-row">
-            <button class="tool-button" id="comb-forward" type="button">COMB FORWARD</button>
-            <button class="tool-button" id="comb-reverse" type="button">COMB REVERSE</button>
-          </div>
         </section>
       </div>
 
@@ -445,8 +396,6 @@
         const bathNumber = document.getElementById('bath-number');
         const status = document.getElementById('status');
         const paletteSelect = document.getElementById('palette');
-        const combForward = document.getElementById('comb-forward');
-        const combReverse = document.getElementById('comb-reverse');
         const pageParams = new URLSearchParams(location.search);
         const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -459,11 +408,14 @@
           '#e8e1c6'
         ];
         const POINT_COUNT = 96;
-        const INITIAL_RING_COUNT = 5;
+        const INITIAL_RING_COUNT = 7;
         const MAX_SHAPES = 180;
         const MAX_CANVAS_PIXELS = 2600000;
         const SUMINAGASHI_PALETTE = 1;
-        const DROP_EXPANSION_SCALE = 3;
+        const DROP_EXPANSION_SCALE = 1.8;
+        const CENTER_RUN_CHANCE = 0.3;
+        const CENTER_RUN_MIN = 2;
+        const CENTER_RUN_MAX = 4;
         const MIN_DROPS_BEFORE_BACKGROUND = 30;
         const FULLNESS_THRESHOLD = 0.92;
         const FULLNESS_HOLD = 8000;
@@ -489,10 +441,7 @@
           tempo: document.getElementById('tempo'),
           dropSize: document.getElementById('drop-size'),
           sizeVariation: document.getElementById('size-variation'),
-          repulsion: document.getElementById('repulsion'),
-          combSpacing: document.getElementById('comb-spacing'),
-          combDirection: document.getElementById('comb-direction'),
-          combPull: document.getElementById('comb-pull')
+          repulsion: document.getElementById('repulsion')
         };
 
         let width = 1;
@@ -503,11 +452,13 @@
         let bathBottom = 1;
         let shapes = [];
         let activeDrop = null;
-        let activeComb = null;
         let nextDropAt = 0;
         let complexity = 0;
         let colorIndex = 0;
         let inkStations = [];
+        let lastInkPosition = null;
+        let centerRunRemaining = 0;
+        let centerRunCooldown = 2;
         let bathColor = PAPER;
         let fullSince = 0;
         let nextFullnessCheck = 0;
@@ -534,8 +485,6 @@
         document.addEventListener('visibilitychange', onVisibilityChange);
         canvas.addEventListener('pointerdown', onBathPointer);
         reseedButton.addEventListener('click', reseed);
-        combForward.addEventListener('click', () => startComb(1));
-        combReverse.addEventListener('click', () => startComb(-1));
         motionPreference.addEventListener('change', onMotionPreference);
 
         function resetBath() {
@@ -559,10 +508,12 @@
 
           shapes = [];
           activeDrop = null;
-          activeComb = null;
           complexity = 0;
           colorIndex = 0;
           inkStations = [];
+          lastInkPosition = null;
+          centerRunRemaining = 0;
+          centerRunCooldown = 2;
           bathColor = PAPER;
           fullSince = 0;
           nextFullnessCheck = performance.now() + FULLNESS_CHECK_INTERVAL;
@@ -590,7 +541,6 @@
 
           const hiddenDuration = time - hiddenAt;
           if (activeDrop) activeDrop.start += hiddenDuration;
-          if (activeComb) activeComb.start += hiddenDuration;
           nextDropAt += hiddenDuration;
           nextFullnessCheck += hiddenDuration;
           backgroundDropCooldownUntil += hiddenDuration;
@@ -605,8 +555,8 @@
           const marginX = Math.min(width * 0.12, openingBase * 2.4);
           const marginY = Math.min(height * 0.12, openingBase * 2.4);
           const poolCount = usesSuminagashiSpacing()
-            ? clamp(Math.round(Math.sqrt(width / Math.max(1, height)) * 3), 3, 5)
-            : clamp(Math.round(Math.sqrt(width / Math.max(1, height)) * 4), 4, 7);
+            ? clamp(Math.round(Math.sqrt(width / Math.max(1, height)) * 4.6), 4, 7)
+            : clamp(Math.round(Math.sqrt(width / Math.max(1, height)) * 5.3), 5, 8);
           const pools = createInkStations(poolCount, marginX, marginY);
 
           for (const pool of pools) {
@@ -635,11 +585,9 @@
                 cursorX,
                 cursorY,
                 Math.max(4, radius),
-                nextInkColor()
+                nextInkColor(),
+                usesSuminagashiSpacing()
               );
-              if (usesSuminagashiSpacing()) {
-                placeSuminagashiSpacer(cursorX, cursorY, radius);
-              }
             }
             colorIndex++;
           }
@@ -677,35 +625,44 @@
           return stations;
         }
 
-        function placeSettledInk(x, y, radius, color, clearing = false) {
+        function placeSettledInk(
+          x,
+          y,
+          radius,
+          color,
+          withHalo = false
+        ) {
           const form = createDropForm();
           const shape = {
             color,
-            clearing,
             form,
             points: circlePoints(x, y, 0.01, form)
           };
+          const halo = withHalo ? createSuminagashiHalo(x, y) : null;
+          if (halo) shapes.push(halo.shape);
           shapes.push(shape);
           applyDropExpansion({
             shape,
+            halo,
             x,
             y,
             currentRadius: 0.01
           }, radius);
         }
 
-        function placeSuminagashiSpacer(x, y, inkRadius) {
-          const spacer = createSuminagashiSpacer(x, y, inkRadius);
-          placeSettledInk(spacer.x, spacer.y, spacer.radius, bathColor, true);
-        }
-
-        function createSuminagashiSpacer(x, y, inkRadius) {
+        function createSuminagashiHalo(x, y) {
           const angle = random() * TAU;
-          const offset = inkRadius * random() * 0.055;
+          const offset = random() * 0.022;
+          const form = createDropForm();
           return {
-            x: x + Math.cos(angle) * offset,
-            y: y + Math.sin(angle) * offset,
-            radius: inkRadius * (0.5 + random() * 0.19)
+            scale: 1.07 + random() * 0.07,
+            offsetX: Math.cos(angle) * offset,
+            offsetY: Math.sin(angle) * offset,
+            shape: {
+              color: bathColor,
+              form,
+              points: circlePoints(x, y, 0.01, form)
+            }
           };
         }
 
@@ -743,23 +700,18 @@
               updateDrop(time);
               needsRender = true;
             }
-            if (activeComb) {
-              updateComb(time);
-              needsRender = true;
-            }
-
-            if (time >= nextFullnessCheck && !activeDrop && !activeComb) {
+            if (time >= nextFullnessCheck && !activeDrop) {
               nextFullnessCheck = time + FULLNESS_CHECK_INTERVAL;
               needsRender = updateBathFullness(time) || needsRender;
             }
 
-            if (!activeDrop && !activeComb && time >= nextDropAt) {
+            if (!activeDrop && time >= nextDropAt) {
               placeAutomaticInk(time);
               needsRender = true;
             }
           }
 
-          if (needsRender) render(time);
+          if (needsRender) render();
           requestAnimationFrame(tick);
         }
 
@@ -775,30 +727,60 @@
 
           const stationIndex = Math.floor(random() * inkStations.length);
           const station = inkStations[stationIndex];
-          const startsNewFamily = random() < 0.16;
-          if (startsNewFamily) {
-            station.x = margin + random() * Math.max(1, width - margin * 2);
-            station.y = margin + random() * Math.max(1, height - margin * 2);
+          if (
+            !centerRunRemaining &&
+            !centerRunCooldown &&
+            lastInkPosition &&
+            random() < CENTER_RUN_CHANCE
+          ) {
+            centerRunRemaining = CENTER_RUN_MIN + Math.floor(
+              random() * (CENTER_RUN_MAX - CENTER_RUN_MIN + 1)
+            );
           }
 
-          const angle = random() * TAU;
-          const placement = random();
-          const offset = placement < 0.12
-            ? 0
-            : placement < 0.78
-              ? base * (0.08 + random() * 0.68)
-              : base * (0.82 + random() * 1.75);
-          const x = clamp(
-            station.x + Math.cos(angle) * offset,
-            margin,
-            width - margin
-          );
-          const y = clamp(
-            station.y + Math.sin(angle) * offset,
-            margin,
-            height - margin
-          );
-          const sizeScale = sampleDropScale(variation);
+          const repeatsLastCenter = centerRunRemaining > 0 && Boolean(lastInkPosition);
+          let startsNewFamily = false;
+          let placement = 0;
+          let x;
+          let y;
+
+          if (repeatsLastCenter) {
+            x = lastInkPosition.x;
+            y = lastInkPosition.y;
+            centerRunRemaining--;
+            if (!centerRunRemaining) {
+              centerRunCooldown = 2 + Math.floor(random() * 3);
+            }
+          } else {
+            if (centerRunCooldown > 0) centerRunCooldown--;
+            startsNewFamily = random() < 0.16;
+            if (startsNewFamily) {
+              station.x = margin + random() * Math.max(1, width - margin * 2);
+              station.y = margin + random() * Math.max(1, height - margin * 2);
+            }
+
+            const angle = random() * TAU;
+            placement = random();
+            const offset = placement < 0.12
+              ? 0
+              : placement < 0.78
+                ? base * (0.08 + random() * 0.68)
+                : base * (0.82 + random() * 1.75);
+            x = clamp(
+              station.x + Math.cos(angle) * offset,
+              margin,
+              width - margin
+            );
+            y = clamp(
+              station.y + Math.sin(angle) * offset,
+              margin,
+              height - margin
+            );
+          }
+
+          const sizeScale = repeatsLastCenter
+            ? clamp(sampleDropScale(variation * 0.65), 0.65, 1.45)
+            : sampleDropScale(variation);
           const radius = Math.max(3.5, base * sizeScale);
 
           if (!startsNewFamily && placement > 0.24) {
@@ -806,10 +788,10 @@
             station.y += (y - station.y) * 0.08;
           }
 
-          startDrop(x, y, radius, nextInkColor(), time);
+          startDrop(x, y, radius, nextInkColor(), time, repeatsLastCenter);
         }
 
-        function startDrop(x, y, radius, color, time) {
+        function startDrop(x, y, radius, color, time, centeredRepeat = false) {
           completeActiveDrop();
           const interval = dropInterval();
           const baseRadius = Math.min(width, height) *
@@ -819,21 +801,27 @@
           const form = createDropForm();
           const shape = {
             color,
-            clearing: false,
             form,
             points: circlePoints(x, y, 0.01, form)
           };
           const impactDuration = 110 + random() * 100;
+          const cadenceScale = centeredRepeat ? 0.78 : 1;
           const expansionDuration = clamp(
-            interval * (0.65 + bloomScale * 0.22 + random() * 0.12),
-            520,
-            1600
+            interval * (0.65 + bloomScale * 0.22 + random() * 0.12) *
+              cadenceScale,
+            centeredRepeat ? 420 : 520,
+            centeredRepeat ? 1050 : 1600
           );
           const impactRadius = clamp(radius * 0.16, 2.5, 6);
+          const halo = usesSuminagashiSpacing()
+            ? createSuminagashiHalo(x, y)
+            : null;
 
+          if (halo) shapes.push(halo.shape);
           shapes.push(shape);
           activeDrop = {
             shape,
+            halo,
             x,
             y,
             targetRadius,
@@ -842,11 +830,12 @@
             start: time,
             impactDuration,
             expansionDuration,
-            duration: impactDuration + expansionDuration,
-            reservePaper: usesSuminagashiSpacing()
+            duration: impactDuration + expansionDuration
           };
 
-          nextDropAt = time + nextDropDelay();
+          lastInkPosition = { x, y };
+          nextDropAt = time + nextDropDelay() *
+            (centerRunRemaining ? 0.58 : 1);
           complexity++;
           updateBathNumber();
 
@@ -896,10 +885,6 @@
         function finishDrop(drop, time) {
           if (drop.backgroundDrop) {
             finishBackgroundDrop(drop, time);
-            return;
-          }
-          if (drop.reservePaper) {
-            placeSuminagashiSpacer(drop.x, drop.y, drop.targetRadius);
           }
         }
 
@@ -922,8 +907,7 @@
           if (!fullSince) fullSince = time;
           if (
             time - fullSince >= FULLNESS_HOLD &&
-            !activeDrop &&
-            !activeComb
+            !activeDrop
           ) {
             startBackgroundDrop(time);
             return true;
@@ -986,8 +970,6 @@
 
         function startBackgroundDrop(time) {
           completeActiveDrop();
-          activeComb = null;
-
           const inset = bathInset();
           const x = width * (0.44 + random() * 0.12);
           const y = height * (0.44 + random() * 0.12);
@@ -1009,7 +991,6 @@
           };
           const shape = {
             color: nextColor,
-            clearing: true,
             backgroundDrop: true,
             form,
             points: circlePoints(x, y, 0.01, form)
@@ -1029,7 +1010,6 @@
             impactDuration,
             expansionDuration,
             duration: impactDuration + expansionDuration,
-            reservePaper: false,
             backgroundDrop: true
           };
 
@@ -1047,6 +1027,9 @@
           bathColor = drop.shape.color;
           shapes = [];
           inkStations = [];
+          lastInkPosition = null;
+          centerRunRemaining = 0;
+          centerRunCooldown = 2;
           complexity = 0;
           fullSince = 0;
           backgroundDropCooldownUntil = time + 12000;
@@ -1062,14 +1045,15 @@
         }
 
         function applyDropExpansion(drop, radius) {
-          const previousArea = drop.currentRadius * drop.currentRadius;
-          const nextArea = radius * radius;
+          const areaScale = drop.halo ? drop.halo.scale * drop.halo.scale : 1;
+          const previousArea = drop.currentRadius * drop.currentRadius * areaScale;
+          const nextArea = radius * radius * areaScale;
           const deltaArea = Math.max(0, nextArea - previousArea) *
             Number(controls.repulsion.value) / 100;
 
           if (deltaArea > 0) {
             for (const shape of shapes) {
-              if (shape === drop.shape) continue;
+              if (shape === drop.shape || shape === drop.halo?.shape) continue;
               for (const point of shape.points) {
                 const dx = point.x - drop.x;
                 const dy = point.y - drop.y;
@@ -1083,225 +1067,23 @@
           }
 
           drop.currentRadius = radius;
+          if (drop.halo) {
+            setCirclePoints(
+              drop.halo.shape.points,
+              drop.x + radius * drop.halo.offsetX,
+              drop.y + radius * drop.halo.offsetY,
+              radius * drop.halo.scale,
+              drop.halo.shape.form
+            );
+          }
           setCirclePoints(drop.shape.points, drop.x, drop.y, radius, drop.shape.form);
         }
 
-        function startComb(sign) {
-          completeActiveDrop();
-          activeComb = null;
-
-          const angle = Number(controls.combDirection.value) * Math.PI / 180;
-          const spacing = Number(controls.combSpacing.value);
-          const pull = Number(controls.combPull.value) / 100;
-          const span = Math.hypot(width, height) * 1.15;
-          const finePull = spacing * (0.18 + pull * 0.35);
-
-          activeComb = createCombPass(angle, sign, spacing, finePull, span, 0, 1250);
-          activeComb.threadLength = spacing * (0.9 + pull * 1.6);
-          prepareCombSweep(activeComb);
-          activeComb.start = performance.now();
-
-          complexity += 2;
-          updateBathNumber();
-          status.textContent = sign > 0
-            ? 'Comb teeth drawing through the floating ink.'
-            : 'Comb teeth drawing back through the floating ink.';
-
-          if (motionPreference.matches) {
-            applyCombSweep(activeComb, activeComb.span * 0.5);
-            addCombFilaments(activeComb);
-            activeComb = null;
-            render();
-          }
-        }
-
-        function createCombPass(
-          angle,
-          sign,
-          spacing,
-          maxDisplacement,
-          span,
-          offset,
-          duration
-        ) {
-          const firstTine = -Math.ceil(span / spacing * 0.5) * spacing + offset;
-          const tineCount = Math.ceil(span / spacing) + 2;
-          const tines = Array.from({ length: tineCount }, (_, index) => ({
-            across: firstTine + index * spacing + (random() * 2 - 1) * spacing * 0.045,
-            width: spacing * (0.23 + random() * 0.045),
-            drag: 0.9 + random() * 0.2
-          }));
-
-          return {
-            angle,
-            spacing,
-            sign,
-            maxDisplacement,
-            span,
-            firstTine,
-            tines,
-            sweepPoints: [],
-            sweepIndex: 0,
-            start: 0,
-            duration
-          };
-        }
-
-        function prepareCombSweep(comb) {
-          const directionX = Math.cos(comb.angle) * comb.sign;
-          const directionY = Math.sin(comb.angle) * comb.sign;
-          const normalX = -directionY;
-          const normalY = directionX;
-          const centerX = width * 0.5;
-          const centerY = height * 0.5;
-
-          comb.directionX = directionX;
-          comb.directionY = directionY;
-          comb.normalX = normalX;
-          comb.normalY = normalY;
-          comb.centerX = centerX;
-          comb.centerY = centerY;
-
-          for (const shape of shapes) {
-            for (const point of shape.points) {
-              const relativeX = point.x - centerX;
-              const relativeY = point.y - centerY;
-              const along = relativeX * directionX + relativeY * directionY;
-              const across = relativeX * normalX + relativeY * normalY;
-              const estimatedIndex = Math.round(
-                (across - comb.firstTine) / comb.spacing
-              );
-              let entrainment = 0;
-
-              for (let offset = -1; offset <= 1; offset++) {
-                const tine = comb.tines[estimatedIndex + offset];
-                if (!tine) continue;
-                const distance = across - tine.across;
-                entrainment += Math.exp(-0.5 * Math.pow(distance / tine.width, 2)) *
-                  tine.drag;
-              }
-              comb.sweepPoints.push({ point, along, across, entrainment });
-            }
-          }
-          comb.sweepPoints.sort((a, b) => a.along - b.along);
-        }
-
-        function updateComb(time) {
-          const comb = activeComb;
-          if (!comb) return;
-          const progress = clamp((time - comb.start) / comb.duration, 0, 1);
-          const eased = smootherStep(progress);
-          const front = -comb.span * 0.5 + eased * comb.span;
-          applyCombSweep(comb, front);
-
-          if (progress >= 1) {
-            addCombFilaments(comb);
-            activeComb = null;
-            nextDropAt = time + nextDropDelay() * 0.35;
-            status.textContent = 'Comb pass complete.';
-          }
-        }
-
-        function addCombFilaments(comb) {
-          const directionX = Math.cos(comb.angle) * comb.sign;
-          const directionY = Math.sin(comb.angle) * comb.sign;
-          const normalX = -directionY;
-          const normalY = directionX;
-          const centerX = width * 0.5;
-          const centerY = height * 0.5;
-          const threadWidth = clamp(comb.spacing * 0.055, 1.5, 4);
-          const rebuilt = [];
-
-          for (const shape of shapes) {
-            rebuilt.push(shape);
-            if (shape.clearing || shape.filament || shape.points.length < 3) continue;
-            let shapeFilaments = 0;
-
-            for (const tine of comb.tines) {
-              if (shapeFilaments >= 6) break;
-              const intersections = [];
-
-              for (let index = 0; index < shape.points.length; index++) {
-                const a = shape.points[index];
-                const b = shape.points[(index + 1) % shape.points.length];
-                const ax = a.x - centerX;
-                const ay = a.y - centerY;
-                const bx = b.x - centerX;
-                const by = b.y - centerY;
-                const aAcross = ax * normalX + ay * normalY;
-                const bAcross = bx * normalX + by * normalY;
-                const crosses = (aAcross <= tine.across && bAcross > tine.across) ||
-                  (bAcross <= tine.across && aAcross > tine.across);
-                if (!crosses) continue;
-
-                const ratio = (tine.across - aAcross) / (bAcross - aAcross);
-                const aAlong = ax * directionX + ay * directionY;
-                const bAlong = bx * directionX + by * directionY;
-                intersections.push(aAlong + (bAlong - aAlong) * ratio);
-              }
-
-              intersections.sort((a, b) => a - b);
-              for (let index = 0; index + 1 < intersections.length; index += 2) {
-                const entry = intersections[index];
-                const exit = intersections[index + 1];
-                if (exit - entry < threadWidth * 1.5) continue;
-
-                const start = exit - threadWidth;
-                const length = comb.threadLength * (0.82 + random() * 0.36);
-                const tip = exit + length;
-                const shoulder = tip - length * 0.24;
-                rebuilt.push({
-                  color: shape.color,
-                  clearing: false,
-                  filament: true,
-                  edge: null,
-                  points: [
-                    combPoint(start, tine.across - threadWidth, centerX, centerY, directionX, directionY, normalX, normalY),
-                    combPoint(shoulder, tine.across - threadWidth * 0.72, centerX, centerY, directionX, directionY, normalX, normalY),
-                    combPoint(tip, tine.across, centerX, centerY, directionX, directionY, normalX, normalY),
-                    combPoint(shoulder, tine.across + threadWidth * 0.72, centerX, centerY, directionX, directionY, normalX, normalY),
-                    combPoint(start, tine.across + threadWidth, centerX, centerY, directionX, directionY, normalX, normalY)
-                  ]
-                });
-                shapeFilaments++;
-                if (shapeFilaments >= 6) break;
-              }
-            }
-          }
-
-          shapes = rebuilt;
-          pruneShapes();
-        }
-
-        function combPoint(along, across, centerX, centerY, directionX, directionY, normalX, normalY) {
-          return constrainPoint({
-            x: centerX + directionX * along + normalX * across,
-            y: centerY + directionY * along + normalY * across
-          });
-        }
-
-        function applyCombSweep(comb, front) {
-          while (comb.sweepIndex < comb.sweepPoints.length) {
-            const sweepPoint = comb.sweepPoints[comb.sweepIndex];
-            if (sweepPoint.along > front) break;
-
-            const displacedAlong = sweepPoint.along +
-              comb.maxDisplacement * sweepPoint.entrainment;
-            sweepPoint.point.x = comb.centerX +
-              comb.directionX * displacedAlong + comb.normalX * sweepPoint.across;
-            sweepPoint.point.y = comb.centerY +
-              comb.directionY * displacedAlong + comb.normalY * sweepPoint.across;
-            constrainPoint(sweepPoint.point);
-            comb.sweepIndex++;
-          }
-        }
-
-        function render(time = 0) {
+        function render() {
           ctx.fillStyle = bathColor;
           ctx.fillRect(0, 0, width, height);
 
           for (const shape of shapes) drawShape(shape);
-          if (activeComb) drawCombGuide(activeComb, time);
           drawBathBorder();
         }
 
@@ -1347,39 +1129,6 @@
           ctx.fill();
         }
 
-        function drawCombGuide(comb, time) {
-          const progress = clamp((time - comb.start) / comb.duration, 0, 1);
-          const alpha = Math.sin(progress * Math.PI) * 0.34;
-          if (alpha <= 0.001) return;
-
-          const directionX = Math.cos(comb.angle) * comb.sign;
-          const directionY = Math.sin(comb.angle) * comb.sign;
-          const normalX = -directionY;
-          const normalY = directionX;
-          const eased = smootherStep(progress);
-          const travel = -comb.span * 0.5 + eased * comb.span;
-          const centerX = width * 0.5 + directionX * travel;
-          const centerY = height * 0.5 + directionY * travel;
-
-          ctx.save();
-          ctx.globalAlpha = alpha * 1.25;
-          ctx.strokeStyle = '#111';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(centerX - normalX * comb.span, centerY - normalY * comb.span);
-          ctx.lineTo(centerX + normalX * comb.span, centerY + normalY * comb.span);
-
-          for (const tine of comb.tines) {
-            const x = centerX + normalX * tine.across;
-            const y = centerY + normalY * tine.across;
-            ctx.moveTo(x - directionX * 7, y - directionY * 7);
-            ctx.lineTo(x + directionX * 13, y + directionY * 13);
-          }
-
-          ctx.stroke();
-          ctx.restore();
-        }
-
         function createDropForm() {
           const looseness = usesSuminagashiSpacing() ? 1.18 : 1;
           return {
@@ -1397,15 +1146,15 @@
           const family = random();
           let sampledScale;
 
-          if (family < 0.12) {
+          if (family < 0.14) {
             sampledScale = 0.16 + random() * 0.18;
-          } else if (family < 0.34) {
+          } else if (family < 0.4) {
             sampledScale = 0.42 + random() * 0.32;
-          } else if (family < 0.8) {
-            sampledScale = 0.82 + random() * 0.58;
+          } else if (family < 0.86) {
+            sampledScale = 0.78 + random() * 0.57;
           } else {
-            // One in five drops becomes an unmistakably large bloom.
-            sampledScale = 2 + random() * 2.2;
+            // Large blooms remain occasional punctuation rather than the norm.
+            sampledScale = 1.65 + random() * 1.75;
           }
 
           return 1 + (sampledScale - 1) * separation;
@@ -1489,17 +1238,7 @@
 
         function pruneShapes() {
           if (shapes.length > MAX_SHAPES) {
-            let overflow = shapes.length - MAX_SHAPES;
-            shapes = shapes.filter((shape) => {
-              if (overflow > 0 && shape.filament) {
-                overflow--;
-                return false;
-              }
-              return true;
-            });
-            if (shapes.length > MAX_SHAPES) {
-              shapes.splice(0, shapes.length - MAX_SHAPES);
-            }
+            shapes.splice(0, shapes.length - MAX_SHAPES);
           }
         }
 
@@ -1529,9 +1268,6 @@
           updateRange(controls.dropSize, `${(Number(controls.dropSize.value) / 10).toFixed(1)}%`);
           updateRange(controls.sizeVariation, `${controls.sizeVariation.value}%`);
           updateRange(controls.repulsion, `${controls.repulsion.value}%`);
-          updateRange(controls.combSpacing, `${controls.combSpacing.value}px`);
-          updateRange(controls.combDirection, `${controls.combDirection.value}°`);
-          updateRange(controls.combPull, `${controls.combPull.value}%`);
           updateBathNumber();
         }
 
@@ -1666,7 +1402,6 @@
             event.preventDefault();
             if (!paused) {
               completeActiveDrop();
-              activeComb = null;
               render();
             }
             paused = !paused;
@@ -1679,7 +1414,6 @@
           paused = event.matches;
           if (paused) {
             completeActiveDrop();
-            activeComb = null;
             render();
           }
           status.textContent = paused
@@ -1721,10 +1455,6 @@
 
         function easeOutCubic(value) {
           return 1 - Math.pow(1 - value, 3);
-        }
-
-        function smootherStep(value) {
-          return value * value * value * (value * (value * 6 - 15) + 10);
         }
 
         function easeInOutSine(value) {

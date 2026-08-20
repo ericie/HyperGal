@@ -8,21 +8,26 @@ remains fixed so the sentence erodes without reflowing. Touch contact and
 keyboard activation provide equivalents where rollover is not available.
 
 On fine-pointer devices, the native cursor becomes a compact knife whose blade
-switches to the exact color assigned to the newly triggered animation.
+switches to the exact color assigned to the newly triggered animation, then
+fades back to white after the cut.
 
 ## Motion
 
-Twelve systems—dial, opposing-weight register, oversized edge crops, conveyor, rain, wave, scale
-stack, weight matrix, vertical shutter, measured ledger, compression, and
-stepped cascade—are selected from the activated character and the order of
-interaction. Glyphs stay square to the page: movement comes from translation,
-scale, cropping, weight, and repetition rather than rotation. Every system
-lasts exactly 2.5 seconds. New systems are additive, so moving quickly across
-the sentence builds temporary wholes from unrelated parts before each part
-fades independently.
+Eighteen systems—concentric-circle dial, opposing-weight register, oversized edge crops,
+conveyor, rain, wave, scale stack, weight matrix, vertical shutter, measured
+ledger, compression, stepped cascade, horizontal and vertical variable-ratio
+retyping, dots, stripes, ribbon waves, and chevrons—are selected randomly on each interaction. Glyphs
+stay square to the page:
+movement comes from translation, scale, cropping, weight, and repetition
+rather than rotation. Every system lasts exactly 2.5 seconds. New systems are
+additive, so moving quickly across the sentence builds temporary wholes from
+unrelated parts before each part fades independently.
 Most motion unfolds gradually across the full lifespan. A single conveyor row,
-rain streak, dial ring, or small set of wave cells occasionally moves quickly,
-making speed an accent within the slower field.
+rain streak, or small set of wave cells occasionally moves quickly, making
+speed an accent within the slower field. Every geometric system is structurally
+paired with the activated letter; no animation consists of shapes alone. The
+patterns use the same palette and color-only entrance and exit behavior as the
+glyphs.
 
 Every background system stays between Geist 100 and 700, moving through clearly
 separated light, regular, and mid-weight roles. No canvas animation uses 900;
@@ -46,7 +51,7 @@ without a server, package manager, CDN, or network connection.
 ## Debug view
 
 Append `?debug=true` to the piece URL to replace the sentence with a labeled
-comparison grid. All twelve production animation systems run together on the
+comparison grid. All eighteen production animation systems run together on the
 same lowercase “a,” synchronized to the same 2.5-second loop. The grid uses
-four columns on wide screens, three columns at medium widths, and two columns
+five columns on wide screens, four columns at medium widths, and two columns
 on narrow screens.

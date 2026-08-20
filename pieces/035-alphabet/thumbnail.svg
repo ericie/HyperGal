@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Alphabet</title>
+  <desc id="desc">The colorful geometric letters in HYPERMEDIA rest at different angles above a black ground line.</desc>
+  <rect width="1200" height="630" fill="#e8ebea"/>
+  <path d="M42 517H1158" stroke="#171918" stroke-width="3"/>
+  <g transform="translate(38.5 413.6) rotate(94.6 55.6 55.6) scale(1.1111)">
+    <rect x="12" y="10" width="29" height="80" fill="#74458a"/>
+    <rect x="59" y="10" width="29" height="80" fill="#9b83a7"/>
+    <rect x="41" y="41" width="18" height="18" fill="#825e93"/>
+  </g>
+  <g transform="translate(118.8 412.7) rotate(5.8 55.6 55.6) scale(1.1111)">
+    <polygon points="12,10 38,10 50,39 62,10 88,10 64,58 36,58" fill="#32637d"/>
+    <rect x="38" y="50" width="26" height="40" fill="#32637d"/>
+    <polygon points="38,10 62,10 50,39" fill="#4a7f99"/>
+  </g>
+  <g transform="translate(284 411.5) rotate(-7.7 55.6 55.6) scale(1.1111)">
+    <rect x="12" y="10" width="34" height="80" fill="#13817d"/>
+    <path d="M46 10H54A28 25 0 0 1 54 60H46Z" fill="#67c0b4"/>
+  </g>
+  <g transform="translate(364.5 408.7) rotate(-12.1 55.6 55.6) scale(1.1111)">
+    <rect x="12" y="10" width="76" height="80" fill="#aaa49f"/>
+    <rect x="60" y="28" width="28" height="14" fill="#e8ebea"/>
+    <rect x="60" y="58" width="28" height="14" fill="#e8ebea"/>
+    <rect x="66" y="13" width="22" height="15" fill="#806b57" opacity=".22"/>
+  </g>
+  <g transform="translate(519 408.6) rotate(12.2 55.6 55.6) scale(1.1111)">
+    <rect x="12" y="10" width="33" height="80" fill="#1b82bd"/>
+    <path d="M45 10H53A27 24 0 0 1 53 58H45Z" fill="#0b91cf"/>
+    <polygon points="45,52 64,52 88,90 64,90 45,61" fill="#126da4"/>
+  </g>
+  <g transform="translate(625.2 415.9) rotate(1.5 55.6 55.6) scale(1.1111)">
+    <rect x="12" y="10" width="76" height="80" fill="#aaa49f"/>
+    <rect x="60" y="28" width="28" height="14" fill="#e8ebea"/>
+    <rect x="60" y="58" width="28" height="14" fill="#e8ebea"/>
+    <rect x="66" y="13" width="22" height="15" fill="#806b57" opacity=".22"/>
+  </g>
+  <g transform="translate(778.9 408.8) rotate(11.8 55.6 55.6) scale(1.1111)">
+    <rect x="10" y="10" width="24" height="80" fill="#e96ca5"/>
+    <rect x="66" y="10" width="24" height="80" fill="#ec68a3"/>
+    <polygon points="30,10 52,47 52,72 26,29" fill="#d63b88"/>
+    <polygon points="70,10 48,47 48,72 74,29" fill="#bb397e" opacity=".72"/>
+  </g>
+  <g transform="translate(891.1 414.8) rotate(-2.9 55.6 55.6) scale(1.1111)">
+    <rect x="20" y="10" width="60" height="80" fill="#68bd67"/>
+    <rect x="45" y="10" width="10" height="80" fill="#36a644"/>
+  </g>
+  <g transform="translate(971.2 414.5) rotate(3.3 55.6 55.6) scale(1.1111)">
+    <rect x="12" y="10" width="35" height="80" fill="#f39a2f"/>
+    <path d="M47 10H52A38 40 0 0 1 52 90H47Z" fill="#f7df43"/>
+  </g>
+  <g transform="translate(1051.7 410.7) rotate(8.8 55.6 55.6) scale(1.1111)">
+    <polygon points="50,8 10,90 32,90 50,49" fill="#7488c2"/>
+    <polygon points="50,8 90,90 68,90 50,49" fill="#24507b"/>
+    <rect x="27" y="57" width="46" height="14" fill="#7488c2"/>
+  </g>
+</svg>

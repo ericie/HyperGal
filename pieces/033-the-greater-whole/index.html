@@ -271,8 +271,8 @@
       .debug-grid {
         display: grid;
         min-height: 0;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        grid-template-rows: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-rows: repeat(4, minmax(0, 1fr));
         gap: 8px;
       }
 
@@ -313,8 +313,8 @@
 
       @media (max-width: 1050px) and (min-width: 641px) {
         .debug-grid {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          grid-template-rows: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-rows: repeat(5, minmax(0, 1fr));
         }
       }
 
@@ -356,7 +356,7 @@
 
         .debug-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          grid-template-rows: repeat(6, minmax(0, 1fr));
+          grid-template-rows: repeat(9, minmax(0, 1fr));
         }
 
         .debug-label {
@@ -409,7 +409,7 @@
       </header>
       <div class="debug-grid">
         <article class="debug-cell" data-mode="0">
-          <span class="debug-label">01 · Dial / radial expansion</span>
+          <span class="debug-label">01 · Dial / circles + type</span>
         </article>
         <article class="debug-cell" data-mode="1">
           <span class="debug-label">02 · Register / opposing weights</span>
@@ -444,6 +444,24 @@
         <article class="debug-cell" data-mode="11">
           <span class="debug-label">12 · Cascade / stepped field</span>
         </article>
+        <article class="debug-cell" data-mode="12">
+          <span class="debug-label">13 · Retype / changing letter-space ratio</span>
+        </article>
+        <article class="debug-cell" data-mode="13">
+          <span class="debug-label">14 · Dots + type / staggered field</span>
+        </article>
+        <article class="debug-cell" data-mode="14">
+          <span class="debug-label">15 · Stripes + type / diagonal drift</span>
+        </article>
+        <article class="debug-cell" data-mode="15">
+          <span class="debug-label">16 · Waves + type / ribbon field</span>
+        </article>
+        <article class="debug-cell" data-mode="16">
+          <span class="debug-label">17 · Chevron + type / zigzag march</span>
+        </article>
+        <article class="debug-cell" data-mode="17">
+          <span class="debug-label">18 · Vertical retype / changing ratio</span>
+        </article>
       </div>
     </section>
 
@@ -453,7 +471,7 @@
 
         const TEXT = "The greater whole is an illusion. Really it's nothing other than a collection of smaller pieces, joined together in such a way as to encourage the human tendency to see wholes.";
         const LIFE = 2500;
-        const MODE_COUNT = 12;
+        const MODE_COUNT = 18;
         const DEBUG = new URLSearchParams(window.location.search).get('debug') === 'true';
         const GROUND_COLOR = [248, 248, 246];
         const COLORS = [
@@ -586,7 +604,7 @@
             character,
             color,
             id,
-            mode: (character.toLowerCase().charCodeAt(0) + id) % MODE_COUNT,
+            mode: Math.floor(Math.random() * MODE_COUNT),
             start: performance.now(),
             x: rect.left + rect.width / 2,
             y: rect.top + rect.height / 2,
@@ -737,27 +755,38 @@
           else if (event.mode === 8) drawShutter(event, t);
           else if (event.mode === 9) drawLedger(event, t);
           else if (event.mode === 10) drawCompression(event, t);
-          else drawCascade(event, t);
+          else if (event.mode === 11) drawCascade(event, t);
+          else if (event.mode === 12) drawRetype(event, t);
+          else if (event.mode === 13) drawDots(event, t);
+          else if (event.mode === 14) drawStripes(event, t);
+          else if (event.mode === 15) drawPatternWaves(event, t);
+          else if (event.mode === 16) drawChevrons(event, t);
+          else drawVerticalRetype(event, t);
         }
 
         function drawDial(event, t) {
-          const diagonal = Math.hypot(width, height);
+          const minimum = Math.min(width, height);
           const progress = smootherstep(t);
-          for (let ring = 0; ring < 4; ring++) {
-            const count = 7 + ring * 5;
-            const accent = ring === event.id % 4
-              ? quickPulse(t, 0.58, 0.035) * 0.018
-              : 0;
-            const radius = (0.04 + ring * 0.075 + progress * 0.11 + accent) * diagonal;
-            const size = Math.max(22, diagonal * (0.035 + ring * 0.006));
-            ctx.font = `${100 + ring * 200} ${size}px Geist`;
-            for (let i = 0; i < count; i++) {
-              const angle = (i / count) * Math.PI * 2 + ring * 0.17;
-              const x = event.x + Math.cos(angle) * radius;
-              const y = event.y + Math.sin(angle) * radius;
-              stamp(event.character, x, y, 1, 1);
-            }
+          const ringCount = 9;
+          const lineWidths = [0.022, 0.009, 0.014, 0.007, 0.019, 0.008, 0.013, 0.006, 0.016];
+
+          ctx.save();
+          ctx.lineCap = 'butt';
+          for (let ring = 0; ring < ringCount; ring++) {
+            const radius = minimum * (
+              0.055
+              + ring * 0.086
+              + progress * (0.035 + ring * 0.008)
+            );
+            ctx.lineWidth = Math.max(1.5, minimum * lineWidths[ring]);
+            ctx.beginPath();
+            ctx.arc(event.x, event.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
           }
+
+          ctx.font = `${400 + event.id % 4 * 100} ${Math.max(18, minimum * 0.16)}px Geist`;
+          stamp(event.character, event.x, event.y, 1, 1);
+          ctx.restore();
         }
 
         function drawRegister(event, t) {
@@ -1038,6 +1067,211 @@
               const y = (lane + 0.5) * cellHeight
                 + (position / steps - 0.5) * cellHeight * 0.72;
               stamp(event.character, x, y, 1, 1);
+            }
+          }
+        }
+
+        function drawRetype(event, t) {
+          const { blockLength, patternLength } = getRetypePattern(t);
+          const size = Math.max(18, Math.min(46, width / 26, height / 9));
+          const rowGap = size * 1.45;
+          const rows = Math.max(4, Math.ceil(height / rowGap));
+          const firstY = (height - (rows - 1) * rowGap) / 2;
+          const weight = 400 + event.id % 3 * 100;
+          const typeStep = Math.floor(t * 18);
+
+          ctx.font = `${weight} ${size}px Geist`;
+          ctx.textAlign = 'left';
+          const cellWidth = Math.max(size * 0.52, ctx.measureText(event.character).width * 1.08);
+          const columns = Math.ceil(width / cellWidth) + patternLength * 2;
+
+          for (let row = 0; row < rows; row++) {
+            const rowIndent = row * 3;
+            const y = firstY + row * rowGap;
+
+            for (let column = -patternLength; column < columns; column++) {
+              const patternIndex = (
+                column - typeStep - rowIndent + event.id % patternLength + patternLength * 4
+              ) % patternLength;
+              if (patternIndex >= blockLength) continue;
+              ctx.fillText(event.character, column * cellWidth, y);
+            }
+          }
+        }
+
+        function drawVerticalRetype(event, t) {
+          const { blockLength, patternLength } = getRetypePattern(t);
+          const size = Math.max(18, Math.min(46, height / 26, width / 9));
+          const columnGap = size * 1.45;
+          const columns = Math.max(4, Math.ceil(width / columnGap));
+          const firstX = (width - (columns - 1) * columnGap) / 2;
+          const weight = 400 + event.id % 3 * 100;
+          const typeStep = Math.floor(t * 18);
+          const cellHeight = size * 1.08;
+          const rows = Math.ceil(height / cellHeight) + patternLength * 2;
+
+          ctx.font = `${weight} ${size}px Geist`;
+          ctx.textAlign = 'center';
+
+          for (let column = 0; column < columns; column++) {
+            const columnIndent = column * 3;
+            const x = firstX + column * columnGap;
+
+            for (let row = -patternLength; row < rows; row++) {
+              const patternIndex = (
+                row - typeStep - columnIndent + event.id % patternLength + patternLength * 4
+              ) % patternLength;
+              if (patternIndex >= blockLength) continue;
+              ctx.fillText(event.character, x, row * cellHeight);
+            }
+          }
+        }
+
+        function getRetypePattern(t) {
+          const ratioSweep = 1 - Math.abs(t * 2 - 1);
+          const ratioStep = Math.round(ratioSweep * 6) / 6;
+          const blockLength = Math.round(9 - ratioStep * 7);
+          const spaceLength = Math.round(2 + ratioStep * 12);
+          return {
+            blockLength,
+            spaceLength,
+            patternLength: blockLength + spaceLength
+          };
+        }
+
+        function drawDots(event, t) {
+          const minimum = Math.min(width, height);
+          const spacing = Math.max(34, minimum / 5.2);
+          const radius = spacing * 0.18;
+          const driftX = t * spacing * 0.9;
+          const driftY = t * spacing * 0.22;
+          const rows = Math.ceil(height / spacing) + 4;
+          const columns = Math.ceil(width / spacing) + 5;
+
+          for (let row = -2; row < rows; row++) {
+            const stagger = row % 2 ? spacing * 0.5 : 0;
+            ctx.font = `${250 + (row + 2) % 4 * 100} ${spacing * 0.46}px Geist`;
+            for (let column = -3; column < columns; column++) {
+              const x = column * spacing + stagger + driftX;
+              const y = row * spacing + driftY;
+              ctx.beginPath();
+              ctx.arc(x - spacing * 0.2, y, radius, 0, Math.PI * 2);
+              ctx.fill();
+              stamp(event.character, x + spacing * 0.2, y, 1, 1);
+            }
+          }
+        }
+
+        function drawStripes(event, t) {
+          const diagonal = Math.hypot(width, height);
+          const spacing = Math.max(52, Math.min(width, height) / 4.4);
+          const lineWidth = spacing * 0.46;
+          const offset = t * spacing * 0.75;
+          const angle = -Math.PI / 4;
+          const cosine = Math.cos(angle);
+          const sine = Math.sin(angle);
+          const letterPositions = [];
+
+          ctx.save();
+          ctx.translate(width / 2, height / 2);
+          ctx.rotate(angle);
+          ctx.lineWidth = lineWidth;
+          ctx.lineCap = 'butt';
+
+          for (let x = -diagonal - spacing; x < diagonal + spacing; x += spacing) {
+            ctx.beginPath();
+            ctx.moveTo(x + offset, -diagonal);
+            ctx.lineTo(x + offset, diagonal);
+            ctx.stroke();
+
+            const gapX = x + offset + spacing * 0.5;
+            for (let localY = -diagonal; localY < diagonal; localY += spacing * 1.7) {
+              letterPositions.push({
+                x: width / 2 + cosine * gapX - sine * localY,
+                y: height / 2 + sine * gapX + cosine * localY
+              });
+            }
+          }
+          ctx.restore();
+
+          ctx.font = `${300 + event.id % 4 * 100} ${spacing * 0.46}px Geist`;
+          for (const position of letterPositions) {
+            if (
+              position.x < -spacing || position.x > width + spacing
+              || position.y < -spacing || position.y > height + spacing
+            ) continue;
+            stamp(event.character, position.x, position.y, 1, 1);
+          }
+        }
+
+        function drawPatternWaves(event, t) {
+          const spacing = Math.max(42, Math.min(width, height) / 5.4);
+          const amplitude = spacing * 0.34;
+          const lineWidth = spacing * 0.31;
+          const wavelength = spacing * 2.45;
+          const phase = t * Math.PI * 1.4;
+          const rows = Math.ceil(height / spacing) + 3;
+
+          ctx.save();
+          ctx.lineWidth = lineWidth;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          for (let row = -1; row < rows; row++) {
+            const baseY = row * spacing;
+            ctx.beginPath();
+            for (let x = -spacing; x <= width + spacing; x += 8) {
+              const y = baseY + Math.sin(x / wavelength * Math.PI * 2 - phase) * amplitude;
+              if (x === -spacing) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          ctx.font = `${300 + event.id % 4 * 100} ${spacing * 0.4}px Geist`;
+          for (let row = -1; row < rows; row++) {
+            const baseY = row * spacing + spacing * 0.5;
+            for (let x = -wavelength; x < width + wavelength; x += wavelength) {
+              const letterX = x + (row % 2 ? wavelength * 0.5 : 0);
+              const letterY = baseY
+                + Math.sin(letterX / wavelength * Math.PI * 2 - phase) * amplitude;
+              stamp(event.character, letterX, letterY, 1, 1);
+            }
+          }
+        }
+
+        function drawChevrons(event, t) {
+          const spacing = Math.max(48, Math.min(width, height) / 4.8);
+          const tooth = spacing * 1.15;
+          const lineWidth = spacing * 0.28;
+          const offset = t * tooth * 0.8;
+          const rows = Math.ceil(height / spacing) + 3;
+
+          ctx.save();
+          ctx.lineWidth = lineWidth;
+          ctx.lineCap = 'square';
+          ctx.lineJoin = 'miter';
+
+          for (let row = -1; row < rows; row++) {
+            const baseY = row * spacing;
+            ctx.beginPath();
+            for (let column = -3; column < Math.ceil(width / tooth) + 3; column++) {
+              const x = column * tooth + offset;
+              const startY = baseY + (column % 2 ? spacing * 0.34 : -spacing * 0.34);
+              if (column === -3) ctx.moveTo(x, startY);
+              else ctx.lineTo(x, startY);
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          ctx.font = `${300 + event.id % 4 * 100} ${spacing * 0.34}px Geist`;
+          for (let row = -1; row < rows; row++) {
+            const letterY = (row + 0.5) * spacing;
+            const stagger = row % 2 ? tooth * 0.8 : 0;
+            for (let x = -tooth; x < width + tooth; x += tooth * 1.6) {
+              stamp(event.character, x + offset + stagger, letterY, 1, 1);
             }
           }
         }

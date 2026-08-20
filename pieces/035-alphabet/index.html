@@ -1,0 +1,1068 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#e8ebea" />
+    <meta
+      name="description"
+      content="Ten colorful geometric letters fall, settle, sprout legs, and run along a single ground line."
+    />
+    <title>Alphabet · HyperGal</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --field: #e8ebea;
+        --paper: #f4f5f2;
+        --ink: #171918;
+        --muted: #5d625f;
+        --rule: #b8bdb9;
+      }
+
+      * { box-sizing: border-box; }
+
+      html {
+        width: 100%;
+        height: 100%;
+        min-height: 100%;
+        background: var(--field);
+      }
+
+      body {
+        width: 100%;
+        height: 100%;
+        min-width: 300px;
+        margin: 0;
+        overflow: hidden;
+        background: var(--field);
+        color: var(--ink);
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        overscroll-behavior: none;
+      }
+
+      button { font: inherit; }
+
+      .stage {
+        --glyph-ground: var(--field);
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        background: var(--field);
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      .stage[hidden],
+      .catalog[hidden] { display: none; }
+
+      .stage:focus-visible {
+        outline: 3px solid var(--ink);
+        outline-offset: -8px;
+      }
+
+      .letter-field {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        contain: strict;
+        pointer-events: none;
+      }
+
+      .falling-letter {
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: block;
+        width: var(--body-size);
+        height: var(--body-size);
+        overflow: visible;
+        transform-origin: 50% 50%;
+        will-change: transform;
+      }
+
+      .ground {
+        position: absolute;
+        left: max(14px, calc(3.5vw + env(safe-area-inset-left)));
+        right: max(14px, calc(3.5vw + env(safe-area-inset-right)));
+        top: 0;
+        height: 3px;
+        background: var(--ink);
+        pointer-events: none;
+      }
+
+      body.debug-mode {
+        height: auto;
+        min-height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: auto;
+      }
+
+      .catalog {
+        --glyph-ground: var(--paper);
+        width: min(100%, 1280px);
+        margin: 0 auto;
+        padding:
+          max(24px, env(safe-area-inset-top))
+          max(18px, env(safe-area-inset-right))
+          max(54px, env(safe-area-inset-bottom))
+          max(18px, env(safe-area-inset-left));
+      }
+
+      .catalog-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 32px;
+        padding-bottom: 18px;
+        border-bottom: 2px solid var(--ink);
+      }
+
+      .title-group {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+      }
+
+      h1,
+      p { margin: 0; }
+
+      h1 {
+        font-size: clamp(1.5rem, 3vw, 2.75rem);
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        line-height: 0.95;
+      }
+
+      .count {
+        color: var(--muted);
+        font-size: 0.75rem;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+      }
+
+      .guide-toggle {
+        flex: none;
+        min-height: 36px;
+        padding: 0 12px;
+        border: 1px solid var(--ink);
+        border-radius: 0;
+        background: transparent;
+        color: var(--ink);
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+      }
+
+      .guide-toggle:hover,
+      .guide-toggle[aria-pressed="true"] {
+        background: var(--ink);
+        color: var(--paper);
+      }
+
+      .guide-toggle:focus-visible {
+        outline: 3px solid #4e66c4;
+        outline-offset: 3px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        border-left: 1px solid var(--rule);
+      }
+
+      .specimen {
+        display: grid;
+        min-width: 0;
+        margin: 0;
+        grid-template-rows: minmax(0, 1fr) auto;
+        border-right: 1px solid var(--rule);
+        border-bottom: 1px solid var(--rule);
+        background: var(--paper);
+      }
+
+      .artboard {
+        position: relative;
+        display: grid;
+        aspect-ratio: 1;
+        min-height: 0;
+        place-items: center;
+        overflow: hidden;
+      }
+
+      .glyph {
+        display: block;
+        width: 78%;
+        height: 78%;
+        overflow: visible;
+      }
+
+      .glyph .construction {
+        opacity: 0;
+        transition: opacity 160ms ease-out;
+        vector-effect: non-scaling-stroke;
+      }
+
+      body.show-guides .glyph .construction { opacity: 1; }
+
+      .glyph .guide-box,
+      .glyph .guide-line {
+        fill: none;
+        stroke: #171918;
+        stroke-width: 0.65;
+        stroke-dasharray: 2 2;
+        opacity: 0.42;
+      }
+
+      .glyph .guide-dot {
+        fill: #171918;
+        opacity: 0.55;
+      }
+
+      figcaption {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 42px;
+        padding: 10px 12px;
+        border-top: 1px solid var(--rule);
+      }
+
+      .letter {
+        font-size: 0.8125rem;
+        font-weight: 800;
+      }
+
+      .recipe {
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 0.625rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        text-align: right;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      @media (max-width: 900px) {
+        .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      }
+
+      @media (max-width: 660px) {
+        .catalog { padding-top: max(18px, env(safe-area-inset-top)); }
+
+        .catalog-header {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 15px;
+        }
+
+        .guide-toggle { min-height: 34px; }
+        .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .glyph { width: 82%; height: 82%; }
+        .recipe { display: none; }
+      }
+
+      @media (max-width: 390px) {
+        .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .glyph .construction { transition: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <main
+      id="stage"
+      class="stage"
+      tabindex="0"
+      aria-label="The geometric letters in HYPERMEDIA fall from above, collide, settle, sprout legs, and run along a ground line. Click, tap, or press Enter to drop them again."
+    >
+      <h1 class="sr-only">Hypermedia</h1>
+      <div id="letter-field" class="letter-field" aria-hidden="true"></div>
+      <div id="ground" class="ground" aria-hidden="true"></div>
+    </main>
+
+    <main id="catalog" class="catalog" hidden>
+      <header class="catalog-header">
+        <div class="title-group">
+          <h1>Alphabet</h1>
+          <p class="count">A–Z / 26</p>
+        </div>
+        <button class="guide-toggle" type="button" aria-pressed="false">
+          Show construction
+        </button>
+      </header>
+      <section class="grid" aria-labelledby="grid-title">
+        <h2 id="grid-title" class="sr-only">Geometric alphabet specimen grid</h2>
+      </section>
+    </main>
+
+    <script>
+      (() => {
+        'use strict';
+
+        const SVG_NS = 'http://www.w3.org/2000/svg';
+        const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === 'true';
+        const stage = document.getElementById('stage');
+        const catalog = document.getElementById('catalog');
+        const letterField = document.getElementById('letter-field');
+        const ground = document.getElementById('ground');
+        const grid = document.querySelector('.grid');
+        const toggle = document.querySelector('.guide-toggle');
+
+        const C = {
+          blue: '#7488c2',
+          navy: '#24507b',
+          coral: '#f05b43',
+          blush: '#edaa9a',
+          mint: '#86c99a',
+          green: '#53ad55',
+          yellow: '#f7df43',
+          orange: '#f39a2f',
+          taupe: '#aaa49f',
+          brown: '#806b57',
+          pink: '#e96ca5',
+          magenta: '#d63b88',
+          cyan: '#55bac5',
+          cyanDark: '#3aa8b5',
+          red: '#f04b50',
+          teal: '#13817d',
+          peach: '#e99b63',
+          violet: '#6250a2',
+          violetDark: '#4e3e8e',
+          slate: '#32637d',
+          olive: '#72a66d',
+          ink: '#171918',
+          paper: 'var(--glyph-ground, #f4f5f2)',
+        };
+
+        const recipes = {
+          A: 'legs / bar', B: 'bar / half-circles', C: 'circle / wedge',
+          D: 'bar / half-circle', E: 'block / notches', F: 'bars / overlap',
+          G: 'circle / cut / bar', H: 'bars / bridge', I: 'bars / seam',
+          J: 'stem / half-circle', K: 'bar / blunt arms', L: 'bars / foot',
+          M: 'stems / folded center', N: 'stems / diagonal', O: 'circle',
+          P: 'bar / half-circle', Q: 'circle / tail', R: 'bar / bowl / leg',
+          S: 'half-circles / bridge', T: 'cap / stem', U: 'stems / bowl',
+          V: 'inverted triangle', W: 'overlapping wedges', X: 'crossed wedges',
+          Y: 'wedges / stem', Z: 'block / diagonal cut',
+        };
+
+        const el = (name, attrs = {}) => {
+          const node = document.createElementNS(SVG_NS, name);
+          for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+          return node;
+        };
+
+        const rect = (x, y, width, height, fill, extra = {}) =>
+          el('rect', { x, y, width, height, fill, ...extra });
+        const circle = (cx, cy, r, fill) => el('circle', { cx, cy, r, fill });
+        const polygon = (points, fill, extra = {}) => el('polygon', { points, fill, ...extra });
+        const path = (d, fill) => el('path', { d, fill });
+        const halfCircle = (cx, cy, r, side, fill) => {
+          const shapes = {
+            bottom: `M${cx - r} ${cy} A${r} ${r} 0 0 0 ${cx + r} ${cy} H${cx - r} Z`,
+            left: `M${cx} ${cy - r} A${r} ${r} 0 0 0 ${cx} ${cy + r} V${cy - r} Z`,
+            right: `M${cx} ${cy - r} A${r} ${r} 0 0 1 ${cx} ${cy + r} V${cy - r} Z`,
+          };
+          return path(shapes[side], fill);
+        };
+
+        const glyphBuilders = {
+          A(svg) {
+            svg.append(
+              polygon('50,8 10,90 32,90 50,49', C.blue),
+              polygon('50,8 90,90 68,90 50,49', C.navy),
+              rect(27, 57, 46, 14, C.blue)
+            );
+          },
+          B(svg) {
+            svg.append(
+              rect(12, 10, 34, 80, C.coral),
+              path('M46 10 H53 A27 20 0 0 1 53 50 H46 Z', C.blush),
+              path('M46 50 H55 A25 20 0 0 1 55 90 H46 Z', C.blush)
+            );
+          },
+          C(svg) {
+            svg.append(
+              circle(50, 50, 40, C.mint),
+              polygon('50,50 91,24 92,50 67,50', C.paper)
+            );
+          },
+          D(svg) {
+            svg.append(
+              rect(12, 10, 35, 80, C.orange),
+              path('M47 10 H52 A38 40 0 0 1 52 90 H47 Z', C.yellow)
+            );
+          },
+          E(svg) {
+            svg.append(
+              rect(12, 10, 76, 80, C.taupe),
+              rect(60, 28, 28, 14, C.paper),
+              rect(60, 58, 28, 14, C.paper),
+              rect(66, 13, 22, 15, C.brown, { opacity: '.22' })
+            );
+          },
+          F(svg) {
+            svg.append(
+              rect(12, 10, 36, 80, C.pink),
+              rect(12, 10, 72, 28, C.pink),
+              rect(48, 30, 36, 26, C.coral)
+            );
+          },
+          G(svg) {
+            svg.append(
+              circle(50, 50, 40, '#5599c5'),
+              rect(50, 52, 40, 38, '#2376b6'),
+              rect(50, 36, 42, 24, C.paper),
+              rect(50, 52, 32, 14, '#2376b6')
+            );
+          },
+          H(svg) {
+            svg.append(
+              rect(12, 10, 29, 80, '#74458a'),
+              rect(59, 10, 29, 80, '#9b83a7'),
+              rect(41, 41, 18, 18, '#825e93')
+            );
+          },
+          I(svg) {
+            svg.append(
+              rect(20, 10, 60, 80, '#68bd67'),
+              rect(45, 10, 10, 80, '#36a644')
+            );
+          },
+          J(svg) {
+            svg.append(
+              rect(58, 10, 30, 55, '#ed8f46'),
+              halfCircle(45, 63, 27, 'bottom', '#f6a33a')
+            );
+          },
+          K(svg) {
+            svg.append(
+              rect(10, 10, 34, 80, '#f8e000'),
+              polygon('38,50 66,10 88,10 56,52', '#f7bd39'),
+              polygon('38,50 56,48 88,90 65,90', '#f5c94b')
+            );
+          },
+          L(svg) {
+            svg.append(
+              rect(16, 10, 32, 80, '#aea399'),
+              rect(16, 62, 70, 28, '#aa8d6e'),
+              rect(48, 62, 38, 28, '#9a7c5e', { opacity: '.45' })
+            );
+          },
+          M(svg) {
+            svg.append(
+              rect(10, 10, 24, 80, C.pink),
+              rect(66, 10, 24, 80, '#ec68a3'),
+              polygon('30,10 52,47 52,72 26,29', C.magenta),
+              polygon('70,10 48,47 48,72 74,29', '#bb397e', { opacity: '.72' })
+            );
+          },
+          N(svg) {
+            svg.append(
+              rect(12, 10, 26, 80, C.cyan),
+              rect(62, 10, 26, 80, C.cyan),
+              polygon('12,10 34,10 88,84 88,90 64,90 12,19', C.cyanDark, { opacity: '.72' })
+            );
+          },
+          O(svg) {
+            svg.append(circle(50, 50, 40, C.red));
+          },
+          P(svg) {
+            svg.append(
+              rect(12, 10, 34, 80, C.teal),
+              path('M46 10 H54 A28 25 0 0 1 54 60 H46 Z', '#67c0b4')
+            );
+          },
+          Q(svg) {
+            svg.append(
+              circle(48, 48, 38, C.peach),
+              polygon('48,59 77,90 91,90 67,58', '#e96c49')
+            );
+          },
+          R(svg) {
+            svg.append(
+              rect(12, 10, 33, 80, '#1b82bd'),
+              path('M45 10 H53 A27 24 0 0 1 53 58 H45 Z', '#0b91cf'),
+              polygon('45,52 64,52 88,90 64,90 45,61', '#126da4')
+            );
+          },
+          S(svg) {
+            svg.append(
+              halfCircle(50, 31, 29, 'left', '#f4d934'),
+              rect(42, 42, 16, 16, '#efc92b'),
+              halfCircle(50, 69, 29, 'right', '#f4d934')
+            );
+          },
+          T(svg) {
+            svg.append(
+              rect(10, 10, 80, 34, '#afa9a4'),
+              rect(36, 38, 32, 52, '#887360'),
+              rect(36, 38, 32, 12, '#9a856f')
+            );
+          },
+          U(svg) {
+            svg.append(
+              circle(50, 52, 38, C.olive),
+              rect(12, 10, 28, 44, C.olive),
+              rect(60, 10, 28, 44, '#7bb276'),
+              rect(40, 10, 20, 44, C.paper)
+            );
+          },
+          V(svg) {
+            svg.append(polygon('10,10 90,10 50,90', '#f26369'));
+          },
+          W(svg) {
+            svg.append(
+              polygon('8,10 66,10 42,90', '#bcaeb2'),
+              polygon('34,10 92,10 58,90', '#a9969c', { opacity: '.82' }),
+              polygon('34,10 66,10 50,63', '#927b84', { opacity: '.46' })
+            );
+          },
+          X(svg) {
+            svg.append(
+              polygon('16,10 56,10 84,90 44,90', C.violet),
+              polygon('44,10 84,10 56,90 16,90', C.violetDark, { opacity: '.75' })
+            );
+          },
+          Y(svg) {
+            svg.append(
+              polygon('12,10 38,10 50,39 62,10 88,10 64,58 36,58', C.slate),
+              rect(38, 50, 26, 40, C.slate),
+              polygon('38,10 62,10 50,39', '#4a7f99')
+            );
+          },
+          Z(svg) {
+            svg.append(
+              rect(12, 10, 76, 26, '#e961a0'),
+              polygon('64,34 88,34 36,70 12,70', '#c62d79'),
+              rect(12, 68, 76, 22, '#e65396')
+            );
+          },
+        };
+
+        function addConstruction(svg) {
+          const group = el('g', { class: 'construction', 'aria-hidden': 'true' });
+          group.append(
+            el('rect', { class: 'guide-box', x: 10, y: 10, width: 80, height: 80 }),
+            el('line', { class: 'guide-line', x1: 50, y1: 6, x2: 50, y2: 94 }),
+            el('line', { class: 'guide-line', x1: 6, y1: 50, x2: 94, y2: 50 }),
+            el('circle', { class: 'guide-dot', cx: 50, cy: 50, r: 1.25 })
+          );
+          svg.append(group);
+        }
+
+        function buildSpecimen(letter, index) {
+          const figure = document.createElement('figure');
+          const artboard = document.createElement('div');
+          const svg = el('svg', {
+            class: 'glyph',
+            viewBox: '0 0 100 100',
+            role: 'img',
+            'aria-labelledby': `glyph-${letter}`,
+          });
+          const title = el('title', { id: `glyph-${letter}` });
+          const caption = document.createElement('figcaption');
+          const name = document.createElement('span');
+          const recipe = document.createElement('span');
+
+          figure.className = 'specimen';
+          artboard.className = 'artboard';
+          title.textContent = `Geometric letter ${letter}`;
+          name.className = 'letter';
+          name.textContent = `${String(index + 1).padStart(2, '0')} · ${letter}`;
+          recipe.className = 'recipe';
+          recipe.textContent = recipes[letter];
+
+          svg.append(title);
+          glyphBuilders[letter](svg);
+          addConstruction(svg);
+          artboard.append(svg);
+          caption.append(name, recipe);
+          figure.append(artboard, caption);
+          return figure;
+        }
+
+        function setGuides(visible) {
+          document.body.classList.toggle('show-guides', visible);
+          toggle.setAttribute('aria-pressed', String(visible));
+          toggle.textContent = visible ? 'Hide construction' : 'Show construction';
+        }
+
+        function showDebugCatalog() {
+          document.body.classList.add('debug-mode');
+          stage.hidden = true;
+          catalog.hidden = false;
+
+          for (const [index, letter] of [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].entries()) {
+            grid.append(buildSpecimen(letter, index));
+          }
+
+          toggle.addEventListener('click', () => {
+            setGuides(toggle.getAttribute('aria-pressed') !== 'true');
+          });
+
+          addEventListener('keydown', event => {
+            if (event.key.toLowerCase() === 'd' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+              setGuides(toggle.getAttribute('aria-pressed') !== 'true');
+            }
+          });
+        }
+
+        function startPhysics() {
+          const WORD = [...'HYPERMEDIA'];
+          const LEG_ANCHORS = {
+            A: [24, 76],
+            D: [30, 70],
+            E: [30, 70],
+            H: [27, 73],
+            I: [34, 66],
+            M: [22, 78],
+            P: [25, 38],
+            R: [26, 72],
+            Y: [44, 56],
+          };
+          const motion = matchMedia('(prefers-reduced-motion: reduce)');
+          const world = { width: 0, height: 0, inset: 0, groundY: 0, size: 0 };
+          let bodies = [];
+          let animationFrame = 0;
+          let resizeFrame = 0;
+          let lastTime = 0;
+          let settledFrames = 0;
+          let phase = 'falling';
+          let phaseStarted = 0;
+          let fallStartedAt = 0;
+
+          const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+          document.body.classList.toggle('debug-mode', false);
+          stage.hidden = false;
+          catalog.hidden = true;
+
+          function measureWorld() {
+            world.width = stage.clientWidth || innerWidth;
+            world.height = stage.clientHeight || innerHeight;
+            world.inset = Math.max(14, world.width * 0.035);
+            world.groundY = Math.round(world.height * 0.82);
+            world.size = clamp(
+              Math.max(world.width / 10.8, Math.min(world.width / 6, 68)),
+              52,
+              112
+            );
+            if (world.height < 480) world.size = Math.min(world.size, 62);
+            ground.style.transform = `translate3d(0, ${world.groundY}px, 0)`;
+          }
+
+          function addWalkerLegs(svg, letter) {
+            const group = el('g', { class: 'walker-legs', 'aria-hidden': 'true' });
+            const anchors = LEG_ANCHORS[letter] || [34, 66];
+            const makeLeg = (anchor, side) => {
+              const legGroup = el('g', { class: `walker-leg walker-leg--${side}` });
+              const limb = el('path', {
+                d: `M${anchor} 87 L${anchor} 98 L${anchor} 109`,
+                fill: 'none',
+                stroke: C.ink,
+                'stroke-width': 7,
+                'stroke-linecap': 'round',
+                'stroke-linejoin': 'round',
+              });
+              const foot = el('path', {
+                d: `M${anchor} 109 H${anchor + (side === 'left' ? -8 : 8)}`,
+                fill: 'none',
+                stroke: C.ink,
+                'stroke-width': 7,
+                'stroke-linecap': 'round',
+              });
+              legGroup.append(limb, foot);
+              return { group: legGroup, limb, foot, anchor, side };
+            };
+            const left = makeLeg(anchors[0], 'left');
+            const right = makeLeg(anchors[1], 'right');
+            group.style.opacity = '0';
+            group.append(left.group, right.group);
+            svg.append(group);
+            return { group, left, right };
+          }
+
+          function makeFallingGlyph(letter, index) {
+            const svg = el('svg', {
+              class: 'falling-letter',
+              viewBox: '0 0 100 100',
+              'aria-hidden': 'true',
+            });
+            svg.style.setProperty('--body-size', `${world.size}px`);
+            svg.style.visibility = 'hidden';
+            svg.dataset.letter = letter;
+            svg.dataset.index = String(index);
+            const legs = addWalkerLegs(svg, letter);
+            glyphBuilders[letter](svg);
+            letterField.append(svg);
+            return { node: svg, legs };
+          }
+
+          function bodyExtent(body) {
+            const turn = Math.abs(Math.cos(body.angle)) + Math.abs(Math.sin(body.angle));
+            return body.size * 0.4 * turn;
+          }
+
+          function renderBody(body) {
+            body.node.style.transform =
+              `translate3d(${body.x - body.size * 0.5}px, ${body.y - body.size * 0.5}px, 0) ` +
+              `rotate(${body.angle}rad)`;
+          }
+
+          function setLegGrowth(body, amount) {
+            const growth = clamp(amount, 0, 1);
+            body.legs.style.opacity = String(growth);
+            body.legs.setAttribute(
+              'transform',
+              `translate(0 87) scale(1 ${growth}) translate(0 -87)`
+            );
+          }
+
+          function setGait(body, gait) {
+            const poseLeg = (leg, phaseOffset) => {
+              const step = gait + phaseOffset;
+              const lift = Math.max(0, Math.sin(step)) * 5;
+              const swing = Math.sin(step) * 9 * body.runDirection;
+              const bend = (leg.side === 'left' ? -2.5 : 2.5) + Math.cos(step) * 2;
+              const kneeX = leg.anchor + swing * 0.35 + bend;
+              const kneeY = 98 - lift * 0.35;
+              const ankleX = leg.anchor + swing;
+              const ankleY = 109 - lift;
+              const toeX = ankleX + body.runDirection * (8 + Math.cos(step) * 2);
+              leg.limb.setAttribute(
+                'd',
+                `M${leg.anchor} 87 L${kneeX} ${kneeY} L${ankleX} ${ankleY}`
+              );
+              leg.foot.setAttribute('d', `M${ankleX} ${ankleY} L${toeX} ${ankleY}`);
+            };
+
+            poseLeg(body.leftLeg, 0);
+            poseLeg(body.rightLeg, Math.PI);
+          }
+
+          function placeReducedMotionWord() {
+            const spacing = (world.width - world.inset * 2) / WORD.length;
+            bodies.forEach((body, index) => {
+              body.size = Math.min(body.size, spacing / 0.82);
+              body.radius = body.size * 0.36;
+              body.active = true;
+              body.angle = 0;
+              body.x = world.inset + spacing * (index + 0.5);
+              body.y = world.groundY - body.size * 0.62;
+              body.node.style.setProperty('--body-size', `${body.size}px`);
+              body.node.style.visibility = 'visible';
+              body.node.style.willChange = 'auto';
+              setLegGrowth(body, 1);
+              setGait(body, index % 2 ? 0.18 : -0.18);
+              renderBody(body);
+            });
+          }
+
+          function resetWorld() {
+            cancelAnimationFrame(animationFrame);
+            animationFrame = 0;
+            lastTime = 0;
+            settledFrames = 0;
+            phase = 'falling';
+            phaseStarted = 0;
+            letterField.replaceChildren();
+            measureWorld();
+
+            const spacing = (world.width - world.inset * 2) / WORD.length;
+            const start = performance.now() + 120;
+            fallStartedAt = start;
+            bodies = WORD.map((letter, index) => {
+              const size = world.size;
+              const parts = makeFallingGlyph(letter, index);
+              return {
+                index,
+                letter,
+                node: parts.node,
+                legs: parts.legs.group,
+                leftLeg: parts.legs.left,
+                rightLeg: parts.legs.right,
+                size,
+                radius: size * 0.36,
+                x: world.inset + spacing * (index + 0.5) + Math.sin(index * 2.3) * size * 0.05,
+                y: -size * (0.58 + (index % 3) * 0.09),
+                vx: Math.sin(index * 1.73) * size * 0.34,
+                vy: 0,
+                angle: ((index % 3) - 1) * 0.055,
+                angularVelocity: Math.cos(index * 1.37) * 0.22,
+                bornAt: start + index * 145,
+                bounce: 0.27 + (index % 4) * 0.015,
+                runDirection: index % 2 ? 1 : -1,
+                runSpeed: size * (0.55 + (index % 4) * 0.09),
+                cadence: 7.4 + (index % 3) * 0.8,
+                standX: 0,
+                standY: 0,
+                standAngle: 0,
+                active: false,
+              };
+            });
+
+            if (motion.matches) {
+              placeReducedMotionWord();
+            } else {
+              animationFrame = requestAnimationFrame(tick);
+            }
+          }
+
+          function resolveBounds(body) {
+            const extent = bodyExtent(body);
+            const left = world.inset;
+            const right = world.width - world.inset;
+
+            if (body.x - extent < left) {
+              body.x = left + extent;
+              if (body.vx < 0) body.vx = -body.vx * 0.58;
+              body.angularVelocity += body.vy / body.size * 0.025;
+            } else if (body.x + extent > right) {
+              body.x = right - extent;
+              if (body.vx > 0) body.vx = -body.vx * 0.58;
+              body.angularVelocity -= body.vy / body.size * 0.025;
+            }
+
+            if (body.y + extent > world.groundY) {
+              body.y = world.groundY - extent;
+              if (body.vy > 34) {
+                body.vy = -body.vy * body.bounce;
+                body.angularVelocity += body.vx / body.size * 0.035;
+              } else if (body.vy > 0) {
+                body.vy = 0;
+              }
+              body.vx *= 0.88;
+              body.angularVelocity *= 0.78;
+            }
+          }
+
+          function resolvePair(a, b) {
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const minimum = a.radius + b.radius;
+            const distanceSquared = dx * dx + dy * dy;
+            if (distanceSquared >= minimum * minimum) return;
+
+            const distance = Math.sqrt(distanceSquared) || 0.001;
+            const nx = dx / distance;
+            const ny = dy / distance;
+            const overlap = minimum - distance;
+            const correction = overlap * 0.5 + 0.02;
+            a.x -= nx * correction;
+            a.y -= ny * correction;
+            b.x += nx * correction;
+            b.y += ny * correction;
+
+            const relativeX = b.vx - a.vx;
+            const relativeY = b.vy - a.vy;
+            const normalSpeed = relativeX * nx + relativeY * ny;
+            if (normalSpeed >= 0) return;
+
+            const impulse = -(1 + 0.28) * normalSpeed * 0.5;
+            a.vx -= impulse * nx;
+            a.vy -= impulse * ny;
+            b.vx += impulse * nx;
+            b.vy += impulse * ny;
+
+            const tx = -ny;
+            const ty = nx;
+            const tangentSpeed = relativeX * tx + relativeY * ty;
+            const friction = clamp(-tangentSpeed * 0.18, -Math.abs(impulse) * 0.2, Math.abs(impulse) * 0.2);
+            a.vx -= friction * tx;
+            a.vy -= friction * ty;
+            b.vx += friction * tx;
+            b.vy += friction * ty;
+            a.angularVelocity -= friction / a.size * 0.14;
+            b.angularVelocity += friction / b.size * 0.14;
+          }
+
+          function simulate(step) {
+            const gravity = clamp(world.height * 1.35, 760, 1400);
+
+            for (const body of bodies) {
+              if (!body.active) continue;
+              body.vy = Math.min(body.vy + gravity * step, world.height * 1.25);
+              body.x += body.vx * step;
+              body.y += body.vy * step;
+              body.angle += body.angularVelocity * step;
+              body.vx *= 0.999;
+              body.angularVelocity *= 0.998;
+              resolveBounds(body);
+            }
+
+            for (let pass = 0; pass < 2; pass++) {
+              for (let i = 0; i < bodies.length; i++) {
+                if (!bodies[i].active) continue;
+                for (let j = i + 1; j < bodies.length; j++) {
+                  if (bodies[j].active) resolvePair(bodies[i], bodies[j]);
+                }
+              }
+              for (const body of bodies) if (body.active) resolveBounds(body);
+            }
+          }
+
+          function beginSprouting(now) {
+            phase = 'sprouting';
+            phaseStarted = now;
+            bodies.forEach(body => {
+              body.active = true;
+              body.node.style.visibility = 'visible';
+              body.vx = 0;
+              body.vy = 0;
+              body.angularVelocity = 0;
+              body.standX = body.x;
+              body.standY = body.y;
+              body.standAngle = body.angle;
+              setLegGrowth(body, 0);
+              setGait(body, 0);
+            });
+          }
+
+          function updateSprouting(now) {
+            const progress = clamp((now - phaseStarted) / 720, 0, 1);
+            const eased = 1 - Math.pow(1 - progress, 4);
+
+            bodies.forEach(body => {
+              const standingY = world.groundY - body.size * 0.62;
+              body.angle = body.standAngle * (1 - eased);
+              body.y = body.standY + (standingY - body.standY) * eased;
+              setLegGrowth(body, eased);
+              renderBody(body);
+            });
+
+            if (progress >= 1) {
+              phase = 'running';
+              phaseStarted = now;
+            }
+          }
+
+          function separateRunners() {
+            for (let i = 0; i < bodies.length; i++) {
+              for (let j = i + 1; j < bodies.length; j++) {
+                const a = bodies[i];
+                const b = bodies[j];
+                const dx = b.x - a.x;
+                const minimum = (a.radius + b.radius) * 0.94;
+                if (Math.abs(dx) >= minimum) continue;
+
+                const direction = dx === 0 ? (a.index < b.index ? 1 : -1) : Math.sign(dx);
+                const overlap = minimum - Math.abs(dx);
+                a.x -= direction * overlap * 0.5;
+                b.x += direction * overlap * 0.5;
+                a.runDirection = -direction;
+                b.runDirection = direction;
+              }
+            }
+          }
+
+          function updateRunners(step, now) {
+            for (const body of bodies) {
+              const gait = ((now - phaseStarted) / 1000) * body.cadence + body.index * 0.73;
+              const halfWidth = body.size * 0.41;
+              body.x += body.runDirection * body.runSpeed * step;
+
+              if (body.x - halfWidth < world.inset) {
+                body.x = world.inset + halfWidth;
+                body.runDirection = 1;
+              } else if (body.x + halfWidth > world.width - world.inset) {
+                body.x = world.width - world.inset - halfWidth;
+                body.runDirection = -1;
+              }
+
+              body.y = world.groundY - body.size * 0.62 - Math.abs(Math.sin(gait * 2)) * body.size * 0.022;
+              body.angle = Math.sin(gait) * 0.035 * body.runDirection;
+              setLegGrowth(body, 1);
+              setGait(body, gait);
+            }
+
+            separateRunners();
+            bodies.forEach(renderBody);
+          }
+
+          function tick(now) {
+            if (!lastTime) lastTime = now;
+            const elapsed = Math.min((now - lastTime) / 1000, 0.034);
+            lastTime = now;
+
+            if (phase === 'falling') {
+              for (const body of bodies) {
+                if (!body.active && now >= body.bornAt) {
+                  body.active = true;
+                  body.node.style.visibility = 'visible';
+                }
+              }
+
+              const substeps = 3;
+              for (let step = 0; step < substeps; step++) simulate(elapsed / substeps);
+
+              let totalMotion = 0;
+              let pending = false;
+              for (const body of bodies) {
+                if (body.active) {
+                  renderBody(body);
+                  totalMotion += Math.abs(body.vx) + Math.abs(body.vy) + Math.abs(body.angularVelocity * body.size);
+                } else {
+                  pending = true;
+                }
+              }
+
+              if (!pending && totalMotion < bodies.length * 4.5) settledFrames += 1;
+              else settledFrames = 0;
+
+              if (!pending && (settledFrames > 60 || now - fallStartedAt > 9000)) {
+                beginSprouting(now);
+              }
+            } else if (phase === 'sprouting') {
+              updateSprouting(now);
+            } else {
+              updateRunners(elapsed, now);
+            }
+
+            animationFrame = requestAnimationFrame(tick);
+          }
+
+          function scheduleResize() {
+            cancelAnimationFrame(resizeFrame);
+            resizeFrame = requestAnimationFrame(resetWorld);
+          }
+
+          stage.addEventListener('pointerdown', resetWorld);
+          stage.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              resetWorld();
+            }
+          });
+          addEventListener('resize', scheduleResize);
+          if (motion.addEventListener) motion.addEventListener('change', resetWorld);
+          else motion.addListener(resetWorld);
+
+          resetWorld();
+        }
+
+        if (DEBUG_MODE) showDebugCatalog();
+        else startPhysics();
+      })();
+    </script>
+  </body>
+</html>
