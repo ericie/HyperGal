@@ -150,6 +150,10 @@
         outline-offset: 2px;
       }
 
+      .water-panel.is-dragging {
+        will-change: transform;
+      }
+
       .water-panel.is-dragging .panel-header { cursor: grabbing; }
       .water-panel.is-collapsed { width: 184px; }
       .water-panel.is-collapsed .panel-header { border-bottom: 0; }
@@ -454,12 +458,12 @@
           '#e3d9e8',
           '#e8e1c6'
         ];
-        const POINT_COUNT = 144;
+        const POINT_COUNT = 96;
         const INITIAL_RING_COUNT = 5;
-        const MAX_SHAPES = 220;
+        const MAX_SHAPES = 180;
+        const MAX_CANVAS_PIXELS = 2600000;
         const SUMINAGASHI_PALETTE = 1;
         const DROP_EXPANSION_SCALE = 3;
-        const DROP_EXPANSION_TIME_SCALE = 10;
         const MIN_DROPS_BEFORE_BACKGROUND = 30;
         const FULLNESS_THRESHOLD = 0.92;
         const FULLNESS_HOLD = 8000;
@@ -494,6 +498,9 @@
         let width = 1;
         let height = 1;
         let dpr = 1;
+        let bathInsetValue = 8;
+        let bathRight = 1;
+        let bathBottom = 1;
         let shapes = [];
         let activeDrop = null;
         let activeComb = null;
@@ -509,6 +516,8 @@
         let seed = seedFromLocation();
         let random = mulberry32(seed);
         let panelDrag = null;
+        let resizeTimer = 0;
+        let hiddenAt = 0;
 
         if (pageParams.get('panel') === '0') {
           document.body.classList.add('no-panel');
@@ -520,8 +529,9 @@
         resetBath();
         requestAnimationFrame(tick);
 
-        addEventListener('resize', resetBath, { passive: true });
+        addEventListener('resize', onResize, { passive: true });
         addEventListener('keydown', onKeyDown);
+        document.addEventListener('visibilitychange', onVisibilityChange);
         canvas.addEventListener('pointerdown', onBathPointer);
         reseedButton.addEventListener('click', reseed);
         combForward.addEventListener('click', () => startComb(1));
@@ -529,9 +539,18 @@
         motionPreference.addEventListener('change', onMotionPreference);
 
         function resetBath() {
+          if (resizeTimer) {
+            clearTimeout(resizeTimer);
+            resizeTimer = 0;
+          }
           width = Math.max(1, innerWidth);
           height = Math.max(1, innerHeight);
-          dpr = Math.min(2, devicePixelRatio || 1);
+          const pixelRatio = devicePixelRatio || 1;
+          const pixelBudgetRatio = Math.sqrt(MAX_CANVAS_PIXELS / (width * height));
+          dpr = Math.min(2, pixelRatio, Math.max(1, pixelBudgetRatio));
+          bathInsetValue = clamp(Math.min(width, height) * 0.018, 8, 18);
+          bathRight = width - bathInsetValue;
+          bathBottom = height - bathInsetValue;
           canvas.width = Math.round(width * dpr);
           canvas.height = Math.round(height * dpr);
           canvas.style.width = `${width}px`;
@@ -554,6 +573,29 @@
           nextDropAt = performance.now() + nextDropDelay() * 0.55;
           updateBathNumber();
           render();
+        }
+
+        function onResize() {
+          if (resizeTimer) clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(resetBath, 120);
+        }
+
+        function onVisibilityChange() {
+          const time = performance.now();
+          if (document.hidden) {
+            hiddenAt = time;
+            return;
+          }
+          if (!hiddenAt) return;
+
+          const hiddenDuration = time - hiddenAt;
+          if (activeDrop) activeDrop.start += hiddenDuration;
+          if (activeComb) activeComb.start += hiddenDuration;
+          nextDropAt += hiddenDuration;
+          nextFullnessCheck += hiddenDuration;
+          backgroundDropCooldownUntil += hiddenDuration;
+          if (fullSince) fullSince += hiddenDuration;
+          hiddenAt = 0;
         }
 
         function seedInitialBath() {
@@ -783,10 +825,10 @@
           };
           const impactDuration = 110 + random() * 100;
           const expansionDuration = clamp(
-            interval * (1.05 + bloomScale * 0.45 + random() * 0.22),
-            1100,
-            3200
-          ) * DROP_EXPANSION_TIME_SCALE;
+            interval * (0.65 + bloomScale * 0.22 + random() * 0.12),
+            520,
+            1600
+          );
           const impactRadius = clamp(radius * 0.16, 2.5, 6);
 
           shapes.push(shape);
@@ -859,37 +901,6 @@
           if (drop.reservePaper) {
             placeSuminagashiSpacer(drop.x, drop.y, drop.targetRadius);
           }
-        }
-
-        function startSuminagashiSpacer(inkDrop, time) {
-          const spacer = createSuminagashiSpacer(
-            inkDrop.x,
-            inkDrop.y,
-            inkDrop.targetRadius
-          );
-          const form = createDropForm();
-          const shape = {
-            color: bathColor,
-            clearing: true,
-            form,
-            points: circlePoints(spacer.x, spacer.y, 0.01, form)
-          };
-          const duration = (175 + random() * 115) * DROP_EXPANSION_TIME_SCALE;
-
-          shapes.push(shape);
-          activeDrop = {
-            shape,
-            x: spacer.x,
-            y: spacer.y,
-            targetRadius: spacer.radius,
-            impactRadius: 0.01,
-            currentRadius: 0.01,
-            start: time,
-            impactDuration: 0,
-            expansionDuration: duration,
-            duration,
-            reservePaper: false
-          };
         }
 
         function updateBathFullness(time) {
@@ -1004,8 +1015,7 @@
             points: circlePoints(x, y, 0.01, form)
           };
           const impactDuration = 180;
-          const expansionDuration = (3400 + random() * 1000) *
-            DROP_EXPANSION_TIME_SCALE;
+          const expansionDuration = 3800 + random() * 900;
 
           shapes.push(shape);
           activeDrop = {
@@ -1088,6 +1098,7 @@
 
           activeComb = createCombPass(angle, sign, spacing, finePull, span, 0, 1250);
           activeComb.threadLength = spacing * (0.9 + pull * 1.6);
+          prepareCombSweep(activeComb);
           activeComb.start = performance.now();
 
           complexity += 2;
@@ -1129,10 +1140,50 @@
             span,
             firstTine,
             tines,
-            processed: new WeakSet(),
+            sweepPoints: [],
+            sweepIndex: 0,
             start: 0,
             duration
           };
+        }
+
+        function prepareCombSweep(comb) {
+          const directionX = Math.cos(comb.angle) * comb.sign;
+          const directionY = Math.sin(comb.angle) * comb.sign;
+          const normalX = -directionY;
+          const normalY = directionX;
+          const centerX = width * 0.5;
+          const centerY = height * 0.5;
+
+          comb.directionX = directionX;
+          comb.directionY = directionY;
+          comb.normalX = normalX;
+          comb.normalY = normalY;
+          comb.centerX = centerX;
+          comb.centerY = centerY;
+
+          for (const shape of shapes) {
+            for (const point of shape.points) {
+              const relativeX = point.x - centerX;
+              const relativeY = point.y - centerY;
+              const along = relativeX * directionX + relativeY * directionY;
+              const across = relativeX * normalX + relativeY * normalY;
+              const estimatedIndex = Math.round(
+                (across - comb.firstTine) / comb.spacing
+              );
+              let entrainment = 0;
+
+              for (let offset = -1; offset <= 1; offset++) {
+                const tine = comb.tines[estimatedIndex + offset];
+                if (!tine) continue;
+                const distance = across - tine.across;
+                entrainment += Math.exp(-0.5 * Math.pow(distance / tine.width, 2)) *
+                  tine.drag;
+              }
+              comb.sweepPoints.push({ point, along, across, entrainment });
+            }
+          }
+          comb.sweepPoints.sort((a, b) => a.along - b.along);
         }
 
         function updateComb(time) {
@@ -1230,45 +1281,22 @@
         }
 
         function applyCombSweep(comb, front) {
-          const directionX = Math.cos(comb.angle) * comb.sign;
-          const directionY = Math.sin(comb.angle) * comb.sign;
-          const normalX = -directionY;
-          const normalY = directionX;
-          const centerX = width * 0.5;
-          const centerY = height * 0.5;
+          while (comb.sweepIndex < comb.sweepPoints.length) {
+            const sweepPoint = comb.sweepPoints[comb.sweepIndex];
+            if (sweepPoint.along > front) break;
 
-          for (const shape of shapes) {
-            for (const point of shape.points) {
-              if (comb.processed.has(point)) continue;
-              const relativeX = point.x - centerX;
-              const relativeY = point.y - centerY;
-              const along = relativeX * directionX + relativeY * directionY;
-              if (along > front) continue;
-
-              const across = relativeX * normalX + relativeY * normalY;
-              const estimatedIndex = Math.round((across - comb.firstTine) / comb.spacing);
-              let entrainment = 0;
-
-              for (let offset = -1; offset <= 1; offset++) {
-                const tine = comb.tines[estimatedIndex + offset];
-                if (!tine) continue;
-                const distance = across - tine.across;
-                entrainment += Math.exp(-0.5 * Math.pow(distance / tine.width, 2)) *
-                  tine.drag;
-              }
-
-              const displacedAlong = along + comb.maxDisplacement * entrainment;
-
-              point.x = centerX + directionX * displacedAlong + normalX * across;
-              point.y = centerY + directionY * displacedAlong + normalY * across;
-              constrainPoint(point);
-              comb.processed.add(point);
-            }
+            const displacedAlong = sweepPoint.along +
+              comb.maxDisplacement * sweepPoint.entrainment;
+            sweepPoint.point.x = comb.centerX +
+              comb.directionX * displacedAlong + comb.normalX * sweepPoint.across;
+            sweepPoint.point.y = comb.centerY +
+              comb.directionY * displacedAlong + comb.normalY * sweepPoint.across;
+            constrainPoint(sweepPoint.point);
+            comb.sweepIndex++;
           }
         }
 
         function render(time = 0) {
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           ctx.fillStyle = bathColor;
           ctx.fillRect(0, 0, width, height);
 
@@ -1391,24 +1419,36 @@
         }
 
         function setCirclePoints(points, cx, cy, radius, form) {
-          const stretch = form ? form.stretch : 1;
-          const rotation = form ? form.rotation : 0;
-          const rotationCosine = Math.cos(rotation);
-          const rotationSine = Math.sin(rotation);
+          const profile = dropProfile(form, points.length);
 
           for (let i = 0; i < points.length; i++) {
-            const angle = i / points.length * TAU;
-            const irregularity = form
-              ? 1 +
-                Math.sin(angle * 3 + form.broadPhase) * form.broadWobble +
-                Math.sin(angle * 7 + form.finePhase) * form.fineWobble
-              : 1;
-            const localX = Math.cos(angle) * radius * irregularity * stretch;
-            const localY = Math.sin(angle) * radius * irregularity / stretch;
-            points[i].x = cx + localX * rotationCosine - localY * rotationSine;
-            points[i].y = cy + localX * rotationSine + localY * rotationCosine;
+            points[i].x = cx + profile[i * 2] * radius;
+            points[i].y = cy + profile[i * 2 + 1] * radius;
             constrainPoint(points[i]);
           }
+        }
+
+        function dropProfile(form, pointCount) {
+          if (form.profile && form.profile.length === pointCount * 2) {
+            return form.profile;
+          }
+
+          const profile = new Float32Array(pointCount * 2);
+          const stretch = form.stretch || 1;
+          const rotationCosine = Math.cos(form.rotation || 0);
+          const rotationSine = Math.sin(form.rotation || 0);
+          for (let i = 0; i < pointCount; i++) {
+            const angle = i / pointCount * TAU;
+            const irregularity = 1 +
+              Math.sin(angle * 3 + (form.broadPhase || 0)) * (form.broadWobble || 0) +
+              Math.sin(angle * 7 + (form.finePhase || 0)) * (form.fineWobble || 0);
+            const localX = Math.cos(angle) * irregularity * stretch;
+            const localY = Math.sin(angle) * irregularity / stretch;
+            profile[i * 2] = localX * rotationCosine - localY * rotationSine;
+            profile[i * 2 + 1] = localX * rotationSine + localY * rotationCosine;
+          }
+          form.profile = profile;
+          return profile;
         }
 
         function nextInkColor() {
@@ -1434,34 +1474,20 @@
         }
 
         function bathInset() {
-          return clamp(Math.min(width, height) * 0.018, 8, 18);
+          return bathInsetValue;
         }
 
         function constrainPoint(point) {
-          const inset = bathInset();
-          point.x = clamp(point.x, inset, width - inset);
-          point.y = clamp(point.y, inset, height - inset);
+          point.x = point.x < bathInsetValue
+            ? bathInsetValue
+            : point.x > bathRight ? bathRight : point.x;
+          point.y = point.y < bathInsetValue
+            ? bathInsetValue
+            : point.y > bathBottom ? bathBottom : point.y;
           return point;
         }
 
         function pruneShapes() {
-          const margin = Math.min(width, height) * 0.3;
-          shapes = shapes.filter((shape, index) => {
-            if (index >= shapes.length - 48) return true;
-            let minX = Infinity;
-            let maxX = -Infinity;
-            let minY = Infinity;
-            let maxY = -Infinity;
-            for (const point of shape.points) {
-              minX = Math.min(minX, point.x);
-              maxX = Math.max(maxX, point.x);
-              minY = Math.min(minY, point.y);
-              maxY = Math.max(maxY, point.y);
-            }
-            return maxX > -margin && minX < width + margin &&
-              maxY > -margin && minY < height + margin;
-          });
-
           if (shapes.length > MAX_SHAPES) {
             let overflow = shapes.length - MAX_SHAPES;
             shapes = shapes.filter((shape) => {
@@ -1544,8 +1570,14 @@
             const rect = panel.getBoundingClientRect();
             panelDrag = {
               pointerId: event.pointerId,
-              offsetX: event.clientX - rect.left,
-              offsetY: event.clientY - rect.top
+              startX: event.clientX,
+              startY: event.clientY,
+              left: rect.left,
+              top: rect.top,
+              width: rect.width,
+              height: rect.height,
+              nextLeft: rect.left,
+              nextTop: rect.top
             };
             panel.classList.add('is-dragging');
             panelHeader.setPointerCapture(event.pointerId);
@@ -1554,7 +1586,7 @@
 
           panelHeader.addEventListener('pointermove', (event) => {
             if (!panelDrag || event.pointerId !== panelDrag.pointerId) return;
-            movePanel(event.clientX - panelDrag.offsetX, event.clientY - panelDrag.offsetY);
+            movePanelDuringDrag(event.clientX, event.clientY);
           });
 
           panelHeader.addEventListener('pointerup', endPanelDrag);
@@ -1563,11 +1595,34 @@
 
         function endPanelDrag(event) {
           if (!panelDrag || event.pointerId !== panelDrag.pointerId) return;
+          panel.style.left = `${Math.round(panelDrag.nextLeft)}px`;
+          panel.style.top = `${Math.round(panelDrag.nextTop)}px`;
+          panel.style.transform = '';
           panel.classList.remove('is-dragging');
           if (panelHeader.hasPointerCapture(event.pointerId)) {
             panelHeader.releasePointerCapture(event.pointerId);
           }
           panelDrag = null;
+        }
+
+        function movePanelDuringDrag(clientX, clientY) {
+          const margin = 8;
+          const maxLeft = Math.max(margin, innerWidth - panelDrag.width - margin);
+          const maxTop = Math.max(margin, innerHeight - panelDrag.height - margin);
+          const left = clamp(
+            panelDrag.left + clientX - panelDrag.startX,
+            margin,
+            maxLeft
+          );
+          const top = clamp(
+            panelDrag.top + clientY - panelDrag.startY,
+            margin,
+            maxTop
+          );
+          panelDrag.nextLeft = left;
+          panelDrag.nextTop = top;
+          panel.style.transform =
+            `translate3d(${left - panelDrag.left}px, ${top - panelDrag.top}px, 0)`;
         }
 
         function movePanel(left, top) {
@@ -1662,10 +1717,6 @@
             t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
             return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
           };
-        }
-
-        function mod(value, divisor) {
-          return ((value % divisor) + divisor) % divisor;
         }
 
         function easeOutCubic(value) {

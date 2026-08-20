@@ -134,7 +134,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
-      "description": "One-player Pong folded into a cylinder. A single paddle stands where the net used to be; the ball leaves one edge and returns from the other, so every save comes back around and the only way to be rid of the ball is to miss. The two counters tally edge crossings, left and right, and exactly one crossing happens per lap — a catch sends the ball back out the edge behind it, a miss lets it through to the far one, so the paddle decides which side a point lands on but never whether one lands. It catches eight of every ten, striking off-centre on purpose to keep the rally alive, and each miss burns a permanent bar into the centre line, which slowly becomes a histogram of where this paddle fails.",
+      "description": "One-player Pong folded into a cylinder. A single paddle stands where the net used to be; the ball leaves one edge and returns from the other, so every save comes back around and the only way to be rid of the ball is to miss. The two counters tally edge crossings, left and right, and exactly one crossing happens per lap — a catch sends the ball back out the edge behind it, a miss lets it through to the far one. The paddle predicts every intercept, plays every ball, and strikes off-centre to keep the rally alive; catch or miss is decided by the actual collision.",
       "updated": "2026-08-20"
     },
     {
@@ -378,7 +378,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "Twenty animated trunk records share one climate while two controls move the stand between a mixed-age wild forest and a uniformly spaced orchard planted all at once.",
+      "description": "Twenty colored trunk records fill a shared terrain: latitude, sun, and wind shape every tree, a broad directional fire crosses the stand, insects visit individual trunks, and two controls move the forest toward a synchronized orchard.",
       "updated": "2026-08-20"
     }
   ]

@@ -47,28 +47,20 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Paddle: a one-player Pong on a looping field. A single paddle stands where the net would be and catches eight of every ten balls. The ball leaves one edge and returns from the other, scoring a point for the edge it crossed. Each miss burns a mark into the centre line."
+      aria-label="Paddle: a one-player Pong on a looping field. A single paddle stands where the net would be and plays every ball. The ball leaves one edge and returns from the other, scoring a point for the edge it crossed."
     ></canvas>
 
     <script>
       (() => {
         const WHITE = '#fff';
 
-        // The paddle is allowed exactly two misses in every ten passes.
-        const BAG_SIZE = 10;
-        const BAG_MISSES = 2;
-
         const MAX_BOUNCE_ANGLE = 0.95; // radians off horizontal at the paddle's rim
         const ENGLISH_MIN = 0.25; // never strike dead-centre, or the rally goes flat
         const ENGLISH_MAX = 0.72; // stay inside the paddle face so the catch still lands
-        const COMMIT_START = 0.12; // fraction of the loop spent watching the ball
-        const COMMIT_END = 0.58; // by here the paddle is on its final mark
         const BALL_TRAIL_LIFE = 0.2; // phosphor persistence, seconds
         const PADDLE_TRAIL_LIFE = 0.1;
         const TRAIL_MAX = 240;
         const FLASH_DUR = 0.18;
-        const SCARS = 160; // histogram buckets down the net
-        const SCAR_FULL = 24; // misses in one bucket that reach full bar length
         const MAX_DT = 1 / 30;
         const REDUCED_TIME_SCALE = 0.32;
 
@@ -115,15 +107,11 @@
         let ball = { x: 0, y: 0, vx: 1, vy: 0 };
         let paddle = { y: 0, vy: 0 };
         let score = { left: 0, right: 0 };
-        let scarLeft = new Int32Array(SCARS);
-        let scarRight = new Int32Array(SCARS);
-        let bag = [];
-        let bagIndex = 0;
         let pass = null;
         let flash = null;
         let ballTrail = [];
         let paddleTrail = [];
-        let stats = { passes: 0, catches: 0, misses: 0, disagree: 0 };
+        let stats = { passes: 0, catches: 0, misses: 0 };
         let lastTime = 0;
         let raf = 0;
 
@@ -189,17 +177,13 @@
           ball.vx = (ball.vx / speed) * ballSpeed;
           ball.vy = (ball.vy / speed) * ballSpeed;
           paddle.y = clamp(paddle.y, paddleMin(), paddleMax());
-          if (pass) planPass(pass.isMiss);
+          if (pass) planPass();
         }
 
         function reset() {
-          scarLeft = new Int32Array(SCARS);
-          scarRight = new Int32Array(SCARS);
           score = { left: 0, right: 0 };
-          stats = { passes: 0, catches: 0, misses: 0, disagree: 0 };
+          stats = { passes: 0, catches: 0, misses: 0 };
           flash = null;
-          bag = [];
-          bagIndex = BAG_SIZE;
 
           const dir = rng() < 0.5 ? 1 : -1;
           const angle = (rng() * 2 - 1) * 0.5;
@@ -214,6 +198,9 @@
           ballTrail = [];
           paddleTrail = [];
           beginPass();
+          // Start a fresh run on its first intercept so an unusually tall or
+          // narrow viewport cannot manufacture a cheap opening miss.
+          paddle.y = pass.targetY;
         }
 
         function reseed() {
@@ -254,59 +241,24 @@
           return fold(ball.y + ball.vy * t, lo, hi);
         }
 
-        function refillBag() {
-          bag = [];
-          for (let i = 0; i < BAG_SIZE; i += 1) bag.push(i < BAG_MISSES);
-          for (let i = bag.length - 1; i > 0; i -= 1) {
-            const j = Math.floor(rng() * (i + 1));
-            const tmp = bag[i];
-            bag[i] = bag[j];
-            bag[j] = tmp;
-          }
-          bagIndex = 0;
-        }
-
-        function drawFromBag() {
-          if (bagIndex >= bag.length) refillBag();
-          const value = bag[bagIndex];
-          bagIndex += 1;
-          return value;
-        }
-
         function beginPass() {
-          planPass(drawFromBag());
+          planPass();
         }
 
-        // Decide where the paddle intends to stand for this pass. Intent is
-        // authoritative — the bag already ruled on catch or miss — and the mark
-        // is chosen so the geometry agrees with the ruling.
-        function planPass(isMiss) {
+        // The ball's crossing height is known exactly, so the paddle always
+        // commits to a playable point on its face instead of manufacturing a
+        // miss. The eventual outcome is decided by the actual collision.
+        function planPass() {
           const predY = predictCrossY();
-          const reach = paddleH / 2 + ballR;
           const lo = paddleMin();
           const hi = paddleMax();
-          let targetY;
+          // Strike off-centre on purpose: a dead-centre hit returns the ball
+          // flat, and a flat rally never comes back anywhere interesting.
+          const english =
+            (rng() < 0.5 ? -1 : 1) * (ENGLISH_MIN + rng() * (ENGLISH_MAX - ENGLISH_MIN));
+          const targetY = clamp(predY + english * (paddleH / 2), lo, hi);
 
-          if (isMiss) {
-            // Stand just far enough off that the ball clips past the rim.
-            const gap = ballR * 0.5 + rng() * ballR * 1.4;
-            const options = [];
-            for (const side of [-1, 1]) {
-              const mark = predY + side * (reach + gap);
-              if (mark >= lo && mark <= hi) options.push(mark);
-            }
-            targetY = options.length
-              ? options[Math.floor(rng() * options.length)]
-              : clamp(predY + (predY < (courtTop + courtBottom) / 2 ? 1 : -1) * (reach + gap), lo, hi);
-          } else {
-            // Strike off-centre on purpose: a dead-centre hit returns the ball
-            // flat, and a flat rally never comes back anywhere interesting.
-            const english =
-              (rng() < 0.5 ? -1 : 1) * (ENGLISH_MIN + rng() * (ENGLISH_MAX - ENGLISH_MIN));
-            targetY = clamp(predY + english * (paddleH / 2), lo, hi);
-          }
-
-          pass = { isMiss, predY, targetY, startDist: distanceToNet(ball.x, ball.vx) };
+          pass = { predY, targetY };
         }
 
         function step(dt) {
@@ -363,8 +315,7 @@
         // Phosphor is drawn from an aged history rather than by fading an
         // accumulation layer. A destination-out fade bottoms out at an alpha of
         // 1/255 and then rounds back to itself, so it never reaches zero and
-        // leaves a permanent haze of every path the ball has taken. The scars
-        // are meant to be the only thing here that lasts.
+        // leaves a permanent haze of every path the ball has taken.
         function ageTrail(list, life, dt) {
           for (const point of list) point.age += dt;
           while (list.length && list[0].age >= life) list.shift();
@@ -372,20 +323,9 @@
         }
 
         function updatePaddle(dt) {
-          const dist = distanceToNet(ball.x, ball.vx);
-          const travelled = pass.startDist > 0 ? 1 - dist / pass.startDist : 1;
-          const commit = smootherStep(
-            clamp((travelled - COMMIT_START) / (COMMIT_END - COMMIT_START), 0, 1)
-          );
-          // Early in the loop the paddle simply watches the ball's height; as
-          // the ball closes it slides onto the mark it committed to.
-          const target = clamp(
-            ball.y + (pass.targetY - ball.y) * commit,
-            paddleMin(),
-            paddleMax()
-          );
-
-          const desired = clamp((target - paddle.y) * 9, -paddleSpeed, paddleSpeed);
+          // Move onto the known intercept from the start of the lap. This keeps
+          // the motion physical while giving the paddle the whole lap to work.
+          const desired = clamp((pass.targetY - paddle.y) * 9, -paddleSpeed, paddleSpeed);
           paddle.vy += (desired - paddle.vy) * Math.min(1, dt * 14);
           paddle.y = clamp(paddle.y + paddle.vy * dt, paddleMin(), paddleMax());
         }
@@ -396,12 +336,9 @@
           const geometryHit = Math.abs(crossY - paddle.y) <= reach;
 
           stats.passes += 1;
-          if (geometryHit === pass.isMiss) stats.disagree += 1;
-
-          if (pass.isMiss) {
+          if (!geometryHit) {
             stats.misses += 1;
-            addScar(dir > 0 ? 'right' : 'left', crossY);
-            flash = { y: crossY, t: 0, miss: true };
+            flash = null;
             // The ball is not turned back; it carries on around the loop.
             ball.x = wrapX(netX + dir * (paddleW / 2 + ballR + 0.5));
           } else {
@@ -412,17 +349,10 @@
             ball.vy = ballSpeed * Math.sin(angle);
             ball.y = crossY;
             ball.x = wrapX(netX - dir * (paddleW / 2 + ballR + 0.5));
-            flash = { y: crossY, t: 0, miss: false };
+            flash = { y: crossY, t: 0 };
           }
 
           beginPass();
-        }
-
-        function addScar(side, y) {
-          const norm = clamp((y - courtTop) / courtH, 0, 0.999999);
-          const bucket = Math.floor(norm * SCARS);
-          const target = side === 'right' ? scarRight : scarLeft;
-          target[bucket] += 1;
         }
 
         function tick(now) {
@@ -439,11 +369,9 @@
           ctx.fillStyle = '#000';
           ctx.fillRect(0, 0, viewportW, viewportH);
 
-          // Only the moving parts smear; the net, the scars and the score stay
-          // crisp underneath.
+          // Only the moving parts smear; the net and score stay crisp.
           drawWalls();
           drawScore();
-          drawScars();
           drawNet();
           drawBallTrail();
           drawPaddleTrail();
@@ -469,28 +397,6 @@
           for (let y = courtTop + 2; y < courtBottom - 2; y += dash + gap) {
             const h = Math.min(dash, courtBottom - 2 - y);
             ctx.fillRect(netX - Math.floor(w / 2), y, w, h);
-          }
-        }
-
-        // Every miss burns a bar into the net at the height the ball slipped
-        // past, growing to the side it was heading. Left bars are left's score
-        // and right bars are right's, so the centre line slowly becomes a
-        // picture of where this paddle fails.
-        function drawScars() {
-          const maxLen = clamp(viewportW * 0.055, 26, 96);
-          const barH = Math.max(1, Math.ceil(courtH / SCARS));
-          const edge = Math.ceil(paddleW / 2);
-
-          for (let i = 0; i < SCARS; i += 1) {
-            const y = Math.round(courtTop + (i / SCARS) * courtH);
-            for (const side of [-1, 1]) {
-              const count = side > 0 ? scarRight[i] : scarLeft[i];
-              if (!count) continue;
-              const load = clamp(Math.log1p(count) / Math.log1p(SCAR_FULL), 0, 1);
-              const len = Math.max(2, Math.round(maxLen * load));
-              ctx.fillStyle = `rgba(255,255,255,${0.2 + load * 0.5})`;
-              ctx.fillRect(side > 0 ? netX + edge : netX - edge - len, y, len, barH);
-            }
           }
         }
 
@@ -548,8 +454,8 @@
         function drawFlash() {
           if (!flash) return;
           const life = 1 - flash.t / FLASH_DUR;
-          const alpha = life * life * (flash.miss ? 0.5 : 0.32);
-          const spread = (flash.miss ? 26 : 16) * (1 - life) + 6;
+          const alpha = life * life * 0.32;
+          const spread = 16 * (1 - life) + 6;
           ctx.fillStyle = `rgba(255,255,255,${alpha})`;
           ctx.fillRect(netX - spread, flash.y - 1.5, spread * 2, 3);
         }
@@ -588,7 +494,7 @@
           ctx.textAlign = 'center';
           ctx.textBaseline = 'alphabetic';
           ctx.fillStyle = 'rgba(255,255,255,0.34)';
-          ctx.fillText('Paddle · 2026 · eight of ten · click to reseed', netX, viewportH - 8);
+          ctx.fillText('Paddle · 2026 · plays every ball · click to reseed', netX, viewportH - 8);
           ctx.textAlign = 'left';
         }
 
@@ -598,8 +504,7 @@
             `passes ${stats.passes}`,
             `catches ${stats.catches}  misses ${stats.misses}`,
             `catch rate ${rate}%`,
-            `geometry disagreements ${stats.disagree}`,
-            `next ${pass.isMiss ? 'MISS' : 'catch'}`,
+            `next intercept ${Math.round(pass.predY)}`,
           ];
           ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
           ctx.fillStyle = 'rgba(255,255,255,0.75)';
@@ -614,11 +519,6 @@
           if (t < 0) t += span * 2;
           if (t > span) t = span * 2 - t;
           return lo + t;
-        }
-
-        function smootherStep(value) {
-          const t = clamp(value, 0, 1);
-          return t * t * t * (t * (t * 6 - 15) + 10);
         }
 
         function clamp(value, min, max) {

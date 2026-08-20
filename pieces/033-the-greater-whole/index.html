@@ -59,13 +59,13 @@
       }
 
       .knife-cursor {
-        --blade-color: var(--pink);
+        --blade-color: #fff;
         position: fixed;
         z-index: 3;
         top: 0;
         left: 0;
         width: 72px;
-        height: 27px;
+        height: 72px;
         pointer-events: none;
         transform: translate3d(-100px, -100px, 0);
         visibility: hidden;
@@ -77,20 +77,27 @@
       .knife-icon {
         display: block;
         width: 72px;
-        height: 27px;
+        height: 72px;
         overflow: visible;
       }
 
       .knife-blade {
         fill: var(--blade-color);
         stroke: var(--ink);
+        stroke-linecap: round;
         stroke-linejoin: round;
-        stroke-width: 2.4;
-        transition: fill 100ms linear;
+        stroke-width: 14;
+        transition: fill 420ms cubic-bezier(0.25, 1, 0.5, 1);
       }
 
-      .knife-handle { fill: var(--ink); }
-      .knife-rivet { fill: var(--ground); }
+      .knife-cursor.is-cutting .knife-blade {
+        transition-duration: 70ms;
+        transition-timing-function: linear;
+      }
+
+      .knife-handle {
+        fill: var(--ink);
+      }
 
       .knife-icon.is-triggered {
         animation: knife-cut 210ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -319,7 +326,7 @@
 
       @keyframes knife-cut {
         0% { transform: translate(0, 0) rotate(0); }
-        42% { transform: translate(5px, 5px) rotate(8deg); }
+        42% { transform: translate(-3px, 3px) rotate(-5deg); }
         100% { transform: translate(0, 0) rotate(0); }
       }
 
@@ -373,13 +380,15 @@
   <body>
     <canvas id="field" aria-hidden="true"></canvas>
     <div class="knife-cursor" id="knife-cursor" aria-hidden="true">
-      <svg class="knife-icon" id="knife-icon" viewBox="0 0 78 28">
-        <g transform="translate(78 0) scale(-1 1)">
-          <path class="knife-blade" d="M1 13 46 3 51 9 46 19Q23 22 7 18Z" />
-          <path class="knife-handle" d="M45 8h30q2 0 2 2v8q0 2-2 2H45Z" />
-          <circle class="knife-rivet" cx="57" cy="14" r="1.5" />
-          <circle class="knife-rivet" cx="68" cy="14" r="1.5" />
-        </g>
+      <svg class="knife-icon" id="knife-icon" viewBox="0 0 512 512">
+        <path
+          class="knife-blade"
+          d="M65 482c12-47 34-89 63-127l140-151 102 71c6 5 7 11 1 17-65 67-138 129-211 166-37 18-71 25-95 24Z"
+        />
+        <path
+          class="knife-handle"
+          d="M264 190 388 62c17-18 44-19 63-7 21 14 28 42 18 64-10 22-33 34-55 26l-69 70c-3 3-3 7-1 13 4 12-1 22-10 27-10 6-23 2-32-6l-32-32c-8-8-11-19-6-27Z"
+        />
       </svg>
     </div>
     <main>
@@ -472,6 +481,7 @@
         let dpr = 1;
         let serial = 0;
         let frame = 0;
+        let knifeColorTimer = 0;
 
         if (DEBUG) {
           document.body.classList.add('is-debug');
@@ -622,15 +632,21 @@
 
         function moveKnife(event) {
           if (DEBUG || !finePointer.matches || event.pointerType === 'touch') return;
-          knifeCursor.style.transform = `translate3d(${event.clientX - 72}px, ${event.clientY - 14}px, 0) rotate(-18deg)`;
+          knifeCursor.style.transform = `translate3d(${event.clientX - 9}px, ${event.clientY - 68}px, 0)`;
           knifeCursor.classList.add('is-visible');
         }
 
         function setKnifeColor(color) {
+          window.clearTimeout(knifeColorTimer);
+          knifeCursor.classList.add('is-cutting');
           knifeCursor.style.setProperty('--blade-color', `rgb(${color.join(' ')})`);
           knifeIcon.classList.remove('is-triggered');
           void knifeIcon.getBoundingClientRect();
           knifeIcon.classList.add('is-triggered');
+          knifeColorTimer = window.setTimeout(() => {
+            knifeCursor.classList.remove('is-cutting');
+            knifeCursor.style.setProperty('--blade-color', '#fff');
+          }, 210);
         }
 
         function draw(now) {
