@@ -64,13 +64,6 @@
         letter-spacing: -.015em;
         line-height: 1.02;
       }
-      .lede {
-        margin: .55rem 0 0;
-        font-size: clamp(1.1rem, 2.2vw, 1.5rem);
-        font-style: italic;
-        line-height: 1.35;
-      }
-
       /* Catalog controls */
       .controls {
         margin-top: clamp(1rem, 2.4vw, 1.6rem);
@@ -200,15 +193,6 @@
         color: #555;
       }
 
-      footer {
-        padding: 1.5rem var(--pad) 3rem;
-        border-top: 1px solid #e6e6e6;
-        font-size: .95rem;
-        font-style: italic;
-        color: #555;
-      }
-      footer a { color: var(--blue); }
-
       @media (max-width: 42rem) {
         .row { flex-wrap: wrap; gap: .2rem 1rem; }
         .row .dates {
@@ -229,17 +213,12 @@
 
     <header>
       <h1>HyperMedia Club</h1>
-      <p class="lede">Interactive artworks made for the browser.</p>
       <div class="controls">
         <p class="ctl"><strong class="lbl">Status:</strong><span id="statuses" role="group" aria-label="Status"></span>. <strong class="lbl">Theme:</strong><span id="themes" role="group" aria-label="Theme"></span>. <strong class="lbl">View:</strong><span id="views" role="group" aria-label="View"></span>. <strong class="lbl">Sort:</strong><span id="sorts" role="group" aria-label="Sort"></span></p>
       </div>
     </header>
 
     <main id="works" class="as-grid" aria-live="polite"></main>
-
-    <footer>
-      <p>HyperMedia Club, Brooklyn &amp; the browser. Everything here runs by opening a file.</p>
-    </footer>
 
     <script>
       (() => {
