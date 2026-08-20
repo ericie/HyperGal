@@ -2,18 +2,6 @@
 window.HYPERGAL_MANIFEST = {
   "pieces": [
     {
-      "slug": "001-drift",
-      "title": "Drift a POC",
-      "year": 2026,
-      "date": "2026-06-16",
-      "category": "generative",
-      "type": "interactive",
-      "wip": true,
-      "thumbnail": "thumbnail.jpg",
-      "description": "A field of slowly drifting points on a low-contrast ground. Generative, runs forever.",
-      "updated": "2026-08-20"
-    },
-    {
       "slug": "002-all-wall",
       "title": "all-wall",
       "year": 2026,
