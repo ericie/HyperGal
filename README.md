@@ -33,6 +33,19 @@ from now, with zero external dependencies.
 - Individual piece: open `pieces/<slug>/index.html` directly. Always works,
   no server, no build.
 
+## Linking gallery states
+
+Gallery filters use validated query parameters: `status`, `theme`, `view`,
+`sort`, and `dir`. Default values are omitted, so the unfiltered published
+grid remains `/`. For example:
+
+`/?status=wip&theme=nature&view=list&sort=alpha&dir=asc`
+
+Filter changes create browser-history entries, and Back/Forward restores both
+the results and each control's pressed state. Unrelated parameters are kept.
+Every loaded or changed state is also sent to Bakalytics as a
+`Gallery filter state` event with all five values in its target.
+
 ## Constraints (the archival rule)
 
 - Each piece is fully self-contained. If a piece uses a library (e.g.

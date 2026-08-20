@@ -249,12 +249,21 @@
         const viewsEl = document.getElementById('views');
         const sortsEl = document.getElementById('sorts');
 
+        const DEFAULTS = {
+          status: 'published',
+          theme: '',
+          view: 'grid',
+          sort: 'date'
+        };
+        const DEFAULT_DIRECTIONS = { alpha: 'asc', date: 'desc' };
+        const FILTER_KEYS = ['status', 'theme', 'view', 'sort', 'dir'];
+
         let pieces = [];
-        let status = 'published';
-        let theme = '';
-        let view = 'grid';
-        let sort = 'date';
-        const sortDirections = { alpha: 'asc', date: 'desc' };
+        let status = DEFAULTS.status;
+        let theme = DEFAULTS.theme;
+        let view = DEFAULTS.view;
+        let sort = DEFAULTS.sort;
+        const sortDirections = { ...DEFAULT_DIRECTIONS };
 
         const STATUSES = [
           ['published', 'Published', p => !p.wip],
@@ -284,13 +293,18 @@
             return fail();
           }
           pieces = data.pieces.slice();
+          readStateFromUrl();
           buildGroup(statusesEl, STATUSES, () => status,
-            v => { status = v; render(); });
+            v => { status = v; });
           buildGroup(themesEl, THEMES, () => theme,
-            v => { theme = theme === v ? '' : v; render(); });
-          buildGroup(viewsEl, VIEWS, () => view, v => { view = v; render(); });
+            v => { theme = theme === v ? '' : v; });
+          buildGroup(viewsEl, VIEWS, () => view, v => { view = v; });
           buildSortGroup();
+          syncControls();
           render();
+          writeStateToUrl('replaceState');
+          trackFilterState();
+          window.addEventListener('popstate', restoreStateFromUrl);
         }
 
         function fail() {
@@ -395,8 +409,7 @@
             b.setAttribute('aria-pressed', String(item[0] === getCurrent()));
             b.addEventListener('click', () => {
               onPick(item[0]);
-              container.querySelectorAll('.opt').forEach((x, j) =>
-                x.setAttribute('aria-pressed', String(items[j][0] === getCurrent())));
+              commitState();
             });
             container.append(b);
             if (i < items.length - 1) container.append(document.createTextNode(', '));
@@ -419,8 +432,7 @@
               } else {
                 sort = value;
               }
-              updateSortGroup();
-              render();
+              commitState();
             });
             sortsEl.append(b);
             if (i < SORTS.length - 1) {
@@ -428,6 +440,90 @@
             }
           });
           updateSortGroup();
+        }
+
+        function commitState() {
+          syncControls();
+          render();
+          if (writeStateToUrl('pushState')) trackFilterState();
+        }
+
+        function restoreStateFromUrl() {
+          readStateFromUrl();
+          syncControls();
+          render();
+          trackFilterState();
+        }
+
+        function syncControls() {
+          syncGroup(statusesEl, STATUSES, status);
+          syncGroup(themesEl, THEMES, theme);
+          syncGroup(viewsEl, VIEWS, view);
+          updateSortGroup();
+        }
+
+        function syncGroup(container, items, current) {
+          container.querySelectorAll('.opt').forEach((button, index) =>
+            button.setAttribute('aria-pressed', String(items[index][0] === current)));
+        }
+
+        function readStateFromUrl() {
+          const params = new URLSearchParams(window.location.search);
+          status = validValue(STATUSES, params.get('status'), DEFAULTS.status);
+          theme = validValue(THEMES, params.get('theme'), DEFAULTS.theme);
+          view = validValue(VIEWS, params.get('view'), DEFAULTS.view);
+          sort = validValue(SORTS, params.get('sort'), DEFAULTS.sort);
+
+          Object.assign(sortDirections, DEFAULT_DIRECTIONS);
+          const requestedDirection = params.get('dir');
+          sortDirections[sort] = requestedDirection === 'asc' || requestedDirection === 'desc'
+            ? requestedDirection
+            : DEFAULT_DIRECTIONS[sort];
+        }
+
+        function validValue(items, requested, fallback) {
+          return items.some(item => item[0] === requested) ? requested : fallback;
+        }
+
+        function writeStateToUrl(method) {
+          const url = new URL(window.location.href);
+          FILTER_KEYS.forEach(key => url.searchParams.delete(key));
+
+          if (status !== DEFAULTS.status) url.searchParams.set('status', status);
+          if (theme !== DEFAULTS.theme) url.searchParams.set('theme', theme);
+          if (view !== DEFAULTS.view) url.searchParams.set('view', view);
+
+          const direction = sortDirections[sort];
+          if (sort !== DEFAULTS.sort || direction !== DEFAULT_DIRECTIONS[DEFAULTS.sort]) {
+            url.searchParams.set('sort', sort);
+            url.searchParams.set('dir', direction);
+          }
+
+          if (url.href === window.location.href) return false;
+          try {
+            window.history[method]({ galleryFilters: true }, '', url.href);
+            return true;
+          } catch {
+            // Keep the gallery usable when opened directly from file://.
+            return false;
+          }
+        }
+
+        function filterStateTarget() {
+          return new URLSearchParams({
+            status,
+            theme: theme || 'all',
+            view,
+            sort,
+            dir: sortDirections[sort]
+          }).toString();
+        }
+
+        function trackFilterState() {
+          const target = filterStateTarget();
+          const send = () => window.bakalytics?.track('Gallery filter state', target);
+          if (window.bakalytics?.track) send();
+          else window.addEventListener('load', send, { once: true });
         }
 
         function updateSortGroup() {
