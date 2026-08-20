@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="A typographic field in which every letter releases a 2.5-second composition made only from itself."
+      content="A typographic field in which every character releases a 2.5-second composition made only from itself."
     />
     <title>The Greater Whole · HyperGal</title>
     <style>
@@ -133,8 +133,7 @@
         white-space: nowrap;
       }
 
-      .glyph,
-      .mark {
+      .glyph {
         display: inline-block;
         font: inherit;
         letter-spacing: inherit;
@@ -320,7 +319,7 @@
 
       @keyframes knife-cut {
         0% { transform: translate(0, 0) rotate(0); }
-        42% { transform: translate(-5px, 5px) rotate(-8deg); }
+        42% { transform: translate(5px, 5px) rotate(8deg); }
         100% { transform: translate(0, 0) rotate(0); }
       }
 
@@ -375,10 +374,12 @@
     <canvas id="field" aria-hidden="true"></canvas>
     <div class="knife-cursor" id="knife-cursor" aria-hidden="true">
       <svg class="knife-icon" id="knife-icon" viewBox="0 0 78 28">
-        <path class="knife-blade" d="M1 13 46 3 51 9 46 19Q23 22 7 18Z" />
-        <path class="knife-handle" d="M45 8h30q2 0 2 2v8q0 2-2 2H45Z" />
-        <circle class="knife-rivet" cx="57" cy="14" r="1.5" />
-        <circle class="knife-rivet" cx="68" cy="14" r="1.5" />
+        <g transform="translate(78 0) scale(-1 1)">
+          <path class="knife-blade" d="M1 13 46 3 51 9 46 19Q23 22 7 18Z" />
+          <path class="knife-handle" d="M45 8h30q2 0 2 2v8q0 2-2 2H45Z" />
+          <circle class="knife-rivet" cx="57" cy="14" r="1.5" />
+          <circle class="knife-rivet" cx="68" cy="14" r="1.5" />
+        </g>
       </svg>
     </div>
     <main>
@@ -389,7 +390,7 @@
         ></blockquote>
       </div>
     </main>
-    <p class="instruction">Cut through any letter</p>
+    <p class="instruction">Cut through any character</p>
     <p class="meter">Active <output id="active-count">00</output> / 2.5 sec</p>
     <p class="sr-only" id="announcement" aria-live="polite"></p>
     <section class="debug-view" id="debug-view" aria-label="Animation comparison grid" hidden>
@@ -503,41 +504,33 @@
             group.className = 'word';
 
             Array.from(word).forEach((character) => {
-              if (/\p{L}/u.test(character)) {
-                const button = document.createElement('button');
-                let lastActivation = -Infinity;
-                button.type = 'button';
-                button.className = 'glyph';
-                button.textContent = character;
-                button.setAttribute('aria-label', `Cut away letter ${character}`);
+              const button = document.createElement('button');
+              let lastActivation = -Infinity;
+              button.type = 'button';
+              button.className = 'glyph';
+              button.textContent = character;
+              button.setAttribute('aria-label', `Cut away ${describeCharacter(character)}`);
 
-                const activate = () => {
-                  const now = performance.now();
-                  if (now - lastActivation < 120) return;
-                  lastActivation = now;
-                  trigger(button, character);
-                  deleteLetter(button, character);
-                };
+              const activate = () => {
+                const now = performance.now();
+                if (now - lastActivation < 120) return;
+                lastActivation = now;
+                trigger(button, character);
+                deleteCharacter(button, character);
+              };
 
-                button.addEventListener('pointerenter', (event) => {
-                  if (event.pointerType !== 'touch') activate();
-                });
-                button.addEventListener('pointerdown', (event) => {
-                  if (event.pointerType === 'touch') activate();
-                });
-                button.addEventListener('keydown', (event) => {
-                  if (event.repeat || (event.key !== 'Enter' && event.key !== ' ')) return;
-                  event.preventDefault();
-                  activate();
-                });
-                group.append(button);
-              } else {
-                const mark = document.createElement('span');
-                mark.className = 'mark';
-                mark.textContent = character;
-                mark.setAttribute('aria-hidden', 'true');
-                group.append(mark);
-              }
+              button.addEventListener('pointerenter', (event) => {
+                if (event.pointerType !== 'touch') activate();
+              });
+              button.addEventListener('pointerdown', (event) => {
+                if (event.pointerType === 'touch') activate();
+              });
+              button.addEventListener('keydown', (event) => {
+                if (event.repeat || (event.key !== 'Enter' && event.key !== ' ')) return;
+                event.preventDefault();
+                activate();
+              });
+              group.append(button);
             });
 
             quote.append(group);
@@ -601,7 +594,7 @@
           if (!frame) frame = requestAnimationFrame(draw);
         }
 
-        function deleteLetter(button, character) {
+        function deleteCharacter(button, character) {
           const wasFocused = document.activeElement === button;
           const remaining = Array.from(quote.querySelectorAll('.glyph:not(.is-deleted)'));
           const index = remaining.indexOf(button);
@@ -611,14 +604,25 @@
           button.disabled = true;
           button.tabIndex = -1;
           button.setAttribute('aria-hidden', 'true');
-          announcement.textContent = `Letter ${character} cut away into a two and a half second animation.`;
+          const description = describeCharacter(character);
+          announcement.textContent = `${description[0].toUpperCase()}${description.slice(1)} cut away into a two and a half second animation.`;
 
           if (wasFocused && next) next.focus();
         }
 
+        function describeCharacter(character) {
+          if (/\p{L}/u.test(character)) return `letter ${character}`;
+          const punctuation = {
+            '.': 'period',
+            ',': 'comma',
+            "'": 'apostrophe'
+          };
+          return punctuation[character] || `character ${character}`;
+        }
+
         function moveKnife(event) {
           if (DEBUG || !finePointer.matches || event.pointerType === 'touch') return;
-          knifeCursor.style.transform = `translate3d(${event.clientX}px, ${event.clientY - 14}px, 0) rotate(-18deg)`;
+          knifeCursor.style.transform = `translate3d(${event.clientX - 72}px, ${event.clientY - 14}px, 0) rotate(-18deg)`;
           knifeCursor.classList.add('is-visible');
         }
 
