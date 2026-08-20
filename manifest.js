@@ -11,7 +11,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A field of slowly drifting points on a low-contrast ground. Generative, runs forever.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "002-all-wall",
@@ -33,7 +33,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
       "description": "Breakout in reverse. An infallible paddle sends one ball on a clean arc to the nearest low column of a level Renaissance-colored wall. Each underside hit reserves one new brick, and only that completed cell creeps the aligned lattice upward. No player, no losing. Click to rebuild.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "004-hunt-prey-paint",
@@ -44,7 +44,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
       "description": "An abstract ecosystem that paints itself in watercolour and cartographic linework, then wipes the painting clean forever. Over a pale NES-bright pixel terrain, blocky prey graze, grow into spiny square emblems that age toward white, and flee hunters with their own alertness and sprint speed. Spiny prey trundle toward richer plant patches and, when they die, burst into clean eraser blasts that wipe stains, foliage, food, and husks instead of fertilizing the ground. Compact black arcade hunters run prey down, fatten, and breed only by splitting in half. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "005-only-invaders",
@@ -56,7 +56,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "Space Invaders after the invaders have vanished. Four small inset cannons fire only at the opposite edge, while any armed non-shooter may volunteer to intercept. Their finite ammunition appears only as cartridge rows; the final round becomes the sole suicide nuke.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "006-only-centipede",
@@ -68,7 +68,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A Centipede riff with small defenders at the top and bottom, one straight bullet each, and fast, hard-edged centipedes that enter from offscreen once the field is nearly cleared. Head shots remove the head and promote the next segment; body shots split the chain. Every hit segment becomes a three-shot mushroom that dents and deforms in the centipede's color.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "007-hydra",
@@ -90,7 +90,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
       "description": "A black-and-white Vectrex-style Asteroids variant. The ship tries to park with visible retrograde burns, predicts asteroid paths, and fires tight two- or three-shot bursts one bullet at a time until a player takes over, thrusting mainly to dodge and keeping only three shots alive at once. Bullets split asteroids into deeper generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Heavier fragments accelerate slowly, drift together under stronger gravity, bump instead of passing through, settle before they glom, and weld into rough integrated asteroid outlines that animate from their joined pieces. Any asteroid can kill the ship on contact.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "009-mutual-command",
@@ -124,7 +124,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "An edge-to-edge masonry of black-and-white labels and utilitarian light-switch diagrams. Each box flips between ON and OFF in a discrete ten-frame transition as its center crosses a hot-pink midpoint line.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "012-happiness-hunter",
@@ -136,7 +136,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "One yellow arcade car hunts for the fastest lane through compact gray traffic, buses, and semi trucks, signaling, speeding up, surging, or backing off to make openings, but never exits. Other gray vehicles have wider speed personalities, from aggressive squeezers to conservative gap-waiters, and try to pass too. Slow traffic packs tighter while fast traffic leaves more room. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray vehicles can take diagonal ramps offscreen and leave the highway. Every vehicle claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car scores +1 for every pass, loses 1 when most vehicles pass it, and loses 5 when a semi passes it.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "013-paddle",
@@ -147,7 +147,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
       "description": "One-player Pong folded into a cylinder. A single paddle stands where the net used to be; the ball leaves one edge and returns from the other, so every save comes back around and the only way to be rid of the ball is to miss. The two counters tally edge crossings, left and right, and exactly one crossing happens per lap — a catch sends the ball back out the edge behind it, a miss lets it through to the far one, so the paddle decides which side a point lands on but never whether one lands. It catches eight of every ten, striking off-centre on purpose to keep the rally alive, and each miss burns a permanent bar into the centre line, which slowly becomes a histogram of where this paddle fails.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "014-only-ghosts",
@@ -159,7 +159,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "Pac hunts every power pellet across a full-frame maze.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "015-growth-rings",
@@ -170,7 +170,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.jpg",
       "description": "A trunk cross-section that grows toward 200 years one ring at a time. Latitude, solar angle, wind exposure, temperature, rainfall, and ground slope push the cambium out of symmetry; heavy rain years bloom into wider uneven rings while severity-scaled fire and pest incidents suppress 1-5 years of growth without cutting into older wood.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "016-up-mario",
@@ -182,7 +182,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A family of tiny chibi Marios races upward through a pastel candy sky, making horizontal leaps between smiling clouds and falling with any cloud that crumbles beneath them.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "017-knot-work",
@@ -194,7 +194,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "An edge-to-edge field of loose Celtic interlace printed in dark brown on worn paper. Continuous rounded cords pass through a Truchet-like knot grid, alternating over and under at crossings and running beyond every side of the browser. Click or press Enter/Space to reseed.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "018-life-checkers",
@@ -206,7 +206,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "Conway's Game of Life played across a shifting four-color checkerboard. At reset, the dead checkerboard changes from top to bottom before the new live cells fade in through ten quick batches.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "019-city-of-signs",
@@ -218,7 +218,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A dense edge-to-edge black-and-white architecture built on a shared grid. Wide chambers and needle-thin towers repeat nested arches, circles, diamonds, miniature buildings, flags, and colonnades through alternating solid mass and carved negative space.",
-      "updated": "2026-08-19"
+      "updated": "2026-08-20"
     },
     {
       "slug": "020-soft-collapse",
@@ -241,7 +241,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
       "description": "Four bookmatched marble tiles cut from one procedural slab. Each seed selects a Life Checkers palette and randomized marble settings for a photographic surface whose turbulence flows through a seamless five-second loop.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "022-hyper-lichen",
@@ -252,7 +252,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
       "description": "Crustose lichen colonies continuously recolonize an entire dark stone surface in full-coverage radial waves of mint, sage, cream, and pale pink. Each completed layer immediately gives way to the next.",
-      "updated": "2026-08-17"
+      "updated": "2026-08-20"
     },
     {
       "slug": "023-marbled-water",
@@ -299,7 +299,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A bright ball and frequent waves of spring-snakes fight for a twenty-storey cube pyramid, painting every landing yellow or green. The scoreboard tracks Yellow, Green, and unclaimed territory; the first side to claim 100% wins.",
-      "updated": "2026-08-19"
+      "updated": "2026-08-20"
     },
     {
       "slug": "027-camouflage",
@@ -357,7 +357,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A perfectly ordinary elevator makes its rounds through five still, fantastical office rooms: flooded desks, indoor weather, a midnight orchard, a sky boardroom, and records without end.",
-      "updated": "2026-08-18"
+      "updated": "2026-08-20"
     },
     {
       "slug": "032-obstacles-and-the-space-between",
@@ -378,7 +378,6 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-08-20",
       "category": "generative",
       "type": "interactive",
-      "wip": true,
       "thumbnail": "thumbnail.png",
       "description": "A field of Geist Sans makes every letter active: crossing one with the knife cursor cuts it from the statement and releases a 2.5-second abstract composition built only from that glyph; each composition can overlap the next.",
       "updated": "2026-08-20"
