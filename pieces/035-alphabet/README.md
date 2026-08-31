@@ -2,11 +2,13 @@
 
 A work-in-progress geometric alphabet assembled from a deliberately small kit
 of parts: circles, rectangles, triangles, overlaps, and cut-outs. The main
-piece drops the ten letters in `HYPERMEDIA` onto a shared ground line. Gravity,
+piece drops the ten letters in `HYPERMEDIA` onto a raised ground line, with
+three angled platforms staggered through the space below it. Gravity,
 restitution, friction, rotation, wall collisions, and letter-to-letter impulses
 let the glyphs bounce, interrupt one another, and eventually settle. Once the
-pile is still, every letter rights itself, sprouts two black legs, and begins
-patrolling the line. Walkers reverse at the edges and scatter when they meet.
+pile is still, every letter rights itself, sprouts two color-matched rubbery
+legs, and begins patrolling the upper line. Walkers reverse at the edges and
+scatter when they meet.
 
 The letterforms borrow the constructional playfulness of mid-century shape
 alphabets without tracing a single typeface. Each glyph has its own palette

@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="HYPERMEDIA falling through a full-screen Plinko field." />
+    <title>HYPERMEDIA — Plinko</title>
+    <link rel="preload" href="PublicSans-VF.ttf" as="font" type="font/ttf" crossorigin />
+    <style>
+      @font-face {
+        font-family: "Public Sans";
+        src: url("PublicSans-VF.ttf") format("truetype-variations");
+        font-weight: 100 900;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      :root {
+        color-scheme: dark;
+        --paper: #000000;
+        --ink: #ffffff;
+        --disk-ink: #000000;
+        --pink: #ff4ab0;
+        --lime: #e8f80d;
+        --blue: #6995ec;
+        --mint: #cee4db;
+      }
+
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        min-width: 320px;
+        margin: 0;
+        overflow: hidden;
+        background: var(--paper);
+      }
+
+      body {
+        color: var(--ink);
+        font-family: "Public Sans", Arial, sans-serif;
+        font-kerning: normal;
+        font-optical-sizing: auto;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .stage {
+        position: relative;
+        width: 100%;
+        height: 100svh;
+        overflow: hidden;
+        background: var(--paper);
+        cursor: pointer;
+        isolation: isolate;
+        touch-action: manipulation;
+      }
+
+      .stage:focus-visible {
+        outline: 2px solid var(--ink);
+        outline-offset: -6px;
+      }
+
+      .board {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        contain: strict;
+      }
+
+      .peg {
+        position: absolute;
+        width: var(--peg-size);
+        height: var(--peg-size);
+        border-radius: 50%;
+        background: var(--ink);
+        translate: -50% -50%;
+      }
+
+      .disk {
+        position: absolute;
+        display: grid;
+        place-items: center;
+        width: var(--disk-size);
+        height: var(--disk-size);
+        border-radius: 50%;
+        background: var(--disk-color);
+        color: var(--disk-ink);
+        font-size: calc(var(--disk-size) * .64);
+        font-weight: 900;
+        font-variation-settings: "wght" 900;
+        line-height: 1;
+        will-change: transform;
+        user-select: none;
+      }
+
+      .stage.paused .disk { will-change: auto; }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .disk { will-change: auto; }
+      }
+    </style>
+  </head>
+  <body>
+    <main
+      class="stage"
+      tabindex="0"
+      role="button"
+      aria-pressed="false"
+      aria-label="HYPERMEDIA Plinko animation. Click or press Space to pause and resume."
+    >
+      <div class="board" aria-hidden="true"></div>
+      <span class="sr-only" aria-live="polite">Animation playing</span>
+    </main>
+
+    <script>
+      (() => {
+        const stage = document.querySelector('.stage');
+        const board = document.querySelector('.board');
+        const status = document.querySelector('.sr-only');
+        const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const colors = [
+          '#ff4ab0',
+          '#e8f80d',
+          '#6995ec',
+          '#32f277',
+          '#ff6b35',
+          '#a675ff',
+          '#00d9ff',
+          '#ff3b30',
+          '#ffd166',
+          '#f7a8ff'
+        ];
+        const characters = [...'HYPERMEDIA'];
+
+        let paused = false;
+        let width = 0;
+        let height = 0;
+        let pegs = [];
+        let topRowPegs = [];
+        let topAimCursor = 0;
+        let disks = [];
+        let lastFrame = performance.now();
+        let resizeFrame = 0;
+
+        function clamp(minimum, value, maximum) {
+          return Math.max(minimum, Math.min(value, maximum));
+        }
+
+        function randomBetween(minimum, maximum) {
+          return minimum + Math.random() * (maximum - minimum);
+        }
+
+        function makePeg(x, y, radius) {
+          const element = document.createElement('i');
+          element.className = 'peg';
+          element.style.left = `${x}px`;
+          element.style.top = `${y}px`;
+          element.style.setProperty('--peg-size', `${radius * 2}px`);
+          board.append(element);
+          return { element, x, y, radius, color: '#ffffff', reserved: false };
+        }
+
+        function chooseTopTarget() {
+          for (let offset = 0; offset < topRowPegs.length; offset++) {
+            const targetIndex = (topAimCursor + offset) % topRowPegs.length;
+            const target = topRowPegs[targetIndex];
+            if (target.color !== '#ffffff' || target.reserved) continue;
+            target.reserved = true;
+            topAimCursor = (targetIndex + 1) % topRowPegs.length;
+            return target;
+          }
+
+          return null;
+        }
+
+        function chooseEntry(radius) {
+          const target = chooseTopTarget();
+          if (target) {
+            const offset = randomBetween(-radius * .34, radius * .34);
+            return {
+              x: clamp(radius, target.x + offset, width - radius),
+              target
+            };
+          }
+
+          const gapCount = topRowPegs.length - 1;
+          const gapIndex = Math.floor(Math.random() * gapCount);
+          const left = topRowPegs[gapIndex];
+          const right = topRowPegs[gapIndex + 1];
+          const minimumX = left.x + left.radius + radius + 2;
+          const maximumX = right.x - right.radius - radius - 2;
+          const x = minimumX < maximumX
+            ? randomBetween(minimumX, maximumX)
+            : (left.x + right.x) * .5;
+          return { x: clamp(radius, x, width - radius), target: null };
+        }
+
+        function makeDisk(character, index, radius) {
+          const element = document.createElement('span');
+          element.className = 'disk';
+          element.textContent = character;
+          element.style.setProperty('--disk-size', `${radius * 2}px`);
+          const color = colors[index];
+          element.style.setProperty('--disk-color', color);
+          board.append(element);
+          const entry = chooseEntry(radius);
+
+          return {
+            element,
+            index,
+            color,
+            radius,
+            angle: randomBetween(-Math.PI, Math.PI),
+            angularVelocity: randomBetween(-.025, .025),
+            targetPeg: entry.target,
+            x: entry.x,
+            y: -radius - index * height * .075,
+            vx: randomBetween(-.25, .25),
+            vy: 0
+          };
+        }
+
+        function placeReducedMotionDisks() {
+          const columns = width < 640 ? 3 : 5;
+          const rows = Math.ceil(disks.length / columns);
+          disks.forEach((disk, index) => {
+            const column = index % columns;
+            const row = Math.floor(index / columns);
+            const itemsInRow = Math.min(columns, disks.length - row * columns);
+            disk.x = width * ((column + 1) / (itemsInRow + 1));
+            disk.y = height * ((row + 1) / (rows + 1));
+            disk.element.style.transform = `translate3d(${disk.x - disk.radius}px, ${disk.y - disk.radius}px, 0) rotate(0rad)`;
+          });
+        }
+
+        function buildBoard() {
+          width = stage.clientWidth;
+          height = stage.clientHeight;
+          board.replaceChildren();
+          pegs = [];
+          topRowPegs = [];
+          topAimCursor = 0;
+          disks = [];
+
+          const columns = width < 640 ? 4 : clamp(5, Math.round(width / 220), 8);
+          const rows = clamp(6, Math.round(height / 130), 8);
+          const edgeInset = width < 640 ? 18 : 28;
+          const spacingX = (width - edgeInset * 2) / (columns - 1);
+          const top = Math.max(52, height * .065);
+          const bottom = Math.max(52, height * .075);
+          const spacingY = (height - top - bottom) / (rows - 1);
+          const pegRadius = clamp(3.5, spacingX * .035, 6);
+          const diskRadius = clamp(28, Math.min(spacingX * .37, spacingY * .39), 64);
+
+          for (let row = 0; row < rows; row++) {
+            const odd = row % 2 === 1;
+            const count = odd ? columns - 1 : columns;
+            for (let column = 0; column < count; column++) {
+              const x = edgeInset + spacingX * (column + (odd ? .5 : 0));
+              const y = top + row * spacingY;
+              const peg = makePeg(x, y, pegRadius);
+              pegs.push(peg);
+              if (row === 0) topRowPegs.push(peg);
+            }
+          }
+
+          disks = characters.map((character, index) => makeDisk(character, index, diskRadius));
+          lastFrame = performance.now();
+          if (reduced) placeReducedMotionDisks();
+        }
+
+        function collideWithPegs(disk) {
+          for (const peg of pegs) {
+            let dx = disk.x - peg.x;
+            let dy = disk.y - peg.y;
+            let distance = Math.hypot(dx, dy);
+            const minimum = disk.radius + peg.radius;
+            if (distance >= minimum) continue;
+
+            if (peg.color !== disk.color) {
+              peg.color = disk.color;
+              peg.element.style.backgroundColor = disk.color;
+            }
+            if (peg === disk.targetPeg) {
+              peg.reserved = false;
+              disk.targetPeg = null;
+            }
+
+            if (distance < .001) {
+              dx = disk.index % 2 ? 1 : -1;
+              dy = -1;
+              distance = Math.SQRT2;
+            }
+
+            const nx = dx / distance;
+            const ny = dy / distance;
+            disk.x = peg.x + nx * minimum;
+            disk.y = peg.y + ny * minimum;
+
+            const tangentialVelocity = disk.vx * -ny + disk.vy * nx;
+            disk.angularVelocity = clamp(-.09, disk.angularVelocity + tangentialVelocity / disk.radius * .28, .09);
+
+            const normalVelocity = disk.vx * nx + disk.vy * ny;
+            if (normalVelocity < 0) {
+              disk.vx -= 1.74 * normalVelocity * nx;
+              disk.vy -= 1.74 * normalVelocity * ny;
+            }
+
+            if (Math.abs(dx) < .8) disk.vx += disk.index % 2 ? .16 : -.16;
+          }
+        }
+
+        function collideDisks() {
+          for (let first = 0; first < disks.length; first++) {
+            for (let second = first + 1; second < disks.length; second++) {
+              const a = disks[first];
+              const b = disks[second];
+              let dx = b.x - a.x;
+              let dy = b.y - a.y;
+              let distance = Math.hypot(dx, dy);
+              const minimum = a.radius + b.radius;
+              if (distance >= minimum) continue;
+
+              if (distance < .001) {
+                dx = first % 2 ? 1 : -1;
+                dy = -1;
+                distance = Math.SQRT2;
+              }
+
+              const nx = dx / distance;
+              const ny = dy / distance;
+              const overlap = minimum - distance;
+              a.x -= nx * overlap * .5;
+              a.y -= ny * overlap * .5;
+              b.x += nx * overlap * .5;
+              b.y += ny * overlap * .5;
+
+              const tangentX = -ny;
+              const tangentY = nx;
+              const tangentVelocity = (b.vx - a.vx) * tangentX + (b.vy - a.vy) * tangentY;
+              const spin = tangentVelocity / minimum * .24;
+              a.angularVelocity = clamp(-.09, a.angularVelocity + spin, .09);
+              b.angularVelocity = clamp(-.09, b.angularVelocity - spin, .09);
+
+              const relativeVelocity = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+              if (relativeVelocity >= 0) continue;
+              const impulse = -(1 + .72) * relativeVelocity * .5;
+              a.vx -= impulse * nx;
+              a.vy -= impulse * ny;
+              b.vx += impulse * nx;
+              b.vy += impulse * ny;
+            }
+          }
+        }
+
+        function resetDisk(disk) {
+          const entry = chooseEntry(disk.radius);
+          disk.targetPeg = entry.target;
+          disk.x = entry.x;
+          disk.y = -disk.radius - disk.index * height * .075;
+          disk.vx = randomBetween(-.25, .25);
+          disk.vy = 0;
+          disk.angle = randomBetween(-Math.PI, Math.PI);
+          disk.angularVelocity = randomBetween(-.025, .025);
+        }
+
+        function tick(now) {
+          const delta = Math.min(2.2, (now - lastFrame) / 16.667);
+          lastFrame = now;
+
+          if (!paused && !reduced) {
+            for (const disk of disks) {
+              disk.vy = Math.min(disk.vy + .31 * delta, 7);
+              disk.vx *= .999;
+              disk.x += disk.vx * delta;
+              disk.y += disk.vy * delta;
+              disk.angle += disk.angularVelocity * delta;
+              disk.angularVelocity *= Math.pow(.996, delta);
+
+              if (disk.x < disk.radius) {
+                disk.x = disk.radius;
+                disk.vx = Math.abs(disk.vx) * .72;
+                disk.angularVelocity = clamp(-.09, disk.angularVelocity - disk.vy / disk.radius * .12, .09);
+              } else if (disk.x > width - disk.radius) {
+                disk.x = width - disk.radius;
+                disk.vx = -Math.abs(disk.vx) * .72;
+                disk.angularVelocity = clamp(-.09, disk.angularVelocity + disk.vy / disk.radius * .12, .09);
+              }
+
+              collideWithPegs(disk);
+              if (disk.targetPeg && disk.y > disk.targetPeg.y + disk.radius + disk.targetPeg.radius + 4) {
+                disk.targetPeg.reserved = false;
+                disk.targetPeg = null;
+              }
+            }
+
+            collideDisks();
+            for (const disk of disks) {
+              const speed = Math.hypot(disk.vx, disk.vy);
+              if (speed > 7.5) {
+                disk.vx = disk.vx / speed * 7.5;
+                disk.vy = disk.vy / speed * 7.5;
+              }
+              if (disk.y > height + disk.radius) resetDisk(disk);
+            }
+          }
+
+          for (const disk of disks) {
+            disk.element.style.transform = `translate3d(${disk.x - disk.radius}px, ${disk.y - disk.radius}px, 0) rotate(${disk.angle}rad)`;
+          }
+          requestAnimationFrame(tick);
+        }
+
+        function toggle() {
+          if (reduced) return;
+          paused = !paused;
+          stage.classList.toggle('paused', paused);
+          stage.setAttribute('aria-pressed', String(paused));
+          status.textContent = paused ? 'Animation paused' : 'Animation playing';
+          lastFrame = performance.now();
+        }
+
+        stage.addEventListener('click', toggle);
+        stage.addEventListener('keydown', event => {
+          if (event.code !== 'Space' && event.code !== 'Enter') return;
+          event.preventDefault();
+          toggle();
+        });
+
+        addEventListener('resize', () => {
+          cancelAnimationFrame(resizeFrame);
+          resizeFrame = requestAnimationFrame(buildBoard);
+        });
+
+        buildBoard();
+        requestAnimationFrame(tick);
+      })();
+    </script>
+  </body>
+</html>

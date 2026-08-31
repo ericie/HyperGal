@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#e8ebea" />
     <meta
       name="description"
-      content="Ten colorful geometric letters fall, settle, sprout legs, and run along a single ground line."
+      content="Ten colorful geometric letters fall, settle, sprout legs, and run above a staggered field of platforms."
     />
     <title>Alphabet · HyperGal</title>
     <style>
@@ -88,6 +88,22 @@
         height: 3px;
         background: var(--ink);
         pointer-events: none;
+      }
+
+      .platform-field {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .platform {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 3px;
+        background: var(--ink);
+        transform-origin: 50% 50%;
       }
 
       body.debug-mode {
@@ -292,10 +308,15 @@
       id="stage"
       class="stage"
       tabindex="0"
-      aria-label="The geometric letters in HYPERMEDIA fall from above, collide, settle, sprout legs, and run along a ground line. Click, tap, or press Enter to drop them again."
+      aria-label="The geometric letters in HYPERMEDIA fall from above, collide, settle, sprout legs, and run above a staggered field of platforms. Click, tap, or press Enter to drop them again."
     >
       <h1 class="sr-only">Hypermedia</h1>
       <div id="letter-field" class="letter-field" aria-hidden="true"></div>
+      <div id="platform-field" class="platform-field" aria-hidden="true">
+        <span class="platform"></span>
+        <span class="platform"></span>
+        <span class="platform"></span>
+      </div>
       <div id="ground" class="ground" aria-hidden="true"></div>
     </main>
 
@@ -323,6 +344,7 @@
         const stage = document.getElementById('stage');
         const catalog = document.getElementById('catalog');
         const letterField = document.getElementById('letter-field');
+        const platforms = [...document.querySelectorAll('.platform')];
         const ground = document.getElementById('ground');
         const grid = document.querySelector('.grid');
         const toggle = document.querySelector('.guide-toggle');
@@ -631,7 +653,7 @@
           const WORD = [...'HYPERMEDIA'];
           const LEG_ANCHORS = {
             A: [24, 76],
-            D: [30, 70],
+            D: [30, 61],
             E: [30, 70],
             H: [27, 73],
             I: [34, 66],
@@ -639,6 +661,17 @@
             P: [25, 38],
             R: [26, 72],
             Y: [44, 56],
+          };
+          const LEG_COLORS = {
+            A: [C.blue, C.navy],
+            D: [C.orange, C.yellow],
+            E: [C.taupe, C.taupe],
+            H: ['#74458a', '#9b83a7'],
+            I: ['#68bd67', '#68bd67'],
+            M: [C.pink, '#ec68a3'],
+            P: [C.teal, C.teal],
+            R: ['#1b82bd', '#126da4'],
+            Y: [C.slate, C.slate],
           };
           const motion = matchMedia('(prefers-reduced-motion: reduce)');
           const world = { width: 0, height: 0, inset: 0, groundY: 0, size: 0 };
@@ -661,7 +694,7 @@
             world.width = stage.clientWidth || innerWidth;
             world.height = stage.clientHeight || innerHeight;
             world.inset = Math.max(14, world.width * 0.035);
-            world.groundY = Math.round(world.height * 0.82);
+            world.groundY = Math.round(world.height * (world.height < 520 ? 0.66 : 0.68));
             world.size = clamp(
               Math.max(world.width / 10.8, Math.min(world.width / 6, 68)),
               52,
@@ -669,33 +702,46 @@
             );
             if (world.height < 480) world.size = Math.min(world.size, 62);
             ground.style.transform = `translate3d(0, ${world.groundY}px, 0)`;
+
+            const platformGap = clamp((world.height - world.groundY) / 3.15, 28, 82);
+            const platformLayout = [
+              { x: 0.08, y: 1, width: 0.28, angle: -7 },
+              { x: 0.49, y: 1.88, width: 0.32, angle: 5 },
+              { x: 0.15, y: 2.76, width: 0.23, angle: -4 },
+            ];
+            platforms.forEach((platform, index) => {
+              const layout = platformLayout[index];
+              const width = clamp(world.width * layout.width, 92, 390);
+              const x = clamp(world.width * layout.x, world.inset, world.width - world.inset - width);
+              const y = world.groundY + platformGap * layout.y;
+              platform.style.width = `${width}px`;
+              platform.style.transform =
+                `translate3d(${x}px, ${y}px, 0) rotate(${layout.angle}deg)`;
+            });
           }
 
           function addWalkerLegs(svg, letter) {
             const group = el('g', { class: 'walker-legs', 'aria-hidden': 'true' });
             const anchors = LEG_ANCHORS[letter] || [34, 66];
-            const makeLeg = (anchor, side) => {
+            const colors = LEG_COLORS[letter] || [C.ink, C.ink];
+            const makeLeg = (anchor, side, color) => {
               const legGroup = el('g', { class: `walker-leg walker-leg--${side}` });
               const limb = el('path', {
-                d: `M${anchor} 87 L${anchor} 98 L${anchor} 109`,
+                d:
+                  `M${anchor} 87 C${anchor - 4} 93 ${anchor + 4} 103 ${anchor} 109 ` +
+                  `Q${anchor + (side === 'left' ? -3 : 3)} 111 ` +
+                  `${anchor + (side === 'left' ? -9 : 9)} 109`,
                 fill: 'none',
-                stroke: C.ink,
-                'stroke-width': 7,
+                stroke: color,
+                'stroke-width': 6.5,
                 'stroke-linecap': 'round',
                 'stroke-linejoin': 'round',
               });
-              const foot = el('path', {
-                d: `M${anchor} 109 H${anchor + (side === 'left' ? -8 : 8)}`,
-                fill: 'none',
-                stroke: C.ink,
-                'stroke-width': 7,
-                'stroke-linecap': 'round',
-              });
-              legGroup.append(limb, foot);
-              return { group: legGroup, limb, foot, anchor, side };
+              legGroup.append(limb);
+              return { group: legGroup, limb, anchor, side };
             };
-            const left = makeLeg(anchors[0], 'left');
-            const right = makeLeg(anchors[1], 'right');
+            const left = makeLeg(anchors[0], 'left', colors[0]);
+            const right = makeLeg(anchors[1], 'right', colors[1]);
             group.style.opacity = '0';
             group.append(left.group, right.group);
             svg.append(group);
@@ -741,19 +787,23 @@
           function setGait(body, gait) {
             const poseLeg = (leg, phaseOffset) => {
               const step = gait + phaseOffset;
-              const lift = Math.max(0, Math.sin(step)) * 5;
-              const swing = Math.sin(step) * 9 * body.runDirection;
-              const bend = (leg.side === 'left' ? -2.5 : 2.5) + Math.cos(step) * 2;
-              const kneeX = leg.anchor + swing * 0.35 + bend;
-              const kneeY = 98 - lift * 0.35;
+              const lift = Math.max(0, Math.sin(step)) * 6.5;
+              const swing = Math.sin(step) * 11 * body.runDirection;
+              const sideBias = leg.side === 'left' ? -1 : 1;
+              const bow = Math.cos(step) * 7 * body.runDirection + sideBias * 1.5;
               const ankleX = leg.anchor + swing;
-              const ankleY = 109 - lift;
-              const toeX = ankleX + body.runDirection * (8 + Math.cos(step) * 2);
+              const ankleY = 109 - lift + Math.cos(step) * 0.8;
+              const toeX = ankleX + body.runDirection * (8.5 + Math.cos(step) * 1.5);
+              const upperControlX = leg.anchor + bow + swing * 0.08;
+              const lowerControlX = ankleX + bow * 0.55 - swing * 0.12;
+              const lowerControlY = 102 - lift * 0.32;
+              const toeControlX = ankleX + body.runDirection * 3.5;
+              const toeControlY = ankleY + 1.2;
               leg.limb.setAttribute(
                 'd',
-                `M${leg.anchor} 87 L${kneeX} ${kneeY} L${ankleX} ${ankleY}`
+                `M${leg.anchor} 87 C${upperControlX} 93 ${lowerControlX} ${lowerControlY} ` +
+                `${ankleX} ${ankleY} Q${toeControlX} ${toeControlY} ${toeX} ${ankleY}`
               );
-              leg.foot.setAttribute('d', `M${ankleX} ${ankleY} L${toeX} ${ankleY}`);
             };
 
             poseLeg(body.leftLeg, 0);

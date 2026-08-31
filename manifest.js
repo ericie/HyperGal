@@ -390,7 +390,18 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.svg",
-      "description": "Ten colorful geometric letters fall, settle, sprout legs, and run along a single ground line."
+      "description": "Ten colorful geometric letters fall, settle, sprout legs, and run above a staggered field of platforms."
+    },
+    {
+      "slug": "036-211c",
+      "title": "HYPERMEDIA",
+      "year": 2026,
+      "date": "2026-08-27",
+      "category": "typography",
+      "type": "interactive",
+      "wip": false,
+      "thumbnail": "thumbnail.png",
+      "description": "Ten uniquely colored HYPERMEDIA disks fall through white Plinko pegs on black, painting every peg they strike."
     }
   ]
 };
