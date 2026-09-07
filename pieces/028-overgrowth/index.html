@@ -184,7 +184,7 @@
       id="garden"
       tabindex="0"
       role="img"
-      aria-label="Overgrowth. A dense, directionless botanical wallpaper on aged rag paper that continually fills with new hand-inked plants. Roses, peonies, poppies, lilies, irises, hibiscus, chrysanthemums, dwarf quince, hydrangeas, honeysuckle, acanthus, green palm and fern foliage, plus cream acanthus, rubber tree, Fatsia japonica, standalone palm fronds, and fern leaves grow in every direction. Click or press R to begin a new arrangement."
+      aria-label="Overgrowth. A dense botanical wallpaper on aged rag paper is laid down, then covered by a white mount with a triangular window cut in it. Every plant that grows afterwards is rooted inside that window and climbs out over the board, until roses, peonies, poppies, lilies, irises, hibiscus, chrysanthemums, dwarf quince, hydrangeas, honeysuckle, acanthus, and palm and fern foliage have overrun the mount. Click or press R to begin a new arrangement."
     ></canvas>
     <canvas id="new-growth" aria-hidden="true"></canvas>
     <p id="status" class="sr-only" aria-live="polite"></p>
@@ -214,6 +214,16 @@
         const FAST_GROWTH_INTERVAL = 1000 / 24;
         const MEDIUM_GROWTH_INTERVAL = 1000 / 20;
         const SLOW_GROWTH_INTERVAL = 1000 / 15;
+        const MAT_DELAY = 900;
+        const MAT_FADE = 520;
+        const MAT = {
+          board: '#f6f4ee',
+          boardEdge: '#e6e1d4',
+          bevel: '#fffefa',
+          cut: '#cec7b6',
+          shadow: '#4a3527',
+          boardRGB: '246, 244, 238',
+        };
         const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
         const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === 'true';
 
@@ -341,6 +351,12 @@
         let renderingGrowth = false;
         let growingPlants = [];
         let census = [];
+        let aperture = null;
+        let matApplied = false;
+        let matDropAt = 0;
+        let rimWalk = 0;
+        // Inscribed text carries a halo of whatever it is printed on.
+        let textGround = P.paperRGB;
 
         if (DEBUG_MODE) {
           showDebugCatalog();
@@ -689,6 +705,11 @@
           growthPaintCost = 0;
           growthPaintInterval = FAST_GROWTH_INTERVAL;
           nextGrowthAt = performance.now() + 350;
+
+          aperture = buildAperture();
+          rimWalk = random();
+          matApplied = false;
+          matDropAt = performance.now() + (reducedMotion.matches ? 0 : MAT_DELAY);
         }
 
         // An edge specimen points into the sheet, but every edge is treated
@@ -704,6 +725,241 @@
           };
         }
 
+        // ---------------------------------------------------------------
+        // The mount
+        //
+        // The plate is finished first, then covered by a white board with a
+        // window cut in it. Everything planted afterwards is rooted inside
+        // that window, so the only way left for the garden to spread is to
+        // climb out over the board.
+        // ---------------------------------------------------------------
+
+        // An upward triangle to start with. The window is only ever read as a
+        // polygon, so a different opening is just a different point list.
+        function buildAperture() {
+          const halfBase = Math.min(
+            width * 0.36,
+            (height * 0.74) / Math.sqrt(3),
+            Math.min(width, height) * 0.4
+          );
+          const tall = halfBase * Math.sqrt(3);
+          const cx = width / 2;
+          const cy = height * 0.5;
+          return measurePolygon([
+            { x: cx, y: cy - tall / 2 },
+            { x: cx + halfBase, y: cy + tall / 2 },
+            { x: cx - halfBase, y: cy + tall / 2 },
+          ]);
+        }
+
+        // Fan the window from its centroid so a root can be picked with even
+        // density inside it, and measure the rim so one can be picked on it.
+        function measurePolygon(points) {
+          let cx = 0;
+          let cy = 0;
+          for (const p of points) {
+            cx += p.x;
+            cy += p.y;
+          }
+          cx /= points.length;
+          cy /= points.length;
+
+          const fans = [];
+          const edges = [];
+          let area = 0;
+          let perimeter = 0;
+          let radius = 0;
+          for (let i = 0; i < points.length; i += 1) {
+            const a = points[i];
+            const b = points[(i + 1) % points.length];
+            area += Math.abs((a.x - cx) * (b.y - cy) - (b.x - cx) * (a.y - cy)) * 0.5;
+            fans.push({ a, b, upTo: area });
+            const from = perimeter;
+            perimeter += Math.hypot(b.x - a.x, b.y - a.y);
+            edges.push({ a, b, from, to: perimeter });
+            radius = Math.max(radius, Math.hypot(a.x - cx, a.y - cy));
+          }
+
+          let top = Infinity;
+          let bottom = -Infinity;
+          for (const p of points) {
+            top = Math.min(top, p.y);
+            bottom = Math.max(bottom, p.y);
+          }
+          return { points, centroid: { x: cx, y: cy }, fans, edges, area, perimeter, radius, top, bottom };
+        }
+
+        function traceAperture(poly) {
+          ctx.moveTo(poly.points[0].x, poly.points[0].y);
+          for (let i = 1; i < poly.points.length; i += 1) {
+            ctx.lineTo(poly.points[i].x, poly.points[i].y);
+          }
+          ctx.closePath();
+        }
+
+        function pointInAperture(poly, r) {
+          const pick = r() * poly.area;
+          let fan = poly.fans[poly.fans.length - 1];
+          for (const candidate of poly.fans) {
+            if (pick <= candidate.upTo) {
+              fan = candidate;
+              break;
+            }
+          }
+          let u = r();
+          let v = r();
+          if (u + v > 1) {
+            u = 1 - u;
+            v = 1 - v;
+          }
+          return {
+            x: poly.centroid.x + (fan.a.x - poly.centroid.x) * u + (fan.b.x - poly.centroid.x) * v,
+            y: poly.centroid.y + (fan.a.y - poly.centroid.y) * u + (fan.b.y - poly.centroid.y) * v,
+          };
+        }
+
+        function pointOnRim(poly, t) {
+          const at = clamp(t, 0, 1) * poly.perimeter;
+          let edge = poly.edges[poly.edges.length - 1];
+          for (const candidate of poly.edges) {
+            if (at <= candidate.to) {
+              edge = candidate;
+              break;
+            }
+          }
+          const k = (at - edge.from) / Math.max(1e-6, edge.to - edge.from);
+          return { x: lerp(edge.a.x, edge.b.x, k), y: lerp(edge.a.y, edge.b.y, k) };
+        }
+
+        // Most specimens are rooted against the rim of the window and aimed
+        // outward, so the growth has nowhere to go but over the mount.
+        function apertureOrigin(r) {
+          let p;
+          if (r() < 0.62) {
+            rimWalk = (rimWalk + GOLDEN) % 1;
+            const rim = pointOnRim(aperture, rimWalk);
+            const pull = lerp(0.02, 0.24, r());
+            p = {
+              x: lerp(rim.x, aperture.centroid.x, pull),
+              y: lerp(rim.y, aperture.centroid.y, pull),
+            };
+          } else {
+            p = pointInAperture(aperture, r);
+          }
+          const dx = p.x - aperture.centroid.x;
+          const dy = p.y - aperture.centroid.y;
+          const heading =
+            Math.hypot(dx, dy) > aperture.radius * 0.14 ? Math.atan2(dy, dx) : r() * TAU;
+          return { x: p.x, y: p.y, rotation: heading + Math.PI / 2 + lerp(-0.6, 0.6, r()) };
+        }
+
+        function drawMat(alpha) {
+          if (!aperture) return;
+          const poly = aperture;
+          const bevel = clamp(Math.min(width, height) * 0.006, 2.4, 7);
+
+          ctx.save();
+
+          // The lip of the board throws a shadow down onto the plate.
+          ctx.save();
+          ctx.beginPath();
+          traceAperture(poly);
+          ctx.clip();
+          ctx.strokeStyle = MAT.shadow;
+          for (let i = 0; i < 6; i += 1) {
+            ctx.globalAlpha = alpha * (0.15 - i * 0.022);
+            ctx.lineWidth = 2 + i * 6;
+            ctx.beginPath();
+            traceAperture(poly);
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          // The board itself, cut away at the window.
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, 0, width, height);
+          traceAperture(poly);
+          ctx.clip('evenodd');
+
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = MAT.board;
+          ctx.fillRect(0, 0, width, height);
+
+          const wash = ctx.createRadialGradient(
+            width * 0.5,
+            height * 0.42,
+            0,
+            width * 0.5,
+            height * 0.5,
+            Math.max(width, height) * 0.8
+          );
+          wash.addColorStop(0, 'rgba(255, 255, 255, 0)');
+          wash.addColorStop(1, 'rgba(188, 180, 161, 0.3)');
+          ctx.fillStyle = wash;
+          ctx.fillRect(0, 0, width, height);
+
+          // The tooth of the board, so it is not a flat digital white.
+          const r = mulberry32((seed ^ 0x6d1f7723) >>> 0);
+          ctx.globalAlpha = alpha * 0.05;
+          ctx.fillStyle = '#a79d86';
+          for (let i = 0; i < Math.round((width * height) / 2600); i += 1) {
+            ctx.fillRect(r() * width, r() * height, lerp(0.5, 1.5, r()), lerp(0.5, 1.5, r()));
+          }
+
+          // A forty-five degree cut: a faint shoulder, then the bright core
+          // of the board where the knife went through.
+          ctx.globalAlpha = alpha * 0.55;
+          ctx.strokeStyle = MAT.boardEdge;
+          ctx.lineWidth = bevel * 2 + 2.4;
+          ctx.beginPath();
+          traceAperture(poly);
+          ctx.stroke();
+
+          ctx.globalAlpha = alpha;
+          ctx.strokeStyle = MAT.bevel;
+          ctx.lineWidth = bevel * 2;
+          ctx.beginPath();
+          traceAperture(poly);
+          ctx.stroke();
+          ctx.restore();
+
+          // The cut line itself, half of it falling over the plate.
+          ctx.globalAlpha = alpha * 0.5;
+          ctx.strokeStyle = MAT.cut;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          traceAperture(poly);
+          ctx.stroke();
+
+          ctx.restore();
+        }
+
+        // The board goes down a beat after the plate, so the covering reads
+        // as a second act rather than part of the first impression.
+        function dropMat(now) {
+          const fade = reducedMotion.matches ? 0 : MAT_FADE;
+          const t = fade ? clamp((now - matDropAt) / fade, 0, 1) : 1;
+
+          growthCtx.setTransform(1, 0, 0, 1, 0, 0);
+          growthCtx.clearRect(0, 0, growthCanvas.width, growthCanvas.height);
+
+          if (t >= 1) {
+            ctx = mainCtx;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            drawMat(1);
+            drawInscription();
+            matApplied = true;
+            nextGrowthAt = now + 240;
+            return;
+          }
+
+          ctx = growthCtx;
+          ctx.setTransform(growthDpr, 0, 0, growthDpr, 0, 0);
+          drawMat(t * t * (3 - 2 * t));
+          ctx = mainCtx;
+        }
+
         // The plate never reaches a finished state. New specimens are stamped
         // straight onto the existing pixels, so the garden keeps getting
         // denser without retaining an ever-growing object graph in memory.
@@ -713,6 +969,11 @@
         }
 
         function growForever(now) {
+          if (!matApplied) {
+            if (now >= matDropAt) dropMat(now);
+            growthFrame = requestAnimationFrame(growForever);
+            return;
+          }
           // Detailed flowers can be expensive while several specimens overlap.
           // Bound the transient work instead of letting a slow species create
           // an ever-growing redraw queue.
@@ -731,19 +992,19 @@
           const unit = clamp(Math.min(width, height) / 560, 0.95, 1.75);
           const isVine = growthCount % 11 === 10;
           const species = isVine ? SPECIES.findIndex((spec) => spec.vine) : null;
-          const origin = isVine
-            ? edgePlantOrigin(growthCount % 4, width * 0.04, random)
-            : {
-                x: lerp(-width * 0.04, width * 1.04, random()),
-                y: lerp(-height * 0.04, height * 1.04, random()),
-                rotation: random() * TAU,
-              };
+          const origin = apertureOrigin(random);
           const plant = createPlant(origin.x, origin.y, species, unit, {
             census: false,
             rotation: origin.rotation,
           });
 
-          plant.scale *= isVine ? lerp(1.05, 1.45, random()) : lerp(0.58, 1.28, random());
+          // Every root stays in the window, so reach is what carries the
+          // growth outward. Later specimens are given more of it, and the
+          // mount is taken a little more of at a time instead of the
+          // colony stalling at one radius.
+          const reach = lerp(1, 1.8, clamp(growthCount / 150, 0, 1));
+          plant.scale *=
+            reach * (isVine ? lerp(1.05, 1.45, random()) : lerp(0.58, 1.28, random()));
 
           growingPlants.push({
             plant,
@@ -965,8 +1226,10 @@
           }
         }
 
+        // Written on the mount, the way a mounted print is titled below its
+        // window in pencil. The growth will bury it soon enough.
         function drawInscription() {
-          if (height < 320 || width < 300) return;
+          if (height < 320 || width < 300 || !aperture) return;
           const size = clamp(Math.min(width, height) * 0.021, 10, 17);
           const ranked = census
             .map((n, i) => ({ n, i }))
@@ -975,22 +1238,23 @@
             .map((entry) => SPECIES[entry.i].latin);
 
           const caption = ranked.join('  ·  ');
-          const baseline = height - margin * 0.52;
+          const captionY = aperture.bottom + (height - aperture.bottom) * 0.54;
+          const plateY = aperture.top * 0.56;
 
           ctx.save();
           ctx.textAlign = 'center';
-          ctx.font = `italic ${size}px Georgia, "Times New Roman", Times, serif`;
+          textGround = MAT.boardRGB;
 
-          // A breath of clean paper under the inscription, the way a plate
-          // keeps its caption out of the ink.
-          paperHalo(width / 2, baseline - size * 0.32, ctx.measureText(caption).width * 0.62 + size * 1.6);
-          inscribe(caption, width / 2, baseline, size, 0.82);
+          if (height - aperture.bottom > size * 2.6) {
+            ctx.font = `italic ${size}px Georgia, "Times New Roman", Times, serif`;
+            inscribe(caption, width / 2, captionY, size, 0.62);
+          }
+          if (aperture.top > size * 2.6) {
+            ctx.font = `${size * 0.72}px Georgia, "Times New Roman", Times, serif`;
+            spacedText(`PLATE ${roman((seed % 240) + 1)}`, width / 2, plateY, size * 0.3, size * 0.72, 0.5);
+          }
 
-          ctx.font = `${size * 0.72}px Georgia, "Times New Roman", Times, serif`;
-          const plate = `PLATE ${roman((seed % 240) + 1)}`;
-          ctx.globalAlpha = 1;
-          paperHalo(width / 2, margin * 0.66 - size * 0.24, ctx.measureText(plate).width * 0.9 + size * 1.4);
-          spacedText(plate, width / 2, margin * 0.66, size * 0.3, size * 0.72, 0.66);
+          textGround = P.paperRGB;
           ctx.restore();
         }
 
@@ -1016,7 +1280,7 @@
           ctx.save();
           ctx.lineJoin = 'round';
           ctx.lineWidth = size * 0.3;
-          ctx.strokeStyle = `rgba(${P.paperRGB}, 0.92)`;
+          ctx.strokeStyle = `rgba(${textGround}, 0.92)`;
           ctx.globalAlpha = 0.9;
           ctx.strokeText(text, x, y);
           ctx.globalAlpha = alpha;

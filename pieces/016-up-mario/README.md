@@ -1,48 +1,54 @@
 # Many Mario
 
-A self-playing vertical platform fighter in a pastel kinetic-toy world.
+A self-playing vertical platform climber in a simplified anime-painted summer
+sky.
 
-A family of tiny chibi Marios climbs forever through a blue candy sky. Every
-Mario favors long sideways leaps and seeks out occupied clouds. When two meet,
-they run into one another and try to shove the other over an edge. Face-to-face
-pressure locks them in a short stalemate; once one turns, the Mario behind him
-can transfer his momentum through the other body and push him into open air.
-Question boxes are lemon yellow, ladders are mint and lavender, and a cropped
-pastel rainbow floats at the edge of the scene.
+A family of fat, bouncy, two-eyed silhouettes climbs forever through an
+anime-painted sky assembled from transparent cloud banks, towers, and wisps.
+Their scale, placement, reflection, and parallax change with every new seed.
+Every runner favors pronounced side-to-side leaps and chooses an independent
+route. Platforms can extend beyond either edge of the viewport, while
+landing targets remain inside the visible area. Runners can cross paths without
+colliding, so the motion stays focused on running, jumping, and landing.
 
-The piece plays itself by default. The lead Mario chooses a local intention:
-hit a nearby question box from below, climb a ladder, cross a stair, jump to a
-reachable cloud, or occasionally descend to revisit a missed box. The player
-can interrupt with left/right/jump input, after which the climb resumes. The
-other Marios independently choose reachable clouds, line up broad lateral
-jumps, land, and either challenge a nearby Mario or look for the next step up.
+The piece plays itself by default at a measured climbing cadence. The lead
+runner chooses a local intention: jump to a reachable platform. The player can
+interrupt with left/right/jump input, after which the climb resumes. The other
+runners independently choose reachable surfaces, line up broad lateral jumps,
+land, and look for the next step up.
 
 ## Physics
 
-Clouds are persistent physical platforms rather than temporary effects. They
-never crumble, rain, or pop into view as a recovery device. Mario bodies carry
-horizontal momentum, meet at a shared contact distance, brace when they face
-one another, and transfer a shove when one catches the other's back. A Mario
-whose center loses the cloud's edge falls under gravity and can land below or
-reappear only after dropping out of view.
+Runners carry horizontal momentum but do not collide with one another. A runner
+whose center loses a platform edge falls under gravity and can still catch a
+surface below. No runner is ever warped back into view. A Mario with no route
+makes one desperate physical jump instead of waiting forever; if it reaches the
+bottom edge, it performs a final upward death bounce before disappearing. When
+every Mario is gone, a new pair waits on ledges below the viewport and the
+camera slowly pans down until it finds them.
 
 ## World
 
-Clouds are generated well above the camera from a seeded random stream and stay
-in place for as long as they remain in the world. The main path stays inside a
-reachable jump envelope, while side clouds, alternate routes, ladders, stairs,
-question boxes, and small peach-colored grumps make the field feel inhabited.
-The camera only rises. Old world elements are trimmed after they are far below
-the viewport so the piece can run indefinitely.
+Platforms are generated well above the camera from a seeded random stream. Four
+altitude zones repeat through the climb: stable black ink lines; square brick
+tiles that crack and fall one square at a time whenever a runner stands on
+them; trapdoors with their triggering lever on the next ledge above; and cloud
+platforms that shed painted chunks into drifting particles on every landing.
+Rare super springs fire runners several platform levels upward. The camera
+follows whichever living Mario has climbed highest, except for its deliberate
+downward search after the whole group has died.
 
 ## Drawing
 
-Everything is drawn at runtime on one dependency-free canvas. Large, faceless,
-borderless cloud silhouettes use a central dome, uneven shoulders, and a softly
-scalloped belly instead of repeated identical lobes. A full pastel palette—sky
-blue, strawberry, lemon, mint, lavender, peach, and denim—keeps depth without
-hard outlines. Mario's red cap, M badge, moustache, overalls, gloves, and warm
-skin tones stay readable even at miniature scale.
+The game runs on one dependency-free canvas. Its background is composed at
+runtime from three transparent anime-painted raster assets rather than one
+finished backdrop. Platforms remain code-drawn so cracks, hinges, levers,
+fragmentation, and impact states can animate precisely. The pastel material
+colors stay soft around stark black-and-white runners. Each figure uses a
+continuous charcoal silhouette: a long pointed hood, two animated white eyes, a
+broad round belly, floppy handless arms, thin legs, and sharp feet. Ground poses
+carry a pronounced step bounce; takeoff stretches the body and every landing
+produces a deep squash.
 
 ## Controls
 

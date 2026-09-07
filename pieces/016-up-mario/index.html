@@ -71,7 +71,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Many Mario: tiny chibi Marios jump between persistent white clouds and use physical shoves to push one another over the edges."
+      aria-label="Many Mario: black two-eyed silhouettes climb through a different anime-painted cloudscape on every run."
     ></canvas>
     <pre id="debug" class="debug" hidden></pre>
 
@@ -81,6 +81,18 @@
         const ctx = canvas.getContext('2d', { alpha: false });
         const debugEl = document.getElementById('debug');
         const params = new URLSearchParams(location.search);
+        const cloudPartSources = {
+          tower: './assets/cloud-tower.png',
+          bank: './assets/cloud-bank.png',
+          wisps: './assets/cloud-wisps.png',
+        };
+        const cloudPartImages = {};
+        for (const [name, src] of Object.entries(cloudPartSources)) {
+          const image = new Image();
+          image.decoding = 'async';
+          image.src = src;
+          cloudPartImages[name] = image;
+        }
         const reduceQuery =
           typeof matchMedia === 'function'
             ? matchMedia('(prefers-reduced-motion: reduce)')
@@ -88,36 +100,33 @@
 
         const DEBUG = params.has('debug');
         const TAU = Math.PI * 2;
-        const GRAVITY = -1580;
-        const RUN_SPEED = 286;
-        const AIR_SPEED = 246;
-        const JUMP_SPEED = 735;
-        const SPRING_SPEED = 870;
-        const HERO_W = 28;
-        const HERO_H = 44;
+        const GRAVITY = -1480;
+        const RUN_SPEED = 266;
+        const AIR_SPEED = 320;
+        const JUMP_SPEED = 680;
+        const SPRING_SPEED = 1080;
+        const HERO_W = 32;
+        const HERO_H = 46;
         const LAUNCH_MARGIN = 20;
         const MIN_TARGET_GAP = 30;
         const MAX_TARGET_GAP = 156;
         const STALL_SECONDS = 2.35;
-        const BOX_ATTEMPT_SECONDS = 1.75;
-        const BOX_SIZE = 26;
-        const BOX_BOTTOM_OFFSET = 60;
-        const LINK_REACH = 14;
-        const LINK_SPEEDS = {
-          ladder: 112,
-          stairs: 148,
-        };
         const CLOUD_PULSE_SECONDS = 0.32;
-        const BUDDY_JUMP_SPEED = 690;
-        const BUDDY_AIR_SPEED = 278;
-        const BUDDY_RUN_SPEED = 176;
-        const MARIO_CONTACT_GAP = 21;
-        const MARIO_EDGE_GRACE = 13;
-        const STALEMATE_SECONDS = 0.82;
+        const AUTO_LANDING_PAUSE = 0.22;
+        const BUDDY_STALL_SECONDS = 2.8;
+        const BUDDY_JUMP_SPEED = 650;
+        const BUDDY_AIR_SPEED = 325;
+        const BUDDY_RUN_SPEED = 162;
+        const DEATH_BOUNCE_SPEED = 470;
+        const SEARCH_PAN_SPEED = 72;
+        const RUNNER_EDGE_GRACE = 13;
+        const CRUMBLE_TILE_SIZE = 21;
+        const ZONE_HEIGHT = 940;
+        const ZONES = ['ink', 'crumble', 'trap', 'shrink'];
 
         /* A candy-shop palette: blue-sky paper, strawberry pink, lemon,
            mint and grape details. The clouds stay quiet and borderless so
-           the physical contest between the figures remains the focus. */
+           the runners' movement remains the focus. */
         const C = {
           white: '#FFFDFC',
           sky: '#A9E4FF',
@@ -132,7 +141,6 @@
           blush: '#F7A8BF',
           lemon: '#FFD96A',
           mint: '#8EDCC9',
-          peach: '#FFB886',
           red: '#ED6670',
           denim: '#6D9FD2',
           skin: '#FFD2AD',
@@ -166,11 +174,9 @@
         let rng = Math.random;
         let hero = null;
         let platforms = [];
-        let barrels = [];
-        let boxes = [];
-        let links = [];
         let particles = [];
         let buddies = [];
+        let cloudscapeLayout = [];
         let buddyCount = 0;
         let keys = {
           left: false,
@@ -188,23 +194,13 @@
         let manualUntil = 0;
         let jumpBufferedUntil = 0;
         let bestHeight = 0;
-        let boxesHit = 0;
         let platformCount = 0;
-        let barrelCount = 0;
-        let boxCount = 0;
-        let linkCount = 0;
+        let trunkCount = 0;
         let targetPlatformId = null;
-        let targetBoxId = null;
-        let targetLinkId = null;
-        let rescueCount = 0;
-        let downTrips = 0;
-        let ladderTrips = 0;
-        let stairTrips = 0;
+        let deathCount = 0;
+        let cameraSearchMode = false;
         let lastProgressAt = 0;
         let lastProgressHeight = 0;
-        let skippedBoxes = 0;
-        let stalemateCount = 0;
-        let shoveOutCount = 0;
 
         debugEl.hidden = !DEBUG;
         resize();
@@ -252,6 +248,50 @@
           };
         }
 
+        function makeCloudscapeLayout() {
+          const skyRng = mulberry32(xmur3(`${seed}:cloud-parts`)());
+          const between = (min, max) => min + skyRng() * (max - min);
+          const layout = [
+            {
+              kind: 'bank',
+              x: between(0.42, 0.58),
+              y: between(0.87, 0.96),
+              width: between(1.02, 1.28),
+              alpha: between(0.72, 0.9),
+              flip: skyRng() > 0.5,
+              parallax: between(0.018, 0.034),
+            },
+          ];
+
+          const towerCount = skyRng() > 0.42 ? 2 : 1;
+          for (let i = 0; i < towerCount; i += 1) {
+            const rightSide = (i + (skyRng() > 0.5 ? 1 : 0)) % 2 === 0;
+            layout.push({
+              kind: 'tower',
+              x: rightSide ? between(0.91, 1.04) : between(-0.04, 0.09),
+              y: between(0.43, 0.7),
+              width: between(0.3, 0.48),
+              alpha: between(0.54, 0.76),
+              flip: rightSide ? skyRng() > 0.24 : skyRng() > 0.76,
+              parallax: between(0.028, 0.048),
+            });
+          }
+
+          const wispCount = 2 + Math.floor(skyRng() * 3);
+          for (let i = 0; i < wispCount; i += 1) {
+            layout.push({
+              kind: 'wisps',
+              x: between(0.12, 0.88),
+              y: between(0.08, 0.58),
+              width: between(0.2, 0.42),
+              alpha: between(0.28, 0.56),
+              flip: skyRng() > 0.5,
+              parallax: between(0.012, 0.028),
+            });
+          }
+          return layout;
+        }
+
         function reset(nextSeed = randomSeed()) {
           cancelAnimationFrame(raf);
           seed = String(nextSeed || randomSeed());
@@ -261,75 +301,23 @@
           cameraY = 0;
           highestCameraY = 0;
           bestHeight = 0;
-          boxesHit = 0;
           platformCount = 0;
-          barrelCount = 0;
-          boxCount = 0;
-          linkCount = 0;
+          trunkCount = 0;
           buddyCount = 0;
-          rescueCount = 0;
-          downTrips = 0;
-          ladderTrips = 0;
-          stairTrips = 0;
-          skippedBoxes = 0;
-          stalemateCount = 0;
-          shoveOutCount = 0;
+          deathCount = 0;
+          cameraSearchMode = false;
           targetPlatformId = null;
-          targetBoxId = null;
-          targetLinkId = null;
           platforms = [];
-          barrels = [];
-          boxes = [];
-          links = [];
           particles = [];
           buddies = [];
+          cloudscapeLayout = makeCloudscapeLayout();
           lastPlatform = makePlatform(worldWidth * 0.5, 88, Math.min(230, worldWidth * 0.74), 'brick', false);
+          configurePlatformZone(lastPlatform, null);
           platforms.push(lastPlatform);
-          addQuestionBoxesForPlatform(lastPlatform);
           highestPlatformY = lastPlatform.y;
           while (highestPlatformY < height * 1.75) addPlatform();
           seedMarioBuddies();
-          hero = {
-            id: 0,
-            x: lastPlatform.x + lastPlatform.w * 0.5,
-            y: lastPlatform.y,
-            previousY: lastPlatform.y,
-            vx: 0,
-            vy: 0,
-            facing: 1,
-            grounded: true,
-            groundId: lastPlatform.id,
-            lastGroundedAt: 0,
-            landedAt: 0,
-            groundedSince: 0,
-            jumpCooldownUntil: 0,
-            stumbleUntil: 0,
-            blinkUntil: 0,
-            rescuedUntil: 0,
-            autoTargetId: null,
-            autoLaunchX: null,
-            autoLandingX: null,
-            routeAttemptTargetId: null,
-            routeAttemptFromId: null,
-            routeAttemptStartedAt: 0,
-            onLink: null,
-            boxTargetId: null,
-            boxAttemptId: null,
-            boxAttemptStartedAt: 0,
-            boxAttemptJumps: 0,
-            revisitPlatformId: null,
-            revisitCooldownUntil: 0,
-            noRouteSince: 0,
-            stride: 0,
-            climbT: 0,
-            nextBlinkAt: 1.8,
-            blinkEndsAt: 0,
-            blinkCount: 0,
-            forcedDir: 0,
-            yieldUntil: 0,
-            clashWith: null,
-            clashSince: 0,
-          };
+          hero = makeHero(lastPlatform);
           pulseCloud(lastPlatform);
           lastProgressAt = 0;
           lastProgressHeight = 0;
@@ -339,6 +327,45 @@
             for (let i = 0; i < steps; i += 1) update(1 / 60);
           }
           raf = requestAnimationFrame(tick);
+        }
+
+        function makeHero(platform, waitingForCamera = false) {
+          const x = safeLandingX(platform, platformCenter(platform));
+          return {
+            id: 0,
+            x,
+            y: platform.y,
+            previousY: platform.y,
+            vx: 0,
+            vy: 0,
+            facing: 1,
+            grounded: true,
+            groundId: platform.id,
+            lastGroundedAt: 0,
+            landedAt: 0,
+            groundedSince: 0,
+            jumpCooldownUntil: 0,
+            stumbleUntil: 0,
+            blinkUntil: 0,
+            dying: false,
+            dead: false,
+            deathStartedAt: 0,
+            deathSpin: 0,
+            waitingForCamera,
+            superJumpUntil: 0,
+            desperateUntil: 0,
+            autoTargetId: null,
+            autoLaunchX: null,
+            autoLandingX: null,
+            routeAttemptTargetId: null,
+            routeAttemptFromId: null,
+            routeAttemptStartedAt: 0,
+            noRouteSince: 0,
+            stride: 0,
+            nextBlinkAt: 1.8,
+            blinkEndsAt: 0,
+            blinkCount: 0,
+          };
         }
 
         function resize() {
@@ -351,7 +378,7 @@
           canvas.style.height = `${height}px`;
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           ctx.imageSmoothingEnabled = true;
-          worldWidth = Math.round(clamp(width * (width < 560 ? 0.96 : 0.86), 300, 920));
+          worldWidth = Math.round(clamp(width * 0.96, 300, 1600));
           worldLeft = Math.round((width - worldWidth) / 2);
         }
 
@@ -368,21 +395,20 @@
         function update(dt) {
           simTime += dt;
           extendWorld();
+          updatePlatformStates();
           updateControls(dt);
           updateHero(dt);
-          updateBarrels(dt);
-          updateQuestionBoxes();
           updateMarioBuddies(dt);
-          resolveMarioPhysics();
           updateParticles(dt);
+          ensureMarioPopulation();
           updateCamera(dt);
-          rescueIfNeeded();
           recoverIfStalled();
           trimWorld();
           updateHud();
         }
 
         function updateControls(dt) {
+          if (hero.dead || hero.dying || hero.waitingForCamera) return;
           if (keys.jump && simTime > jumpBufferedUntil) jumpBufferedUntil = simTime + 0.12;
           if (manualActive()) {
             targetPlatformId = null;
@@ -392,14 +418,13 @@
         }
 
         function updateHero(dt) {
-          hero.previousY = hero.y;
-          updateBlink();
-          if (hero.onLink) {
-            hero.climbT += dt;
-            updateLinkTravel(dt);
+          if (hero.dead || hero.waitingForCamera) return;
+          if (hero.dying) {
+            updateDyingMario(hero, dt);
             return;
           }
-
+          hero.previousY = hero.y;
+          updateBlink();
           let desiredVx = 0;
           const manual = manualActive();
 
@@ -430,6 +455,10 @@
           hero.y += hero.vy * dt;
           if (hero.grounded) hero.stride += Math.abs(hero.vx) * dt;
           keepHeroInShaft();
+          if (!hero.grounded && screenY(hero.y) >= height - hudHeight()) {
+            beginMarioDeath(hero);
+            return;
+          }
           collidePlatforms();
         }
 
@@ -446,10 +475,12 @@
 
         function planAutopilot() {
           hero.autoVx = 0;
-          targetBoxId = null;
-          targetLinkId = null;
 
           if (!hero.grounded) {
+            if (hero.desperateUntil > simTime) {
+              hero.autoVx = hero.facing * AIR_SPEED;
+              return;
+            }
             const target = activeAirTarget() || chooseAirLandingTarget();
             targetPlatformId = target ? target.id : null;
             if (!target) return;
@@ -467,42 +498,9 @@
             return;
           }
 
-          if (hero.yieldUntil > simTime) {
-            targetPlatformId = current.id;
-            hero.facing = hero.forcedDir || hero.facing;
-            hero.autoVx = hero.facing * RUN_SPEED * 0.56;
-            return;
-          }
-
-          const shoveTarget = nearestMarioOpponent(current.id, hero);
-          if (shoveTarget) {
-            const dx = shoveTarget.x - hero.x;
-            targetPlatformId = current.id;
-            hero.noRouteSince = 0;
-            hero.autoVx = Math.abs(dx) < MARIO_CONTACT_GAP + 2
-              ? Math.sign(dx || hero.facing) * RUN_SPEED * 0.72
-              : clamp(dx * 5.2, -RUN_SPEED, RUN_SPEED);
-            return;
-          }
-
-          const localBox = chooseLocalQuestionBox(current);
-          if (localBox) {
-            planQuestionBox(current, localBox);
-            return;
-          }
-          clearBoxAttempt();
-
-          const downLink = chooseDownRevisitLink(current);
-          if (downLink) {
-            hero.noRouteSince = 0;
-            followLinkPlan(current, downLink, -1);
-            return;
-          }
-
-          const upLink = chooseUpLink(current);
-          if (upLink) {
-            hero.noRouteSince = 0;
-            followLinkPlan(current, upLink, 1);
+          if (simTime < hero.landedAt + AUTO_LANDING_PAUSE) {
+            targetPlatformId = null;
+            hero.autoVx = 0;
             return;
           }
 
@@ -531,67 +529,23 @@
           }
         }
 
-        function planQuestionBox(current, box) {
-          targetBoxId = box.id;
-          hero.boxTargetId = box.id;
-          hero.noRouteSince = 0;
-
-          if (hero.boxAttemptId !== box.id) {
-            hero.boxAttemptId = box.id;
-            hero.boxAttemptStartedAt = simTime;
-            hero.boxAttemptJumps = 0;
-          }
-
-          const attemptAge = simTime - hero.boxAttemptStartedAt;
-          if (attemptAge > BOX_ATTEMPT_SECONDS || hero.boxAttemptJumps >= 3) {
-            skipQuestionBox(current, box);
-            return;
-          }
-
-          const left = platformLeft(current) + HERO_W * 0.65 + 6;
-          const right = platformLeft(current) + current.w - HERO_W * 0.65 - 6;
-          const targetX = clamp(box.x, left, right);
-          const dx = targetX - hero.x;
-          hero.autoVx = clamp(dx * 4.8, -RUN_SPEED, RUN_SPEED);
-          if (Math.abs(dx) < 11 && simTime >= hero.jumpCooldownUntil) {
-            hero.boxAttemptJumps += 1;
-            jump(false);
-          }
-        }
-
-        function skipQuestionBox(current, box) {
-          box.skipUntil = simTime + 8;
-          box.failedAt = simTime;
-          skippedBoxes += 1;
-          clearBoxAttempt();
-          targetBoxId = null;
-          current.boxSkips = (current.boxSkips || 0) + 1;
-          if ((current.boxHits || 0) + current.boxSkips >= current.boxQuota) {
-            current.boxQuota = current.boxHits || 0;
-          }
-        }
-
-        function clearBoxAttempt() {
-          hero.boxTargetId = null;
-          hero.boxAttemptId = null;
-          hero.boxAttemptStartedAt = 0;
-          hero.boxAttemptJumps = 0;
-        }
-
         function activeAirTarget() {
           const target = platformById(hero.autoTargetId);
-          if (!target) return null;
+          if (!target || !platformIsSolid(target)) return null;
           const missedBy = target.y - hero.y;
-          if (missedBy > MAX_TARGET_GAP || hero.y < target.y - 52) return null;
+          const targetRange = hero.superJumpUntil > simTime ? MAX_TARGET_GAP + 260 : MAX_TARGET_GAP;
+          if (missedBy > targetRange || hero.y < target.y - 52) return null;
           return target;
         }
 
         function chooseAirLandingTarget() {
           let best = null;
           for (const platform of platforms) {
+            if (!platformIsSolid(platform)) continue;
             if (platform.y > hero.y + 34 || platform.y < hero.y - 210) continue;
-            const left = platformLeft(platform) + landingMargin(platform);
-            const right = platformLeft(platform) + platform.w - landingMargin(platform);
+            const bounds = landingBounds(platform);
+            if (!bounds) continue;
+            const { left, right } = bounds;
             const xGap = hero.x < left ? left - hero.x : hero.x > right ? hero.x - right : 0;
             const timeBias = hero.vy > 0 && platform.y < hero.y - 30 ? 70 : 0;
             if (xGap > AIR_SPEED * 1.05) continue;
@@ -601,157 +555,24 @@
           return best;
         }
 
-        function chooseLocalQuestionBox(current) {
-          const available = boxes
-            .filter((box) => !box.hit && box.platformId === current.id && (!box.skipUntil || box.skipUntil < simTime))
-            .sort((a, b) => Math.abs(a.x - hero.x) - Math.abs(b.x - hero.x));
-          if (!available.length) {
-            if (hero.revisitPlatformId === current.id) {
-              hero.revisitPlatformId = null;
-              hero.revisitCooldownUntil = simTime + rand(8, 14);
-            }
-            return null;
-          }
-
-          if (current.boxQuota == null) {
-            const quotaRoll = rng();
-            current.boxQuota = quotaRoll < 0.18 ? 0 : quotaRoll < 0.78 ? 1 : Math.min(2, available.length);
-            current.boxHits = current.boxHits || 0;
-          }
-          if (hero.revisitPlatformId === current.id) current.boxQuota = Math.max(current.boxQuota, current.boxHits + 1);
-          if ((current.boxHits || 0) >= current.boxQuota) return null;
-          return available[0];
-        }
-
-        function chooseDownRevisitLink(current) {
-          if (simTime < hero.revisitCooldownUntil || hero.revisitPlatformId) return null;
-          if (!current.revisitChecked) {
-            current.revisitChecked = true;
-            current.revisitIntent = rng() < 0.46;
-          }
-          if (!current.revisitIntent) return null;
-
-          const candidates = links
-            .filter((link) => link.upperId === current.id)
-            .filter((link) => {
-              const lower = platformById(link.lowerId);
-              if (!lower || lower.y <= cameraY - 120) return false;
-              return platformHasUnhitBoxes(link.lowerId);
-            })
-            .sort((a, b) => linkDownScore(a) - linkDownScore(b));
-          if (!candidates.length) return null;
-          current.revisitIntent = false;
-          hero.revisitPlatformId = candidates[0].lowerId;
-          return candidates[0];
-        }
-
-        function chooseUpLink(current) {
-          const candidates = links
-            .filter((link) => link.lowerId === current.id)
-            .filter((link) => platformById(link.upperId))
-            .sort((a, b) => platformById(a.upperId).y - platformById(b.upperId).y);
-          if (!candidates.length) return null;
-          return candidates[0];
-        }
-
-        function followLinkPlan(current, link, dir) {
-          targetLinkId = link.id;
-          targetPlatformId = dir > 0 ? link.upperId : link.lowerId;
-          const entryX = dir > 0 ? link.x1 : link.x2;
-          const dx = entryX - hero.x;
-          hero.autoVx = clamp(dx * 4.4, -RUN_SPEED, RUN_SPEED);
-          if (Math.abs(dx) < LINK_REACH && simTime >= hero.jumpCooldownUntil) startLink(link, dir);
-        }
-
-        function startLink(link, dir) {
-          hero.onLink = { linkId: link.id, dir, t: dir > 0 ? 0 : 1 };
-          clearRouteAttempt();
-          hero.grounded = false;
-          hero.groundId = null;
-          hero.vx = 0;
-          hero.vy = 0;
-          hero.x = dir > 0 ? link.x1 : link.x2;
-          hero.y = dir > 0 ? link.y1 : link.y2;
-          targetLinkId = link.id;
-          if (dir < 0) downTrips += 1;
-          if (link.kind === 'ladder') ladderTrips += 1;
-          else if (link.kind === 'stairs') stairTrips += 1;
-          spawnDust(hero.x, hero.y, 8, COLORS.smoke);
-        }
-
-        function updateLinkTravel(dt) {
-          const link = linkById(hero.onLink.linkId);
-          if (!link) {
-            hero.onLink = null;
-            return;
-          }
-          const span = Math.max(1, link.y2 - link.y1);
-          const dir = hero.onLink.dir;
-          const baseSpeed = LINK_SPEEDS[link.kind];
-          hero.onLink.t = clamp(hero.onLink.t + (dir * baseSpeed * dt) / span, 0, 1);
-          hero.previousY = hero.y;
-          hero.x = lerp(link.x1, link.x2, hero.onLink.t);
-          hero.y = lerp(link.y1, link.y2, hero.onLink.t);
-          hero.facing = link.x2 >= link.x1 ? 1 : -1;
-
-          if ((dir > 0 && hero.onLink.t >= 1) || (dir < 0 && hero.onLink.t <= 0)) {
-            finishLink(link, dir);
-          }
-        }
-
-        function finishLink(link, dir) {
-          const platform = platformById(dir > 0 ? link.upperId : link.lowerId);
-          hero.onLink = null;
-          if (!platform) return;
-          hero.x = dir > 0 ? link.x2 : link.x1;
-          hero.y = platform.y;
-          hero.previousY = hero.y;
-          hero.vx = 0;
-          hero.vy = 0;
-          hero.grounded = true;
-          hero.groundId = platform.id;
-          hero.lastGroundedAt = simTime;
-          hero.landedAt = simTime;
-          hero.groundedSince = simTime;
-          hero.autoTargetId = null;
-          hero.autoLaunchX = null;
-          hero.autoLandingX = null;
-          clearRouteAttempt();
-          platform.visited = true;
-          platform.pulseUntil = simTime + 0.18;
-          pulseCloud(platform);
-          if (dir > 0 && hero.revisitPlatformId === platform.id) hero.revisitPlatformId = null;
-          spawnDust(hero.x, hero.y, 8, COLORS.smoke);
-        }
-
-        function linkDownScore(link) {
-          const lower = platformById(link.lowerId);
-          if (!lower) return Infinity;
-          return Math.abs(link.x2 - hero.x) + (hero.y - lower.y) * 0.15;
-        }
-
-        function platformHasUnhitBoxes(platformId) {
-          return boxes.some((box) => box.platformId === platformId && !box.hit);
-        }
-
         function chooseTargetRoute(current, jumpSpeed = JUMP_SPEED) {
           let best = null;
           for (const platform of platforms) {
             if (platform.id === current.id) continue;
+            if (platform.branch) continue;
+            if (!platformIsSolid(platform)) continue;
             if (platform.avoidUntil && platform.avoidUntil > simTime) continue;
             const route = routeToPlatform(current, platform, jumpSpeed);
             if (!route) continue;
             const widthBonus = Math.min(44, platform.w * 0.24);
             const motionCost = platform.moving ? 28 : 0;
             const sideways = Math.abs(platformCenter(platform) - platformCenter(current));
-            const occupied = marioOccupants(platform.id, hero).length;
             route.score =
               route.gap * 1.75 +
               route.dx * 0.32 +
               motionCost -
               widthBonus -
-              Math.min(210, sideways) * 0.62 -
-              occupied * 72 +
+              Math.min(280, sideways) * 0.92 +
               platform.id * 0.0001;
             if (!best || route.score < best.score) best = route;
           }
@@ -759,28 +580,31 @@
         }
 
         function routeToPlatform(current, target, jumpSpeed = JUMP_SPEED) {
+          if (!platformIsSolid(current) || !platformIsSolid(target)) return null;
           const gap = target.y - current.y;
-          const maxGap = jumpSpeed > JUMP_SPEED ? MAX_TARGET_GAP + 74 : MAX_TARGET_GAP;
+          const maxGap = jumpSpeed > JUMP_SPEED ? MAX_TARGET_GAP + 260 : MAX_TARGET_GAP;
           if (gap < MIN_TARGET_GAP || gap > maxGap) return null;
-          if (target.w < HERO_W + 54) return null;
+          if (target.w < HERO_W + 48) return null;
 
           const flightTime = jumpFlightTime(gap, jumpSpeed);
           if (!flightTime) return null;
 
-          const currentLeft = platformLeft(current);
-          const currentRight = currentLeft + current.w;
-          const targetLeft = platformLeft(target);
-          const targetRight = targetLeft + target.w;
-          const currentMargin = Math.min(LAUNCH_MARGIN, current.w * 0.28);
-          const targetMargin = landingMargin(target);
+          const currentPlatformLeft = platformLeft(current);
+          const currentLeft = Math.max(HERO_W * 0.5 + 4, currentPlatformLeft);
+          const currentRight = Math.min(worldWidth - HERO_W * 0.5 - 4, currentPlatformLeft + current.w);
+          const targetBounds = landingBounds(target);
+          if (!targetBounds || currentRight - currentLeft < HERO_W * 0.6) return null;
+          const targetLeft = targetBounds.left;
+          const targetRight = targetBounds.right;
+          const currentMargin = Math.min(LAUNCH_MARGIN, (currentRight - currentLeft) * 0.28);
           let landingX = platformCenter(target);
 
           if (targetLeft > currentRight) {
-            landingX = targetLeft + targetMargin;
+            landingX = targetLeft;
           } else if (targetRight < currentLeft) {
-            landingX = targetRight - targetMargin;
+            landingX = targetRight;
           } else {
-            landingX = clamp(platformCenter(current), targetLeft + targetMargin, targetRight - targetMargin);
+            landingX = clamp(platformCenter(current), targetLeft, targetRight);
           }
 
           let launchX = landingX;
@@ -810,14 +634,333 @@
           return clamp(platform.w * (platform.moving ? 0.32 : 0.24), 20, 38);
         }
 
+        function landingBounds(platform) {
+          if (platform.zone === 'crumble') return crumbleLandingBounds(platform);
+          const platformEdge = platformLeft(platform);
+          const heroInset = HERO_W * 0.5 + 4;
+          const hardLeft = Math.max(heroInset, platformEdge + HERO_W * 0.42);
+          const hardRight = Math.min(worldWidth - heroInset, platformEdge + platform.w - HERO_W * 0.42);
+          if (hardRight < hardLeft) return null;
+          const margin = landingMargin(platform);
+          const softLeft = Math.max(hardLeft, platformEdge + margin);
+          const softRight = Math.min(hardRight, platformEdge + platform.w - margin);
+          return softRight >= softLeft
+            ? { left: softLeft, right: softRight }
+            : { left: hardLeft, right: hardRight };
+        }
+
+        function crumbleLandingBounds(platform) {
+          const platformEdge = platformLeft(platform);
+          const heroInset = HERO_W * 0.5 + 4;
+          const bricks = ensureCrumbleBricks(platform);
+          const runs = [];
+          let start = -1;
+          for (let index = 0; index <= bricks.length; index += 1) {
+            const intact = index < bricks.length && !bricks[index].broken;
+            if (intact && start < 0) start = index;
+            if ((!intact || index === bricks.length) && start >= 0) {
+              const first = bricks[start];
+              const last = bricks[index - 1];
+              const rawLeft = platformEdge + first.x;
+              const rawRight = platformEdge + last.x + last.w;
+              const visibleLeft = Math.max(heroInset, rawLeft);
+              const visibleRight = Math.min(worldWidth - heroInset, rawRight);
+              if (visibleRight > visibleLeft) runs.push({ left: visibleLeft, right: visibleRight });
+              start = -1;
+            }
+          }
+          runs.sort((a, b) => (b.right - b.left) - (a.right - a.left));
+          const run = runs[0];
+          if (!run) return null;
+          const inset = Math.min(12, (run.right - run.left) * 0.24);
+          return run.right - run.left > inset * 2
+            ? { left: run.left + inset, right: run.right - inset }
+            : { left: (run.left + run.right) * 0.5, right: (run.left + run.right) * 0.5 };
+        }
+
         function safeLandingX(platform, x) {
-          const left = platformLeft(platform) + landingMargin(platform);
-          const right = platformLeft(platform) + platform.w - landingMargin(platform);
-          return clamp(x, left, right);
+          const bounds = landingBounds(platform);
+          return bounds ? clamp(x, bounds.left, bounds.right) : clamp(x, HERO_W * 0.5 + 4, worldWidth - HERO_W * 0.5 - 4);
         }
 
         function platformCenter(platform) {
-          return platformLeft(platform) + platform.w * 0.5;
+          if (platform.zone === 'crumble') {
+            const bounds = crumbleLandingBounds(platform);
+            if (bounds) return (bounds.left + bounds.right) * 0.5;
+          }
+          const left = Math.max(0, platformLeft(platform));
+          const right = Math.min(worldWidth, platformLeft(platform) + platform.w);
+          return (left + right) * 0.5;
+        }
+
+        function platformCenterBounds(platformWidth) {
+          const minimumPlayableWidth = HERO_W + 8;
+          return {
+            min: Math.max(18 - worldLeft, minimumPlayableWidth - platformWidth * 0.5),
+            max: Math.min(worldWidth + worldLeft - 18, worldWidth - minimumPlayableWidth + platformWidth * 0.5),
+          };
+        }
+
+        function platformIsSolid(platform) {
+          if (!platform || platform.collapsed) return false;
+          if (platform.zone === 'crumble') {
+            ensureCrumbleBricks(platform);
+            return platform.crumbleBricks.some((brick) => !brick.broken);
+          }
+          if (platform.zone === 'trap' && platform.trapRole === 'trapdoor' && platform.trapOpenUntil > simTime) return false;
+          return true;
+        }
+
+        function ensureCrumbleBricks(platform) {
+          if (platform.crumbleBricks) return platform.crumbleBricks;
+          const count = Math.max(4, Math.round(platform.baseW / CRUMBLE_TILE_SIZE));
+          const tileW = platform.baseW / count;
+          platform.crumbleBricks = Array.from({ length: count }, (_, index) => ({
+            index,
+            x: index * tileW,
+            w: tileW,
+            hitAt: 0,
+            breakAt: 0,
+            broken: false,
+          }));
+          return platform.crumbleBricks;
+        }
+
+        function platformHasFootingAt(platform, actorX, halfWidth = 0) {
+          if (!platformIsSolid(platform)) return false;
+          const left = platformLeft(platform);
+          if (platform.zone !== 'crumble') {
+            return actorX + halfWidth >= left && actorX - halfWidth <= left + platform.w;
+          }
+          return ensureCrumbleBricks(platform).some((brick) => {
+            if (brick.broken) return false;
+            const brickLeft = left + brick.x;
+            return actorX + halfWidth >= brickLeft + 1 && actorX - halfWidth <= brickLeft + brick.w - 1;
+          });
+        }
+
+        function updatePlatformStates() {
+          for (const platform of platforms) {
+            if (platform.collapsed && platform.restoreAt && simTime >= platform.restoreAt) restorePlatform(platform);
+            if (!platform.collapsed && platform.collapseAt && simTime >= platform.collapseAt) collapsePlatform(platform);
+            if (platform.zone === 'crumble' && platform.crumbleBricks) {
+              for (const brick of platform.crumbleBricks) {
+                if (!brick.broken && brick.breakAt && simTime >= brick.breakAt) breakCrumbleBrick(platform, brick);
+              }
+            }
+            if (platform.zone === 'trap' && platform.trapRole === 'lever' && platform.activatedUntil > simTime) {
+              openTrapdoorsUnderMarios(platform);
+            }
+          }
+
+          if (hero.grounded) {
+            const platform = platformById(hero.groundId);
+            if (!platformIsSolid(platform)) releaseHeroFromPlatform();
+            else updatePlatformContact(platform, hero.x);
+          }
+          for (const buddy of buddies) {
+            if (!buddy.grounded) continue;
+            const platform = platformById(buddy.platformId);
+            if (!platformIsSolid(platform)) dropMarioBuddy(buddy);
+            else updatePlatformContact(platform, buddy.x);
+          }
+        }
+
+        function updatePlatformContact(platform, actorX) {
+          if (platform.zone === 'crumble') triggerCrumble(platform, actorX);
+          if (platform.zone !== 'trap' || platform.trapRole !== 'lever') return;
+          const leverX = platformLeft(platform) + platform.w * 0.5;
+          if (Math.abs(actorX - leverX) < 24) triggerLever(platform);
+        }
+
+        function handlePlatformLanding(platform, actorX) {
+          if (!platform) return;
+          if (platform.zone === 'crumble') triggerCrumble(platform, actorX);
+          if (platform.zoneSafe) return;
+          if (platform.zone === 'shrink') breakCloudPlatform(platform);
+          if (platform.zone === 'trap' && platform.trapRole === 'lever') {
+            const leverX = platformLeft(platform) + platform.w * 0.5;
+            if (Math.abs(actorX - leverX) < platform.w * 0.32) triggerLever(platform);
+          }
+        }
+
+        function triggerCrumble(platform, actorX) {
+          const left = platformLeft(platform);
+          const brick = ensureCrumbleBricks(platform)
+            .filter((candidate) => !candidate.broken && !candidate.breakAt)
+            .sort((a, b) => {
+              const aCenter = left + a.x + a.w * 0.5;
+              const bCenter = left + b.x + b.w * 0.5;
+              return Math.abs(actorX - aCenter) - Math.abs(actorX - bCenter);
+            })
+            .find((candidate) => actorX >= left + candidate.x - 2 && actorX <= left + candidate.x + candidate.w + 2);
+          if (!brick) return;
+          brick.hitAt = simTime;
+          brick.breakAt = simTime + (prefersReducedMotion ? 0.34 : 0.2);
+          platform.pulseUntil = simTime + 0.28;
+        }
+
+        function breakCrumbleBrick(platform, brick) {
+          brick.broken = true;
+          brick.breakAt = 0;
+          spawnBrickDebris(platform, brick);
+          platform.pulseUntil = simTime + 0.2;
+        }
+
+        function ensureCloudChunks(platform) {
+          if (platform.cloudChunks) return platform.cloudChunks;
+          const count = 5;
+          platform.cloudChunks = Array.from({ length: count }, (_, index) => ({
+            index,
+            x: platform.baseW * clamp(0.08 + index * 0.21 + (hash01(platform.id * 173 + index * 29) - 0.5) * 0.045, 0.06, 0.94),
+            w: platform.baseW * (0.28 + hash01(platform.id * 199 + index * 31) * 0.11),
+            h: 31 + (1 - Math.abs(index - 2) / 2) * 13 + hash01(platform.id * 257 + index * 47) * 7,
+            lift: -7 - (1 - Math.abs(index - 2) / 2) * 13 - hash01(platform.id * 313 + index * 59) * 5,
+            broken: false,
+          }));
+          return platform.cloudChunks;
+        }
+
+        function breakCloudPlatform(platform) {
+          if (platform.collapsed || platform.collapseAt) return;
+          platform.shrinkLevel = Math.min(4, (platform.shrinkLevel || 0) + 1);
+          const remaining = ensureCloudChunks(platform).filter((chunk) => !chunk.broken);
+          const breaking = [];
+          if (platform.shrinkLevel >= 4) {
+            breaking.push(...remaining);
+          } else if (remaining.length) {
+            breaking.push(platform.shrinkLevel % 2 === 0 ? remaining[0] : remaining[remaining.length - 1]);
+          }
+          for (const chunk of breaking) {
+            chunk.broken = true;
+            spawnCloudChunkParticles(platform, chunk);
+          }
+
+          const survivors = platform.cloudChunks.filter((chunk) => !chunk.broken);
+          if (survivors.length) {
+            const left = Math.max(0, Math.min(...survivors.map((chunk) => chunk.x - chunk.w * 0.42)));
+            const right = Math.min(platform.baseW, Math.max(...survivors.map((chunk) => chunk.x + chunk.w * 0.42)));
+            platform.x = platform.baseX + left;
+            platform.w = Math.max(12, right - left);
+          }
+          platform.pulseUntil = simTime + 0.34;
+
+          if (hero.grounded && hero.groundId === platform.id) {
+            hero.x = clamp(hero.x, platform.x + 8, platform.x + platform.w - 8);
+          }
+          for (const buddy of buddies) {
+            if (!buddy.grounded || buddy.platformId !== platform.id) continue;
+            buddy.localX = clamp(buddy.x - platform.x, 8, Math.max(8, platform.w - 8));
+          }
+          if (!survivors.length) platform.collapseAt = simTime + 0.12;
+        }
+
+        function spawnCloudChunkParticles(platform, chunk) {
+          if (prefersReducedMotion) return;
+          const centerX = platform.baseX + chunk.x;
+          for (let i = 0; i < 9; i += 1) {
+            particles.push({
+              kind: 'cloud',
+              x: centerX + rand(-chunk.w * 0.24, chunk.w * 0.24),
+              y: platform.y + rand(-8, 7),
+              vx: rand(-58, 58),
+              vy: rand(28, 138),
+              r: rand(2.8, 7.5),
+              stretch: rand(0.65, 1.5),
+              rotation: rand(-0.5, 0.5),
+              spin: rand(-2.8, 2.8),
+              age: 0,
+              life: rand(0.55, 1.05),
+              color: i % 3 === 0 ? '#DCCEF4' : C.white,
+            });
+          }
+        }
+
+        function triggerLever(lever) {
+          const wasActive = lever.activatedUntil > simTime;
+          lever.activatedUntil = Math.max(lever.activatedUntil, simTime + 2.4);
+          if (!wasActive) spawnDust(platformCenter(lever), lever.y + 4, 10, C.lemon);
+          openTrapdoorsUnderMarios(lever);
+        }
+
+        function openTrapdoorsUnderMarios(lever) {
+          const band = Math.floor(Math.max(0, lever.y - 88) / ZONE_HEIGHT);
+          const occupiedPlatformIds = new Set();
+          if (hero.grounded && hero.groundId) occupiedPlatformIds.add(hero.groundId);
+          for (const buddy of buddies) {
+            if (buddy.grounded && buddy.platformId) occupiedPlatformIds.add(buddy.platformId);
+          }
+          const traps = platforms
+            .filter((platform) => platform.zone === 'trap' && platform.trapRole === 'trapdoor')
+            .filter((platform) => Math.floor(Math.max(0, platform.y - 88) / ZONE_HEIGHT) === band)
+            .filter((platform) => platform.y < lever.y)
+            .filter((platform) => occupiedPlatformIds.has(platform.id) && platform.trapOpenUntil <= simTime);
+          for (const trap of traps) {
+            trap.openedAt = simTime;
+            trap.trapOpenUntil = simTime + 2.2;
+            spawnDust(platformCenter(trap), trap.y, 14, C.mid);
+            releaseActorsFromPlatform(trap);
+          }
+        }
+
+        function collapsePlatform(platform) {
+          if (platform.collapsed) return;
+          platform.collapsed = true;
+          platform.restoreAt = platform.zone === 'shrink' ? simTime + 4.1 : 0;
+          platform.collapseAt = 0;
+          spawnDust(platform.x + platform.w * 0.5, platform.y, 20, C.white);
+          releaseActorsFromPlatform(platform);
+        }
+
+        function restorePlatform(platform) {
+          platform.x = platform.baseX;
+          platform.w = platform.baseW;
+          platform.collapsed = false;
+          platform.restoreAt = 0;
+          platform.collapseAt = 0;
+          platform.shrinkLevel = 0;
+          if (platform.cloudChunks) {
+            for (const chunk of platform.cloudChunks) chunk.broken = false;
+          }
+          platform.pulseUntil = simTime + 0.34;
+        }
+
+        function releaseHeroFromPlatform() {
+          hero.grounded = false;
+          hero.groundId = null;
+          hero.vy = Math.min(hero.vy, -48);
+          hero.autoTargetId = null;
+          hero.autoLaunchX = null;
+          hero.autoLandingX = null;
+        }
+
+        function releaseActorsFromPlatform(platform) {
+          if (hero.grounded && hero.groundId === platform.id) releaseHeroFromPlatform();
+          for (const buddy of buddies) {
+            if (buddy.grounded && buddy.platformId === platform.id) dropMarioBuddy(buddy);
+          }
+        }
+
+        function spawnBrickDebris(platform, brick) {
+          if (prefersReducedMotion) return;
+          const pieces = 3;
+          const left = platformLeft(platform) + brick.x;
+          for (let i = 0; i < pieces; i += 1) {
+            particles.push({
+              kind: 'brick',
+              x: left + ((i + 0.5) / pieces) * brick.w,
+              y: platform.y - 7,
+              vx: rand(-34, 34),
+              vy: rand(-105, 26),
+              w: rand(5, 9),
+              h: rand(6, 10),
+              rotation: rand(-0.3, 0.3),
+              spin: rand(-4.5, 4.5),
+              age: 0,
+              life: rand(0.75, 1.2),
+              color: i % 2 ? '#C96F78' : '#EEA2A7',
+            });
+          }
         }
 
         function manualDesiredVx() {
@@ -848,6 +991,7 @@
           hero.routeAttemptFromId = route ? fromId : null;
           hero.routeAttemptStartedAt = route ? simTime : 0;
           hero.jumpCooldownUntil = simTime + 0.11;
+          hero.superJumpUntil = superJump ? simTime + 1.7 : 0;
           spawnDust(hero.x, hero.y, superJump ? 18 : 11, COLORS.smoke);
         }
 
@@ -870,9 +1014,11 @@
           if (hero.vy <= 0) {
             const half = HERO_W * 0.42;
             for (const platform of platforms) {
+              if (!platformIsSolid(platform)) continue;
               const left = platformLeft(platform);
               const right = left + platform.w;
               if (hero.x + half < left || hero.x - half > right) continue;
+              if (!platformHasFootingAt(platform, hero.x, half)) continue;
               if (hero.previousY >= platform.y && hero.y <= platform.y + 2) {
                 landed = platform;
                 break;
@@ -890,6 +1036,7 @@
           if (isNewLanding) {
             markRouteAttemptResult(landed);
             pulseCloud(landed);
+            handlePlatformLanding(landed, hero.x);
             hero.landedAt = simTime;
             hero.groundedSince = simTime;
             hero.autoTargetId = null;
@@ -925,151 +1072,132 @@
         }
 
         function updateCamera(dt) {
-          const target = hero.y - height * 0.48;
+          if (cameraSearchMode) {
+            const target = hero.y - height * 0.18;
+            cameraY = Math.max(target, cameraY - SEARCH_PAN_SPEED * dt);
+            if (screenY(hero.y) <= height - hudHeight() - 28) {
+              cameraSearchMode = false;
+              hero.waitingForCamera = false;
+              for (const buddy of buddies) buddy.waitingForCamera = false;
+              for (const platform of platforms) platform.searchPlatform = false;
+              highestCameraY = cameraY;
+              lastProgressAt = simTime;
+              lastProgressHeight = hero.y;
+            }
+            return;
+          }
+
+          const activeRunners = [hero, ...buddies].filter(
+            (runner) => !runner.dead && !runner.dying && !runner.waitingForCamera
+          );
+          if (!activeRunners.length) return;
+          const highestRunnerY = activeRunners.reduce((highest, runner) => Math.max(highest, runner.y), activeRunners[0].y);
+          const target = highestRunnerY - height * 0.48;
           highestCameraY = Math.max(highestCameraY, target);
           cameraY += (highestCameraY - cameraY) * (1 - Math.exp(-2.7 * dt));
-          bestHeight = Math.max(bestHeight, Math.max(0, hero.y - 88));
-          if (bestHeight > lastProgressHeight + 38) {
-            lastProgressHeight = bestHeight;
+          bestHeight = Math.max(bestHeight, Math.max(0, highestRunnerY - 88));
+          const heroHeight = Math.max(0, hero.y - 88);
+          if (heroHeight > lastProgressHeight + 38) {
+            lastProgressHeight = heroHeight;
             lastProgressAt = simTime;
           }
-        }
-
-        function rescueIfNeeded() {
-          if (hero.y > cameraY - 210) return;
-          const platform = platforms
-            .filter((p) => p.y > cameraY + height * 0.18 && p.y < cameraY + height * 0.78)
-            .sort((a, b) => a.y - b.y)[0];
-          const landing = platform || platforms[platforms.length - 1];
-          if (!landing) return;
-          const left = platformLeft(landing);
-          hero.x = left + landing.w * 0.5;
-          hero.y = landing.y + 4;
-          hero.previousY = hero.y;
-          hero.vx = 0;
-          hero.vy = JUMP_SPEED * 0.72;
-          hero.grounded = false;
-          hero.groundId = null;
-          clearRouteAttempt();
-          hero.rescuedUntil = simTime + 0.6;
-          rescueCount += 1;
-          lastProgressAt = simTime;
-          spawnDust(hero.x, hero.y, 24, COLORS.ink);
         }
 
         function recoverIfStalled() {
+          if (hero.dead || hero.dying || hero.waitingForCamera || cameraSearchMode) return;
           if (manualActive()) return;
           if (simTime - lastProgressAt < STALL_SECONDS) return;
-          if (!hero.grounded) {
-            if (hero.onLink) return;
-            const landing = chooseAirLandingTarget() || nearestLowerPlatform();
-            if (!landing) return;
-            hero.x = safeLandingX(landing, hero.x);
-            hero.y = landing.y;
-            hero.previousY = hero.y;
-            hero.vx = 0;
-            hero.vy = 0;
-            hero.grounded = true;
-            hero.groundId = landing.id;
-            hero.lastGroundedAt = simTime;
-            hero.landedAt = simTime;
-            hero.groundedSince = simTime;
-            pulseCloud(landing);
-            hero.autoTargetId = null;
-            hero.autoLaunchX = null;
-            hero.autoLandingX = null;
-            clearRouteAttempt();
-            lastProgressAt = simTime;
-            spawnDust(hero.x, hero.y, 16, COLORS.ink);
-            return;
-          }
+          if (!hero.grounded) return;
           const current = platformById(hero.groundId);
           if (!current) return;
           const route = chooseTargetRoute(current);
           if (route) {
             jump(false, route);
           } else {
-            hero.autoVx = clamp((platformCenter(current) - hero.x) * 3.2, -RUN_SPEED, RUN_SPEED);
-            if (Math.abs(platformCenter(current) - hero.x) < 16) jump(false);
+            desperateHeroJump(current);
           }
           lastProgressAt = simTime;
         }
 
-        function nearestLowerPlatform() {
-          let best = null;
-          for (const platform of platforms) {
-            if (platform.y > hero.y + 28 || platform.y < cameraY - 120) continue;
-            const x = safeLandingX(platform, hero.x);
-            const score = Math.abs(x - hero.x) * 1.4 + Math.abs(hero.y - platform.y) * 0.3 - platform.y * 0.015;
-            if (!best || score < best.score) best = { ...platform, score };
-          }
-          return best;
+        function desperateHeroJump(platform) {
+          const leftSpace = hero.x - platformLeft(platform);
+          const rightSpace = platformLeft(platform) + platform.w - hero.x;
+          const direction = leftSpace > rightSpace ? -1 : 1;
+          hero.facing = direction;
+          jump(false, null);
+          hero.vx = direction * AIR_SPEED * 0.92;
+          hero.autoVx = direction * AIR_SPEED;
+          hero.desperateUntil = simTime + 1.15;
+          hero.stumbleUntil = simTime + 0.45;
+          hero.noRouteSince = 0;
         }
 
-        function updateBarrels(dt) {
-          for (const barrel of barrels) {
-            const platform = platformById(barrel.platformId);
-            if (!platform) {
-              barrel.dead = true;
-              continue;
-            }
-            barrel.offset += barrel.dir * barrel.speed * dt;
-            const min = barrel.radius + 5;
-            const max = platform.w - barrel.radius - 5;
-            if (barrel.offset < min) {
-              barrel.offset = min;
-              barrel.dir = 1;
-            } else if (barrel.offset > max) {
-              barrel.offset = max;
-              barrel.dir = -1;
-            }
-            barrel.roll += (barrel.dir * barrel.speed * dt) / barrel.radius;
-            const bx = platformLeft(platform) + barrel.offset;
-            const by = platform.y + barrel.radius;
-            const dx = hero.x - bx;
-            const dy = hero.y - by;
-            if (Math.abs(dx) < HERO_W * 0.58 + barrel.radius && Math.abs(dy) < HERO_H * 0.45 && simTime > barrel.bumpCooldownUntil) {
-              const push = dx >= 0 ? 1 : -1;
-              hero.vx += push * 190;
-              hero.vy = Math.max(hero.vy, 250);
-              hero.stumbleUntil = simTime + 0.36;
-              hero.blinkUntil = simTime + 0.14;
-              barrel.bumpCooldownUntil = simTime + 0.9;
-              spawnDust(hero.x, hero.y - HERO_H * 0.35, 16, COLORS.ink);
-            }
-          }
-          barrels = barrels.filter((barrel) => !barrel.dead);
+        function beginMarioDeath(actor) {
+          if (actor.dead || actor.dying || actor.waitingForCamera) return;
+          actor.y = cameraY;
+          actor.previousY = actor.y;
+          actor.grounded = false;
+          actor.groundId = null;
+          actor.platformId = null;
+          actor.targetId = null;
+          actor.autoTargetId = null;
+          actor.falling = true;
+          actor.dying = true;
+          actor.deathStartedAt = simTime;
+          actor.deathSpin = 0;
+          actor.vy = DEATH_BOUNCE_SPEED;
+          actor.vx *= 0.34;
+          deathCount += 1;
+          spawnDust(actor.x, actor.y + 4, 14, C.white);
         }
 
-        function updateQuestionBoxes() {
-          const headY = hero.y + HERO_H + 12;
-          const previousHeadY = hero.previousY + HERO_H + 12;
-          for (const box of boxes) {
-            if (box.hit) continue;
-            const withinX = Math.abs(hero.x - box.x) < BOX_SIZE * 0.62;
-            const hitFromBelow = hero.vy > 0 && previousHeadY <= box.y && headY >= box.y;
-            if (withinX && hitFromBelow) {
-              hitQuestionBox(box);
-              break;
-            }
+        function updateDyingMario(actor, dt) {
+          actor.previousY = actor.y;
+          actor.vy += GRAVITY * dt;
+          actor.x += actor.vx * dt;
+          actor.y += actor.vy * dt;
+          actor.deathSpin += dt * (actor.facing || 1) * 7.5;
+          if (simTime - actor.deathStartedAt > 0.22 && actor.vy < 0 && actor.y <= cameraY) {
+            actor.y = cameraY;
+            actor.dying = false;
+            actor.dead = true;
           }
         }
 
-        function hitQuestionBox(box) {
-          box.hit = true;
-          box.hitAt = simTime;
-          boxesHit += 1;
-          hero.vy = Math.min(hero.vy, 96);
-          hero.blinkUntil = simTime + 0.12;
-          clearBoxAttempt();
-          targetBoxId = null;
-          const platform = platformById(box.platformId);
-          if (platform) platform.boxHits = (platform.boxHits || 0) + 1;
-          if (hero.revisitPlatformId === box.platformId && !platformHasUnhitBoxes(box.platformId)) {
-            hero.revisitPlatformId = null;
-            hero.revisitCooldownUntil = simTime + rand(8, 15);
+        function ensureMarioPopulation() {
+          buddies = buddies.filter((buddy) => !buddy.dead);
+          if (!hero.dead || buddies.some((buddy) => !buddy.dead)) return;
+          const pocket = buildSearchPocket();
+          const startingPlatform = pocket[0];
+          hero = makeHero(startingPlatform, true);
+          addMarioBuddy(startingPlatform, buddyCount + 1);
+          for (const buddy of buddies) buddy.waitingForCamera = true;
+          cameraSearchMode = true;
+          targetPlatformId = null;
+        }
+
+        function buildSearchPocket() {
+          const platformsInPocket = [];
+          const startY = cameraY - Math.max(320, height * 0.58);
+          const endY = cameraY - 76;
+          let y = startY;
+          let index = 0;
+          while (y < endY) {
+            const w = clamp(worldWidth * (index === 0 ? 0.44 : 0.28), 132, index === 0 ? 270 : 210);
+            const sway = (index % 2 === 0 ? -1 : 1) * Math.min(worldWidth * 0.2, 150);
+            const center = clamp(worldWidth * 0.5 + sway, w * 0.5 - 28, worldWidth - w * 0.5 + 28);
+            const platform = makePlatform(center, y, w, 'ink', false);
+            platform.zone = 'ink';
+            platform.type = 'ink';
+            platform.zoneSafe = true;
+            platform.searchPlatform = true;
+            platform.spring = index === 2;
+            platforms.push(platform);
+            platformsInPocket.push(platform);
+            y += 94 + (index % 2) * 10;
+            index += 1;
           }
-          spawnDust(box.x, box.y + BOX_SIZE * 0.5, 18, COLORS.ink);
+          return platformsInPocket;
         }
 
         function updateParticles(dt) {
@@ -1078,6 +1206,7 @@
             particle.x += particle.vx * dt;
             particle.y += particle.vy * dt;
             particle.vy += GRAVITY * 0.18 * dt;
+            if (particle.rotation !== undefined) particle.rotation += (particle.spin || 0) * dt;
           }
           particles = particles.filter((particle) => particle.age < particle.life);
         }
@@ -1092,38 +1221,48 @@
         function addMarioBuddy(platform, variant = buddyCount) {
           if (!platform || buddies.some((buddy) => buddy.platformId === platform.id)) return;
           const edge = Math.min(28, platform.w * 0.24);
-          const localX = edge + hash01(platform.id * 719 + variant * 31) * Math.max(1, platform.w - edge * 2);
+          const platformEdge = platformLeft(platform);
+          const desiredX = platformEdge + edge + hash01(platform.id * 719 + variant * 31) * Math.max(1, platform.w - edge * 2);
+          const x = safeLandingX(platform, desiredX);
+          const localX = x - platformEdge;
           buddies.push({
             id: ++buddyCount,
             platformId: platform.id,
             localX,
-            x: platformLeft(platform) + localX,
+            x,
             y: platform.y,
             vx: 0,
             vy: 0,
             spin: 0,
             grounded: true,
             falling: false,
+            dying: false,
+            dead: false,
+            deathStartedAt: 0,
+            deathSpin: 0,
+            waitingForCamera: false,
             targetId: null,
+            noRouteSince: 0,
             previousY: platform.y,
-            jumpAt: simTime + 0.45 + hash01(platform.id * 911 + variant * 43) * 1.2,
+            jumpAt: simTime + 0.65 + hash01(platform.id * 911 + variant * 43) * 1.45,
             facing: hash01(platform.id * 991) < 0.5 ? -1 : 1,
             landedAt: simTime,
             phase: hash01(platform.id * 883 + variant * 67) * TAU,
             pose: variant % 3,
-            forcedDir: 0,
-            yieldUntil: 0,
-            clashWith: null,
-            clashSince: 0,
           });
         }
 
         function updateMarioBuddies(dt) {
           for (const buddy of buddies) {
+            if (buddy.dead || buddy.waitingForCamera) continue;
+            if (buddy.dying) {
+              updateDyingMario(buddy, dt);
+              continue;
+            }
             buddy.previousY = buddy.y;
             if (buddy.grounded) {
               const platform = platformById(buddy.platformId);
-              if (!platform) {
+              if (!platform || !platformIsSolid(platform)) {
                 dropMarioBuddy(buddy);
               } else {
                 buddy.x = platformLeft(platform) + buddy.localX;
@@ -1136,52 +1275,41 @@
               buddy.y += buddy.vy * dt;
               if (buddy.falling) buddy.spin += buddy.vx * dt * 0.003;
               else steerMarioBuddy(buddy, dt);
+              if (screenY(buddy.y) >= height - hudHeight()) {
+                beginMarioDeath(buddy);
+                continue;
+              }
               collideMarioBuddy(buddy);
-              if (buddy.y < cameraY - 220) respawnMarioBuddy(buddy);
             }
           }
         }
 
         function updateGroundedMarioBuddy(buddy, platform, dt) {
-          const rival = nearestMarioOpponent(platform.id, buddy);
-          if (!rival && simTime >= buddy.jumpAt) {
+          if (simTime >= buddy.jumpAt) {
             launchMarioBuddy(buddy, platform);
             return;
           }
 
-          let desired = 0;
-          if (buddy.yieldUntil > simTime) {
-            buddy.facing = buddy.forcedDir || buddy.facing;
-            desired = buddy.facing * BUDDY_RUN_SPEED * 0.58;
-          } else if (rival) {
-            const dx = rival.x - buddy.x;
-            const dir = Math.sign(dx || buddy.facing);
-            desired = dir * BUDDY_RUN_SPEED;
-            if (Math.abs(dx) > MARIO_CONTACT_GAP * 0.65) buddy.facing = dir;
-            buddy.jumpAt = Math.max(buddy.jumpAt, simTime + 0.45);
-          }
-
-          const accel = rival ? 15 : 8;
-          buddy.vx += (desired - buddy.vx) * (1 - Math.exp(-accel * dt));
+          buddy.vx += (0 - buddy.vx) * (1 - Math.exp(-8 * dt));
           buddy.vx = clamp(buddy.vx, -BUDDY_RUN_SPEED, BUDDY_RUN_SPEED);
           buddy.localX += buddy.vx * dt;
           buddy.x = platformLeft(platform) + buddy.localX;
           if (!marioHasFooting(buddy, platform)) dropMarioBuddy(buddy, Math.sign(buddy.vx), Math.abs(buddy.vx));
         }
 
-        function chooseMarioBuddyTarget(current, buddy) {
+        function chooseMarioBuddyTarget(current, buddy, jumpSpeed = BUDDY_JUMP_SPEED) {
           const candidates = [];
           for (const platform of platforms) {
             if (platform.id === current.id) continue;
-            const route = routeToPlatform(current, platform, BUDDY_JUMP_SPEED);
+            if (!platformIsSolid(platform)) continue;
+            const route = routeToPlatform(current, platform, jumpSpeed);
             if (!route) continue;
-            if (route.gap < 58 || route.gap > 148) continue;
+            const maxGap = jumpSpeed > BUDDY_JUMP_SPEED ? MAX_TARGET_GAP + 240 : 148;
+            if (route.gap < 58 || route.gap > maxGap) continue;
             const sideways = Math.abs(platformCenter(platform) - platformCenter(current));
-            const occupied = marioOccupants(platform.id, buddy).length;
             route.score =
               Math.abs(route.gap - 102) * 0.42 -
-              Math.min(220, sideways) * 1.05 -
-              occupied * 86;
+              Math.min(220, sideways) * 1.05;
             candidates.push(route);
           }
           candidates.sort((a, b) => a.score - b.score);
@@ -1191,9 +1319,15 @@
         function launchMarioBuddy(buddy, current) {
           const route = chooseMarioBuddyTarget(current, buddy);
           if (!route) {
-            buddy.jumpAt = simTime + 0.55;
+            if (!buddy.noRouteSince) buddy.noRouteSince = simTime;
+            if (simTime - buddy.noRouteSince >= BUDDY_STALL_SECONDS) {
+              desperateMarioBuddyJump(buddy, current);
+              return;
+            }
+            buddy.jumpAt = simTime + 0.72;
             return;
           }
+          buddy.noRouteSince = 0;
           const landingX = safeLandingX(route.target, route.landingX);
           buddy.platformId = null;
           buddy.targetId = route.target.id;
@@ -1203,6 +1337,22 @@
           buddy.vx = clamp((landingX - buddy.x) / Math.max(0.4, route.flightTime), -BUDDY_AIR_SPEED, BUDDY_AIR_SPEED);
           buddy.facing = buddy.vx < 0 ? -1 : 1;
           spawnDust(buddy.x, buddy.y, 6, C.lemon);
+        }
+
+        function desperateMarioBuddyJump(buddy, current) {
+          const leftSpace = buddy.x - platformLeft(current);
+          const rightSpace = platformLeft(current) + current.w - buddy.x;
+          const direction = leftSpace > rightSpace ? -1 : 1;
+          buddy.platformId = null;
+          buddy.targetId = null;
+          buddy.grounded = false;
+          buddy.falling = true;
+          buddy.noRouteSince = 0;
+          buddy.vx = direction * BUDDY_AIR_SPEED * 0.94;
+          buddy.vy = BUDDY_JUMP_SPEED * 0.86;
+          buddy.facing = direction;
+          buddy.spin = 0;
+          spawnDust(buddy.x, buddy.y, 8, C.lemon);
         }
 
         function steerMarioBuddy(buddy, dt) {
@@ -1221,7 +1371,8 @@
         function collideMarioBuddy(buddy) {
           if (buddy.vy > 0) return;
           const candidates = platforms
-            .filter((platform) => buddy.x > platformLeft(platform) + 10 && buddy.x < platformLeft(platform) + platform.w - 10)
+            .filter((platform) => platformIsSolid(platform))
+            .filter((platform) => platformHasFootingAt(platform, buddy.x, 6))
             .filter((platform) => buddy.previousY >= platform.y && buddy.y <= platform.y + 2)
             .sort((a, b) => b.y - a.y);
           const landed = candidates[0];
@@ -1235,16 +1386,36 @@
           buddy.spin = 0;
           buddy.grounded = true;
           buddy.falling = false;
+          buddy.noRouteSince = 0;
           buddy.landedAt = simTime;
-          buddy.jumpAt = simTime + 1.1 + hash01(buddy.id * 1301 + landed.id * 17) * 1.15;
+          buddy.jumpAt = simTime + 1.35 + hash01(buddy.id * 1301 + landed.id * 17) * 1.3;
           pulseCloud(landed);
+          handlePlatformLanding(landed, buddy.x);
           spawnDust(buddy.x, buddy.y, 5, C.mint);
+          if (landed.spring && Math.abs(buddy.x - (platformLeft(landed) + landed.w * 0.5)) < landed.w * 0.35) {
+            launchMarioBuddyFromSpring(buddy, landed);
+          }
+        }
+
+        function launchMarioBuddyFromSpring(buddy, platform) {
+          const route = chooseMarioBuddyTarget(platform, buddy, SPRING_SPEED);
+          const landingX = route ? safeLandingX(route.target, route.landingX) : buddy.x;
+          buddy.platformId = null;
+          buddy.targetId = route ? route.target.id : null;
+          buddy.grounded = false;
+          buddy.falling = !route;
+          buddy.vy = SPRING_SPEED;
+          buddy.vx = route
+            ? clamp((landingX - buddy.x) / Math.max(0.4, route.flightTime), -BUDDY_AIR_SPEED, BUDDY_AIR_SPEED)
+            : buddy.facing * BUDDY_AIR_SPEED * 0.35;
+          spawnDust(buddy.x, buddy.y, 16, C.mid);
         }
 
         function dropMarioBuddy(buddy, direction = 0, speed = 0) {
-          if (buddy.falling) return;
+          if (buddy.falling || buddy.dying || buddy.dead) return;
           buddy.platformId = null;
           buddy.targetId = null;
+          buddy.noRouteSince = 0;
           buddy.grounded = false;
           buddy.falling = true;
           buddy.vx = direction
@@ -1254,166 +1425,12 @@
           buddy.spin = 0;
         }
 
-        function marioOccupants(platformId, exclude = null) {
-          const occupants = [];
-          if (hero && hero !== exclude && hero.grounded && !hero.onLink && hero.groundId === platformId) occupants.push(hero);
-          for (const buddy of buddies) {
-            if (buddy !== exclude && buddy.grounded && buddy.platformId === platformId) occupants.push(buddy);
-          }
-          return occupants;
-        }
-
-        function nearestMarioOpponent(platformId, body) {
-          const occupants = marioOccupants(platformId, body);
-          occupants.sort((a, b) => Math.abs(a.x - body.x) - Math.abs(b.x - body.x));
-          return occupants[0] || null;
-        }
-
         function marioHasFooting(body, platform) {
-          const left = platformLeft(platform) - MARIO_EDGE_GRACE;
-          const right = platformLeft(platform) + platform.w + MARIO_EDGE_GRACE;
+          if (!platformIsSolid(platform)) return false;
+          if (platform.zone === 'crumble') return platformHasFootingAt(platform, body.x, RUNNER_EDGE_GRACE * 0.45);
+          const left = platformLeft(platform) - RUNNER_EDGE_GRACE;
+          const right = platformLeft(platform) + platform.w + RUNNER_EDGE_GRACE;
           return body.x >= left && body.x <= right;
-        }
-
-        function syncMarioLocalX(body) {
-          if (body === hero || !body.grounded) return;
-          const platform = platformById(body.platformId);
-          if (platform) body.localX = body.x - platformLeft(platform);
-        }
-
-        function resolveMarioPhysics() {
-          const grounded = [];
-          if (hero.grounded && !hero.onLink) grounded.push(hero);
-          for (const buddy of buddies) if (buddy.grounded) grounded.push(buddy);
-
-          for (let i = 0; i < grounded.length; i += 1) {
-            for (let j = i + 1; j < grounded.length; j += 1) {
-              const a = grounded[i];
-              const b = grounded[j];
-              const aPlatform = a === hero ? a.groundId : a.platformId;
-              const bPlatform = b === hero ? b.groundId : b.platformId;
-              if (aPlatform !== bPlatform || Math.abs(a.y - b.y) > 8) continue;
-
-              const left = a.x < b.x || (a.x === b.x && a.id < b.id) ? a : b;
-              const right = left === a ? b : a;
-              const distance = right.x - left.x;
-              if (distance >= MARIO_CONTACT_GAP) {
-                clearMarioClash(a, b);
-                continue;
-              }
-
-              const overlap = MARIO_CONTACT_GAP - distance;
-              const leftPressing = left.facing === 1;
-              const rightPressing = right.facing === -1;
-              if (leftPressing && rightPressing) {
-                resolveStalemate(left, right, overlap, aPlatform);
-              } else if (leftPressing) {
-                shoveMario(left, right, 1, overlap, aPlatform);
-              } else if (rightPressing) {
-                shoveMario(right, left, -1, overlap, aPlatform);
-              } else {
-                left.x -= overlap * 0.5;
-                right.x += overlap * 0.5;
-                syncMarioLocalX(left);
-                syncMarioLocalX(right);
-              }
-            }
-          }
-        }
-
-        function resolveStalemate(left, right, overlap, platformId) {
-          const platform = platformById(platformId);
-          if (!platform) return;
-          left.x -= overlap * 0.5;
-          right.x += overlap * 0.5;
-          left.vx = Math.min(0, left.vx) * 0.18;
-          right.vx = Math.max(0, right.vx) * 0.18;
-          keepStalemateOnCloud(left, platform);
-          keepStalemateOnCloud(right, platform);
-          syncMarioLocalX(left);
-          syncMarioLocalX(right);
-
-          if (left.clashWith !== right.id) {
-            stalemateCount += 1;
-            left.clashWith = right.id;
-            right.clashWith = left.id;
-            left.clashSince = simTime;
-            right.clashSince = simTime;
-            return;
-          }
-
-          if (simTime - left.clashSince < STALEMATE_SECONDS) return;
-          const clashRound = Math.floor((simTime + left.id + right.id) / 3);
-          const leftWins = hash01((left.id + 17) * 2081 + (right.id + 31) * 1597 + clashRound * 97) < 0.5;
-          const loser = leftWins ? right : left;
-          const pushDir = leftWins ? 1 : -1;
-          loser.forcedDir = pushDir;
-          loser.facing = pushDir;
-          loser.yieldUntil = simTime + 0.9;
-          loser.vx = pushDir * 42;
-          clearMarioClash(left, right);
-        }
-
-        function keepStalemateOnCloud(body, platform) {
-          const left = platformLeft(platform) + MARIO_EDGE_GRACE;
-          const right = platformLeft(platform) + platform.w - MARIO_EDGE_GRACE;
-          body.x = clamp(body.x, left, right);
-        }
-
-        function clearMarioClash(a, b) {
-          if (a.clashWith === b.id) {
-            a.clashWith = null;
-            a.clashSince = 0;
-          }
-          if (b.clashWith === a.id) {
-            b.clashWith = null;
-            b.clashSince = 0;
-          }
-        }
-
-        function shoveMario(attacker, defender, direction, overlap, platformId) {
-          clearMarioClash(attacker, defender);
-          defender.x += direction * (overlap + 1.25);
-          defender.vx = direction * Math.max(92, Math.abs(defender.vx), Math.abs(attacker.vx) * 0.84);
-          attacker.vx *= 0.82;
-          syncMarioLocalX(attacker);
-          syncMarioLocalX(defender);
-
-          const platform = platformById(platformId);
-          if (!platform || marioHasFooting(defender, platform)) return;
-          shoveOutCount += 1;
-          if (defender === hero) {
-            hero.grounded = false;
-            hero.groundId = null;
-            hero.vx = direction * Math.max(118, Math.abs(hero.vx));
-            hero.vy = -42;
-            hero.stumbleUntil = simTime + 0.48;
-            clearRouteAttempt();
-          } else {
-            dropMarioBuddy(defender, direction, Math.abs(defender.vx));
-          }
-          spawnDust(defender.x, defender.y, 12, C.lemon);
-        }
-
-        function respawnMarioBuddy(buddy) {
-          const candidates = platforms
-            .filter((platform) => platform.y > cameraY + height * 0.35 && platform.y < cameraY + height * 0.9)
-            .filter((platform) => !buddies.some((other) => other !== buddy && other.platformId === platform.id));
-          const platform = candidates[Math.floor(hash01(buddy.id * 1597 + Math.floor(simTime)) * candidates.length)];
-          if (!platform) return;
-          buddy.platformId = platform.id;
-          buddy.localX = clamp(platform.w * (0.28 + hash01(buddy.id * 2081) * 0.44), 20, platform.w - 20);
-          buddy.x = platformLeft(platform) + buddy.localX;
-          buddy.y = platform.y + 64;
-          buddy.vx = 0;
-          buddy.vy = 0;
-          buddy.spin = 0;
-          buddy.grounded = true;
-          buddy.falling = false;
-          buddy.targetId = null;
-          buddy.landedAt = simTime;
-          buddy.jumpAt = simTime + 0.45;
-          spawnDust(buddy.x, buddy.y, 10, C.lemon);
         }
 
         function pulseCloud(platform) {
@@ -1427,14 +1444,10 @@
 
         function trimWorld() {
           const cutoff = cameraY - 240;
-          platforms = platforms.filter((platform) => platform.y > cutoff || platform.id === hero.groundId);
-          barrels = barrels.filter((barrel) => {
-            const platform = platformById(barrel.platformId);
-            return platform && platform.y > cutoff;
-          });
-          boxes = boxes.filter((box) => box.y > cutoff);
-          links = links.filter((link) => link.y2 > cutoff && platformById(link.lowerId) && platformById(link.upperId));
-          buddies = buddies.filter((buddy) => buddy.falling || buddy.y > cutoff - 220);
+          platforms = platforms.filter(
+            (platform) => platform.y > cutoff || platform.id === hero.groundId || platform.searchPlatform
+          );
+          buddies = buddies.filter((buddy) => !buddy.dead && (buddy.dying || buddy.falling || buddy.y > cutoff - 220));
         }
 
         function addPlatform() {
@@ -1442,16 +1455,17 @@
           const gap = rand(height < 620 ? 86 : 92, height < 620 ? 116 : 126);
           const y = previous.y + gap;
           const minW = clamp(worldWidth * 0.2, 82, 118);
-          const maxW = clamp(worldWidth * 0.34, 132, 196);
+          const maxW = clamp(worldWidth * 0.34, 144, 248);
           const w = rand(minW, maxW) * (rng() < 0.12 ? 1.14 : 1);
-          const maxShift = clamp(gap * 0.9 + (previous.w + w) * 0.22, 128, Math.min(220, worldWidth * 0.46));
+          const maxShift = clamp(gap * 1.12 + (previous.w + w) * 0.28, 156, Math.min(294, worldWidth * 0.62));
           const previousCenter = platformLeft(previous) + previous.w * 0.5;
           let center = previousCenter;
           let foundReachable = false;
-          const preferredSide = platformCount % 2 === 0 ? 1 : -1;
+          const preferredSide = Math.floor(trunkCount / 3) % 2 === 0 ? 1 : -1;
+          const centerBounds = platformCenterBounds(w);
           for (let attempt = 0; attempt < 28; attempt += 1) {
             const side = attempt < 18 ? preferredSide : rng() < 0.5 ? -1 : 1;
-            const candidateCenter = clamp(previousCenter + side * rand(maxShift * 0.58, maxShift), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+            const candidateCenter = clamp(previousCenter + side * rand(maxShift * 0.7, maxShift), centerBounds.min, centerBounds.max);
             const candidate = { x: candidateCenter - w * 0.5, y, w, h: 18, moving: false, travel: 0 };
             center = candidateCenter;
             if (routeToPlatform(previous, candidate) && canPlacePlatform(candidate)) {
@@ -1461,7 +1475,7 @@
           }
           if (!foundReachable) {
             for (let attempt = 0; attempt < 12; attempt += 1) {
-              const candidateCenter = clamp(previousCenter + rand(-72, 72), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+              const candidateCenter = clamp(previousCenter + rand(-118, 118), centerBounds.min, centerBounds.max);
               const candidate = { x: candidateCenter - w * 0.5, y, w, h: 18, moving: false, travel: 0 };
               if (routeToPlatform(previous, candidate) && canPlacePlatform(candidate)) {
                 center = candidateCenter;
@@ -1469,20 +1483,19 @@
                 break;
               }
             }
-            if (!foundReachable) center = clamp(previousCenter, w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+            if (!foundReachable) center = clamp(previousCenter, centerBounds.min, centerBounds.max);
           }
-          const type = rng() < 0.18 ? 'girder' : 'brick';
-          const moving = y > 800 && w > 136 && rng() < 0.06;
-          const platform = makePlatform(center, y, w, type, moving);
-          platform.spring = false;
+          const zone = zoneForHeight(y);
+          const moving = zone === 'ink' && y > 800 && w > 136 && rng() < 0.06;
+          const platform = makePlatform(center, y, w, zone, moving);
+          configurePlatformZone(platform, previous);
+          platform.spring = shouldHaveSpring(platform);
           platforms.push(platform);
-          maybeAddLink(previous, platform);
           lastPlatform = platform;
           highestPlatformY = y;
+          trunkCount += 1;
 
-          addQuestionBoxesForPlatform(platform);
           addBranchPlatforms(previous, platform);
-          if (y > 520 && !platform.moving && rng() < 0.08) addBarrel(platform);
         }
 
         function addBranchPlatforms(previous, trunk) {
@@ -1491,13 +1504,14 @@
           for (let i = 0; i < branchCount; i += 1) {
             const base = trunk;
             const baseCenter = platformCenter(base);
-            const side = baseCenter < worldWidth * 0.5 ? 1 : -1;
+            const side = baseCenter < worldWidth * 0.5 ? -1 : 1;
             let chosen = null;
             for (let attempt = 0; attempt < 14; attempt += 1) {
               const gap = rand(78, 124);
               const y = base.y + gap;
-              const w = rand(clamp(worldWidth * 0.18, 78, 112), clamp(worldWidth * 0.29, 118, 166));
-              const center = clamp(baseCenter + side * rand(96, Math.min(198, worldWidth * 0.34)), w * 0.5 + 12, worldWidth - w * 0.5 - 12);
+              const w = rand(clamp(worldWidth * 0.18, 82, 126), clamp(worldWidth * 0.29, 132, 194));
+              const bounds = platformCenterBounds(w);
+              const center = clamp(baseCenter + side * rand(180, Math.min(380, worldWidth * 0.56)), bounds.min, bounds.max);
               const candidate = { x: center - w * 0.5, y, w, h: 16, moving: false, travel: 0 };
               if (routeToPlatform(base, candidate) && canPlacePlatform(candidate)) {
                 chosen = { center, y, w };
@@ -1505,54 +1519,12 @@
               }
             }
             if (!chosen) continue;
-            const platform = makePlatform(chosen.center, chosen.y, chosen.w, rng() < 0.5 ? 'brick' : 'girder', false);
+            const platform = makePlatform(chosen.center, chosen.y, chosen.w, zoneForHeight(chosen.y), false);
+            configurePlatformZone(platform, base);
+            platform.spring = shouldHaveSpring(platform);
             platform.branch = true;
             platforms.push(platform);
-            maybeAddLink(base, platform);
-            addQuestionBoxesForPlatform(platform);
-            if (rng() < 0.07) addBarrel(platform);
           }
-        }
-
-        function maybeAddLink(lower, upper, forcedKind) {
-          if (!lower || !upper || lower.moving || upper.moving) return;
-          const gap = upper.y - lower.y;
-          if (gap < 46 || gap > 236) return;
-          const roll = rng();
-          if (!forcedKind && roll > 0.2) return;
-          const kind = forcedKind || (roll < 0.1 ? 'stairs' : 'ladder');
-          const lowerLeft = platformLeft(lower);
-          const lowerRight = lowerLeft + lower.w;
-          const upperLeft = platformLeft(upper);
-          const upperRight = upperLeft + upper.w;
-          let x1 = clamp(platformCenter(upper), lowerLeft + 22, lowerRight - 22);
-          let x2 = clamp(x1, upperLeft + 22, upperRight - 22);
-          if (kind === 'stairs') {
-            x1 = clamp(platformCenter(lower) + (platformCenter(upper) > platformCenter(lower) ? 30 : -30), lowerLeft + 24, lowerRight - 24);
-            x2 = clamp(platformCenter(upper) + (x1 < platformCenter(upper) ? -30 : 30), upperLeft + 24, upperRight - 24);
-          } else {
-            const sharedLeft = Math.max(lowerLeft + 22, upperLeft + 22);
-            const sharedRight = Math.min(lowerRight - 22, upperRight - 22);
-            if (sharedLeft > sharedRight) return;
-            const verticalX = clamp((platformCenter(lower) + platformCenter(upper)) * 0.5, sharedLeft, sharedRight);
-            x1 = verticalX;
-            x2 = verticalX;
-          }
-          const link = {
-            id: ++linkCount,
-            kind,
-            lowerId: lower.id,
-            upperId: upper.id,
-            x1,
-            x2,
-            y1: lower.y,
-            y2: upper.y,
-          };
-          if (!canPlaceLink(link)) {
-            linkCount -= 1;
-            return;
-          }
-          links.push(link);
         }
 
         function makePlatform(center, y, w, type, moving) {
@@ -1562,8 +1534,23 @@
             x: center - w * 0.5,
             y,
             w,
+            baseX: center - w * 0.5,
+            baseW: w,
             h: 38,
             type,
+            zone: zoneForHeight(y),
+            zoneSafe: false,
+            trapRole: null,
+            trapdoorTargetId: null,
+            activatedUntil: 0,
+            openedAt: 0,
+            trapOpenUntil: 0,
+            crumbleBricks: null,
+            collapseAt: 0,
+            collapsed: false,
+            restoreAt: 0,
+            shrinkLevel: 0,
+            cloudChunks: null,
             moving,
             travel,
             phase: rand(0, TAU),
@@ -1574,95 +1561,45 @@
           };
         }
 
-        function addQuestionBoxesForPlatform(platform, force = false) {
-          if (platform.moving && !force) return;
-          if (!force && rng() > 0.62) return;
-          const count = !force && platform.w > 142 && rng() < 0.16 ? 2 : 1;
-          const left = platformLeft(platform) + platform.w * 0.3;
-          const right = platformLeft(platform) + platform.w * 0.7;
-          const slots = count === 1 ? [0.5] : [0.26, 0.74];
-          for (let i = 0; i < count; i += 1) {
-            const t = slots[i];
-            const candidate = {
-              id: ++boxCount,
-              platformId: platform.id,
-              x: lerp(left, right, t) + rand(-8, 8),
-              y: platform.y + BOX_BOTTOM_OFFSET,
-              size: BOX_SIZE,
-              hit: false,
-              hitAt: 0,
-              phase: rand(0, TAU),
-            };
-            if (canPlaceQuestionBox(candidate, platform)) {
-              boxes.push(candidate);
-            } else {
-              boxCount -= 1;
-            }
+        function zoneForHeight(y) {
+          const index = Math.floor(Math.max(0, y - 88) / ZONE_HEIGHT);
+          return ZONES[index % ZONES.length];
+        }
+
+        function configurePlatformZone(platform, previous) {
+          platform.zone = zoneForHeight(platform.y);
+          platform.type = platform.zone;
+          platform.zoneSafe = !previous || previous.zone !== platform.zone;
+          if (platform.zone === 'crumble') ensureCrumbleBricks(platform);
+          if (platform.zone === 'shrink') ensureCloudChunks(platform);
+          if (platform.zone !== 'trap') return;
+          if (platform.zoneSafe) {
+            platform.trapRole = 'solid';
+          } else if (previous && previous.zone === 'trap' && previous.trapRole === 'trapdoor') {
+            platform.trapRole = 'lever';
+            platform.trapdoorTargetId = previous.id;
+          } else {
+            platform.trapRole = 'trapdoor';
           }
         }
 
-        function addBarrel(platform) {
-          barrels.push({
-            id: ++barrelCount,
-            platformId: platform.id,
-            offset: rand(platform.w * 0.22, platform.w * 0.78),
-            dir: rng() < 0.5 ? -1 : 1,
-            speed: rand(42, 74),
-            radius: rand(9, 12),
-            roll: rand(0, TAU),
-            bumpCooldownUntil: 0,
-          });
+        function shouldHaveSpring(platform) {
+          if (platform.zone === 'crumble') return false;
+          if (platform.trapRole === 'trapdoor' || platform.trapRole === 'lever') return false;
+          return Math.floor(platform.y / 100) % 7 === 3 || rng() < 0.045;
         }
 
         function canPlacePlatform(candidate, mode = 'strict') {
           const rect = platformVisualRect(candidate, 8);
           const relaxed = mode === 'relaxed';
-          if (rect.left < 8 || rect.right > worldWidth - 8) return false;
+          const visibleWidth = Math.min(worldWidth, rect.right) - Math.max(0, rect.left);
+          if (visibleWidth < HERO_W + 8) return false;
           for (const platform of platforms) {
             const other = platformVisualRect(platform, 0);
             const horizontalGap = Math.max(other.left - rect.right, rect.left - other.right, 0);
             const verticalGap = Math.abs(candidate.y - platform.y);
             if (verticalGap < (relaxed ? 42 : 74) && horizontalGap < (relaxed ? 18 : 30)) return false;
             if (rectsOverlap(rect, platformVisualRect(platform, 10))) return false;
-          }
-          for (const box of boxes) {
-            if (box.hit && simTime - box.hitAt > 0.45) continue;
-            if (rectsOverlap(rect, boxVisualRect(box, 7))) return false;
-          }
-          if (!relaxed) {
-            for (const link of links) {
-              if (rectsOverlap(rect, linkVisualRect(link, 4))) return false;
-            }
-          }
-          return true;
-        }
-
-        function canPlaceQuestionBox(box, platform) {
-          const left = platformLeft(platform) + 18;
-          const right = platformLeft(platform) + platform.w - 18;
-          if (box.x - box.size * 0.5 < left || box.x + box.size * 0.5 > right) return false;
-          const rect = boxVisualRect(box, 5);
-          if (rect.left < 10 || rect.right > worldWidth - 10) return false;
-          for (const other of platforms) {
-            if (other.id !== platform.id && rectsOverlap(rect, platformVisualRect(other, 7))) return false;
-          }
-          for (const other of boxes) {
-            if (rectsOverlap(rect, boxVisualRect(other, 9))) return false;
-          }
-          for (const link of links) {
-            if (rectsOverlap(rect, linkVisualRect(link, 5))) return false;
-          }
-          return true;
-        }
-
-        function canPlaceLink(link) {
-          const rect = linkVisualRect(link, 3);
-          for (const platform of platforms) {
-            if (platform.id === link.lowerId || platform.id === link.upperId) continue;
-            if (rectsOverlap(rect, platformVisualRect(platform, 4))) return false;
-          }
-          for (const box of boxes) {
-            if (rectsOverlap(rect, boxVisualRect(box, 7))) return false;
           }
           return true;
         }
@@ -1678,26 +1615,6 @@
           };
         }
 
-        function boxVisualRect(box, pad = 0) {
-          const half = box.size * 0.5;
-          return {
-            left: box.x - half - pad,
-            right: box.x + half + pad,
-            bottom: box.y - pad,
-            top: box.y + box.size + pad,
-          };
-        }
-
-        function linkVisualRect(link, pad = 0) {
-          const reach = (link.kind === 'stairs' ? 15 : 11) + pad;
-          return {
-            left: Math.min(link.x1, link.x2) - reach,
-            right: Math.max(link.x1, link.x2) + reach,
-            bottom: Math.min(link.y1, link.y2) - 6 - pad,
-            top: Math.max(link.y1, link.y2) + 6 + pad,
-          };
-        }
-
         function rectsOverlap(a, b) {
           return a.left < b.right && a.right > b.left && a.bottom < b.top && a.top > b.bottom;
         }
@@ -1710,18 +1627,12 @@
           return null;
         }
 
-        function linkById(id) {
-          if (!id) return null;
-          for (const link of links) {
-            if (link.id === id) return link;
-          }
-          return null;
-        }
-
         function platformLeft(platform) {
           if (!platform.moving) return platform.x;
           const drift = Math.sin(simTime * platform.speed + platform.phase) * platform.travel;
-          return clamp(platform.x + drift, 8, worldWidth - platform.w - 8);
+          const bounds = platformCenterBounds(platform.w);
+          const center = clamp(platform.x + platform.w * 0.5 + drift, bounds.min, bounds.max);
+          return center - platform.w * 0.5;
         }
 
         function spawnDust(x, y, count, color) {
@@ -1742,30 +1653,21 @@
 
         function updateHud() {
           if (DEBUG) {
+            const livingMarios = [hero, ...buddies].filter((runner) => !runner.dead).length;
             debugEl.textContent = [
               `seed ${seed}`,
               `height ${Math.floor(bestHeight)}`,
               `platforms ${platforms.length}`,
-              `links ${links.length}`,
-              `barrels ${barrels.length}`,
-              `marios ${buddies.length + 1}`,
+              `marios ${livingMarios}`,
               `falling ${buddies.filter((buddy) => buddy.falling).length + (!hero.grounded && hero.vy < 0 ? 1 : 0)}`,
-              `boxes ${boxes.length}`,
-              `hit ${boxesHit}`,
               `target ${targetPlatformId || '-'}`,
-              `box ${targetBoxId || '-'}`,
-              `link ${targetLinkId || '-'}`,
               `ground ${hero.grounded ? hero.groundId || '-' : '-'}`,
               `y ${Math.round(hero.y)}`,
               `vy ${Math.round(hero.vy)}`,
               `noRoute ${hero.noRouteSince ? (simTime - hero.noRouteSince).toFixed(1) : '-'}`,
-              `down ${downTrips}`,
-              `ladders ${ladderTrips}`,
-              `stairs ${stairTrips}`,
-              `rescues ${rescueCount}`,
-              `stalemates ${stalemateCount}`,
-              `shove outs ${shoveOutCount}`,
-              `skips ${skippedBoxes}`,
+              `deaths ${deathCount}`,
+              `search ${cameraSearchMode ? 'down' : 'no'}`,
+              `springs ${platforms.filter((platform) => platform.spring).length}`,
               `manual ${manualActive() ? 'yes' : 'no'}`,
             ].join('\n');
           }
@@ -1779,10 +1681,7 @@
 
         function render() {
           drawBackground();
-          drawLinks();
           drawPlatforms();
-          drawQuestionBoxes();
-          drawBarrels();
           drawParticles();
           drawMarioBuddies();
           drawHero();
@@ -1888,24 +1787,7 @@
           sky.addColorStop(1, '#C9F0FF');
           ctx.fillStyle = sky;
           ctx.fillRect(0, 0, width, height);
-
-          /* A cropped candy rainbow is the visual anchor. It is deliberately
-             oversized, like a sticker peeking in from the page edge. */
-          ctx.save();
-          ctx.globalAlpha = 0.48;
-          ctx.lineCap = 'round';
-          const rainbowX = width < 560 ? width + 62 : width + 80;
-          const rainbowY = 116;
-          const rainbowR = Math.min(210, width * 0.24 + 80);
-          const rainbow = [C.deep, C.lemon, C.mint, C.pale];
-          for (let i = 0; i < rainbow.length; i += 1) {
-            ctx.strokeStyle = rainbow[i];
-            ctx.lineWidth = 18;
-            ctx.beginPath();
-            ctx.arc(rainbowX, rainbowY, rainbowR - i * 21, Math.PI * 0.72, Math.PI * 1.36);
-            ctx.stroke();
-          }
-          ctx.restore();
+          drawCloudscape(playHeight);
 
           const drift = cameraY * 0.28;
           const band = 118;
@@ -1930,21 +1812,27 @@
             ctx.restore();
           }
 
-          /* Distant milk-white cloudlets soften the empty parts of the sky
-             without creating the old tunnel walls. */
-          ctx.save();
-          ctx.globalAlpha = 0.28;
-          const cloudDrift = cameraY * 0.16;
-          for (let i = -2; i < 7; i += 1) {
-            const n = i + Math.floor(cloudDrift / 310) * 7;
-            const x = hash01(n * 83 + 9) * width;
-            const y = mod(i * 190 + hash01(n * 107) * 90 + cloudDrift, playHeight + 220) - 110;
-            const w = 90 + hash01(n * 131) * 100;
-            cloudPath(x, y, w, 0.72);
-            ctx.fillStyle = C.white;
-            ctx.fill();
+        }
+
+        /* Each run assembles a fresh sky from transparent painted parts.
+           The seed keeps a run reproducible while reseeding changes the
+           cloud-bank balance, scale, reflection and parallax. */
+        function drawCloudscape(playHeight) {
+          for (const part of cloudscapeLayout) {
+            const image = cloudPartImages[part.kind];
+            if (!image || !image.complete || !image.naturalWidth) continue;
+            const drawWidth = width * part.width;
+            const drawHeight = drawWidth * (image.naturalHeight / image.naturalWidth);
+            const drift = Math.sin(cameraY * part.parallax * 0.002 + part.x * 7) * playHeight * 0.075;
+            const x = width * part.x;
+            const y = playHeight * part.y + drift;
+            ctx.save();
+            ctx.globalAlpha = part.alpha;
+            ctx.translate(x, y);
+            ctx.scale(part.flip ? -1 : 1, 1);
+            ctx.drawImage(image, -drawWidth * 0.5, -drawHeight * 0.5, drawWidth, drawHeight);
+            ctx.restore();
           }
-          ctx.restore();
         }
 
         /* Two parallax layers of soft shapes so the shaft has air in it. */
@@ -2050,45 +1938,175 @@
 
         function drawPlatforms() {
           for (const platform of platforms) {
+            if (platform.collapsed) continue;
             const sy = screenY(platform.y);
             if (sy < -90 || sy > height + 90) continue;
             const sx = worldLeft + platformLeft(platform);
             const pulse = clamp(1 - (simTime - platform.pulseUntil + 0.24) / 0.24, 0, 1);
-            drawCloudPlatform(platform, sx, sy, pulse);
+            if (platform.zone === 'ink') drawInkPlatform(platform, sx, sy, pulse);
+            else if (platform.zone === 'crumble') drawCrumblePlatform(platform, sx, sy, pulse);
+            else if (platform.zone === 'trap') drawTrapPlatform(platform, sx, sy, pulse);
+            else drawCloudPlatform(platform, sx, sy, pulse);
             if (platform.spring) drawSpring(sx + platform.w * 0.5, sy - 2);
-            if (platform.id === targetPlatformId && !manualActive()) drawTargetTick(sx + platform.w * 0.5, sy - 34);
           }
+        }
+
+        function applyPlatformPulse(cx, sy, pulse) {
+          if (pulse <= 0) return;
+          ctx.translate(cx, sy + 6);
+          ctx.scale(1 + pulse * 0.04, 1 - pulse * 0.07);
+          ctx.translate(-cx, -(sy + 6));
+        }
+
+        function drawInkPlatform(platform, sx, sy, pulse) {
+          const w = platform.w;
+          const cx = sx + w * 0.5;
+          const wobble = Math.sin(platform.id * 9.7) * 2;
+          ctx.save();
+          applyPlatformPulse(cx, sy, pulse);
+          ctx.strokeStyle = SKIN.outline;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(sx + 3, sy - 1);
+          ctx.quadraticCurveTo(cx - w * 0.16, sy - 4 + wobble, cx, sy - 1);
+          ctx.quadraticCurveTo(cx + w * 0.2, sy + 2 - wobble, sx + w - 3, sy - 1);
+          ctx.stroke();
+          ctx.lineWidth = 2;
+          ctx.globalAlpha = 0.82;
+          ctx.beginPath();
+          ctx.moveTo(sx + 10, sy + 7);
+          ctx.quadraticCurveTo(cx, sy + 10 - wobble, sx + w - 12, sy + 6);
+          ctx.stroke();
+          for (let x = sx + 18; x < sx + w - 10; x += 25) {
+            ctx.beginPath();
+            ctx.moveTo(x, sy + 2);
+            ctx.lineTo(x + 4, sy + 9 + Math.sin(x) * 1.5);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        function drawCrumblePlatform(platform, sx, sy, pulse) {
+          const w = platform.w;
+          const cx = sx + w * 0.5;
+          ctx.save();
+          applyPlatformPulse(cx, sy, pulse);
+          for (const brick of ensureCrumbleBricks(platform)) {
+            if (brick.broken) continue;
+            const progress = brick.breakAt
+              ? clamp((simTime - brick.hitAt) / Math.max(0.01, brick.breakAt - brick.hitAt), 0, 1)
+              : 0;
+            const shake = prefersReducedMotion ? 0 : Math.sin(simTime * 52 + brick.index * 2.3) * progress * 1.8;
+            const left = sx + brick.x + 1 + shake;
+            const top = sy - 10 + Math.abs(shake) * 0.35;
+            const size = Math.max(5, brick.w - 2);
+            ctx.fillStyle = brick.index % 2 ? '#D97882' : '#EEA2A7';
+            ctx.fillRect(left, top, size, 19);
+            ctx.strokeStyle = '#6C4555';
+            ctx.lineWidth = 1.4;
+            ctx.strokeRect(left, top, size, 19);
+            if (progress > 0.08) {
+              ctx.beginPath();
+              ctx.moveTo(left + size * 0.28, top + 1);
+              ctx.lineTo(left + size * 0.58, top + 7);
+              ctx.lineTo(left + size * 0.42, top + 12);
+              ctx.lineTo(left + size * 0.68, top + 18);
+              ctx.strokeStyle = SKIN.outline;
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
+        }
+
+        function drawTrapPlatform(platform, sx, sy, pulse) {
+          const w = platform.w;
+          const cx = sx + w * 0.5;
+          const isDoor = platform.trapRole === 'trapdoor';
+          const isLever = platform.trapRole === 'lever';
+          let open = 0;
+          if (isDoor && platform.openedAt) {
+            if (platform.trapOpenUntil > simTime) open = clamp((simTime - platform.openedAt) / 0.22, 0, 1);
+            else open = clamp(1 - (simTime - platform.trapOpenUntil) / 0.28, 0, 1);
+          }
+
+          ctx.save();
+          applyPlatformPulse(cx, sy, pulse);
+          if (isDoor) {
+            const gap = 5;
+            const panelW = w * 0.5 - gap;
+            drawTrapPanel(sx, sy, panelW, open * Math.PI * 0.5, 1);
+            drawTrapPanel(sx + w, sy, panelW, -open * Math.PI * 0.5, -1);
+            fillCircle(sx + 4, sy, 5, '#66507D');
+            fillCircle(sx + w - 4, sy, 5, '#66507D');
+          } else {
+            fillRound(sx, sy - 5, w, 15, 4, '#66507D');
+            fillRound(sx + 4, sy - 3, w - 8, 8, 3, '#B7E8D9');
+          }
+
+          if (isLever) {
+            const active = platform.activatedUntil > simTime;
+            const angle = active ? -0.78 : 0.58;
+            const baseY = sy - 7;
+            fillOval(cx, baseY, 11, 4, '#66507D');
+            ctx.strokeStyle = SKIN.outline;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(cx, baseY - 1);
+            ctx.lineTo(cx + Math.sin(angle) * 15, baseY - Math.cos(angle) * 15);
+            ctx.stroke();
+            fillCircle(cx + Math.sin(angle) * 15, baseY - Math.cos(angle) * 15, 5, active ? C.lemon : C.mid);
+          }
+          ctx.restore();
+        }
+
+        function drawTrapPanel(hingeX, hingeY, panelW, angle, direction) {
+          ctx.save();
+          ctx.translate(hingeX, hingeY);
+          ctx.rotate(angle);
+          const x = direction > 0 ? 0 : -panelW;
+          fillRound(x, -5, panelW, 12, 3, '#66507D');
+          fillRound(x + 3, -3, panelW - 6, 7, 2, '#D8C9F4');
+          ctx.restore();
         }
 
         function drawCloudPlatform(platform, sx, sy, pulse) {
           const w = platform.w;
           const cx = sx + w * 0.5;
-          const body = C.white;
           const underside = '#EEDFFF';
 
           ctx.save();
-          if (pulse > 0) {
-            ctx.translate(cx, sy + 8);
-            ctx.scale(1 + pulse * 0.035, 1 - pulse * 0.055);
-            ctx.translate(-cx, -(sy + 8));
+          applyPlatformPulse(cx, sy, pulse);
+
+          for (const chunk of ensureCloudChunks(platform)) {
+            if (chunk.broken) continue;
+            const chunkX = worldLeft + platform.baseX + chunk.x;
+            const chunkY = sy + chunk.lift;
+            cloudChunkPath(chunkX + 2, chunkY + 7, chunk.w, chunk.h, chunk.index);
+            ctx.fillStyle = 'rgba(92, 66, 124, 0.13)';
+            ctx.fill();
+            cloudChunkPath(chunkX, chunkY + 3, chunk.w, chunk.h, chunk.index);
+            ctx.fillStyle = underside;
+            ctx.fill();
+            cloudChunkPath(chunkX, chunkY, chunk.w, chunk.h, chunk.index);
+            ctx.fillStyle = C.white;
+            ctx.fill();
           }
 
-          cloudPath(cx + 4, sy + 9, w * 0.97, 0.94);
-          ctx.fillStyle = 'rgba(92, 66, 124, 0.15)';
-          ctx.fill();
-
-          cloudPath(cx, sy, w, 1);
-          ctx.save();
-          ctx.clip();
-          ctx.fillStyle = body;
-          ctx.fillRect(cx - w, sy - 60, w * 3, 200);
-          ctx.fillStyle = underside;
-          ctx.fillRect(cx - w, sy + 17, w * 3, 120);
-          ctx.globalAlpha = 0.5;
-          fillOval(cx - w * 0.18, sy - 8, w * 0.23, 7, C.white);
           ctx.restore();
+        }
 
-          ctx.restore();
+        function cloudChunkPath(cx, cy, w, h, index) {
+          const tilt = (hash01(index * 83 + 19) - 0.5) * h * 0.18;
+          ctx.beginPath();
+          ctx.moveTo(cx - w * 0.5, cy + h * 0.16);
+          ctx.bezierCurveTo(cx - w * 0.58, cy - h * 0.12, cx - w * 0.34, cy - h * 0.38, cx - w * 0.2, cy - h * 0.26);
+          ctx.bezierCurveTo(cx - w * 0.12, cy - h * 0.68 + tilt, cx + w * 0.22, cy - h * 0.72, cx + w * 0.28, cy - h * 0.28);
+          ctx.bezierCurveTo(cx + w * 0.5, cy - h * 0.3, cx + w * 0.6, cy + h * 0.02, cx + w * 0.46, cy + h * 0.2);
+          ctx.bezierCurveTo(cx + w * 0.28, cy + h * 0.38, cx - w * 0.28, cy + h * 0.36, cx - w * 0.5, cy + h * 0.16);
+          ctx.closePath();
         }
 
         /* One plump storybook silhouette: a big center dome, two shoulders,
@@ -2128,175 +2146,6 @@
           fillRound(cx - 13, sy - 31, 26, 7, 3.5, C.deep);
         }
 
-        function drawTargetTick(cx, sy) {
-          const bob = Math.sin(simTime * 5) * 2.5;
-          ctx.save();
-          ctx.globalAlpha = 0.75;
-          ctx.fillStyle = C.pale;
-          ctx.beginPath();
-          ctx.moveTo(cx, sy + 9 + bob);
-          ctx.lineTo(cx - 7, sy + bob);
-          ctx.lineTo(cx + 7, sy + bob);
-          ctx.closePath();
-          ctx.fill();
-          fillRound(cx - 3, sy - 9 + bob, 6, 9, 3, C.pale);
-          ctx.restore();
-        }
-
-        /* -- LINKS -- */
-
-        function drawLinks() {
-          for (const link of links) {
-            const y1 = screenY(link.y1);
-            const y2 = screenY(link.y2);
-            if (Math.max(y1, y2) < -60 || Math.min(y1, y2) > height + 60) continue;
-            const x1 = worldLeft + link.x1;
-            const x2 = worldLeft + link.x2;
-            const active = link.id === targetLinkId;
-            if (link.kind === 'stairs') drawStairs(x1, y1, x2, y2, active);
-            else drawLadder(x1, y1, x2, y2, active);
-          }
-        }
-
-        function linkTones(active) {
-          return active ? { rail: C.deep, step: C.lemon } : { rail: C.pale, step: C.mint };
-        }
-
-        function drawLadder(x1, y1, x2, y2, active) {
-          const x = (x1 + x2) * 0.5;
-          const tone = linkTones(active);
-          const top = Math.min(y1, y2);
-          const bottom = Math.max(y1, y2);
-          capsule(x - 9, top + 6, x - 9, bottom - 2, 5.5, tone.rail);
-          capsule(x + 9, top + 6, x + 9, bottom - 2, 5.5, tone.rail);
-          for (let y = top + 18; y < bottom - 6; y += 17) {
-            capsule(x - 7, y, x + 7, y, 4.5, tone.step);
-          }
-        }
-
-        /* Treads fanned across a stringer. The link itself is often almost
-           vertical, so the drawing takes a horizontal liberty -- otherwise a
-           staircase is indistinguishable from a ladder. */
-        function drawStairs(x1, y1, x2, y2, active) {
-          const tone = linkTones(active);
-          const top = Math.min(y1, y2);
-          const bottom = Math.max(y1, y2);
-          const steps = Math.max(3, Math.round((bottom - top) / 22));
-          const dir = x2 >= x1 ? 1 : -1;
-          const spread = 13;
-          const fan = (t) => lerp(x1, x2, t) + dir * lerp(-spread, spread, t);
-
-          capsule(fan(0) - dir * 9, y1 + 4, fan(1) + dir * 9, y2 - 4, 7, tone.rail);
-          for (let i = 0; i <= steps; i += 1) {
-            const t = i / steps;
-            fillRound(fan(t) - 12, lerp(y1, y2, t) - 3.5, 24, 7, 3.5, tone.step);
-          }
-        }
-
-        /* -- QUESTION BOXES -- */
-
-        function drawQuestionBoxes() {
-          for (const box of boxes) {
-            const sy = screenY(box.y + box.size);
-            if (sy < -48 || sy > height + 48) continue;
-            const sx = worldLeft + box.x - box.size * 0.5;
-            const age = simTime - box.hitAt;
-            const lift = box.hit ? Math.max(0, 1 - age / 0.2) * 9 : Math.sin(simTime * 2.4 + box.x * 0.05) * 1.4;
-            const s = box.size;
-            const targeted = box.id === targetBoxId && !box.hit;
-
-            ctx.save();
-            ctx.translate(sx + s * 0.5, sy - lift + s * 0.5);
-            if (targeted) ctx.scale(1 + Math.sin(simTime * 6) * 0.04, 1 + Math.sin(simTime * 6) * 0.04);
-            ctx.translate(-s * 0.5, -s * 0.5);
-
-            fillRound(1.5, 4, s, s, 8, SHADOW);
-
-            if (box.hit) {
-              fillRound(0, 0, s, s, 8, C.mint);
-              /* Opened: a contented little face. */
-              ctx.strokeStyle = C.white;
-              ctx.lineWidth = 2.4;
-              ctx.lineCap = 'round';
-              for (const side of [-1, 1]) {
-                ctx.beginPath();
-                ctx.arc(s * 0.5 + side * 5.5, s * 0.46, 3.4, Math.PI * 1.1, Math.PI * 1.9);
-                ctx.stroke();
-              }
-              ctx.beginPath();
-              ctx.arc(s * 0.5, s * 0.6, 2.6, Math.PI * 0.15, Math.PI * 0.85);
-              ctx.stroke();
-            } else {
-              fillRound(0, 0, s, s, 8, C.lemon);
-              fillRound(4, 4, s - 8, 5, 2.5, '#FFF2A9');
-              ctx.strokeStyle = C.ink;
-              ctx.lineWidth = 2;
-              ctx.beginPath();
-              roundRectPath(0, 0, s, s, 8);
-              ctx.stroke();
-              ctx.fillStyle = C.deep;
-              ctx.font = '900 17px "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText('?', s * 0.5, s * 0.58);
-            }
-
-            ctx.restore();
-
-            /* Burst of sparkles on the frame the box opens. */
-            if (box.hit && age < 0.45) {
-              const t = age / 0.45;
-              ctx.save();
-              ctx.globalAlpha = 1 - t;
-              for (let i = 0; i < 5; i += 1) {
-                const a = (i / 5) * TAU - 0.4;
-                const d = 14 + t * 22;
-                sparkle(sx + s * 0.5 + Math.cos(a) * d, sy - lift + s * 0.5 + Math.sin(a) * d, 4 * (1 - t) + 1.5, C.pale);
-              }
-              ctx.restore();
-            }
-          }
-        }
-
-        /* -- BARRELS -- little grumps that patrol a cloud -- */
-
-        function drawBarrels() {
-          for (const barrel of barrels) {
-            const platform = platformById(barrel.platformId);
-            if (!platform) continue;
-            const bx = worldLeft + platformLeft(platform) + barrel.offset;
-            const by = screenY(platform.y + barrel.radius + 2);
-            if (by < -46 || by > height + 46) continue;
-            const r = barrel.radius;
-            const hop = Math.abs(Math.sin(barrel.roll * 1.4));
-            const squash = 1 + hop * 0.08;
-
-            ctx.save();
-            ctx.translate(bx, by);
-            fillOval(1, r * 0.95, r * 0.85, r * 0.28, SHADOW);
-            ctx.scale(1 / squash, squash);
-            ctx.rotate(Math.sin(barrel.roll) * 0.16);
-
-            fillCircle(0, 0, r, C.peach);
-            fillOval(0, r * 0.42, r * 0.72, r * 0.4, C.deep);
-
-            const face = barrel.dir;
-            fillOval(-r * 0.34 + face * 1.5, -r * 0.16, r * 0.19, r * 0.26, C.white);
-            fillOval(r * 0.34 + face * 1.5, -r * 0.16, r * 0.19, r * 0.26, C.white);
-            fillCircle(-r * 0.34 + face * 2.6, -r * 0.12, r * 0.1, C.night);
-            fillCircle(r * 0.34 + face * 2.6, -r * 0.12, r * 0.1, C.night);
-
-            ctx.strokeStyle = C.night;
-            ctx.lineWidth = 1.8;
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.arc(face * 1.5, r * 0.44, r * 0.22, Math.PI * 1.15, Math.PI * 1.85);
-            ctx.stroke();
-
-            ctx.restore();
-          }
-        }
-
         /* -- PARTICLES -- */
 
         function drawParticles() {
@@ -2305,160 +2154,223 @@
             const sx = worldLeft + particle.x;
             const sy = screenY(particle.y);
             ctx.globalAlpha = (1 - age) * 0.85;
-            fillCircle(sx, sy, Math.max(1, particle.r * (1 - age * 0.5)), particle.color || C.pale);
+            if (particle.kind === 'brick') {
+              ctx.save();
+              ctx.translate(sx, sy);
+              ctx.rotate(particle.rotation || 0);
+              ctx.fillStyle = particle.color;
+              ctx.fillRect(-particle.w * 0.5, -particle.h * 0.5, particle.w, particle.h);
+              ctx.restore();
+            } else if (particle.kind === 'cloud') {
+              ctx.save();
+              ctx.translate(sx, sy);
+              ctx.rotate(particle.rotation || 0);
+              ctx.scale(particle.stretch || 1, 1);
+              fillOval(0, 0, Math.max(1, particle.r * (1 - age * 0.45)), Math.max(1, particle.r * 0.62), particle.color);
+              ctx.restore();
+            } else {
+              fillCircle(sx, sy, Math.max(1, particle.r * (1 - age * 0.5)), particle.color || C.pale);
+            }
           }
           ctx.globalAlpha = 1;
         }
 
         /* ====================================================
-           HERO -- a small round climber who actually moves
-           Built on a skeleton so arms and legs swing, reach, tuck and splay
-           instead of holding one pose. Tones step down the ramp from back
-           limb to boot, which is what keeps a flat figure readable.
+           RUNNERS -- black-and-white action silhouettes
+           The run-and-jump timing still comes from classic action sprites,
+           while a pointed hood, two white eyes and tapered body carry the
+           severe graphic language of the supplied silhouette reference.
            ==================================================== */
 
         const FOOT_Y = -1;
         const HIP_Y = -18;
         const SHOULDER_Y = -29;
         const HEAD_Y = -38;
-        const HEAD_R = 10;
 
-        /* Stepped back-to-front so no two touching shapes share a tone. */
+        /* Existing pose calls retain their depth-role names, but every body
+           part now resolves to a single charcoal silhouette. */
         const SKIN = {
-          back: '#C95D68',
-          shirt: C.red,
-          arm: C.red,
-          bib: C.denim,
-          leg: '#5687B9',
-          boot: C.cocoa,
-          cap: C.red,
+          outline: '#272D30',
+          deepest: '#272D30',
+          back: '#272D30',
+          mid: '#272D30',
+          bright: '#FFFDFC',
+          face: '#FFFDFC',
+          shirt: '#272D30',
+          arm: '#272D30',
+          leg: '#272D30',
+          boot: '#272D30',
+          cap: '#272D30',
         };
+
+        function armorCapsule(ax, ay, bx, by, thickness) {
+          capsule(ax, ay, bx, by, Math.max(2.8, thickness * 0.56), SKIN.outline);
+        }
+
+        /* A loose, handless arm. Both control points sag below the shoulder,
+           so the limb trails the pose instead of reading as a rigid bar. */
+        function drawFloppyArm(ax, ay, bx, by, thickness) {
+          const dx = bx - ax;
+          const dy = by - ay;
+          const length = Math.hypot(dx, dy);
+          const sag = 3.2 + length * 0.13;
+          ctx.strokeStyle = SKIN.outline;
+          ctx.lineWidth = Math.max(2.6, thickness * 0.54);
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(ax, ay);
+          ctx.bezierCurveTo(ax + dx * 0.28, ay + sag, ax + dx * 0.72, by + sag * 0.72, bx, by);
+          ctx.stroke();
+        }
+
+        function armorBoot(x, y, direction = 1) {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.scale(direction, 1);
+          ctx.fillStyle = SKIN.outline;
+          ctx.beginPath();
+          ctx.moveTo(-2.4, -5.5);
+          ctx.lineTo(2.2, -5.2);
+          ctx.quadraticCurveTo(2.8, -2.2, 6.8, 0.4);
+          ctx.lineTo(-5.6, 2.2);
+          ctx.lineTo(-0.4, -1.4);
+          ctx.fill();
+          ctx.restore();
+        }
 
         function drawMarioBuddies() {
           for (const buddy of buddies) {
+            if (buddy.dead) continue;
             const sx = worldLeft + buddy.x;
             const sy = screenY(buddy.y);
             if (sy < -90 || sy > height + 120) continue;
-            const wave = Math.sin(simTime * 3.2 + buddy.phase);
-            const panic = buddy.falling;
-            const airborne = !buddy.grounded && !panic;
+            const panic = buddy.falling || buddy.dying;
+            const airborne = !buddy.grounded;
+            const gait = buddy.grounded ? clamp(Math.abs(buddy.vx) / BUDDY_RUN_SPEED, 0, 1) : 0;
+            const phase = simTime * (4.2 + gait * 4.4) + buddy.phase;
 
-            if (buddy.grounded) fillOval(sx, sy + 2, 11, 3.2, SHADOW_SOFT);
+            if (buddy.grounded) fillOval(sx, sy + 2, 12, 3.2, SHADOW_SOFT);
             ctx.save();
-            ctx.translate(sx, sy - (buddy.grounded ? Math.abs(wave) * 0.7 : 0));
-            ctx.rotate(panic ? buddy.spin : airborne ? clamp(buddy.vx / BUDDY_AIR_SPEED, -1, 1) * 0.08 : 0);
-            ctx.scale(0.88, 0.88);
-
-            /* Short tucked limbs keep the silhouette toy-like and sweet. */
-            const step = buddy.grounded ? wave * 1.1 : 0;
-            const footLift = airborne ? -5 : panic ? -3 : 0;
-            capsule(-4, -12, -5 - step, -1 + footLift, 6, C.denim);
-            capsule(4, -12, 5 + step, -1 + footLift - (airborne ? 2 : 0), 6, C.denim);
-            fillOval(-5.8 - step, footLift, 4.8, 2.8, C.cocoa);
-            fillOval(5.8 + step, footLift - (airborne ? 2 : 0), 4.8, 2.8, C.cocoa);
-
-            /* Round overalls body with sunny buttons. */
-            fillRound(-9, -28, 18, 18, 8, C.red);
-            fillRound(-8.5, -23, 17, 14, 7, C.denim);
-            capsule(-5, -26, -4, -19, 2.5, C.denim);
-            capsule(5, -26, 4, -19, 2.5, C.denim);
-            fillCircle(-4.2, -20, 1.5, C.lemon);
-            fillCircle(4.2, -20, 1.5, C.lemon);
-
-            /* Compact reaching pose—hands stay near the cheeks, even in air. */
-            const handY = airborne ? -34 : panic ? -32 : -27 - Math.max(0, wave) * 2;
-            const handX = airborne ? 11 : 10.5;
-            limb(-7, -25, -handX, handY + (airborne ? 2 : 0), -1, 5, C.red);
-            limb(7, -25, handX, handY, 1, 5, C.red);
-            fillCircle(-handX, handY + (airborne ? 2 : 0), 3.3, C.white);
-            fillCircle(handX, handY, 3.3, C.white);
-
-            /* Peach face, red cap, M badge and two-bean moustache. */
-            fillCircle(0, -36, 10.5, C.skin);
-            fillCircle(-9.2, -35, 2.7, C.skin);
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(0, -36, 10.5, 0, TAU);
-            ctx.clip();
-            ctx.fillStyle = C.red;
-            ctx.fillRect(-13, -50, 26, 10);
-            ctx.restore();
-            fillRound(-10.5, -42, 21, 4.7, 2.4, C.red);
-            fillCircle(0, -45, 3.1, C.white);
-            ctx.fillStyle = C.red;
-            ctx.font = '900 4.4px "Arial Rounded MT Bold", system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('M', 0, -44.7);
-
-            if (panic) {
-              ctx.strokeStyle = C.night;
-              ctx.lineWidth = 1.5;
-              for (const side of [-1, 1]) {
-                ctx.beginPath();
-                ctx.moveTo(side * 4.8 - 1.5, -35.5);
-                ctx.lineTo(side * 4.8 + 1.5, -32.5);
-                ctx.moveTo(side * 4.8 + 1.5, -35.5);
-                ctx.lineTo(side * 4.8 - 1.5, -32.5);
-                ctx.stroke();
-              }
-              fillOval(0, -27.6, 2.3, 3.1, C.night);
-            } else {
-              fillOval(-4.5, -34, 1.9, 2.7, C.night);
-              fillOval(4.5, -34, 1.9, 2.7, C.night);
-              fillCircle(-3.9, -34.8, 0.7, C.white);
-              fillCircle(5.1, -34.8, 0.7, C.white);
-            }
-            fillOval(-3, -29.8, 3.3, 1.9, C.cocoa);
-            fillOval(3, -29.8, 3.3, 1.9, C.cocoa);
-            fillOval(-8, -30, 2.5, 1.4, C.blush);
-            fillOval(8, -30, 2.5, 1.4, C.blush);
-
+            const bounce = buddy.grounded ? Math.abs(Math.sin(phase)) * gait : 0;
+            const bob = -bounce * 2.6;
+            ctx.translate(sx, sy + bob);
+            ctx.rotate(
+              buddy.dying
+                ? buddy.deathSpin
+                : panic
+                  ? buddy.spin
+                  : airborne
+                    ? clamp(buddy.vx / BUDDY_AIR_SPEED, -1, 1) * 0.09
+                    : 0
+            );
+            ctx.scale(buddy.facing * 0.9 * (1 + bounce * 0.08), 0.9 * (1 - bounce * 0.09));
+            drawBuddyRunner(buddy, phase, gait, panic);
             ctx.restore();
           }
         }
 
+        function drawBuddyRunner(buddy, phase, gait, panic) {
+          const rising = !buddy.grounded && buddy.vy > -80;
+          let footBack;
+          let footFront;
+          let armBackEnd;
+          let armFrontEnd;
+
+          if (panic) {
+            footBack = [-10, -5];
+            footFront = [10, -7];
+            armBackEnd = [-14, -18];
+            armFrontEnd = [13, -20];
+          } else if (!buddy.grounded && rising) {
+            /* Split knees carry the jump while both soft arms lag beneath the
+               shoulders, preserving the floppy silhouette in the air. */
+            footBack = [-8, -9];
+            footFront = [8, -5];
+            armBackEnd = [-12, -17];
+            armFrontEnd = [7, -15];
+          } else if (!buddy.grounded) {
+            footBack = [-10, -4];
+            footFront = [7, -10];
+            armBackEnd = [-14, -18];
+            armFrontEnd = [12, -16];
+          } else {
+            const stride = 9 * gait;
+            const liftA = Math.max(0, Math.sin(phase)) * 5.5 * gait;
+            const liftB = Math.max(0, Math.sin(phase + Math.PI)) * 5.5 * gait;
+            footBack = [-Math.cos(phase) * stride - 1, -1 - liftA];
+            footFront = [-Math.cos(phase + Math.PI) * stride + 1, -1 - liftB];
+            armBackEnd = [-8 - Math.cos(phase + Math.PI) * 7 * gait, -17 - liftB * 0.22];
+            armFrontEnd = [8 - Math.cos(phase) * 7 * gait, -18 - liftA * 0.22];
+          }
+
+          armorCapsule(-5, -16, footBack[0], footBack[1] - 2, 6.2, SKIN.back);
+          armorBoot(footBack[0], footBack[1], 1, true);
+          drawFloppyArm(-9, -28, armBackEnd[0], armBackEnd[1], 4.8);
+
+          drawRunnerTorso(-1.2, gait * 1.8);
+
+          armorCapsule(5, -16, footFront[0], footFront[1] - 2, 6.5, SKIN.leg);
+          armorBoot(footFront[0], footFront[1], 1, false);
+          drawFloppyArm(9, -28, armFrontEnd[0], armFrontEnd[1], 5.1);
+          drawRunnerHead(2.2, -38, panic, false);
+        }
+
         function drawHero() {
+          if (hero.dead) return;
           const sx = worldLeft + hero.x;
           const sy = screenY(hero.y);
-          const link = hero.onLink ? linkById(hero.onLink.linkId) : null;
           const hurt = hero.stumbleUntil > simTime;
+
+          if (hero.dying) {
+            const stretch = clamp(Math.abs(hero.vy) / DEATH_BOUNCE_SPEED, 0, 1);
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(hero.deathSpin);
+            ctx.scale(hero.facing * (1 - stretch * 0.1), 1 + stretch * 0.14);
+            drawHeroRun(clamp(hero.vy / JUMP_SPEED, -0.9, 1));
+            ctx.restore();
+            return;
+          }
 
           /* Contact shadow, tighter once he leaves the ground. */
           if (hero.grounded) fillOval(sx, sy + 2, 14, 4, SHADOW);
           else fillOval(sx, sy + 2, 9, 2.5, SHADOW_SOFT);
 
           ctx.save();
-          ctx.translate(sx, sy);
 
           /* Landing squash and takeoff stretch, pivoted on the feet. */
-          const land = Math.max(0, 1 - (simTime - hero.landedAt) / 0.2);
-          const air = hero.grounded || link ? 0 : clamp(hero.vy / JUMP_SPEED, -0.9, 1);
-          ctx.scale(1 + 0.18 * land - Math.max(0, air) * 0.05, 1 - 0.2 * land + Math.max(0, air) * 0.06);
+          const speed = hero.grounded ? clamp(Math.abs(hero.vx) / RUN_SPEED, 0, 1) : 0;
+          const stepBounce = hero.grounded ? Math.abs(Math.sin(hero.stride / 18)) * speed : 0;
+          const idleBounce = hero.grounded ? (0.5 + Math.sin(simTime * 3.2) * 0.5) * (1 - speed) * 0.22 : 0;
+          const bounce = stepBounce + idleBounce;
+          ctx.translate(sx, sy - bounce * 2.8);
+          const land = Math.max(0, 1 - (simTime - hero.landedAt) / 0.28);
+          const air = hero.grounded ? 0 : clamp(hero.vy / JUMP_SPEED, -0.9, 1);
+          ctx.scale(
+            1 + 0.3 * land + bounce * 0.08 - Math.max(0, air) * 0.1,
+            1 - 0.32 * land - bounce * 0.08 + Math.max(0, air) * 0.14
+          );
 
           if (hurt) ctx.rotate(Math.sin(simTime * 40) * 0.08);
 
-          if (link) drawHeroClimb();
-          else {
-            ctx.scale(hero.facing, 1);
-            drawHeroRun(air);
-          }
+          ctx.scale(hero.facing, 1);
+          drawHeroRun(air);
 
           ctx.restore();
 
-          if (hero.rescuedUntil > simTime) drawRescueSparkles(sx, sy);
         }
 
         /* Side view: run cycle on the ground, tuck rising, splay falling. */
         function drawHeroRun(air) {
           const grounded = hero.grounded;
           const gait = grounded ? clamp(Math.abs(hero.vx) / RUN_SPEED, 0, 1) : 0;
-          const phase = hero.stride / 22;
+          const phase = hero.stride / 18;
           const breathe = Math.sin(simTime * 2.3) * (grounded ? 1 - gait : 0);
 
-          /* Bob up as each leg passes under the body. */
-          const bob = grounded ? -Math.abs(Math.sin(phase)) * 2.6 * gait + breathe * 0.6 : 0;
-          const lean = grounded ? clamp(hero.vx / RUN_SPEED, -1, 1) * hero.facing * 1.4 : air * 1.6;
+          /* The faster he moves, the more the whole sprite pitches into the
+             run. This is the reference sheet's low, aggressive dash line. */
+          const bob = grounded ? -Math.abs(Math.sin(phase)) * 1.4 * gait + breathe * 0.7 : 0;
+          const lean = grounded ? gait * 2.8 : air * 1.5;
 
           ctx.save();
           ctx.translate(0, bob);
@@ -2466,201 +2378,116 @@
           const hipX = lean * 0.5;
           const shoulderX = lean * 2;
 
-          /* Foot targets: a flat half-loop on the ground, tucked in the air. */
+          /* Long ground strides trade places in a flat loop. Airborne poses
+             stop interpolating and snap to authored silhouettes, like sprites. */
           let footA;
           let footB;
           if (grounded) {
-            const swing = 6 * gait;
-            const lift = 4.5 * gait;
-            footA = [Math.cos(phase) * swing + 1, FOOT_Y - Math.max(0, Math.sin(phase)) * lift];
-            footB = [Math.cos(phase + Math.PI) * swing + 1, FOOT_Y - Math.max(0, Math.sin(phase + Math.PI)) * lift];
+            const swing = 10 * gait;
+            const lift = 6.2 * gait;
+            footA = [-Math.cos(phase) * swing - 1, FOOT_Y - Math.max(0, Math.sin(phase)) * lift];
+            footB = [-Math.cos(phase + Math.PI) * swing + 1, FOOT_Y - Math.max(0, Math.sin(phase + Math.PI)) * lift];
           } else if (air > 0.1) {
-            footA = [-4, FOOT_Y - 4 - air * 3];
-            footB = [5, FOOT_Y - 6 - air * 2];
+            footA = [-8, FOOT_Y - 8 - air * 2];
+            footB = [8, FOOT_Y - 4 - air * 2];
           } else {
             const fall = clamp(-air, 0, 1);
-            footA = [-5, FOOT_Y - 2 - fall * 2];
-            footB = [5, FOOT_Y - 4 + fall];
+            footA = [-10, FOOT_Y - 3 - fall];
+            footB = [8, FOOT_Y - 9 + fall * 2];
           }
 
-          /* Hands counter-swing against the legs. */
-          let handA;
-          let handB;
+          /* Handless arms counter-swing loosely on the ground, then trail
+             beneath the shoulders through both authored air poses. */
+          let armEndA;
+          let armEndB;
           if (grounded) {
-            const swing = 3 * gait;
-            const droop = SHOULDER_Y + 10 + breathe * 0.5;
-            handA = [-10.5 - Math.cos(phase) * swing, droop - Math.abs(Math.sin(phase)) * 2 * gait];
-            handB = [10.5 - Math.cos(phase + Math.PI) * swing, droop - Math.abs(Math.sin(phase + Math.PI)) * 2 * gait];
+            const swing = 8 * gait;
+            const droop = SHOULDER_Y + 12 + breathe * 0.4;
+            armEndA = [-8 - Math.cos(phase + Math.PI) * swing, droop - Math.max(0, Math.sin(phase + Math.PI)) * 2.2 * gait];
+            armEndB = [9 - Math.cos(phase) * swing, droop - 1 - Math.max(0, Math.sin(phase)) * 2.2 * gait];
           } else if (air > 0.1) {
-            handA = [-9.5, SHOULDER_Y - 2 - air * 4];
-            handB = [10, SHOULDER_Y - 5 - air * 3];
+            armEndA = [-12, SHOULDER_Y + 12];
+            armEndB = [7, SHOULDER_Y + 15];
           } else {
             const fall = clamp(-air, 0, 1);
-            handA = [-10, SHOULDER_Y - 1 - fall * 2];
-            handB = [10, SHOULDER_Y - 4 - fall * 2];
+            armEndA = [-14, SHOULDER_Y + 10 + fall * 3];
+            armEndB = [13, SHOULDER_Y + 13 + fall * 2];
           }
 
-          /* Back limbs a tone lighter, so the pose reads in depth. */
-          limb(hipX - 3.5, HIP_Y, footA[0], footA[1], -3, 8, SKIN.back);
-          fillOval(footA[0] + 1, footA[1] + 0.5, 5, 3, SKIN.back);
-          limb(shoulderX - 6, SHOULDER_Y + 1, handA[0], handA[1], 1.5, 5.8, SKIN.back);
-          fillCircle(handA[0], handA[1], 3.6, SKIN.back);
+          /* The sprite-sheet pose supplies the separation now; every limb is
+             intentionally cut from the same flat silhouette. */
+          armorCapsule(hipX - 5, HIP_Y, footA[0], footA[1] - 2, 6.4, SKIN.back);
+          armorBoot(footA[0], footA[1], 1, true);
+          drawFloppyArm(shoulderX - 9, SHOULDER_Y + 1, armEndA[0], armEndA[1], 4.8);
 
-          drawTorso(hipX, shoulderX);
+          drawRunnerTorso(hipX, shoulderX);
 
-          limb(hipX + 3.5, HIP_Y, footB[0], footB[1], -3, 8.5, SKIN.leg);
-          fillOval(footB[0] + 1.2, footB[1] + 0.5, 5.4, 3.2, SKIN.boot);
-          limb(shoulderX + 6, SHOULDER_Y + 1, handB[0], handB[1], -1.5, 6, SKIN.arm);
-          fillCircle(handB[0], handB[1], 3.8, SKIN.arm);
+          armorCapsule(hipX + 5, HIP_Y, footB[0], footB[1] - 2, 6.8, SKIN.leg);
+          armorBoot(footB[0], footB[1], 1, false);
+          drawFloppyArm(shoulderX + 9, SHOULDER_Y + 1, armEndB[0], armEndB[1], 5.1);
 
-          drawHead(shoulderX, air, gait, false);
+          drawRunnerHeroHead(shoulderX, air, gait, false);
           ctx.restore();
         }
 
-        /* Front view: hand over hand up a ladder or a stair. */
-        function drawHeroClimb() {
-          const c = hero.climbT * 7;
-          const s = Math.sin(c);
+        function drawRunnerTorso(hipX, shoulderX) {
           ctx.save();
-          ctx.translate(0, -Math.abs(s) * 0.8);
+          ctx.translate((hipX + shoulderX) * 0.5, 0);
+          ctx.rotate((shoulderX - hipX) * 0.018);
 
-          const handAY = SHOULDER_Y - 9 - s * 4;
-          const handBY = SHOULDER_Y - 9 + s * 4;
-          const footAY = FOOT_Y - Math.max(0, -s) * 4;
-          const footBY = FOOT_Y - Math.max(0, s) * 4;
-
-          limb(-4, HIP_Y, -5, footAY, 2, 8, SKIN.back);
-          fillOval(-5, footAY + 0.5, 5, 3, SKIN.back);
-          limb(4, HIP_Y, 5, footBY, -2, 8.5, SKIN.leg);
-          fillOval(5, footBY + 0.5, 5.4, 3.2, SKIN.boot);
-
-          drawTorso(0, 0);
-          drawHead(0, 0, 0, true);
-
-          limb(-6.5, SHOULDER_Y + 2, -11.5, handAY, -2, 6.2, SKIN.arm);
-          fillCircle(-11.5, handAY, 3.7, SKIN.arm);
-          limb(6.5, SHOULDER_Y + 2, 11.5, handBY, 2, 6.2, SKIN.arm);
-          fillCircle(11.5, handBY, 3.7, SKIN.arm);
-
-          ctx.restore();
-        }
-
-        function drawTorso(hipX, shoulderX) {
-          const h = HIP_Y - SHOULDER_Y;
-          ctx.save();
-          ctx.translate(hipX, 0);
-          ctx.rotate((shoulderX - hipX) * 0.012);
-
-          /* Shirt, then dungarees over the lower two thirds. */
-          fillRound(-9.5, SHOULDER_Y - 1, 19, h + 7, 8, SKIN.shirt);
-          fillRound(-9.5, SHOULDER_Y + 5, 19, h + 1, 7, SKIN.bib);
-          capsule(-4.5, SHOULDER_Y, -4.5, SHOULDER_Y + 7, 2.8, SKIN.bib);
-          capsule(4.5, SHOULDER_Y, 4.5, SHOULDER_Y + 7, 2.8, SKIN.bib);
-          fillCircle(0, SHOULDER_Y + 8.5, 2, C.lemon);
-
-          ctx.restore();
-        }
-
-        function drawHead(offsetX, air, gait, frontOn) {
-          const nod = gait > 0 ? Math.sin(hero.stride / 11) * 0.7 : Math.sin(simTime * 2.3) * 0.5;
-          ctx.save();
-          ctx.translate(offsetX * 0.55, HEAD_Y + nod);
-
-          /* Face */
-          fillCircle(0, 0, HEAD_R, C.skin);
-          /* Far ear, one tone back so it sits behind the face. */
-          if (!frontOn) fillCircle(-HEAD_R + 1, 1.5, 2.8, C.skin);
-
-          /* Cap: clipped to the head so the silhouette stays clean, plus a
-             brim that points the way he is going. */
-          ctx.save();
+          /* A pinched neck opens into a broad, weighted belly. The low center
+             of mass makes every squash and stretch read as soft and bouncy. */
+          ctx.fillStyle = SKIN.outline;
           ctx.beginPath();
-          ctx.arc(0, 0, HEAD_R, 0, TAU);
-          ctx.clip();
-          ctx.fillStyle = SKIN.cap;
-          ctx.fillRect(-HEAD_R - 2, -HEAD_R - 8, HEAD_R * 2 + 4, HEAD_R + 4);
-          ctx.restore();
-          if (frontOn) fillRound(-10.5, -5.4, 21, 4.6, 2.3, SKIN.cap);
-          else fillRound(-4.5, -5.6, 16, 4.8, 2.4, SKIN.cap);
-          fillCircle(0, -HEAD_R - 0.5, 3.2, C.white);
-          ctx.fillStyle = C.red;
-          ctx.font = '900 4.5px "Arial Rounded MT Bold", system-ui, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('M', 0, -HEAD_R - 0.2);
+          ctx.moveTo(-6.2, SHOULDER_Y - 2);
+          ctx.bezierCurveTo(-11.6, SHOULDER_Y, -15.5, -25, -14.2, -19);
+          ctx.bezierCurveTo(-17, -12.2, -11.2, -7.4, 0, -7.4);
+          ctx.bezierCurveTo(11.2, -7.4, 17, -12.2, 14.2, -19);
+          ctx.bezierCurveTo(15.5, -25, 11.6, SHOULDER_Y, 6.2, SHOULDER_Y - 2);
+          ctx.closePath();
+          ctx.fill();
 
-          drawFace(frontOn ? 0 : 2, air, frontOn);
           ctx.restore();
         }
 
-        function drawFace(look, air, frontOn) {
-          const blinking = simTime < hero.blinkEndsAt;
-          const hurt = hero.stumbleUntil > simTime;
-          const gap = frontOn ? 4.6 : 4.2;
-          const eyeY = 2.6;
-
-          if (hurt) {
-            /* Dazed: two little crosses. */
-            ctx.strokeStyle = C.night;
-            ctx.lineWidth = 1.7;
-            ctx.lineCap = 'round';
-            for (const side of [-1, 1]) {
-              const x = look + side * gap;
-              ctx.beginPath();
-              ctx.moveTo(x - 2.2, eyeY - 2.2);
-              ctx.lineTo(x + 2.2, eyeY + 2.2);
-              ctx.moveTo(x + 2.2, eyeY - 2.2);
-              ctx.lineTo(x - 2.2, eyeY + 2.2);
-              ctx.stroke();
-            }
-          } else if (blinking) {
-            ctx.strokeStyle = C.night;
-            ctx.lineWidth = 1.8;
-            ctx.lineCap = 'round';
-            for (const side of [-1, 1]) {
-              ctx.beginPath();
-              ctx.arc(look + side * gap, eyeY - 1, 2.4, Math.PI * 0.15, Math.PI * 0.85);
-              ctx.stroke();
-            }
-          } else {
-            for (const side of [-1, 1]) {
-              const x = look + side * gap;
-              fillOval(x, eyeY, 2.2, 2.9, C.night);
-              fillCircle(x + 0.8, eyeY - 1.2, 0.9, C.white);
-            }
-          }
-
-          /* Cheeks: the one warm note in the whole piece. */
-          fillOval(look - gap - 3.2, eyeY + 3.8, 2.3, 1.5, C.blush);
-          fillOval(look + gap + 3.2, eyeY + 3.8, 2.3, 1.5, C.blush);
-
-          /* The button moustache and red cap make the tiny silhouette read as
-             Mario even before the viewer notices the little M badge. */
-          fillOval(look - 2.8, eyeY + 4.4, 3.2, 1.9, C.cocoa);
-          fillOval(look + 2.8, eyeY + 4.4, 3.2, 1.9, C.cocoa);
-
-          /* Mouth: an open O in the air, a small smile on the ground. */
-          if (air > 0.25) {
-            fillOval(look, eyeY + 7.1, 1.5, 1.9, C.night);
-          } else {
-            ctx.strokeStyle = C.night;
-            ctx.lineWidth = 1.5;
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.arc(look, eyeY + 6.2, 2.1, Math.PI * 0.12, Math.PI * 0.88);
-            ctx.stroke();
-          }
+        function drawRunnerHeroHead(offsetX, air, gait, frontOn) {
+          const nod = gait > 0 ? Math.sin(hero.stride / 11) * 0.7 : Math.sin(simTime * 2.3) * 0.5;
+          drawRunnerHead(offsetX * 0.55, HEAD_Y + nod, hero.stumbleUntil > simTime, frontOn);
         }
 
-        function drawRescueSparkles(sx, sy) {
-          const t = clamp((hero.rescuedUntil - simTime) / 0.6, 0, 1);
+        function drawRunnerHead(x, y, hurt, frontOn) {
           ctx.save();
-          ctx.globalAlpha = t;
-          for (let i = 0; i < 6; i += 1) {
-            const a = (i / 6) * TAU + simTime * 2;
-            const d = 22 + (1 - t) * 20;
-            sparkle(sx + Math.cos(a) * d, sy - 22 + Math.sin(a) * d, 3 + t * 3, C.mid);
+          ctx.translate(x, y);
+
+          /* One continuous hood: a soft crown sweeps back into a long point,
+             then pinches into the neck just beneath the eyes. */
+          ctx.fillStyle = SKIN.outline;
+          ctx.beginPath();
+          ctx.moveTo(8.2, 5.2);
+          ctx.bezierCurveTo(9.2, -2.8, 6.2, -9.4, -1.8, -11.2);
+          ctx.bezierCurveTo(-8.4, -12.5, -13.1, -8.1, -15.2, -2.5);
+          ctx.lineTo(frontOn ? -16.2 : -20.5, 7.4);
+          ctx.lineTo(-3.4, 3.6);
+          ctx.bezierCurveTo(-3.5, 8.1, 0.8, 10.5, 5.2, 8.7);
+          ctx.bezierCurveTo(7.2, 7.9, 8, 6.7, 8.2, 5.2);
+          ctx.closePath();
+          ctx.fill();
+
+          const eyeXs = frontOn ? [-2.6, 2.6] : [0.2, 5.2];
+          const blinking = simTime < hero.blinkEndsAt;
+          if (blinking && !hurt) {
+            for (const eyeX of eyeXs) fillOval(eyeX, 0.2, 2.25, 0.8, SKIN.face);
+          } else {
+            for (const eyeX of eyeXs) {
+              fillOval(eyeX, 0.2, 2.55, 3.25, SKIN.face);
+              ctx.save();
+              ctx.translate(hurt ? eyeX - 0.25 : eyeX + 0.65, hurt ? 0.8 : 0.45);
+              if (hurt) ctx.rotate(-0.42);
+              fillOval(0, 0, 1.05, 1.7, SKIN.outline);
+              ctx.restore();
+            }
           }
+
           ctx.restore();
         }
 

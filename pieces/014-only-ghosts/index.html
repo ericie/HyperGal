@@ -18,28 +18,6 @@
       const ctx = canvas.getContext('2d');
       const TAU = Math.PI * 2;
 
-      const MAZE = [
-        '#################',
-        '#.....#...#.....#',
-        '#.###.#.#.#.###.#',
-        '#.#.....#.....#.#',
-        '#.#...#####...#.#',
-        '#.....#...#.....#',
-        '#.###.#.#.#.###.#',
-        '#.#.....#.....#.#',
-        '#.#...#####...#.#',
-        '#...............#',
-        '#################',
-      ];
-
-      const POWER_CELLS = [
-        [1, 1], [8, 1], [15, 1],
-        [3, 3], [13, 3],
-        [1, 5], [15, 5],
-        [3, 7], [13, 7],
-        [1, 9], [8, 9], [15, 9],
-      ];
-
       const DIRS = [
         { x: 1, y: 0, angle: 0 },
         { x: 0, y: 1, angle: Math.PI / 2 },
@@ -47,9 +25,26 @@
         { x: 0, y: -1, angle: -Math.PI / 2 },
       ];
 
-      const ROWS = MAZE.length;
-      const COLS = MAZE[0].length;
+      const MIN_VIEW_COLS = 17;
+      const MIN_VIEW_ROWS = 11;
+      const CHUNK_ROOMS = 8;
+      const CHUNK_SPAN = CHUNK_ROOMS * 2;
       const PAC_SPEED = 3.15;
+      const PAC_START_RADIUS = 0.16;
+      const PAC_GROWTH_PER_PELLET = 0.022;
+      const PAC_MAX_RADIUS = 2.4;
+      const PAC_WARP_RADIUS = 0.38;
+      const PAC_STARVE_DELAY = 0.85;
+      const PAC_SHRINK_RATE = 0.28;
+      const WARP_BASE_REACH = 3.25;
+      const WARP_REACH_PER_RADIUS = 3;
+      const WARP_PUSH = 1;
+      const WARP_DRAW_MARGIN = 3;
+      const CAMERA_MARGIN_X = 3.25;
+      const CAMERA_MARGIN_Y = 2.25;
+      const WALL_COLOR_DISTANCE = 18;
+      const WALL_HUES = [222, 252, 282, 0, 28, 55, 126];
+      const WORLD_SEED = crypto.getRandomValues(new Uint32Array(1))[0];
       const keyOf = (c, r) => `${c},${r}`;
       const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -59,25 +54,172 @@
       let cellWidth = 1;
       let cellHeight = 1;
       let unit = 1;
+      let viewCols = MIN_VIEW_COLS;
+      let viewRows = MIN_VIEW_ROWS;
       let lastTime = performance.now();
-      let powerPellets = new Set();
+      const openCells = new Set();
+      const powerPellets = new Set();
+      const seededPelletCells = new Set();
+      const generatedChunks = new Set();
+
+      const camera = {
+        x: 0,
+        y: 0,
+        targetX: 0,
+        targetY: 0,
+      };
 
       const pac = {
-        c: 8,
+        c: 9,
         r: 5,
-        x: 8.5,
+        x: 9.5,
         y: 5.5,
         next: null,
         step: 0,
         dir: DIRS[2],
         mouth: 0,
+        radius: PAC_START_RADIUS,
+        targetRadius: PAC_START_RADIUS,
+        hunger: 0,
+        distance: 0,
       };
 
-      function resetPowerPellets() {
-        powerPellets = new Set(POWER_CELLS.map(([c, r]) => keyOf(c, r)));
+      function hash32(a, b, salt = 0) {
+        let value = WORLD_SEED
+          ^ Math.imul(a, 0x9e3779b1)
+          ^ Math.imul(b, 0x85ebca77)
+          ^ Math.imul(salt, 0xc2b2ae3d);
+        value = Math.imul(value ^ (value >>> 16), 0x7feb352d);
+        value = Math.imul(value ^ (value >>> 15), 0x846ca68b);
+        return (value ^ (value >>> 16)) >>> 0;
+      }
+
+      function seededRandom(seed) {
+        return function random() {
+          seed |= 0;
+          seed = (seed + 0x6d2b79f5) | 0;
+          let value = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+          value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
+          return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function shuffle(items, random) {
+        for (let i = items.length - 1; i > 0; i--) {
+          const j = Math.floor(random() * (i + 1));
+          [items[i], items[j]] = [items[j], items[i]];
+        }
+        return items;
+      }
+
+      function portalIndex(axis, boundaryC, boundaryR) {
+        const salt = axis === 'vertical' ? 0x51f15e : 0x2ab7d3;
+        return hash32(boundaryC, boundaryR, salt) % CHUNK_ROOMS;
+      }
+
+      function openCell(c, r) {
+        const key = keyOf(c, r);
+        openCells.add(key);
+        if (seededPelletCells.has(key)) return;
+        seededPelletCells.add(key);
+        if (c !== pac.c || r !== pac.r) powerPellets.add(key);
+      }
+
+      function generateChunk(chunkC, chunkR) {
+        const chunkKey = keyOf(chunkC, chunkR);
+        if (generatedChunks.has(chunkKey)) return;
+        generatedChunks.add(chunkKey);
+
+        const originC = chunkC * CHUNK_SPAN;
+        const originR = chunkR * CHUNK_SPAN;
+        const random = seededRandom(hash32(chunkC, chunkR, 0x014));
+        const roomKey = (c, r) => `${c},${r}`;
+        const visited = new Set();
+        const first = {
+          c: Math.floor(random() * CHUNK_ROOMS),
+          r: Math.floor(random() * CHUNK_ROOMS),
+        };
+        const stack = [first];
+        visited.add(roomKey(first.c, first.r));
+
+        for (let r = 0; r < CHUNK_ROOMS; r++) {
+          for (let c = 0; c < CHUNK_ROOMS; c++) {
+            openCell(originC + c * 2 + 1, originR + r * 2 + 1);
+          }
+        }
+
+        while (stack.length) {
+          const current = stack[stack.length - 1];
+          const options = shuffle(DIRS.map((dir) => ({
+            c: current.c + dir.x,
+            r: current.r + dir.y,
+          })), random).filter((next) => (
+            next.c >= 0 && next.c < CHUNK_ROOMS
+            && next.r >= 0 && next.r < CHUNK_ROOMS
+            && !visited.has(roomKey(next.c, next.r))
+          ));
+
+          if (options.length === 0) {
+            stack.pop();
+            continue;
+          }
+
+          const next = options[0];
+          openCell(
+            originC + current.c + next.c + 1,
+            originR + current.r + next.r + 1,
+          );
+          visited.add(roomKey(next.c, next.r));
+          stack.push(next);
+        }
+
+        // A few loops keep the corridors feeling like a chase maze rather than a tree.
+        for (let i = 0; i < CHUNK_ROOMS / 2; i++) {
+          const c = Math.floor(random() * CHUNK_ROOMS);
+          const r = Math.floor(random() * CHUNK_ROOMS);
+          const options = DIRS.filter((dir) => (
+            c + dir.x >= 0 && c + dir.x < CHUNK_ROOMS
+            && r + dir.y >= 0 && r + dir.y < CHUNK_ROOMS
+          ));
+          const dir = options[Math.floor(random() * options.length)];
+          openCell(originC + c * 2 + 1 + dir.x, originR + r * 2 + 1 + dir.y);
+        }
+
+        const leftPortal = portalIndex('vertical', chunkC, chunkR);
+        const rightPortal = portalIndex('vertical', chunkC + 1, chunkR);
+        const topPortal = portalIndex('horizontal', chunkC, chunkR);
+        const bottomPortal = portalIndex('horizontal', chunkC, chunkR + 1);
+        openCell(originC, originR + leftPortal * 2 + 1);
+        openCell(originC + CHUNK_SPAN, originR + rightPortal * 2 + 1);
+        openCell(originC + topPortal * 2 + 1, originR);
+        openCell(originC + bottomPortal * 2 + 1, originR + CHUNK_SPAN);
+
+      }
+
+      function ensureChunks(minC, minR, maxC, maxR) {
+        const minChunkC = Math.floor(minC / CHUNK_SPAN);
+        const maxChunkC = Math.floor(maxC / CHUNK_SPAN);
+        const minChunkR = Math.floor(minR / CHUNK_SPAN);
+        const maxChunkR = Math.floor(maxR / CHUNK_SPAN);
+        for (let chunkR = minChunkR; chunkR <= maxChunkR; chunkR++) {
+          for (let chunkC = minChunkC; chunkC <= maxChunkC; chunkC++) {
+            generateChunk(chunkC, chunkR);
+          }
+        }
+      }
+
+      function ensureWorldAroundPac() {
+        ensureChunks(
+          pac.c - CHUNK_SPAN,
+          pac.r - CHUNK_SPAN,
+          pac.c + CHUNK_SPAN,
+          pac.r + CHUNK_SPAN,
+        );
       }
 
       function resize() {
+        const centerWorldX = width === 0 ? pac.x : camera.x + viewCols / 2;
+        const centerWorldY = height === 0 ? pac.y : camera.y + viewRows / 2;
         dpr = Math.min(2, window.devicePixelRatio || 1);
         width = window.innerWidth;
         height = window.innerHeight;
@@ -86,13 +228,19 @@
         canvas.style.width = `${width}px`;
         canvas.style.height = `${height}px`;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        cellWidth = width / COLS;
-        cellHeight = height / ROWS;
-        unit = Math.min(cellWidth, cellHeight);
+        unit = Math.min(width / MIN_VIEW_COLS, height / MIN_VIEW_ROWS);
+        cellWidth = unit;
+        cellHeight = unit;
+        viewCols = width / unit;
+        viewRows = height / unit;
+        camera.x = centerWorldX - viewCols / 2;
+        camera.y = centerWorldY - viewRows / 2;
+        camera.targetX = camera.x;
+        camera.targetY = camera.y;
       }
 
       function isOpen(c, r) {
-        return r >= 0 && r < ROWS && c >= 0 && c < COLS && MAZE[r][c] !== '#';
+        return openCells.has(keyOf(c, r));
       }
 
       function neighbors(c, r) {
@@ -105,51 +253,100 @@
         return result;
       }
 
-      function pathToNearestPowerPellet(startC, startR) {
-        const queue = [{ c: startC, r: startR, path: [] }];
+      function stepToNearestPowerPellet(startC, startR) {
+        const queue = [{ c: startC, r: startR }];
         const seen = new Set([keyOf(startC, startR)]);
+        const previous = new Map();
 
         for (let head = 0; head < queue.length; head++) {
           const current = queue[head];
-          if (powerPellets.has(keyOf(current.c, current.r))) return current.path;
+          const currentKey = keyOf(current.c, current.r);
+          if (powerPellets.has(currentKey)) {
+            let step = current;
+            let parent = previous.get(currentKey);
+            while (parent && parent.key !== keyOf(startC, startR)) {
+              step = parent.cell;
+              parent = previous.get(parent.key);
+            }
+            const dir = DIRS.find((candidate) => (
+              candidate.x === step.c - startC && candidate.y === step.r - startR
+            ));
+            return dir ? { ...step, dir } : null;
+          }
 
           for (const next of neighbors(current.c, current.r)) {
             const key = keyOf(next.c, next.r);
             if (seen.has(key)) continue;
             seen.add(key);
-            queue.push({
-              c: next.c,
-              r: next.r,
-              path: current.path.concat(next),
-            });
+            previous.set(key, { key: currentKey, cell: current });
+            queue.push({ c: next.c, r: next.r });
           }
         }
 
-        return [];
+        return null;
       }
 
       function consumePowerPellet() {
         if (!powerPellets.delete(keyOf(pac.c, pac.r))) return;
-        if (powerPellets.size === 0) resetPowerPellets();
+        pac.hunger = 0;
+        pac.targetRadius = Math.min(
+          PAC_MAX_RADIUS,
+          pac.targetRadius + PAC_GROWTH_PER_PELLET,
+        );
       }
 
       function chooseNextStep() {
         consumePowerPellet();
-        const path = pathToNearestPowerPellet(pac.c, pac.r);
-        if (path.length === 0) return;
-        pac.next = path[0];
+        ensureWorldAroundPac();
+        pac.next = stepToNearestPowerPellet(pac.c, pac.r);
+        if (!pac.next) return;
         pac.dir = pac.next.dir;
         pac.step = 0;
       }
 
+      function updateCamera(dt) {
+        if (pac.x < camera.targetX + CAMERA_MARGIN_X) {
+          camera.targetX = pac.x - CAMERA_MARGIN_X;
+        } else if (pac.x > camera.targetX + viewCols - CAMERA_MARGIN_X) {
+          camera.targetX = pac.x - viewCols + CAMERA_MARGIN_X;
+        }
+
+        if (pac.y < camera.targetY + CAMERA_MARGIN_Y) {
+          camera.targetY = pac.y - CAMERA_MARGIN_Y;
+        } else if (pac.y > camera.targetY + viewRows - CAMERA_MARGIN_Y) {
+          camera.targetY = pac.y - viewRows + CAMERA_MARGIN_Y;
+        }
+
+        const follow = 1 - Math.exp(-dt * 9);
+        camera.x = lerp(camera.x, camera.targetX, follow);
+        camera.y = lerp(camera.y, camera.targetY, follow);
+      }
+
       function update(dt) {
         pac.mouth += dt * 12;
+        pac.hunger += dt;
+        if (pac.hunger > PAC_STARVE_DELAY) {
+          pac.targetRadius = Math.max(
+            PAC_START_RADIUS,
+            pac.targetRadius - PAC_SHRINK_RATE * dt,
+          );
+        }
+        pac.radius = lerp(
+          pac.radius,
+          pac.targetRadius,
+          1 - Math.exp(-dt * 5),
+        );
         if (!pac.next) chooseNextStep();
-        if (!pac.next) return;
+        if (!pac.next) {
+          updateCamera(dt);
+          return;
+        }
 
+        pac.distance += dt * PAC_SPEED;
         pac.step = Math.min(1, pac.step + dt * PAC_SPEED);
         pac.x = lerp(pac.c + 0.5, pac.next.c + 0.5, pac.step);
         pac.y = lerp(pac.r + 0.5, pac.next.r + 0.5, pac.step);
+        updateCamera(dt);
 
         if (pac.step < 1) return;
         pac.c = pac.next.c;
@@ -160,33 +357,101 @@
         consumePowerPellet();
       }
 
+      function screenX(worldX) {
+        return (worldX - camera.x) * cellWidth;
+      }
+
+      function screenY(worldY) {
+        return (worldY - camera.y) * cellHeight;
+      }
+
+      function warpedPoint(worldX, worldY) {
+        const x = screenX(worldX);
+        const y = screenY(worldY);
+        const excess = Math.max(0, pac.radius - PAC_WARP_RADIUS);
+        if (excess === 0) return { x, y };
+
+        const dx = worldX - pac.x;
+        const dy = worldY - pac.y;
+        const distance = Math.hypot(dx, dy);
+        const reach = WARP_BASE_REACH + excess * WARP_REACH_PER_RADIUS;
+        if (distance === 0 || distance >= reach) return { x, y };
+
+        const influence = 1 - distance / reach;
+        const falloff = influence * influence * (3 - 2 * influence);
+        const push = excess * WARP_PUSH * falloff;
+        return {
+          x: x + (dx / distance) * push * cellWidth,
+          y: y + (dy / distance) * push * cellHeight,
+        };
+      }
+
+      function traceWarpedEdge(x1, y1, x2, y2, moveToStart = true) {
+        const segments = 4;
+        for (let i = 0; i <= segments; i++) {
+          const progress = i / segments;
+          const point = warpedPoint(
+            lerp(x1, x2, progress),
+            lerp(y1, y2, progress),
+          );
+          if (i === 0 && moveToStart) ctx.moveTo(point.x, point.y);
+          else if (i === 0) continue;
+          else ctx.lineTo(point.x, point.y);
+        }
+      }
+
+      function wallColors() {
+        const position = pac.distance / WALL_COLOR_DISTANCE;
+        const index = Math.floor(position) % WALL_HUES.length;
+        const nextIndex = (index + 1) % WALL_HUES.length;
+        const progress = position - Math.floor(position);
+        const startHue = WALL_HUES[index];
+        const endHue = WALL_HUES[nextIndex];
+        const hueDelta = ((endHue - startHue + 540) % 360) - 180;
+        const hue = (startHue + hueDelta * progress + 360) % 360;
+        return {
+          hue,
+          fill: `hsl(${hue} 66% 18%)`,
+          stroke: `hsl(${hue} 100% 61%)`,
+        };
+      }
+
       function drawMaze() {
         ctx.fillStyle = '#05050d';
         ctx.fillRect(0, 0, width, height);
 
-        ctx.fillStyle = '#11194f';
-        for (let r = 0; r < ROWS; r++) {
-          for (let c = 0; c < COLS; c++) {
-            if (MAZE[r][c] !== '#') continue;
-            ctx.fillRect(c * cellWidth, r * cellHeight, cellWidth, cellHeight);
+        const minC = Math.floor(camera.x) - WARP_DRAW_MARGIN;
+        const maxC = Math.ceil(camera.x + viewCols) + WARP_DRAW_MARGIN;
+        const minR = Math.floor(camera.y) - WARP_DRAW_MARGIN;
+        const maxR = Math.ceil(camera.y + viewRows) + WARP_DRAW_MARGIN;
+        ensureChunks(minC - 1, minR - 1, maxC + 1, maxR + 1);
+        const colors = wallColors();
+
+        ctx.fillStyle = colors.fill;
+        ctx.beginPath();
+        for (let r = minR; r <= maxR; r++) {
+          for (let c = minC; c <= maxC; c++) {
+            if (isOpen(c, r)) continue;
+            traceWarpedEdge(c, r, c + 1, r);
+            traceWarpedEdge(c + 1, r, c + 1, r + 1, false);
+            traceWarpedEdge(c + 1, r + 1, c, r + 1, false);
+            traceWarpedEdge(c, r + 1, c, r, false);
+            ctx.closePath();
           }
         }
+        ctx.fill();
 
-        ctx.strokeStyle = '#365cff';
+        ctx.strokeStyle = colors.stroke;
         ctx.lineWidth = Math.max(2, unit * 0.065);
         ctx.lineCap = 'square';
         ctx.beginPath();
-        for (let r = 0; r < ROWS; r++) {
-          for (let c = 0; c < COLS; c++) {
-            if (MAZE[r][c] !== '#') continue;
-            const left = c * cellWidth;
-            const top = r * cellHeight;
-            const right = left + cellWidth;
-            const bottom = top + cellHeight;
-            if (isOpen(c, r - 1)) { ctx.moveTo(left, top); ctx.lineTo(right, top); }
-            if (isOpen(c, r + 1)) { ctx.moveTo(left, bottom); ctx.lineTo(right, bottom); }
-            if (isOpen(c - 1, r)) { ctx.moveTo(left, top); ctx.lineTo(left, bottom); }
-            if (isOpen(c + 1, r)) { ctx.moveTo(right, top); ctx.lineTo(right, bottom); }
+        for (let r = minR; r <= maxR; r++) {
+          for (let c = minC; c <= maxC; c++) {
+            if (isOpen(c, r)) continue;
+            if (isOpen(c, r - 1)) traceWarpedEdge(c, r, c + 1, r);
+            if (isOpen(c, r + 1)) traceWarpedEdge(c, r + 1, c + 1, r + 1);
+            if (isOpen(c - 1, r)) traceWarpedEdge(c, r, c, r + 1);
+            if (isOpen(c + 1, r)) traceWarpedEdge(c + 1, r, c + 1, r + 1);
           }
         }
         ctx.stroke();
@@ -197,31 +462,34 @@
         const radius = Math.max(3, unit * 0.13);
         for (const key of powerPellets) {
           const [c, r] = key.split(',').map(Number);
+          if (
+            c < camera.x - WARP_DRAW_MARGIN || c > camera.x + viewCols + WARP_DRAW_MARGIN
+            || r < camera.y - WARP_DRAW_MARGIN || r > camera.y + viewRows + WARP_DRAW_MARGIN
+          ) continue;
+          const point = warpedPoint(c + 0.5, r + 0.5);
           ctx.beginPath();
-          ctx.arc((c + 0.5) * cellWidth, (r + 0.5) * cellHeight, radius, 0, TAU);
+          ctx.arc(point.x, point.y, radius, 0, TAU);
           ctx.fill();
         }
       }
 
       function drawPac() {
-        const x = pac.x * cellWidth;
-        const y = pac.y * cellHeight;
-        const radius = unit * 0.38;
+        const x = screenX(pac.x);
+        const y = screenY(pac.y);
+        const radius = unit * pac.radius;
         const mouth = 0.12 + Math.abs(Math.sin(pac.mouth)) * 0.32;
 
         ctx.fillStyle = '#ffe83d';
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(pac.dir.angle);
         ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.arc(x, y, radius, pac.dir.angle + mouth, pac.dir.angle - mouth, false);
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, radius, mouth, -mouth, false);
         ctx.closePath();
         ctx.fill();
 
-        const eyeX = x + pac.dir.x * radius * 0.18;
-        const eyeY = y - radius * 0.34;
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(eyeX, eyeY, radius * 0.115, 0, TAU);
-        ctx.fill();
+        ctx.restore();
       }
 
       function draw() {
@@ -239,7 +507,7 @@
       }
 
       window.addEventListener('resize', resize);
-      resetPowerPellets();
+      ensureWorldAroundPac();
       resize();
       requestAnimationFrame(frame);
     </script>

@@ -71,6 +71,24 @@
         const HERO_YELLOW = '#ffd21f';
         const TRAFFIC_GRAYS = ['#545b65', '#656d78', '#777f8a', '#8a929d', '#9da4ae'];
         const FIELD_COLORS = ['#173b27', '#244d31', '#315b36', '#3d622f'];
+        // ---- label system ------------------------------------------------
+        // One monospace family, one step scale, one plate treatment. Sizes are
+        // fitted against measured text rather than guessed from character
+        // counts, so a label never outgrows the shoulder it is drawn in.
+        const LABEL_STACK = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+        const LABEL = { micro: 12, body: 20, lead: 27 };
+        const PAYOUT = {
+          ink: '#fffbe2',
+          winFill: '#0f7c45',
+          winEdge: '#ffe253',
+          lossFill: '#6d1014',
+          lossEdge: '#ff8175',
+        };
+        const CALLOUT_MAX_W = 300;
+        const PANEL_RADIUS = 12;
+        const CALLOUT_MAX_LINES = 2;
+        const COMPACT_GUTTER = 132;
+
         const COLORS = {
           sky: '#070910',
           asphalt: '#1a1f28',
@@ -295,7 +313,13 @@
             desiredSpeed = profile < 0.65 ? rand(14, 30) : rand(30, 42);
           } else {
             desiredSpeed =
-              profile < 0.18 ? rand(10, 22) : profile > 0.74 ? rand(40, 56) : rand(21, 41);
+              profile < 0.16
+                ? rand(10, 22)
+                : profile > 0.88
+                  ? rand(62, 84)
+                  : profile > 0.7
+                    ? rand(40, 56)
+                    : rand(21, 41);
           }
           const ambitionBias = kind === 'car' ? 0 : kind === 'bus' ? -0.1 : -0.14;
           const ambition = clamp((desiredSpeed - 14) / 42 + rand(-0.2, 0.24) + ambitionBias, 0, 1);
@@ -314,7 +338,7 @@
             prevDelta: s - hero.s,
             lane,
             drawLane: lane,
-            speed: clamp(desiredSpeed + (fromBehind ? rand(-6, 8) : rand(-13, 7)), 6, 56),
+            speed: clamp(desiredSpeed + (fromBehind ? rand(-6, 8) : rand(-13, 7)), 6, 88),
             desiredSpeed,
             ambition,
             aggression,
@@ -951,7 +975,7 @@
             : vehicle.brake ?? 9.4;
           const delta = targetSpeed - vehicle.speed;
           vehicle.speed += clamp(delta * (vehicle.isHero ? 0.92 : 0.76) * dt, -brake * dt, accel * dt);
-          vehicle.speed = clamp(vehicle.speed, 0, vehicle.isHero ? 46 : 56);
+          vehicle.speed = clamp(vehicle.speed, 0, vehicle.isHero ? 46 : 88);
           if (!vehicle.isHero) vehicle.scoreFlash = Math.max(0, vehicle.scoreFlash - dt * 2.4);
         }
 
@@ -1315,7 +1339,7 @@
         }
 
         function safeGap(vehicle, frontVehicle) {
-          const speedRatio = clamp(vehicle.speed / 48, 0, 1);
+          const speedRatio = clamp(vehicle.speed / 62, 0, 1);
           const base = vehicle.isHero ? 5.8 + speedRatio * 7.2 : 4.5 + speedRatio * 6.2;
           const speedTerm = vehicle.speed * (vehicle.isHero ? 0.14 + speedRatio * 0.24 : 0.1 + speedRatio * 0.22);
           const closingTerm = Math.max(0, vehicle.speed - frontVehicle.speed) * (0.46 + speedRatio * 0.36);
@@ -1502,8 +1526,8 @@
             drawPixelExitRamp(ramp);
 
             const signW = Math.min(78, laneWidth * 0.92);
-            const signX = Math.min(width - signW - 8, ramp.roadRight + laneWidth * 0.18);
-            const signY = ramp.startY - laneWidth * 0.95;
+            const signX = Math.min(width - signW - 8, ramp.roadShoulder + 12);
+            const signY = ramp.startY + clamp(laneWidth * 0.34, 26, 58);
             if (signY > -40 && signY < height + 10) {
               rect(signX, signY, signW, 28, '#0f7c45');
               strokeRect(signX, signY, signW, 28, '#d8ffd8', 2);
@@ -1512,35 +1536,57 @@
           }
         }
 
+        // Same strip height, palette, and edge line as drawRoad, so the ramp
+        // reads as the highway continuing rather than as a separate object.
+        // Nothing here is keyed to a moving screen coordinate: the old dashed
+        // centre line was phased off ramp.endY, which shifts every frame, and
+        // that is what made the ramp strobe.
         function drawPixelExitRamp(ramp) {
-          const pixel = 6;
-          const shoulderHalf = pixelSnap(ramp.half + ramp.shoulder, pixel);
-          const asphaltHalf = pixelSnap(ramp.half, pixel);
-          const top = Math.floor(ramp.endY / pixel) * pixel;
-          const bottom = Math.ceil(ramp.startY / pixel) * pixel;
-          const seamX = pixelSnap(ramp.roadRight - pixel, pixel);
+          const strip = 6;
+          const top = Math.floor(ramp.endY / strip) * strip;
+          const bottom = Math.ceil(ramp.startY / strip) * strip;
+          const seamX = ramp.roadRight;
+          const outer = [];
+          const inner = [];
 
-          for (let y = top; y <= bottom; y += pixel) {
-            const center = pixelSnap(exitRampCenterAtY(ramp, y + pixel * 0.5), pixel);
-            const shoulderLeft = Math.max(seamX, center - shoulderHalf);
-            const shoulderRight = center + shoulderHalf;
-            const asphaltLeft = Math.max(seamX, center - asphaltHalf);
-            const asphaltRight = center + asphaltHalf;
+          for (let y = top; y <= bottom; y += strip) {
+            const center = exitRampCenterAtY(ramp, y + strip * 0.5);
+            const asphaltLeft = Math.max(seamX, center - ramp.half);
+            const asphaltRight = center + ramp.half;
+            // Skip the slivers behind the road edge; they used to leave a stray
+            // grey nub hanging off the mouth of the ramp.
+            if (asphaltRight - asphaltLeft < strip) continue;
 
-            if (shoulderRight > shoulderLeft) {
-              rect(shoulderLeft, y, shoulderRight - shoulderLeft, pixel + 1, '#263544');
-            }
-            if (asphaltRight > asphaltLeft) {
-              rect(asphaltLeft, y, asphaltRight - asphaltLeft, pixel + 1, COLORS.asphalt);
-              rect(asphaltRight - 4, y, 4, pixel + 1, '#f9f2a4');
-              if (
-                asphaltLeft > ramp.roadRight + pixel &&
-                mod(Math.abs(y - ramp.endY), 30) < 14
-              ) {
-                rect(asphaltLeft, y, 4, pixel + 1, COLORS.lane);
-              }
+            const shoulderLeft = Math.max(seamX, asphaltLeft - ramp.shoulder);
+            const shoulderRight = asphaltRight + ramp.shoulder;
+            rect(shoulderLeft, y, shoulderRight - shoulderLeft, strip + 1, COLORS.shoulder);
+            rect(asphaltLeft, y, asphaltRight - asphaltLeft, strip + 1, COLORS.asphalt);
+
+            outer.push([asphaltRight + ramp.shoulder * 0.6, y + strip * 0.5]);
+            if (asphaltLeft - seamX > strip) {
+              inner.push([asphaltLeft - ramp.shoulder * 0.6, y + strip * 0.5]);
             }
           }
+
+          strokeRampEdge(outer);
+          strokeRampEdge(inner);
+        }
+
+        // Stroked rather than stamped per row: a 4px diagonal line matches the
+        // highway's edge line, where stacking one rect per strip built a band
+        // several times too heavy.
+        function strokeRampEdge(points) {
+          if (points.length < 2) return;
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(points[0][0], points[0][1]);
+          for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i][0], points[i][1]);
+          ctx.strokeStyle = '#f9f2a4';
+          ctx.lineWidth = 4;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+          ctx.restore();
         }
 
         function exitRampCenterAtY(ramp, y) {
@@ -1757,59 +1803,68 @@
           drawScoreBank(t, pad);
           drawScoreBurst(t);
 
-          if (hero.signal) {
-            drawPixelText(hero.signal < 0 ? '<' : '>', width - pad, pad + 45, clamp(width * 0.034, 20, 34), COLORS.amber, 'right');
-          }
-          if (hero.stoppedForObstacle) {
-            drawPixelText('WAIT', width / 2, height * 0.16, clamp(width * 0.045, 24, 48), COLORS.hudHot, 'center');
-          }
+          if (hero.stoppedForObstacle) drawWaitTag(t);
           drawMiniMeter(pad, height - pad - 24);
         }
 
+        function drawWaitTag(t) {
+          const size = clamp(width * 0.038, 22, 40);
+          const w = Math.ceil(measureLabel('WAIT', size)) + 36;
+          const h = Math.round(size + 28);
+          const x = Math.round(width / 2 - w / 2);
+          const y = Math.round(height * 0.16 - h / 2);
+          const pulse = prefersReducedMotion ? 1 : 0.55 + Math.abs(Math.sin(t * 2.4)) * 0.45;
+          ctx.save();
+          ctx.globalAlpha = pulse;
+          drawPlate(x, y, w, h, 'rgba(8, 10, 16, 0.94)', COLORS.hudHot);
+          ctx.restore();
+          drawPixelText('WAIT', width / 2, y + h / 2 + size * 0.36, size, COLORS.hudHot, 'center');
+        }
+
         function drawScoreBank(t, pad) {
-          const gutter = Math.max(0, roadLeft);
-          const scoreColor = score < 0 ? '#ff5b4f' : COLORS.hudHot;
-          if (gutter < 92) {
-            drawCompactScoreRail(t, gutter, scoreColor);
+          const scoreColor = score < 0 ? '#ff6a5e' : COLORS.hudHot;
+          if (roadLeft < COMPACT_GUTTER) {
+            drawCompactScoreRail(t, scoreColor);
             return;
           }
 
-          const boardW = Math.min(216, gutter - pad * 2);
+          const boardW = Math.round(Math.min(roadLeft - pad - 8, 244));
           const x = pad;
           const y = pad;
-          drawPixelText('HAPPINESS', x, y + 15, clamp(boardW * 0.095, 13, 18), COLORS.hud, 'left');
-          drawPixelText('HUNTER', x, y + 34, clamp(boardW * 0.095, 13, 18), HERO_YELLOW, 'left');
+          const markSize = fitLabelSize('HAPPINESS', boardW, 14, LABEL.body);
+          const markLead = Math.round(markSize * 1.18);
+          drawPixelText('HAPPINESS', x, y + markSize, markSize, COLORS.hud, 'left');
+          drawPixelText('HUNTER', x, y + markSize + markLead, markSize, HERO_YELLOW, 'left');
 
-          const bankY = y + 49;
-          rect(x, bankY, boardW, 64, 'rgba(3, 4, 7, 0.88)');
-          rect(x, bankY, boardW, 5, HERO_YELLOW);
-          rect(x, bankY + 59, boardW, 5, '#7a4e00');
-          drawPixelText('SCORE', x + 10, bankY + 24, 12, '#f8f4df', 'left');
-          drawPixelText(formatScore(score), x + boardW - 10, bankY + 48, clamp(boardW * 0.18, 26, 36), scoreColor, 'right');
+          const digits = formatScore(score);
+          const digitSize = fitLabelSize(digits, boardW - 28, LABEL.lead, 42);
+          const bankY = Math.round(y + markSize + markLead + 16);
+          const bankH = Math.round(LABEL.micro + digitSize + 30);
+          drawPlate(x, bankY, boardW, bankH, 'rgba(3, 4, 7, 0.93)', HERO_YELLOW);
+          drawPixelText('SCORE', x + 14, bankY + LABEL.micro + 12, LABEL.micro, '#cec8ab', 'left');
+          drawPixelText(digits, x + boardW - 14, bankY + bankH - 14, digitSize, scoreColor, 'right');
 
-          const blink = prefersReducedMotion || Math.floor(t * 5) % 2 === 0;
-          for (let lx = x + 9; lx < x + boardW - 4; lx += 18) {
-            rect(lx, bankY - 2, 4, 4, blink ? '#fff8b4' : '#825b0a');
-          }
-          drawScoreHistoryTrail(x + 8, bankY + 76, Math.max(10, boardW - 16), false);
+          drawScoreHistoryTrail(x + 12, bankY + bankH + 20, Math.max(10, boardW - 24), false);
         }
 
-        function drawCompactScoreRail(t, gutter, scoreColor) {
-          const railW = Math.max(28, Math.floor(gutter - 10));
+        function compactRailWidth() {
+          return Math.round(clamp(roadLeft - 10, 32, 98));
+        }
+
+        function drawCompactScoreRail(t, scoreColor) {
+          const railW = compactRailWidth();
           const x = 5;
           const y = 8;
-          rect(x, y, railW, 137, 'rgba(3, 4, 7, 0.9)');
-          rect(x, y, railW, 4, HERO_YELLOW);
-          drawPixelText('HH', x + railW / 2, y + 22, 11, COLORS.hud, 'center');
-          drawPixelText('S', x + railW / 2, y + 40, 10, HERO_YELLOW, 'center');
-          const chars = formatScore(score).split('');
-          const digitSize = clamp(railW * 0.58, 16, 24);
-          chars.forEach((char, index) => {
-            drawPixelText(char, x + railW / 2, y + 64 + index * 22, digitSize, scoreColor, 'center');
-          });
-          const blink = prefersReducedMotion || Math.floor(t * 5) % 2 === 0;
-          rect(x + 4, y + 129, railW - 8, 4, blink ? '#fff8b4' : '#825b0a');
-          drawScoreHistoryTrail(x + railW / 2, y + 150, 0, true);
+          const digits = formatScore(score);
+          const markSize = fitLabelSize('HH', railW - 16, 11, 18);
+          const digitSize = fitLabelSize(digits, railW - 16, 14, 30);
+          const railH = Math.round(markSize + digitSize + 32);
+          drawPlate(x, y, railW, railH, 'rgba(3, 4, 7, 0.93)', HERO_YELLOW);
+          drawPixelText('HH', x + railW / 2, y + markSize + 11, markSize, COLORS.hud, 'center');
+          drawPixelText(digits, x + railW / 2, y + railH - 13, digitSize, scoreColor, 'center');
+
+          rect(x + 10, y + markSize + 17, railW - 20, 2, 'rgba(255, 210, 31, 0.55)');
+          drawScoreHistoryTrail(x + railW / 2, y + railH + 18, 0, true);
         }
 
         function drawScoreHistoryTrail(x, y, availableWidth, vertical) {
@@ -1817,7 +1872,10 @@
           items.forEach((item, index) => {
             const px = vertical ? x : x + index * Math.min(18, availableWidth / Math.max(1, items.length));
             const py = vertical ? y + index * 15 : y;
-            drawPixelBubble(px, py, 5, item.sign > 0 ? '#f6c515' : '#d52f29', COLORS.ink);
+            ctx.beginPath();
+            ctx.arc(Math.round(px), Math.round(py), 4.5, 0, TAU);
+            ctx.fillStyle = item.sign > 0 ? '#f6c515' : '#e2493f';
+            ctx.fill();
           });
         }
 
@@ -1834,8 +1892,10 @@
           const fade = clamp((burst.until - t) / 0.3, 0, 1);
           const intro = clamp(age / 0.13, 0, 1);
           const positive = burst.amount > 0;
-          const bubbleW = burst.amount === -5 ? 82 : 66;
-          const bubbleH = 48;
+          const label = formatDelta(burst.amount);
+          const size = LABEL.lead;
+          const bubbleW = Math.ceil(measureLabel(label, size)) + 34;
+          const bubbleH = Math.round(size + 22);
           const x = scoreBubbleX(burst, bubbleW);
           const y = heroScreenY - 10 - age * (prefersReducedMotion ? 8 : 27) - index * 9;
           const scale = prefersReducedMotion ? 1 : 0.72 + easeOutQuart(intro) * 0.28;
@@ -1844,16 +1904,15 @@
           ctx.globalAlpha = fade;
           ctx.translate(x, y);
           ctx.scale(scale, scale);
-          drawSteppedBubble(
+          drawPlate(
             -bubbleW / 2,
             -bubbleH / 2,
             bubbleW,
             bubbleH,
-            positive ? '#0f7c45' : '#6d1014',
-            positive ? '#ffe253' : '#ff6157',
-            burst.side
+            positive ? PAYOUT.winFill : PAYOUT.lossFill,
+            positive ? PAYOUT.winEdge : PAYOUT.lossEdge
           );
-          drawPixelText(formatDelta(burst.amount), 0, 10, burst.amount === -5 ? 28 : 30, '#fffbe2', 'center');
+          drawPixelText(label, 0, size * 0.36, size, PAYOUT.ink, 'center');
           ctx.restore();
         }
 
@@ -1875,135 +1934,262 @@
           })[0];
         }
 
+        // The roadside callout is one plate at every viewport: the copy is
+        // measured and wrapped to fit, ornaments stay outside the plate, and
+        // when the shoulder is too thin to hold legible type the plate docks
+        // along the top edge instead of shrinking into the field.
         function drawChainOverlay(burst, t) {
           const age = Math.max(0, t - burst.at);
           const fade = clamp((burst.until - t) / 0.35, 0, 1);
           const positive = burst.amount > 0;
-          const hot = positive ? '#ffe253' : '#ff6157';
-          const cool = positive ? '#17c964' : '#a7162a';
-          const copy = chainCopy(burst);
-          const placement = chainOverlayPlacement(burst);
-          const baseY = heroScreenY - clamp(height * 0.2, 120, 175);
-          const pulse = prefersReducedMotion ? 1 : 0.92 + easeOutQuart(clamp(age / 0.18, 0, 1)) * 0.08;
+          const skin = positive
+            ? { fill: 'rgba(9, 48, 30, 0.94)', edge: PAYOUT.winEdge, accent: '#3ddc84' }
+            : { fill: 'rgba(56, 12, 14, 0.94)', edge: PAYOUT.lossEdge, accent: '#ff6f62' };
+          const place = chainOverlayPlacement(burst);
+          const layout = layoutCallout(chainCopy(burst), place.textWidth, place.minSize, place.maxSize);
+          const badgeSize = Math.round(clamp(layout.size * 0.56, 11, 19));
+          const textBlock = layout.lines.length * layout.lineHeight;
+          const plateW = place.plateWidth;
+          const plateH = Math.round(textBlock + badgeSize + 42);
+          const y = place.dock === 'top' ? Math.round(12 + plateH / 2) : place.y;
+          const intro = easeOutQuart(clamp(age / 0.34, 0, 1));
+          const rise = prefersReducedMotion ? 0 : (1 - intro) * 12;
+          const pop = prefersReducedMotion ? 1 : 0.93 + intro * 0.07;
 
           ctx.save();
           ctx.globalAlpha = fade;
-          ctx.translate(placement.x, baseY);
-          if (burst.milestone) {
-            ctx.scale(pulse, pulse);
-            drawPixelBurst(0, 0, clamp(placement.width * 0.4, 18, 52), hot, t);
-            drawStackedChainText(copy, 0, -14, placement.width, hot);
-            drawPixelText(`x${burst.chain}`, 0, 39, clamp(placement.width * 0.18, 12, 20), '#fffbe2', 'center');
-          } else if (burst.variant === 0) {
-            const orbit = clamp(placement.width * 0.3, 13, 34);
-            drawPixelBubble(-orbit, 3, 8, cool, COLORS.ink);
-            drawPixelBubble(orbit, 7, 6, hot, COLORS.ink);
-            drawPixelBubble(-orbit * 0.55, -18, 5, hot, COLORS.ink);
-            drawStackedChainText(copy, 0, 0, placement.width, hot);
-          } else if (burst.variant === 1) {
-            ctx.rotate(burst.side * -0.035);
-            drawStackedChainText(copy, 0, -5, placement.width, hot);
-            rect(-placement.width * 0.32, 22, placement.width * 0.22, 4, cool);
-            rect(-placement.width * 0.06, 22, placement.width * 0.12, 4, hot);
-            rect(placement.width * 0.1, 22, placement.width * 0.22, 4, cool);
-          } else if (burst.variant === 2) {
-            const alertW = Math.max(28, placement.width - 6);
-            drawSteppedBubble(-alertW / 2, -27, alertW, 58, 'rgba(3, 4, 7, 0.88)', hot, -burst.side);
-            drawStackedChainText(copy, 0, -7, alertW - 8, hot);
-            drawPixelText(`x${burst.chain}`, 0, 23, clamp(alertW * 0.16, 11, 17), '#fffbe2', 'center');
-          } else if (burst.variant === 3) {
-            const radius = clamp(placement.width * 0.38, 18, 44);
-            drawPixelDiamond(0, 0, radius, 'rgba(3, 4, 7, 0.84)', hot);
-            drawPixelText(`x${burst.chain}`, 0, 6, clamp(radius * 0.55, 13, 23), '#fffbe2', 'center');
-            drawStackedChainText(copy, 0, radius + 18, placement.width, hot);
-          } else {
-            drawStackedChainText(copy, 0, -5, placement.width, hot);
-            for (let i = -2; i <= 2; i += 1) {
-              const spacing = Math.min(17, placement.width / 5);
-              drawPixelBubble(i * spacing, 26 + Math.abs(i) * 3, 4 + (i === 0 ? 2 : 0), i % 2 ? cool : hot, COLORS.ink);
-            }
-          }
+          ctx.translate(place.x, y + rise);
+          ctx.scale(pop, pop);
+
+          if (burst.milestone) drawCalloutGlow(plateW, plateH, skin.accent, t);
+          drawPlate(-plateW / 2, -plateH / 2, plateW, plateH, skin.fill, skin.edge);
+
+          const top = -plateH / 2 + 16;
+          layout.lines.forEach((line, index) => {
+            drawPixelText(line, 0, top + index * layout.lineHeight + layout.size * 0.8, layout.size, PAYOUT.ink, 'center');
+          });
+
+          const ruleY = Math.round(top + textBlock + 5);
+          const ruleW = Math.round(plateW * 0.4);
+          rect(-ruleW / 2, ruleY, ruleW, 2, skin.accent);
+          drawChainTally(burst, place.textWidth, badgeSize, ruleY + badgeSize + 9, skin);
+          ctx.restore();
+        }
+
+        // The old badge just said "x3", which reads as a points multiplier it
+        // never was. Lead with the points the run actually banked, in the same
+        // bright ink as the payout chips, then say how long the run is.
+        function drawChainTally(burst, maxWidth, size, baseY, skin) {
+          const points = formatDelta(burst.chainTotal);
+          const pointsW = measureLabel(points, size);
+          const gap = size * 1.05;
+          const runText = chainRunText(burst, maxWidth - pointsW - gap, size);
+          const totalW = pointsW + (runText ? gap + measureLabel(runText, size) : 0);
+          const x = -totalW / 2;
+          drawPixelText(points, x, baseY, size, PAYOUT.ink, 'left');
+          if (runText) drawPixelText(runText, x + pointsW + gap, baseY, size, skin.accent, 'left');
+        }
+
+        function chainRunText(burst, room, size) {
+          if (room <= 0) return '';
+          const long = `${burst.chain} IN A ROW`;
+          if (measureLabel(long, size) <= room) return long;
+          const short = `x${burst.chain}`;
+          return measureLabel(short, size) <= room ? short : '';
+        }
+
+        // A milestone glows and breathes instead of throwing pixel rays across
+        // the copy, which is what used to make the words unreadable.
+        function drawCalloutGlow(plateW, plateH, color, t) {
+          const pulse = prefersReducedMotion ? 0.5 : 0.35 + Math.abs(Math.sin(t * 2.6)) * 0.45;
+          ctx.save();
+          ctx.globalAlpha *= pulse;
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 28;
+          ctx.fillStyle = color;
+          roundedPath(-plateW / 2, -plateH / 2, plateW, plateH, PANEL_RADIUS);
+          ctx.fill();
           ctx.restore();
         }
 
         function chainOverlayPlacement(burst) {
           const roadRight = roadLeft + roadWidth;
-          const leftWidth = Math.max(0, roadLeft - 8);
-          const rightWidth = Math.max(0, width - roadRight - 8);
+          const leftRoom = Math.max(0, roadLeft - 10);
+          const rightRoom = Math.max(0, width - roadRight - 10);
           let side = burst.side;
-          if (side < 0 && leftWidth < 28 && rightWidth > leftWidth) side = 1;
-          if (side > 0 && rightWidth < 28 && leftWidth > rightWidth) side = -1;
-          const gutterWidth = side < 0 ? leftWidth : rightWidth;
+          if (side < 0 && leftRoom < rightRoom - 24) side = 1;
+          if (side > 0 && rightRoom < leftRoom - 24) side = -1;
+
+          if (roadLeft >= COMPACT_GUTTER) {
+            const room = side < 0 ? leftRoom : rightRoom;
+            const plateWidth = Math.round(Math.min(room - 18, CALLOUT_MAX_W));
+            return {
+              dock: 'gutter',
+              plateWidth,
+              textWidth: plateWidth - 22,
+              minSize: 17,
+              maxSize: 34,
+              x: Math.round(side < 0 ? 6 + room / 2 : roadRight + 4 + room / 2),
+              y: heroScreenY - clamp(height * 0.2, 120, 175),
+            };
+          }
+
+          const pad = clamp(width * 0.025, 14, 28);
+          const left = 5 + compactRailWidth() + 12;
+          const right = width - pad;
+          const plateWidth = Math.round(clamp(right - left, 118, CALLOUT_MAX_W));
           return {
-            side,
-            width: Math.max(24, gutterWidth),
-            x: side < 0 ? 4 + gutterWidth / 2 : roadRight + 4 + gutterWidth / 2,
+            dock: 'top',
+            plateWidth,
+            textWidth: plateWidth - 22,
+            minSize: 16,
+            maxSize: 28,
+            x: Math.round(left + (right - left) / 2),
+            y: 0,
           };
         }
 
-        function drawStackedChainText(text, x, y, maxWidth, color) {
-          const words = text.replace(/!+$/, '').split(' ');
-          const longest = Math.max(...words.map((word) => word.length));
-          const size = clamp(maxWidth / Math.max(3.2, longest * 0.62), 9, 19);
-          const lineHeight = size + 3;
-          const startY = y - ((words.length - 1) * lineHeight) / 2;
-          words.forEach((word, index) => {
-            drawPixelText(word, x, startY + index * lineHeight, size, color, 'center');
-          });
+        // Try the largest size whose wrapped copy still fits two lines, so a
+        // wide shoulder gets a headline and a thin one degrades to smaller
+        // type rather than to text that spills over the road.
+        function layoutCallout(text, maxWidth, minSize, maxSize) {
+          for (let size = maxSize; size >= minSize; size -= 1) {
+            const lines = wrapLabelLines(text, size, maxWidth);
+            if (calloutFits(lines, size, maxWidth)) {
+              return { size, lines, lineHeight: Math.round(size * 1.16) };
+            }
+          }
+          // Nothing fits at the preferred floor, so keep shrinking rather than
+          // let a long word run off the shoulder and onto the road.
+          let size = minSize;
+          let lines = wrapLabelLines(text, size, maxWidth);
+          while (size > 12 && !calloutFits(lines, size, maxWidth)) {
+            size -= 1;
+            lines = wrapLabelLines(text, size, maxWidth);
+          }
+          return { size, lines: lines.slice(0, CALLOUT_MAX_LINES), lineHeight: Math.round(size * 1.16) };
         }
+
+        function calloutFits(lines, size, maxWidth) {
+          return lines.length <= CALLOUT_MAX_LINES
+            && lines.every((line) => measureLabel(line, size) <= maxWidth);
+        }
+
+        function wrapLabelLines(text, size, maxWidth) {
+          const lines = [];
+          let line = '';
+          for (const word of text.split(' ')) {
+            const next = line ? `${line} ${word}` : word;
+            if (line && measureLabel(next, size) > maxWidth) {
+              lines.push(line);
+              line = word;
+            } else {
+              line = next;
+            }
+          }
+          if (line) lines.push(line);
+          return lines;
+        }
+
+        // Copy answers what actually just happened - what got passed, how bad
+        // the hit was, how deep the run is - instead of drawing from one flat
+        // list. Five phrases indexed by a cycling counter meant the same five
+        // came back in the same order all session.
+        const CHAIN_COPY = {
+          pass: [
+            'CLEAN PASS', 'TWO WIDE', 'HOT LAP', 'FULL THROTTLE', 'SLICED THROUGH',
+            'FOUND THE GAP', 'WENT AROUND', 'STUCK THE MOVE', 'NICE LINE', 'THREADED IT',
+            'ON THE MOVE', 'GAP CLOSED', 'OUTBRAKED', 'SIDE BY SIDE', 'DOWN THE INSIDE',
+          ],
+          bigPass: [
+            'CLEARED THE RIG', 'PAST THE TRUCK', 'AROUND THE BUS', 'BIG ONE DOWN',
+            'OUTRAN THE RIG', 'TRUCK DISPATCHED', 'WIDE LOAD CLEARED',
+          ],
+          lost: [
+            'GOT PASSED', 'OFF PACE', 'LOST POSITION', 'BACK MARKER', 'FIND A GAP',
+            'WRONG LANE', 'BOXED OUT', 'TOO SLOW', 'DROPPED ONE', 'LEFT BEHIND',
+            'STUCK BEHIND', 'LOSING TOUCH', 'SHOULD HAVE MOVED',
+          ],
+          trucked: [
+            'TRUCKED', 'EIGHTEEN WHEELS', 'BIG RIG WINS', 'FLATTENED',
+            'THE RIG GOT YOU', 'SEMI TROUBLE', 'ROLLED RIGHT OVER', 'THAT ONE HURT',
+          ],
+          // Milestones escalate by tier, so twenty straight cannot read the
+          // same as five.
+          runs: [
+            ['FIVE STRAIGHT', 'HIGH FIVE', 'ON A ROLL', 'FIVE IN A ROW'],
+            ['TEN STRAIGHT', 'DOUBLE DIGITS', 'ROLLING NOW', 'TEN AND COUNTING'],
+            ['FIFTEEN UP', 'UNSTOPPABLE', 'PURE PACE', 'LAPPING THEM'],
+            ['RAMPAGE', 'NOBODY LEFT', 'ALL COMERS', 'VICTORY LAP', 'ABSOLUTE PACE'],
+          ],
+          slides: [
+            ['FIVE LOST', 'ROUGH PATCH', 'SLIPPING', 'FIVE DOWN'],
+            ['TEN DOWN', 'REALLY SLIPPING', 'TEN LOST', 'GOING BACKWARDS'],
+            ['FIFTEEN DOWN', 'DISASTER LAP', 'NOTHING WORKING'],
+            ['TOTAL COLLAPSE', 'ROCK BOTTOM', 'PARKING LOT', 'PULL OVER'],
+          ],
+        };
 
         function chainCopy(burst) {
+          const positive = burst.amount > 0;
           if (burst.milestone) {
-            if (burst.chain === 5) return burst.amount > 0 ? 'FIVE PASSES!' : 'FIVE LOST!';
-            const wins = ['OVERTAKE RUN!', 'FLYING LAP!', 'POLE PACE!'];
-            const losses = ['LOSING GROUND!', 'OFF THE PACE!', 'BOXED IN!'];
-            const milestones = burst.amount > 0 ? wins : losses;
-            return milestones[Math.floor(burst.chain / 5) % milestones.length];
+            const tiers = positive ? CHAIN_COPY.runs : CHAIN_COPY.slides;
+            const index = clamp(Math.floor(burst.chain / 5) - 1, 0, tiers.length - 1);
+            return pickCopy(tiers[index], burst);
           }
-          const positive = ['CLEAN PASS', 'TWO WIDE', 'HOT LAP', 'PASSING STREAK', 'FULL THROTTLE'];
-          const negative = ['GOT PASSED', 'OFF PACE', 'LOST POSITION', 'BACK MARKER', 'FIND A GAP'];
-          const options = burst.amount > 0 ? positive : negative;
-          return options[burst.variant % options.length];
+          if (!positive && burst.amount <= -5) return pickCopy(CHAIN_COPY.trucked, burst);
+          if (positive && burst.kind !== 'car') return pickCopy(CHAIN_COPY.bigPass, burst);
+          return pickCopy(positive ? CHAIN_COPY.pass : CHAIN_COPY.lost, burst);
         }
 
-        function drawSteppedBubble(x, y, w, h, fill, border, tailSide) {
-          rect(x + 6, y, w - 12, h, border);
-          rect(x, y + 6, w, h - 12, border);
-          rect(x + 6, y + 5, w - 12, h - 10, fill);
-          rect(x + 5, y + 7, w - 10, h - 14, fill);
-          const tailX = tailSide < 0 ? x + 13 : x + w - 19;
-          rect(tailX, y + h - 1, 12, 6, border);
-          rect(tailX + (tailSide < 0 ? 0 : 6), y + h + 5, 6, 6, border);
+        function pickCopy(pool, burst) {
+          const seed = burst.chain * 7.71 + burst.variant * 13.37 + Math.abs(burst.chainTotal) * 2.93;
+          return pool[Math.floor(hash01(seed) * pool.length) % pool.length];
         }
 
-        function drawPixelBubble(x, y, radius, fill, border) {
-          rect(x - radius, y - radius - 2, radius * 2, radius * 2 + 4, border);
-          rect(x - radius - 2, y - radius, radius * 2 + 4, radius * 2, border);
-          rect(x - radius + 2, y - radius, radius * 2 - 4, radius * 2, fill);
-          rect(x - radius, y - radius + 2, radius * 2, radius * 2 - 4, fill);
+        // arcTo rather than roundRect: same corners everywhere, including
+        // browsers old enough to predate roundRect, which matters for a piece
+        // meant to still open in a decade.
+        function roundedPath(x, y, w, h, radius) {
+          const r = Math.max(0, Math.min(radius, w * 0.5, h * 0.5));
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.arcTo(x + w, y, x + w, y + h, r);
+          ctx.arcTo(x + w, y + h, x, y + h, r);
+          ctx.arcTo(x, y + h, x, y, r);
+          ctx.arcTo(x, y, x + w, y, r);
+          ctx.closePath();
         }
 
-        function drawPixelDiamond(x, y, radius, fill, border) {
-          const step = 6;
-          for (let offset = -radius; offset <= radius; offset += step) {
-            const half = radius - Math.abs(offset);
-            rect(x - half - 3, y + offset, half * 2 + 6, step, border);
-            if (half > 6) rect(x - half + 3, y + offset, half * 2 - 6, step, fill);
-          }
+        function drawPlate(x, y, w, h, fill, border) {
+          const radius = Math.min(PANEL_RADIUS, h * 0.34);
+          ctx.save();
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+          ctx.shadowBlur = 16;
+          ctx.shadowOffsetY = 5;
+          roundedPath(x, y, w, h, radius);
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.restore();
+
+          roundedPath(x + 1, y + 1, w - 2, h - 2, radius - 1);
+          ctx.strokeStyle = border;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // A hairline of light along the top edge keeps the panel from
+          // reading as a flat hole punched in the scene.
+          ctx.save();
+          roundedPath(x + 1, y + 1, w - 2, h - 2, radius - 1);
+          ctx.clip();
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+          ctx.fillRect(x, y, w, Math.max(2, h * 0.22));
+          ctx.restore();
         }
 
-        function drawPixelBurst(x, y, radius, color, t) {
-          const blink = prefersReducedMotion || Math.floor(t * 8) % 2 === 0;
-          const ray = blink ? 18 : 11;
-          rect(x - 3, y - radius, 6, ray, color);
-          rect(x - 3, y + radius - ray, 6, ray, color);
-          rect(x - radius, y - 3, ray, 6, color);
-          rect(x + radius - ray, y - 3, ray, 6, color);
-          rect(x - radius * 0.72, y - radius * 0.72, 10, 10, color);
-          rect(x + radius * 0.62, y - radius * 0.72, 10, 10, color);
-          rect(x - radius * 0.72, y + radius * 0.62, 10, 10, color);
-          rect(x + radius * 0.62, y + radius * 0.62, 10, 10, color);
-        }
+
+
+
 
         function formatScore(value) {
           const absolute = String(Math.abs(value)).padStart(3, '0');
@@ -2029,40 +2215,73 @@
           rect(x - 3, y, 6, 2, '#fff6d5');
         }
 
+        // Labels sit on panels now, so the contrast comes from the panel and
+        // the type only needs a soft drop for depth. The old keyline halo read
+        // as a sticker outline once the panels stopped being pixel-stepped.
         function drawPixelText(text, x, y, size, color, align) {
-          ctx.font = `700 ${Math.round(size)}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+          const px = Math.round(size);
+          ctx.save();
+          ctx.font = labelFont(px);
           ctx.textAlign = align;
           ctx.textBaseline = 'alphabetic';
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-          ctx.fillText(text, Math.round(x + 2), Math.round(y + 2));
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+          ctx.shadowBlur = 3;
+          ctx.shadowOffsetY = 1;
           ctx.fillStyle = color;
           ctx.fillText(text, Math.round(x), Math.round(y));
+          ctx.restore();
+        }
+
+        function labelFont(size) {
+          return `700 ${Math.round(size)}px ${LABEL_STACK}`;
+        }
+
+        function measureLabel(text, size) {
+          ctx.font = labelFont(size);
+          return ctx.measureText(text).width;
+        }
+
+        function fitLabelSize(text, maxWidth, minSize, maxSize) {
+          let size = Math.round(maxSize);
+          while (size > minSize && measureLabel(text, size) > maxWidth) size -= 1;
+          return size;
         }
 
         function laneCenter(lane) {
           return roadLeft + (lane + 0.5) * laneWidth;
         }
 
+        // The ramp is specified by the width a car actually needs measured
+        // ACROSS the ramp, then converted to the horizontal half-width the
+        // scanline renderer wants. Sizing `half` directly (as this used to)
+        // made a diagonal corridor far narrower than a lane, because a
+        // horizontal slice of a diagonal band is longer than the band is wide.
         function exitRampGeometry(s) {
           const bounds = roadBoundsAt(s);
           const startY = worldToY(s);
-          const half = clamp(laneWidth * 0.3, 18, 44);
-          const shoulder = clamp(laneWidth * 0.09, 6, 14);
-          const startX = bounds.right - half;
+          const shoulder = Math.max(16, laneWidth * 0.22);
+          const corridor = clamp(laneWidth * 0.86, 52, 108);
           const endX = width + Math.max(laneWidth * 0.58, 64);
-          const endY = startY - clamp((endX - startX) * 0.58, 142, height * 0.46);
-          const curveX = startX + (endX - startX) * 0.38;
+          const startX = bounds.right - laneWidth * 0.5;
+          const run = endX - startX;
+          const drop = clamp(run * 0.92, 210, height * 0.62);
+          const slant = Math.hypot(run, drop);
+          const half = (corridor * 0.5 * slant) / Math.max(1, drop);
+          const endY = startY - drop;
+          const curveX = startX + run * 0.38;
           const curveY = startY + (endY - startY) * 0.38;
           return {
             startX,
             startY,
             roadRight: bounds.right,
+            roadShoulder: bounds.right + shoulder,
             curveX,
             curveY,
             endX,
             endY,
             half,
-            shoulder,
+            corridor,
+            shoulder: shoulder * 0.62,
           };
         }
 

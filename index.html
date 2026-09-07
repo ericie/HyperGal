@@ -260,6 +260,16 @@
         const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+        // A piece with no commit yet has no manifest "updated" date; it was
+        // touched more recently than anything committed, so it counts as today.
+        const now = new Date();
+        const TODAY = [
+          now.getFullYear(),
+          String(now.getMonth() + 1).padStart(2, '0'),
+          String(now.getDate()).padStart(2, '0')
+        ].join('-');
+        function updatedOn(p) { return p.updated || TODAY; }
+
         const script = document.createElement('script');
         script.src = `./manifest.js?v=${Date.now()}`;
         script.onload = boot;
@@ -302,10 +312,13 @@
             list.sort((a, b) => direction * title(a).localeCompare(
               title(b), undefined, { sensitivity: 'base' }));
           } else {
-            // Slug (≈ creation order) breaks same-day ties.
-            list.sort((a, b) => direction * (
-              a.date < b.date ? -1 : a.date > b.date ? 1 :
-              a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0));
+            // Updated, not published: slug (≈ creation order) breaks ties.
+            list.sort((a, b) => {
+              const [x, y] = [updatedOn(a), updatedOn(b)];
+              return direction * (
+                x < y ? -1 : x > y ? 1 :
+                a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0);
+            });
           }
           return list;
         }
@@ -344,7 +357,7 @@
         function dateMeta(p) {
           const dates = el('span', 'dates');
           dates.append(dateItem('Published', p.date || (p.year ? String(p.year) : '')));
-          dates.append(dateItem('Updated', p.updated));
+          dates.append(dateItem('Updated', updatedOn(p)));
           if (p.wip) dates.append(el('span', '', 'In progress'));
           return dates;
         }
@@ -364,7 +377,7 @@
           a.href = `./pieces/${p.slug}/index.html`;
           a.setAttribute('aria-label',
             `${title(p)}${p.date ? ', published ' + fmtDate(p.date) : ''}` +
-            `${p.updated ? ', updated ' + fmtDate(p.updated) : ''}` +
+            `, updated ${fmtDate(updatedOn(p))}` +
             `${p.wip ? ', in progress' : ''}`);
           return a;
         }

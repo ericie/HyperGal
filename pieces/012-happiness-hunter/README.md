@@ -4,7 +4,9 @@ An autonomous arcade traffic piece. One yellow hero car searches for the
 fastest lane, accelerates or backs off to manufacture an opening, and works
 through compact gray traffic, buses, and semi trucks, signaling as it hunts
 for passes. Other drivers want to get ahead too, with slow pokes, sprinters,
-aggressive squeezers, and conservative gap-waiters sharing the road. Slow
+aggressive squeezers, and conservative gap-waiters sharing the road. A minority
+of drivers are sprinters that run well past anything the hero can do, even
+surging. Slow
 traffic packs tighter; fast traffic leaves more room. When the road opens up,
 the hero sometimes surges forward. The hero never exits.
 
@@ -26,6 +28,10 @@ collapsing into narrower two-lane bottlenecks and opening again.
 Alternating parcels of green farmland move behind the narrower road, making the
 forward travel visible even when traffic is briefly still.
 
+Exit ramps carry the highway's own asphalt, shoulder, and edge lines, and are
+sized by the width a car needs measured across the ramp rather than across the
+screen, so a diagonal ramp stays a full lane wide.
+
 Obstacles appear on the highway: construction, police cars, accidents, and
 road animals. The yellow car is the only car that scores: each gray car it
 passes adds one point, each car that passes it costs one point, and a semi
@@ -35,12 +41,23 @@ traffic.
 
 The permanent score bank lives entirely in the roadside field so the highway
 remains visible. Each pass or loss produces a compact speech-bubble payout near
-the passed car on the side farthest from the hero. Longer runs rotate through
-racing-language text, bubble clusters, roadside alerts, multiplier stamps, chip
-trails, and five-event burst announcements placed in the roadside gutters.
+the passed car on the side farthest from the hero. Longer runs raise a roadside
+callout panel: racing-language copy measured and wrapped to fit the shoulder it
+sits in, with an accent rule and, below it, the points the run has banked
+followed by its length. The copy answers what actually happened - an ordinary
+pass, a truck or bus cleared, a five-point hit from a semi, a run five or
+twenty deep - and is chosen by hashing the event rather than cycling an index,
+so a long session does not loop the same handful of phrases. Milestone copy
+escalates by tier, and milestones glow and breathe rather than throwing marks
+across the words. Where
+the shoulder is too thin to hold legible type, the callout docks along the top
+edge rather than shrinking into the field. Every label is bold monospace on a
+rounded, shadowed panel, sized against measured text.
 Recent results survive as a small roadside trail rather than a second
-scoreboard. Road-width transitions and exit ramps are rasterized as matching
-staircase pixels rather than smooth vector diagonals.
+scoreboard. Road-width transitions and the ramp surface are rasterized as
+matching staircase pixels rather than smooth vector diagonals; only the painted
+edge lines are stroked, so a diagonal edge reads as a line instead of a row of
+detached dots.
 
 ## Archival rule
 

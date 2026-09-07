@@ -1,4 +1,4 @@
-# HYPERMEDIA
+# Hypermedia Title 02
 
 A self-contained full-screen Plinko machine spelling `HYPERMEDIA`.
 Ten large letter disks, each with its own color, fall at a controlled speed through a sparse

@@ -251,7 +251,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "Large colored ink drops alternate with open-water spaces, building wandering suminagashi rings inside a bounded floating bath. Adjustable disturbances pull the accumulated contours into new patterns.",
+      "description": "Large colored ink drops and open-water halos build wandering suminagashi rings, including brief runs of exact-center blooms, inside a bounded floating bath.",
       "updated": "2026-08-20"
     },
     {
@@ -308,7 +308,7 @@ window.HYPERGAL_MANIFEST = {
       "category": "nature",
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
-      "description": "A dense, directionless botanical wallpaper on aged rag paper. Dye-pot hibiscus, chrysanthemums, orange daylilies, fringed iris, dwarf quince, Monstera, green palm and fern foliage, and varied cream leaves unfold through twenty hand-drawn growth stages in every direction.",
+      "description": "A dense botanical wallpaper on aged rag paper, covered by a white mount with a triangular window cut in it. Every plant that grows afterwards is rooted inside that window and climbs out over the board, until dye-pot hibiscus, chrysanthemums, fringed iris, quince, and palm and fern foliage have overrun the mount.",
       "updated": "2026-08-20"
     },
     {
@@ -355,7 +355,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "Black pulses fade as they travel from three contour-drawn stones, then intensify when their nested, non-crossing samon join.",
+      "description": "Black waves split at stone-to-stone junctions, rebound from the frame, and intensify where their nested, non-crossing samon overlap.",
       "updated": "2026-08-20"
     },
     {
@@ -382,19 +382,19 @@ window.HYPERGAL_MANIFEST = {
       "updated": "2026-08-20"
     },
     {
-      "slug": "035-alphabet",
-      "title": "Alphabet",
+      "slug": "035-hypermedia-title-01",
+      "title": "Hypermedia Title 01",
       "year": 2026,
       "date": "2026-08-20",
       "category": "typography",
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.svg",
-      "description": "Ten colorful geometric letters fall, settle, sprout legs, and run above a staggered field of platforms."
+      "description": "Ten colorful geometric letters land on a center-pivoting teeter-totter, sprout legs, and slide or walk off as the platform tips."
     },
     {
-      "slug": "036-211c",
-      "title": "HYPERMEDIA",
+      "slug": "036-hypermedia-title-02",
+      "title": "Hypermedia Title 02",
       "year": 2026,
       "date": "2026-08-27",
       "category": "typography",
@@ -402,6 +402,39 @@ window.HYPERGAL_MANIFEST = {
       "wip": false,
       "thumbnail": "thumbnail.png",
       "description": "Ten uniquely colored HYPERMEDIA disks fall through white Plinko pegs on black, painting every peg they strike."
+    },
+    {
+      "slug": "037-cover-ups",
+      "title": "Cover Ups",
+      "year": 2026,
+      "date": "2026-09-01",
+      "category": "typography",
+      "type": "interactive",
+      "wip": true,
+      "thumbnail": "thumbnail.svg",
+      "description": "Fantasy-alphabet words appear across a weathered wall, then vanish under broad horizontal repair patches with slowly wandering edges and thin, surface-revealing paint."
+    },
+    {
+      "slug": "038-many-frogs",
+      "title": "Many Frogs",
+      "year": 2026,
+      "date": "2026-09-03",
+      "category": "games",
+      "type": "interactive",
+      "wip": false,
+      "thumbnail": "thumbnail.png",
+      "description": "Twelve autonomous frogs cross an endless, obstacle-filled course of traffic, logs, and alligators, leaving permanent colorful stains before the camera returns to the next waiting group."
+    },
+    {
+      "slug": "039-drips",
+      "title": "Drips",
+      "year": 2026,
+      "date": "2026-09-07",
+      "category": "generative",
+      "type": "interactive",
+      "wip": false,
+      "thumbnail": "thumbnail.png",
+      "description": "Dark liquid starts halfway down a visible masonry depth map, filling cool recesses before overflowing through their lowest channels."
     }
   ]
 };

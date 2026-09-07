@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#e8ebea" />
     <meta
       name="description"
-      content="Ten colorful geometric letters fall, settle, sprout legs, and run above a staggered field of platforms."
+      content="Ten colorful geometric letters land on a center-pivoting teeter-totter, sprout legs, and slide or walk off as the platform tips."
     />
-    <title>Alphabet · HyperGal</title>
+    <title>Hypermedia Title 01 · HyperGal</title>
     <style>
       :root {
         color-scheme: light;
@@ -80,14 +80,26 @@
         will-change: transform;
       }
 
-      .ground {
+      .rule {
         position: absolute;
-        left: max(14px, calc(3.5vw + env(safe-area-inset-left)));
-        right: max(14px, calc(3.5vw + env(safe-area-inset-right)));
-        top: 0;
-        height: 3px;
-        background: var(--ink);
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
         pointer-events: none;
+      }
+
+      .rule-line {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 6;
+        stroke-linecap: square;
+        stroke-linejoin: round;
+      }
+
+      .fulcrum {
+        fill: var(--ink);
+        stroke: none;
       }
 
       .platform-field {
@@ -308,7 +320,7 @@
       id="stage"
       class="stage"
       tabindex="0"
-      aria-label="The geometric letters in HYPERMEDIA fall from above, collide, settle, sprout legs, and run above a staggered field of platforms. Click, tap, or press Enter to drop them again."
+      aria-label="The geometric letters in HYPERMEDIA fall onto a center-pivoting teeter-totter, settle, sprout legs, and patrol it. As the platform tips, walkers slide or step off its ends, bounce down staggered platforms, and leave the frame; once the top platform is bare the word falls again. Click, tap, or press Enter to drop it now."
     >
       <h1 class="sr-only">Hypermedia</h1>
       <div id="letter-field" class="letter-field" aria-hidden="true"></div>
@@ -317,13 +329,16 @@
         <span class="platform"></span>
         <span class="platform"></span>
       </div>
-      <div id="ground" class="ground" aria-hidden="true"></div>
+      <svg class="rule" aria-hidden="true">
+        <path id="rule-path" class="rule-line" d="" />
+        <path id="fulcrum-path" class="fulcrum" d="" />
+      </svg>
     </main>
 
     <main id="catalog" class="catalog" hidden>
       <header class="catalog-header">
         <div class="title-group">
-          <h1>Alphabet</h1>
+          <h1>Hypermedia Title 01</h1>
           <p class="count">A–Z / 26</p>
         </div>
         <button class="guide-toggle" type="button" aria-pressed="false">
@@ -345,7 +360,8 @@
         const catalog = document.getElementById('catalog');
         const letterField = document.getElementById('letter-field');
         const platforms = [...document.querySelectorAll('.platform')];
-        const ground = document.getElementById('ground');
+        const rulePath = document.getElementById('rule-path');
+        const fulcrumPath = document.getElementById('fulcrum-path');
         const grid = document.querySelector('.grid');
         const toggle = document.querySelector('.guide-toggle');
 
@@ -651,6 +667,20 @@
 
         function startPhysics() {
           const WORD = [...'HYPERMEDIA'];
+          // Odds that a walker reaching an end keeps going instead of turning.
+          // A thinning line wanders off sooner: the fewer walkers are left, the
+          // less often one turns back.
+          const STEP_OFF_CHANCE = 0.08;
+          // Give the word a short patrol before the moving slope starts
+          // winning over the walkers' own direction.
+          const PATROL_GRACE = 2600;
+          const stepOffChance = walking =>
+            STEP_OFF_CHANCE * (1 + (WORD.length - walking) * 0.9);
+          const TEETER_MAX_ANGLE = (13 * Math.PI) / 180;
+          const TEETER_PERIOD = 6200;
+          const TEETER_DELAY = 1800;
+          const TEETER_RAMP = 1400;
+          let teeterStartedAt = 0;
           const LEG_ANCHORS = {
             A: [24, 76],
             D: [30, 61],
@@ -674,7 +704,19 @@
             Y: [C.slate, C.slate],
           };
           const motion = matchMedia('(prefers-reduced-motion: reduce)');
-          const world = { width: 0, height: 0, inset: 0, groundY: 0, size: 0 };
+          const world = {
+            width: 0,
+            height: 0,
+            inset: 0,
+            groundY: 0,
+            ledge: 0,
+            ledgeLeft: 0,
+            ledgeRight: 0,
+            ledgeCenter: 0,
+            teeterAngle: 0,
+            slabs: [],
+            size: 0,
+          };
           let bodies = [];
           let animationFrame = 0;
           let resizeFrame = 0;
@@ -683,8 +725,10 @@
           let phase = 'falling';
           let phaseStarted = 0;
           let fallStartedAt = 0;
+          let emptyAt = 0;
 
           const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+          const toss = () => Math.random() - 0.5;
 
           document.body.classList.toggle('debug-mode', false);
           stage.hidden = false;
@@ -694,22 +738,31 @@
             world.width = stage.clientWidth || innerWidth;
             world.height = stage.clientHeight || innerHeight;
             world.inset = Math.max(14, world.width * 0.035);
-            world.groundY = Math.round(world.height * (world.height < 520 ? 0.66 : 0.68));
+            world.groundY = Math.round(world.height * (world.height < 520 ? 0.5 : 0.52));
+
+            const span = world.width - world.inset * 2;
+            world.ledge = Math.round(clamp(span * (world.width < 520 ? 0.86 : 0.72), 180, 900));
+            world.ledgeLeft = Math.round((world.width - world.ledge) * 0.5);
+            world.ledgeRight = world.ledgeLeft + world.ledge;
+            world.ledgeCenter = world.width * 0.5;
+
+            // Every letter has to land on the rule, so the word is sized to
+            // stand on it with room to spare.
             world.size = clamp(
-              Math.max(world.width / 10.8, Math.min(world.width / 6, 68)),
-              52,
+              Math.max(world.ledge / 11, Math.min(world.ledge / 6.4, 68)),
+              46,
               112
             );
-            if (world.height < 480) world.size = Math.min(world.size, 62);
-            ground.style.transform = `translate3d(0, ${world.groundY}px, 0)`;
+            if (world.height < 480) world.size = Math.min(world.size, 58);
+            world.size = Math.min(world.size, world.ledge / (WORD.length * 1.25));
 
-            const platformGap = clamp((world.height - world.groundY) / 3.15, 28, 82);
+            const platformGap = clamp((world.height - world.groundY) / 3.4, 28, 120);
             const platformLayout = [
               { x: 0.08, y: 1, width: 0.28, angle: -7 },
               { x: 0.49, y: 1.88, width: 0.32, angle: 5 },
               { x: 0.15, y: 2.76, width: 0.23, angle: -4 },
             ];
-            platforms.forEach((platform, index) => {
+            world.slabs = platforms.map((platform, index) => {
               const layout = platformLayout[index];
               const width = clamp(world.width * layout.width, 92, 390);
               const x = clamp(world.width * layout.x, world.inset, world.width - world.inset - width);
@@ -717,7 +770,56 @@
               platform.style.width = `${width}px`;
               platform.style.transform =
                 `translate3d(${x}px, ${y}px, 0) rotate(${layout.angle}deg)`;
+
+              const radians = (layout.angle * Math.PI) / 180;
+              return {
+                x: x + width * 0.5,
+                y: y + 1.5,
+                half: width * 0.5,
+                cos: Math.cos(radians),
+                sin: Math.sin(radians),
+              };
             });
+          }
+
+          function groundAt(x) {
+            const horizontalHalf = Math.cos(world.teeterAngle) * world.ledge * 0.5;
+            const offset = x - world.ledgeCenter;
+            if (Math.abs(offset) > horizontalHalf) return Infinity;
+            return world.groundY + offset * Math.tan(world.teeterAngle);
+          }
+
+          function applyTeeter(angle) {
+            world.teeterAngle = angle;
+            const half = world.ledge * 0.5;
+            const dx = Math.cos(angle) * half;
+            const dy = Math.sin(angle) * half;
+            rulePath.setAttribute(
+              'd',
+              `M${(world.ledgeCenter - dx).toFixed(1)} ${(world.groundY - dy).toFixed(1)} ` +
+              `L${(world.ledgeCenter + dx).toFixed(1)} ${(world.groundY + dy).toFixed(1)}`
+            );
+
+            const fulcrumWidth = clamp(world.size * 0.62, 28, 54);
+            const fulcrumHeight = clamp(world.size * 0.48, 24, 44);
+            const top = world.groundY + 4;
+            fulcrumPath.setAttribute(
+              'd',
+              `M${world.ledgeCenter.toFixed(1)} ${top.toFixed(1)} ` +
+              `L${(world.ledgeCenter + fulcrumWidth * 0.5).toFixed(1)} ${(top + fulcrumHeight).toFixed(1)} ` +
+              `L${(world.ledgeCenter - fulcrumWidth * 0.5).toFixed(1)} ${(top + fulcrumHeight).toFixed(1)} Z`
+            );
+          }
+
+          function updateTeeter(now) {
+            if (motion.matches || now <= teeterStartedAt + TEETER_DELAY) {
+              applyTeeter(0);
+              return;
+            }
+            const movingFor = now - teeterStartedAt - TEETER_DELAY;
+            const ramp = clamp(movingFor / TEETER_RAMP, 0, 1);
+            const phase = (movingFor / TEETER_PERIOD) * Math.PI * 2;
+            applyTeeter(Math.sin(phase) * TEETER_MAX_ANGLE * ramp);
           }
 
           function addWalkerLegs(svg, letter) {
@@ -762,6 +864,12 @@
             glyphBuilders[letter](svg);
             letterField.append(svg);
             return { node: svg, legs };
+          }
+
+          function dropAway(body) {
+            body.gone = true;
+            body.active = false;
+            body.node.style.visibility = 'hidden';
           }
 
           function bodyExtent(body) {
@@ -811,14 +919,15 @@
           }
 
           function placeReducedMotionWord() {
-            const spacing = (world.width - world.inset * 2) / WORD.length;
+            const spacing = world.ledge / WORD.length;
+            const size = Math.min(world.size, spacing / 0.86);
             bodies.forEach((body, index) => {
-              body.size = Math.min(body.size, spacing / 0.82);
+              body.size = size;
               body.radius = body.size * 0.36;
               body.active = true;
               body.angle = 0;
-              body.x = world.inset + spacing * (index + 0.5);
-              body.y = world.groundY - body.size * 0.62;
+              body.x = world.ledgeLeft + spacing * (index + 0.5);
+              body.y = groundAt(body.x) - body.size * 0.62;
               body.node.style.setProperty('--body-size', `${body.size}px`);
               body.node.style.visibility = 'visible';
               body.node.style.willChange = 'auto';
@@ -838,8 +947,11 @@
             letterField.replaceChildren();
             measureWorld();
 
-            const spacing = (world.width - world.inset * 2) / WORD.length;
+            const spacing = (world.ledge - world.size * 2) / WORD.length;
             const start = performance.now() + 120;
+            emptyAt = 0;
+            teeterStartedAt = start;
+            applyTeeter(0);
             fallStartedAt = start;
             bodies = WORD.map((letter, index) => {
               const size = world.size;
@@ -853,21 +965,30 @@
                 rightLeg: parts.legs.right,
                 size,
                 radius: size * 0.36,
-                x: world.inset + spacing * (index + 0.5) + Math.sin(index * 2.3) * size * 0.05,
+                x:
+                  world.ledgeLeft + world.size + spacing * (index + 0.5) +
+                  (Math.sin(index * 2.3) * 0.05 + toss() * 0.1) * size,
                 y: -size * (0.58 + (index % 3) * 0.09),
-                vx: Math.sin(index * 1.73) * size * 0.34,
+                vx: (Math.sin(index * 1.73) * 0.22 + toss() * 0.3) * size,
                 vy: 0,
                 angle: ((index % 3) - 1) * 0.055,
-                angularVelocity: Math.cos(index * 1.37) * 0.22,
+                angularVelocity: Math.cos(index * 1.37) * 0.22 + toss() * 0.3,
                 bornAt: start + index * 145,
                 bounce: 0.27 + (index % 4) * 0.015,
                 runDirection: index % 2 ? 1 : -1,
                 runSpeed: size * (0.55 + (index % 4) * 0.09),
+                slideVx: 0,
                 cadence: 7.4 + (index % 3) * 0.8,
                 standX: 0,
                 standY: 0,
                 standAngle: 0,
+                footY: 0,
                 active: false,
+                grounded: false,
+                stepping: 0,
+                dropping: false,
+                droppedAt: 0,
+                gone: false,
               };
             });
 
@@ -893,16 +1014,73 @@
               body.angularVelocity -= body.vy / body.size * 0.025;
             }
 
-            if (body.y + extent > world.groundY) {
-              body.y = world.groundY - extent;
-              if (body.vy > 34) {
-                body.vy = -body.vy * body.bounce;
-                body.angularVelocity += body.vx / body.size * 0.035;
-              } else if (body.vy > 0) {
-                body.vy = 0;
-              }
-              body.vx *= 0.88;
-              body.angularVelocity *= 0.78;
+          }
+
+          function resolveGround(body) {
+            const extent = bodyExtent(body);
+            const top = groundAt(body.x);
+            if (!Number.isFinite(top)) return;
+            if (body.y - top >= extent * 0.9 || body.y + extent <= top) return;
+
+            body.y = top - extent;
+            body.grounded = true;
+            if (body.vy > 34) {
+              body.vy = -body.vy * body.bounce;
+              body.angularVelocity += (body.vx / body.size) * 0.035;
+            } else if (body.vy > 0) {
+              body.vy = 0;
+            }
+            body.vx *= 0.88;
+            body.angularVelocity *= 0.78;
+          }
+
+          function tipOverEdge(body, step) {
+            if (!body.grounded) return;
+            const extent = bodyExtent(body);
+            const here = groundAt(body.x);
+            const fall = side => {
+              const beyond = groundAt(body.x + side * extent * 0.85);
+              return (Number.isFinite(beyond) ? beyond : world.height) - here;
+            };
+            const bias = fall(1) - fall(-1);
+            if (Math.abs(bias) < extent * 0.6) return;
+            const direction = Math.sign(bias);
+            const lean = clamp(Math.abs(bias) / (extent * 2.5), 0, 1);
+            body.vx += direction * lean * body.size * 2.6 * step;
+            body.angularVelocity += direction * lean * 7 * step;
+          }
+
+          function resolveSlabs(body) {
+            if (body.droppedAt && performance.now() - body.droppedAt > 3000) return;
+            const radius = bodyExtent(body);
+            for (const slab of world.slabs) {
+              const along = clamp(
+                (body.x - slab.x) * slab.cos + (body.y - slab.y) * slab.sin,
+                -slab.half,
+                slab.half
+              );
+              const ox = body.x - (slab.x + along * slab.cos);
+              const oy = body.y - (slab.y + along * slab.sin);
+              const distance = Math.hypot(ox, oy) || 0.001;
+              if (distance >= radius) continue;
+
+              const nx = ox / distance;
+              const ny = oy / distance;
+              body.x += nx * (radius - distance);
+              body.y += ny * (radius - distance);
+
+              const normalSpeed = body.vx * nx + body.vy * ny;
+              if (normalSpeed >= 0) continue;
+              const restitution = body.bounce + 0.24;
+              body.vx -= (1 + restitution) * normalSpeed * nx;
+              body.vy -= (1 + restitution) * normalSpeed * ny;
+
+              const tx = -ny;
+              const ty = nx;
+              const tangentSpeed = body.vx * tx + body.vy * ty;
+              body.vx -= tangentSpeed * 0.07 * tx;
+              body.vy -= tangentSpeed * 0.07 * ty;
+              body.angularVelocity += (tangentSpeed / body.size) * 0.3;
             }
           }
 
@@ -957,7 +1135,14 @@
               body.angle += body.angularVelocity * step;
               body.vx *= 0.999;
               body.angularVelocity *= 0.998;
+              body.grounded = false;
               resolveBounds(body);
+              resolveGround(body);
+              if (body.grounded) {
+                body.vx += gravity * Math.sin(world.teeterAngle) * 0.32 * step;
+              }
+              resolveSlabs(body);
+              tipOverEdge(body, step);
             }
 
             for (let pass = 0; pass < 2; pass++) {
@@ -967,7 +1152,11 @@
                   if (bodies[j].active) resolvePair(bodies[i], bodies[j]);
                 }
               }
-              for (const body of bodies) if (body.active) resolveBounds(body);
+              for (const body of bodies) {
+                if (!body.active) continue;
+                resolveBounds(body);
+                resolveGround(body);
+              }
             }
           }
 
@@ -975,10 +1164,18 @@
             phase = 'sprouting';
             phaseStarted = now;
             bodies.forEach(body => {
+              if (body.gone) return;
+              const top = groundAt(body.x);
+              if (!Number.isFinite(top) || top - body.y > body.size) {
+                startDropping(body, body.x < world.ledgeLeft ? -1 : 1);
+                return;
+              }
+              body.footY = top;
               body.active = true;
               body.node.style.visibility = 'visible';
               body.vx = 0;
               body.vy = 0;
+              body.slideVx = 0;
               body.angularVelocity = 0;
               body.standX = body.x;
               body.standY = body.y;
@@ -993,7 +1190,10 @@
             const eased = 1 - Math.pow(1 - progress, 4);
 
             bodies.forEach(body => {
-              const standingY = world.groundY - body.size * 0.62;
+              if (body.gone || body.dropping) return;
+              const surface = groundAt(body.x);
+              if (Number.isFinite(surface)) body.footY = surface;
+              const standingY = body.footY - body.size * 0.62;
               body.angle = body.standAngle * (1 - eased);
               body.y = body.standY + (standingY - body.standY) * eased;
               setLegGrowth(body, eased);
@@ -1006,11 +1206,30 @@
             }
           }
 
+          function startDropping(body, away) {
+            const slideVelocity = body.slideVx || 0;
+            body.dropping = true;
+            body.droppedAt = performance.now();
+            body.stepping = 0;
+            body.vx = slideVelocity + away * body.runSpeed * 0.35;
+            body.slideVx = 0;
+            body.vy = 0;
+            body.angularVelocity = away * 1.7;
+          }
+
+          function shovedOff(body) {
+            const top = groundAt(body.x);
+            if (Number.isFinite(top) && top - body.footY < body.size * 0.7) return;
+            startDropping(body, body.x < world.ledgeLeft ? -1 : 1);
+          }
+
           function separateRunners() {
             for (let i = 0; i < bodies.length; i++) {
               for (let j = i + 1; j < bodies.length; j++) {
                 const a = bodies[i];
                 const b = bodies[j];
+                if (a.gone || b.gone || a.dropping || b.dropping) continue;
+                if (Math.abs(a.y - b.y) > a.size * 0.6) continue;
                 const dx = b.x - a.x;
                 const minimum = (a.radius + b.radius) * 0.94;
                 if (Math.abs(dx) >= minimum) continue;
@@ -1021,32 +1240,102 @@
                 b.x += direction * overlap * 0.5;
                 a.runDirection = -direction;
                 b.runDirection = direction;
+                shovedOff(a);
+                shovedOff(b);
               }
             }
           }
 
           function updateRunners(step, now) {
-            for (const body of bodies) {
-              const gait = ((now - phaseStarted) / 1000) * body.cadence + body.index * 0.73;
-              const halfWidth = body.size * 0.41;
-              body.x += body.runDirection * body.runSpeed * step;
+            const gravity = clamp(world.height * 1.35, 760, 1400);
+            let walking = 0;
+            for (const body of bodies) if (!body.gone && !body.dropping) walking += 1;
+            const stepOff = now - phaseStarted < PATROL_GRACE ? 0 : stepOffChance(walking);
 
-              if (body.x - halfWidth < world.inset) {
-                body.x = world.inset + halfWidth;
-                body.runDirection = 1;
-              } else if (body.x + halfWidth > world.width - world.inset) {
-                body.x = world.width - world.inset - halfWidth;
-                body.runDirection = -1;
+            for (const body of bodies) {
+              if (body.gone) continue;
+              const gait = ((now - phaseStarted) / 1000) * body.cadence + body.index * 0.73;
+
+              if (body.dropping) {
+                body.vy = Math.min(body.vy + gravity * step, world.height * 1.25);
+                body.x += body.vx * step;
+                body.y += body.vy * step;
+                body.angle += body.angularVelocity * step;
+                body.grounded = false;
+                resolveGround(body);
+                resolveSlabs(body);
+                setGait(body, gait);
+                if (body.grounded && body.vy <= 0) {
+                  // Caught by the stroke again: back on its feet.
+                  body.dropping = false;
+                  body.droppedAt = 0;
+                  body.stepping = 0;
+                  body.vx = 0;
+                  body.vy = 0;
+                  body.slideVx = 0;
+                  body.angularVelocity = 0;
+                  body.angle = 0;
+                  body.footY = groundAt(body.x);
+                } else if (body.y - bodyExtent(body) > world.height) {
+                  dropAway(body);
+                }
+                continue;
               }
 
-              body.y = world.groundY - body.size * 0.62 - Math.abs(Math.sin(gait * 2)) * body.size * 0.022;
-              body.angle = Math.sin(gait) * 0.035 * body.runDirection;
+              const here = groundAt(body.x);
+              if (!Number.isFinite(here)) {
+                // Walked off the end of the stroke.
+                body.y = body.footY - body.size * 0.62;
+                startDropping(body, body.runDirection);
+                continue;
+              }
+
+              const look = body.size * 0.55;
+              const ahead = groundAt(body.x + body.runDirection * look);
+              const rise = here - (Number.isFinite(ahead) ? ahead : here + body.size * 4);
+
+              if (body.stepping && body.stepping !== body.runDirection) body.stepping = 0;
+              if (!body.stepping) {
+                if (rise < -body.size * 0.7) {
+                  // The stroke falls away ahead: turn back, or walk off it.
+                  if (Math.random() < stepOff) body.stepping = body.runDirection;
+                  else body.runDirection = -body.runDirection;
+                } else if (rise > body.size * 0.55) {
+                  // Too steep to climb.
+                  body.runDirection = -body.runDirection;
+                }
+              }
+
+              body.slideVx += gravity * Math.sin(world.teeterAngle) * 0.5 * step;
+              body.slideVx *= Math.pow(0.989, step * 60);
+              body.slideVx = clamp(body.slideVx, -body.runSpeed * 1.5, body.runSpeed * 1.5);
+              body.x += (body.runDirection * body.runSpeed + body.slideVx) * step;
+              const surface = groundAt(body.x);
+              if (!Number.isFinite(surface)) {
+                startDropping(body, body.runDirection);
+                continue;
+              }
+              body.footY = surface;
+
+              // Keep the feet on the plank while the whole body follows its angle.
+              const reach = body.size * 0.4;
+              const behind = groundAt(body.x - reach);
+              const front = groundAt(body.x + reach);
+              const tilt =
+                (Number.isFinite(behind) ? behind : surface) -
+                (Number.isFinite(front) ? front : surface);
+              if (Math.abs(tilt) > body.size * 1.3) {
+                startDropping(body, tilt > 0 ? 1 : -1);
+                continue;
+              }
+              body.y = body.footY - body.size * 0.62 - Math.abs(Math.sin(gait * 2)) * body.size * 0.022;
+              body.angle = Math.sin(gait) * 0.035 * body.runDirection + world.teeterAngle * 0.78;
               setLegGrowth(body, 1);
               setGait(body, gait);
             }
 
             separateRunners();
-            bodies.forEach(renderBody);
+            for (const body of bodies) if (!body.gone) renderBody(body);
           }
 
           function tick(now) {
@@ -1054,9 +1343,11 @@
             const elapsed = Math.min((now - lastTime) / 1000, 0.034);
             lastTime = now;
 
+            updateTeeter(now);
+
             if (phase === 'falling') {
               for (const body of bodies) {
-                if (!body.active && now >= body.bornAt) {
+                if (!body.active && !body.gone && now >= body.bornAt) {
                   body.active = true;
                   body.node.style.visibility = 'visible';
                 }
@@ -1066,26 +1357,44 @@
               for (let step = 0; step < substeps; step++) simulate(elapsed / substeps);
 
               let totalMotion = 0;
+              let standing = 0;
               let pending = false;
               for (const body of bodies) {
+                if (body.gone) continue;
                 if (body.active) {
+                  if (body.y - bodyExtent(body) > world.height) {
+                    dropAway(body);
+                    continue;
+                  }
                   renderBody(body);
+                  standing += 1;
                   totalMotion += Math.abs(body.vx) + Math.abs(body.vy) + Math.abs(body.angularVelocity * body.size);
                 } else {
+                  standing += 1;
                   pending = true;
                 }
               }
 
-              if (!pending && totalMotion < bodies.length * 4.5) settledFrames += 1;
+              if (!pending && totalMotion < standing * 4.5) settledFrames += 1;
               else settledFrames = 0;
 
-              if (!pending && (settledFrames > 60 || now - fallStartedAt > 9000)) {
+              if (standing && !pending && (settledFrames > 60 || now - fallStartedAt > 9000)) {
                 beginSprouting(now);
               }
             } else if (phase === 'sprouting') {
               updateSprouting(now);
             } else {
               updateRunners(elapsed, now);
+            }
+
+            if (bodies.every(body => body.gone)) {
+              if (!emptyAt) emptyAt = now;
+              else if (now - emptyAt > 900) {
+                resetWorld();
+                return;
+              }
+            } else {
+              emptyAt = 0;
             }
 
             animationFrame = requestAnimationFrame(tick);

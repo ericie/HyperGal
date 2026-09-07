@@ -1,0 +1,1083 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="Twelve autonomous frogs cross an endless course of traffic, logs, alligators, and permanent colorful stains." />
+    <link rel="icon" href="data:," />
+    <title>Many Frogs · HyperGal</title>
+    <style>
+      :root { color-scheme: dark; --void: oklch(0.08 0 0); }
+      * { box-sizing: border-box; }
+      html, body {
+        width: 100%; height: 100%; margin: 0; overflow: hidden;
+        background: var(--void);
+      }
+      body { min-width: 300px; }
+      canvas {
+        position: fixed; inset: 0; display: block;
+        width: 100%; height: 100%; background: var(--void);
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game" aria-hidden="true"></canvas>
+    <script>
+      (() => {
+        'use strict';
+
+        const FROG_COUNT = 12;
+        const COLS = 17;
+        const HOP_TIME = 0.18;
+        const OPENING_HOLD = 0.68;
+        const RETURN_PAUSE = 1.15;
+        const RETURN_DURATION = 2.8;
+        const HAZARD_COLLISION_Y = 0.58;
+        const FROG_HIT_RADIUS = 0.24;
+        const FROG_CLEARANCE = 0.52;
+        const TAU = Math.PI * 2;
+        const COURSE_SEED = hashString('many-frogs-038-course');
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+        const canvas = document.querySelector('#game');
+        const ctx = canvas.getContext('2d', { alpha: false });
+
+        const palette = {
+          void: 'oklch(0.08 0 0)',
+          verge: 'oklch(0.14 0.025 160)',
+          grassA: 'oklch(0.35 0.077 160)',
+          grassB: 'oklch(0.39 0.095 153)',
+          grassLine: 'oklch(0.55 0.12 151)',
+          road: 'oklch(0.19 0.018 250)',
+          roadEdge: 'oklch(0.38 0.03 245)',
+          roadMark: 'oklch(0.76 0.055 88)',
+          water: 'oklch(0.34 0.105 232)',
+          waterLine: 'oklch(0.63 0.11 218)',
+          log: 'oklch(0.38 0.095 58)',
+          logLight: 'oklch(0.58 0.13 65)',
+          gator: 'oklch(0.31 0.075 132)',
+          gatorLight: 'oklch(0.53 0.12 123)',
+          gatorEye: 'oklch(0.88 0.17 94)',
+          rock: 'oklch(0.36 0.025 226)',
+          rockLight: 'oklch(0.55 0.035 218)',
+          ink: 'oklch(0.97 0.015 145)',
+          tire: 'oklch(0.09 0 0)'
+        };
+
+        const frogColors = [
+          'oklch(0.76 0.21 145)', 'oklch(0.82 0.18 127)',
+          'oklch(0.71 0.22 157)', 'oklch(0.78 0.17 171)',
+          'oklch(0.84 0.16 103)', 'oklch(0.7 0.2 136)',
+          'oklch(0.75 0.19 182)', 'oklch(0.87 0.14 119)',
+          'oklch(0.69 0.21 149)', 'oklch(0.8 0.18 155)',
+          'oklch(0.73 0.18 112)', 'oklch(0.81 0.16 139)'
+        ];
+
+        const stainColors = [
+          'oklch(0.54 0.24 25)', 'oklch(0.58 0.25 350)',
+          'oklch(0.59 0.24 300)', 'oklch(0.62 0.23 225)',
+          'oklch(0.63 0.22 155)', 'oklch(0.7 0.2 83)'
+        ];
+
+        let width = 0;
+        let height = 0;
+        let dpr = 1;
+        let tile = 48;
+        let boardLeft = 0;
+        let visibleRows = 12;
+        let cameraY = 0;
+        let targetCameraY = 0;
+        let round = 0;
+        let roundSeed = 1;
+        let nextRoundSeed = 0;
+        let frogs = [];
+        let waitingFrogs = [];
+        let particles = [];
+        let bloodStains = [];
+        let elapsed = 0;
+        let lastTime = performance.now();
+        let gameOverAt = -1;
+        let gameOverCameraY = 0;
+        let running = !document.hidden;
+        let frame = 0;
+
+        resize();
+        startRound();
+        frame = requestAnimationFrame(loop);
+
+        window.addEventListener('resize', resize, { passive: true });
+        document.addEventListener('visibilitychange', () => {
+          running = !document.hidden;
+          lastTime = performance.now();
+          if (running && !frame) frame = requestAnimationFrame(loop);
+        });
+
+        function startRound() {
+          round += 1;
+          roundSeed = nextRoundSeed || hashString(`many-frogs-${round}-${Math.floor(Date.now() / 1000)}`);
+          cameraY = 0;
+          targetCameraY = 0;
+          gameOverAt = -1;
+          gameOverCameraY = 0;
+          particles = [];
+          frogs = waitingFrogs.length ? waitingFrogs : createFrogs(roundSeed, false);
+          frogs.forEach((frog, index) => {
+            frog.nextMoveAt = elapsed + OPENING_HOLD + index * 0.03 + hash(roundSeed + index * 613) * 0.08;
+          });
+          waitingFrogs = [];
+          nextRoundSeed = 0;
+        }
+
+        function createFrogs(seed, waiting) {
+          return Array.from({ length: FROG_COUNT }, (_, index) => {
+            const spread = 3.1 + index * (10.8 / (FROG_COUNT - 1));
+            return {
+              id: index,
+              x: spread,
+              y: 0,
+              fromX: spread,
+              fromY: 0,
+              toX: spread,
+              toY: 0,
+              hop: 1,
+              alive: true,
+              facing: 'up',
+              deathAt: -1,
+              deathKind: '',
+              deathPhase: '',
+              color: frogColors[index],
+              decision: 0,
+              waitStreak: 0,
+              nextMoveAt: waiting ? Infinity : elapsed + OPENING_HOLD + index * 0.03 + hash(seed + index * 613) * 0.08,
+              boldness: hash(seed + index * 1709),
+              patience: hash(seed + index * 2347),
+              lateralPreference: hash(seed + index * 4517) < 0.5 ? -1 : 1
+            };
+          });
+        }
+
+        function loop(now) {
+          const dt = Math.min(0.035, Math.max(0, (now - lastTime) / 1000));
+          lastTime = now;
+          if (running) update(dt);
+          draw();
+          frame = requestAnimationFrame(loop);
+        }
+
+        function update(dt) {
+          elapsed += dt;
+
+          frogs.forEach((frog) => {
+            if (!frog.alive) return;
+
+            if (frog.hop < 1) {
+              const nextHop = Math.min(1, frog.hop + dt / HOP_TIME);
+              const t = easeOutQuart(nextHop);
+              const nextX = lerp(frog.fromX, frog.toX, t);
+              const nextY = lerp(frog.fromY, frog.toY, t);
+              if (frogSpaceBlocked(frog, nextX, nextY, elapsed, frog.fromX, frog.fromY)) {
+                cancelHop(frog);
+                return;
+              }
+              frog.hop = nextHop;
+              frog.x = nextX;
+              frog.y = nextY;
+              const hazard = hazardAt(frog.x, frog.y, elapsed);
+              if (hazard) {
+                killFrog(frog, hazard);
+                return;
+              }
+              if (frog.hop === 1) checkLanding(frog);
+              return;
+            }
+
+            const lane = getLane(Math.round(frog.y));
+            if (lane.type === 'river') {
+              if (alligatorAt(lane, frog.x, elapsed)) {
+                killFrog(frog, 'gator');
+                return;
+              }
+              const log = supportingLogAt(lane, frog.x, elapsed);
+              if (!log) {
+                killFrog(frog, 'splash');
+                return;
+              }
+              frog.x += lane.speed * dt;
+              frog.fromX = frog.x;
+              frog.toX = frog.x;
+              if (frog.x < -0.2 || frog.x > COLS + 0.2) {
+                killFrog(frog, 'splash');
+                return;
+              }
+            } else if (lane.type === 'road' && hitsVehicleAt(lane, frog.x, elapsed)) {
+              killFrog(frog, 'traffic');
+              return;
+            }
+
+            if (elapsed >= frog.nextMoveAt) chooseMove(frog);
+          });
+
+          const alive = frogs.filter((frog) => frog.alive);
+          if (gameOverAt >= 0) {
+            targetCameraY = 0;
+            const returnAge = elapsed - gameOverAt;
+            if (returnAge <= RETURN_PAUSE) {
+              cameraY = gameOverCameraY;
+            } else if (reducedMotion.matches) {
+              cameraY = 0;
+            } else {
+              const progress = clamp((returnAge - RETURN_PAUSE) / RETURN_DURATION, 0, 1);
+              cameraY = lerp(gameOverCameraY, 0, easeInOutCubic(progress));
+            }
+          } else if (alive.length) {
+            const lead = Math.max(...alive.map((frog) => frog.y));
+            targetCameraY = Math.max(0, lead - visibleRows * 0.47);
+            cameraY = reducedMotion.matches
+              ? targetCameraY
+              : lerp(cameraY, targetCameraY, 1 - Math.pow(0.0008, dt));
+          }
+
+          frogs.forEach((frog) => {
+            if (frog.alive && worldToScreenY(frog.y) > height + tile * 0.2) {
+              killFrog(frog, 'fall');
+            }
+          });
+
+          particles = particles.filter((particle) => elapsed - particle.born < particle.life);
+          particles.forEach((particle) => {
+            particle.x += particle.vx * dt;
+            particle.y += particle.vy * dt;
+            particle.vy -= 0.5 * dt;
+          });
+
+          if (gameOverAt >= 0 && elapsed - gameOverAt >= RETURN_PAUSE + RETURN_DURATION) startRound();
+        }
+
+        function chooseMove(frog) {
+          if (!frog.alive || frog.hop < 1 || gameOverAt >= 0) return;
+
+          if (frog.decision === 0) {
+            beginHop(frog, 'up');
+            return;
+          }
+
+          const choices = [
+            { direction: 'up', dx: 0, dy: 1, base: 10 },
+            { direction: 'left', dx: -1, dy: 0, base: 2 },
+            { direction: 'right', dx: 1, dy: 0, base: 2 },
+            { direction: 'down', dx: 0, dy: -1, base: -5 },
+            { direction: 'wait', dx: 0, dy: 0, base: 0 }
+          ];
+
+          const currentLane = getLane(Math.round(frog.y));
+          const evaluated = [];
+
+          choices.forEach((choice, index) => {
+            const arrival = elapsed + (choice.direction === 'wait' ? 0.11 : HOP_TIME);
+            let x = frog.x + choice.dx;
+            const y = Math.max(-1, frog.y + choice.dy);
+            if (choice.direction === 'wait' && currentLane.type === 'river') {
+              x += currentLane.speed * (arrival - elapsed);
+            }
+            if (x < 0.25 || x > COLS - 0.25) return;
+
+            const lane = getLane(Math.round(y));
+            const dwell = lane.type === 'road' ? 0.15 : lane.type === 'river' ? 0.2 : 0.05;
+            const danger = moveDanger(frog, choice, x, y, arrival, dwell);
+            const riskWeight = lerp(2.3, 1.55, frog.boldness);
+            let score = choice.base - danger * riskWeight;
+
+            if (choice.dy > 0) score += frog.boldness * 1.2;
+            if (choice.dx === frog.lateralPreference) score += 0.4;
+            if (choice.direction === 'wait') {
+              score += currentLane.type === 'grass'
+                ? 3.7 + frog.patience * 1.4
+                : currentLane.type === 'river' ? 0.8 : -18;
+              score -= Math.min(11, frog.waitStreak * 0.65);
+            }
+            if (currentLane.type !== 'grass' && choice.dy > 0) score += 2.2;
+            if (choice.dy > 0 && danger < 40) score += Math.min(7, frog.waitStreak * 0.45);
+
+            const thinkDelay = lane.type === 'grass' ? 0.28 : 0.075;
+            const carriedX = lane.type === 'river' ? x + lane.speed * thinkDelay : x;
+            const escapeAt = arrival + thinkDelay + HOP_TIME;
+            const escapeMoves = [[0, 1], [-1, 0], [1, 0], [0, -1]];
+            let escapeDanger = Infinity;
+
+            escapeMoves.forEach(([nextDx, nextDy]) => {
+              const nextX = carriedX + nextDx;
+              const nextY = Math.max(-1, y + nextDy);
+              if (nextX < 0.25 || nextX > COLS - 0.25) return;
+              const nextLane = getLane(Math.round(nextY));
+              const nextDwell = nextLane.type === 'road' ? 0.13 : nextLane.type === 'river' ? 0.18 : 0.04;
+              escapeDanger = Math.min(
+                escapeDanger,
+                laneDanger(nextLane, nextX, escapeAt, nextDwell)
+              );
+            });
+
+            if (escapeDanger >= 50) score -= 35;
+            else score += Math.max(0, 6 - escapeDanger) * 0.55;
+
+            score += brainRandom(frog, index + 1) * 0.9;
+            evaluated.push({ ...choice, score, danger, escapeDanger });
+          });
+
+          const escapeLimit = frog.waitStreak > 8 ? 101 : 60;
+          const safe = evaluated.filter((choice) => choice.danger < 40 && choice.escapeDanger < escapeLimit);
+          const pool = safe.length ? safe : evaluated;
+          pool.sort((a, b) => b.score - a.score);
+          beginHop(frog, pool.length ? pool[0].direction : 'wait');
+        }
+
+        function moveDanger(frog, choice, targetX, targetY, arrival, dwell) {
+          if (frogSpaceBlocked(frog, targetX, targetY, arrival, frog.x, frog.y)) return 100;
+          const targetLane = getLane(Math.round(targetY));
+          const landingDanger = laneDanger(targetLane, targetX, arrival, dwell);
+          if (choice.direction === 'wait' || landingDanger >= 100) return landingDanger;
+
+          const steps = Math.max(2, Math.ceil(HOP_TIME / 0.025));
+          for (let step = 1; step <= steps; step += 1) {
+            const progress = step / steps;
+            const x = lerp(frog.x, targetX, progress);
+            const y = lerp(frog.y, targetY, progress);
+            const atTime = elapsed + HOP_TIME * progress;
+            if (hazardAt(x, y, atTime)) return 100;
+            if (frogSpaceBlocked(frog, x, y, atTime, frog.x, frog.y)) return 100;
+          }
+          return landingDanger;
+        }
+
+        function frogSpaceBlocked(frog, x, y, atTime = elapsed, fromX = frog.x, fromY = frog.y) {
+          return frogs.some((other) => {
+            if (!other.alive || other === frog) return false;
+            const predicted = predictedFrogPosition(other, atTime);
+            if (frogsTooClose(x, y, predicted.x, predicted.y)) return true;
+
+            if (other.hop < 1 && frogsTooClose(x, y, other.toX, other.toY)) return true;
+            return other.hop < 1 &&
+              frogsTooClose(fromX, fromY, other.toX, other.toY) &&
+              frogsTooClose(x, y, other.fromX, other.fromY);
+          });
+        }
+
+        function predictedFrogPosition(frog, atTime) {
+          const secondsAhead = Math.max(0, atTime - elapsed);
+          if (frog.hop < 1) {
+            const remainingHopTime = (1 - frog.hop) * HOP_TIME;
+            const futureHop = Math.min(1, frog.hop + secondsAhead / HOP_TIME);
+            const progress = easeOutQuart(futureHop);
+            let x = lerp(frog.fromX, frog.toX, progress);
+            const y = lerp(frog.fromY, frog.toY, progress);
+            if (secondsAhead > remainingHopTime) {
+              const lane = getLane(Math.round(frog.toY));
+              if (lane.type === 'river') x += lane.speed * (secondsAhead - remainingHopTime);
+            }
+            return { x, y };
+          }
+
+          const lane = getLane(Math.round(frog.y));
+          return {
+            x: frog.x + (lane.type === 'river' ? lane.speed * secondsAhead : 0),
+            y: frog.y
+          };
+        }
+
+        function frogsTooClose(ax, ay, bx, by) {
+          const dx = ax - bx;
+          const dy = ay - by;
+          return dx * dx + dy * dy < FROG_CLEARANCE * FROG_CLEARANCE;
+        }
+
+        function cancelHop(frog) {
+          frog.x = frog.fromX;
+          frog.y = frog.fromY;
+          frog.toX = frog.fromX;
+          frog.toY = frog.fromY;
+          frog.hop = 1;
+          frog.waitStreak += 1;
+          frog.nextMoveAt = elapsed + 0.08 + brainRandom(frog, 109) * 0.1;
+          const hazard = hazardAt(frog.x, frog.y, elapsed);
+          if (hazard) killFrog(frog, hazard);
+        }
+
+        function laneDanger(lane, x, atTime, duration = 0.12) {
+          if (lane.type === 'grass') return blockedByGrassObstacle(lane.row, x) ? 100 : 0;
+          if (lane.type === 'river') {
+            if (alligatorAt(lane, x, atTime)) return 100;
+            if (!supportingLogAt(lane, x, atTime)) return 100;
+            const futureX = x + lane.speed * duration;
+            return futureX < 0.3 || futureX > COLS - 0.3 ? 65 : 0.15;
+          }
+
+          let clearance = Infinity;
+          const steps = Math.max(1, Math.ceil(duration / 0.035));
+          for (let step = 0; step <= steps; step += 1) {
+            const sampleTime = atTime + duration * (step / steps);
+            if (hitsVehicleAt(lane, x, sampleTime)) return 100;
+            laneObjectsAt(lane, sampleTime).forEach((vehicle) => {
+              const distance = x < vehicle.x
+                ? vehicle.x - x
+                : x > vehicle.x + vehicle.length
+                  ? x - vehicle.x - vehicle.length
+                  : 0;
+              clearance = Math.min(clearance, distance);
+            });
+          }
+          return clearance < 0.72 ? (0.72 - clearance) * 10 : 0;
+        }
+
+        function beginHop(frog, direction) {
+          frog.decision += 1;
+
+          if (direction === 'wait') {
+            frog.waitStreak += 1;
+            frog.nextMoveAt = elapsed + 0.1 + brainRandom(frog, 91) * 0.13;
+            return;
+          }
+
+          const vectors = {
+            up: [0, 1], down: [0, -1], left: [-1, 0], right: [1, 0]
+          };
+          const [dx, dy] = vectors[direction];
+          const targetX = clamp(frog.x + dx, 0.25, COLS - 0.25);
+          const targetY = Math.max(-1, frog.y + dy);
+          if (frogSpaceBlocked(frog, targetX, targetY, elapsed + HOP_TIME, frog.x, frog.y)) {
+            frog.waitStreak += 1;
+            frog.nextMoveAt = elapsed + 0.08 + brainRandom(frog, 103) * 0.1;
+            return;
+          }
+
+          frog.waitStreak = 0;
+          frog.fromX = frog.x;
+          frog.fromY = frog.y;
+          frog.toX = targetX;
+          frog.toY = targetY;
+          frog.facing = direction;
+          frog.nextMoveAt = Infinity;
+
+          if (reducedMotion.matches) {
+            const steps = Math.max(2, Math.ceil(HOP_TIME / 0.025));
+            for (let step = 1; step <= steps; step += 1) {
+              const progress = step / steps;
+              const hazard = hazardAt(
+                lerp(frog.fromX, frog.toX, progress),
+                lerp(frog.fromY, frog.toY, progress),
+                elapsed + HOP_TIME * progress
+              );
+              if (hazard) {
+                frog.x = lerp(frog.fromX, frog.toX, progress);
+                frog.y = lerp(frog.fromY, frog.toY, progress);
+                killFrog(frog, hazard);
+                return;
+              }
+            }
+            frog.hop = 1;
+            frog.x = frog.toX;
+            frog.y = frog.toY;
+            checkLanding(frog);
+          } else {
+            frog.hop = 0;
+          }
+        }
+
+        function checkLanding(frog) {
+          if (!frog.alive) return;
+          frog.x = frog.toX;
+          frog.y = frog.toY;
+          if (frogSpaceBlocked(frog, frog.x, frog.y, elapsed, frog.fromX, frog.fromY)) {
+            cancelHop(frog);
+            return;
+          }
+          const lane = getLane(Math.round(frog.y));
+
+          if (lane.type === 'grass' && blockedByGrassObstacle(lane.row, frog.x)) {
+            frog.x = frog.fromX;
+            frog.y = frog.fromY;
+          }
+          if (lane.type === 'river') {
+            if (alligatorAt(lane, frog.x, elapsed)) {
+              killFrog(frog, 'gator');
+              return;
+            }
+            if (!supportingLogAt(lane, frog.x, elapsed)) {
+              killFrog(frog, 'splash');
+              return;
+            }
+          }
+          if (lane.type === 'road' && hitsVehicleAt(lane, frog.x, elapsed)) {
+            killFrog(frog, 'traffic');
+            return;
+          }
+
+          const urgency = lane.type === 'grass' ? 0.24 : lane.type === 'road' ? 0.035 : 0.05;
+          const variation = lane.type === 'grass' ? 0.3 : lane.type === 'road' ? 0.045 : 0.07;
+          frog.nextMoveAt = elapsed + urgency + brainRandom(frog, 117) * variation;
+        }
+
+        function killFrog(frog, kind) {
+          if (!frog.alive) return;
+          frog.alive = false;
+          frog.deathAt = elapsed;
+          frog.deathKind = kind;
+          frog.deathPhase = kind === 'fall' ? 'bottom' : frog.hop < 1 ? 'hop' : 'ground';
+          addBloodStain(frog, kind);
+
+          if (!reducedMotion.matches && kind !== 'fall') {
+            const count = kind === 'splash' ? 11 : 7;
+            for (let i = 0; i < count; i += 1) {
+              const angle = (i / count) * TAU + hash(i + frog.id * 31) * 0.7;
+              const speed = 0.65 + hash(i * 7 + frog.id) * 1.3;
+              particles.push({
+                x: frog.x,
+                y: frog.y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                born: elapsed,
+                life: 0.55 + hash(i * 19) * 0.35,
+                color: kind === 'splash' ? palette.waterLine : frog.color,
+                size: 0.03 + hash(i * 13) * 0.045
+              });
+            }
+          }
+
+          if (!frogs.some((item) => item.alive) && gameOverAt < 0) {
+            gameOverAt = elapsed;
+            gameOverCameraY = cameraY;
+            nextRoundSeed = hashString(`many-frogs-${round + 1}-${Math.floor(Date.now() / 1000)}`);
+            waitingFrogs = createFrogs(nextRoundSeed, true);
+          }
+        }
+
+        function addBloodStain(frog, kind) {
+          const seed = hashString(`${round}-${frog.id}-${Math.round(elapsed * 1000)}-${kind}`);
+          const droplets = Array.from({ length: 4 + Math.floor(hash(seed + 41) * 5) }, (_, index) => ({
+            angle: hash(seed + index * 97) * TAU,
+            distance: 0.16 + hash(seed + index * 211) * 0.48,
+            size: 0.035 + hash(seed + index * 397) * 0.07
+          }));
+          bloodStains.push({
+            x: frog.x,
+            y: frog.y,
+            color: stainColors[(frog.id + round) % stainColors.length],
+            rotation: hash(seed + 17) * TAU,
+            scale: 0.72 + hash(seed + 29) * 0.55,
+            droplets
+          });
+        }
+
+        function getLane(row) {
+          if (row < 2 || row % 7 === 0 || row % 13 === 0) {
+            return { type: 'grass', row, variant: hash(row * 31 + COURSE_SEED) };
+          }
+
+          const seed = hash(row * 7919 + COURSE_SEED);
+          const type = seed < 0.57 ? 'road' : 'river';
+          const direction = hash(row * 1181 + COURSE_SEED * 3) < 0.5 ? -1 : 1;
+          const climb = Math.max(0, row) * 0.008;
+          const speedBase = type === 'road' ? 1.45 : 0.72;
+          const speedRange = type === 'road' ? 1.45 : 0.72;
+          return {
+            type,
+            row,
+            direction,
+            speed: direction * (speedBase + Math.min(0.9, climb) + hash(row * 3571 + COURSE_SEED) * speedRange),
+            length: type === 'road'
+              ? 1.05 + hash(row * 1877 + COURSE_SEED) * 1.15
+              : 2.25 + hash(row * 2213 + COURSE_SEED) * 2.1,
+            spacing: type === 'road'
+              ? 3.6 + hash(row * 1297 + COURSE_SEED) * 2.25
+              : 4.8 + hash(row * 1213 + COURSE_SEED) * 2.5,
+            offset: hash(row * 3301 + COURSE_SEED) * 20
+          };
+        }
+
+        function laneObjectsAt(lane, atTime) {
+          const travel = lane.offset + lane.speed * atTime;
+          const first = Math.floor((-lane.spacing - travel) / lane.spacing);
+          const last = Math.ceil((COLS + lane.spacing - travel) / lane.spacing);
+          const objects = [];
+          for (let id = first; id <= last; id += 1) {
+            objects.push({ x: travel + id * lane.spacing, length: lane.length, id });
+          }
+          return objects;
+        }
+
+        function riverObjectsAt(lane, atTime) {
+          return laneObjectsAt(lane, atTime).map((object) => ({
+            ...object,
+            kind: mod(object.id + Math.abs(lane.row), 7) === 0 ? 'alligator' : 'log'
+          }));
+        }
+
+        function supportingLogAt(lane, frogX, atTime) {
+          return riverObjectsAt(lane, atTime).find((log) => log.kind === 'log' &&
+            frogX > log.x + FROG_HIT_RADIUS &&
+            frogX < log.x + log.length - FROG_HIT_RADIUS);
+        }
+
+        function alligatorAt(lane, frogX, atTime) {
+          return riverObjectsAt(lane, atTime).find((gator) => gator.kind === 'alligator' &&
+            frogX > gator.x - FROG_HIT_RADIUS &&
+            frogX < gator.x + gator.length + FROG_HIT_RADIUS);
+        }
+
+        function grassObstacles(row) {
+          if (row < 2) return [];
+          const count = hash(COURSE_SEED + row * 421) < 0.58 ? 1 : 2;
+          const obstacles = [];
+          for (let index = 0; index < count; index += 1) {
+            const x = 0.8 + hash(COURSE_SEED + row * 1291 + index * 3571) * (COLS - 1.6);
+            if (!obstacles.some((rock) => Math.abs(rock.x - x) < 1.15)) {
+              obstacles.push({
+                x,
+                scale: 0.72 + hash(COURSE_SEED + row * 1877 + index * 733) * 0.4,
+                tilt: (hash(COURSE_SEED + row * 2017 + index * 977) - 0.5) * 0.5
+              });
+            }
+          }
+          return obstacles;
+        }
+
+        function blockedByGrassObstacle(row, frogX) {
+          return grassObstacles(row).some((rock) => Math.abs(frogX - rock.x) < 0.48 * rock.scale);
+        }
+
+        function hitsVehicleAt(lane, frogX, atTime) {
+          return laneObjectsAt(lane, atTime).some((vehicle) =>
+            frogX > vehicle.x - FROG_HIT_RADIUS &&
+            frogX < vehicle.x + vehicle.length + FROG_HIT_RADIUS);
+        }
+
+        function hazardAt(frogX, frogY, atTime) {
+          const firstRow = Math.floor(frogY) - 1;
+          const lastRow = Math.ceil(frogY) + 1;
+          for (let row = firstRow; row <= lastRow; row += 1) {
+            if (Math.abs(frogY - row) > HAZARD_COLLISION_Y) continue;
+            const lane = getLane(row);
+            if (lane.type === 'road' && hitsVehicleAt(lane, frogX, atTime)) return 'traffic';
+            if (lane.type === 'river' && alligatorAt(lane, frogX, atTime)) return 'gator';
+            if (lane.type === 'river' && !supportingLogAt(lane, frogX, atTime)) return 'splash';
+          }
+          return '';
+        }
+
+        function draw() {
+          ctx.fillStyle = palette.void;
+          ctx.fillRect(0, 0, width, height);
+
+          const minRow = Math.floor(cameraY - 5);
+          const maxRow = Math.ceil(cameraY + visibleRows + 3);
+          const rows = [];
+          for (let row = minRow; row <= maxRow; row += 1) rows.push(row);
+          rows.forEach(drawLaneSurface);
+          drawBloodStains();
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(boardLeft, 0, COLS * tile, height);
+          ctx.clip();
+          rows.forEach(drawLaneObjects);
+          ctx.restore();
+
+          drawBoardEdges();
+          drawParticles();
+          waitingFrogs.forEach(drawFrog);
+          frogs.forEach(drawFrog);
+        }
+
+        function drawLaneSurface(row) {
+          const lane = getLane(row);
+          const top = worldToScreenY(row + 0.5);
+          const h = tile + 1;
+          if (top > height || top + h < 0) return;
+
+          ctx.fillStyle = lane.type === 'grass'
+            ? (lane.variant > 0.5 ? palette.grassA : palette.grassB)
+            : lane.type === 'road' ? palette.road : palette.water;
+          ctx.fillRect(boardLeft, top, COLS * tile, h);
+
+          if (lane.type === 'grass') drawGrass(row, top);
+          else if (lane.type === 'road') drawRoadSurface(top);
+          else drawRiverSurface(lane, top);
+        }
+
+        function drawLaneObjects(row) {
+          const lane = getLane(row);
+          const top = worldToScreenY(row + 0.5);
+          if (top > height || top + tile + 1 < 0) return;
+          if (lane.type === 'grass') drawGrassObstacles(row, top);
+          else if (lane.type === 'road') drawVehicles(lane, top);
+          else drawRiverObjects(lane, top);
+        }
+
+        function drawGrass(row, top) {
+          ctx.strokeStyle = palette.grassLine;
+          ctx.lineWidth = Math.max(1, tile * 0.025);
+          ctx.globalAlpha = 0.38;
+          for (let i = 0; i < 16; i += 1) {
+            const x = boardLeft + hash(row * 53 + i * 97 + COURSE_SEED) * COLS * tile;
+            const y = top + hash(row * 71 + i * 41) * tile;
+            ctx.beginPath();
+            ctx.moveTo(x, y + tile * 0.1);
+            ctx.lineTo(x + (hash(i * 13 + row) - 0.5) * tile * 0.12, y - tile * 0.08);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        function drawGrassObstacles(row, top) {
+          grassObstacles(row).forEach((rock) => {
+            const x = worldToScreenX(rock.x);
+            const y = top + tile * 0.57;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rock.tilt);
+            ctx.scale(rock.scale, rock.scale);
+            ctx.fillStyle = 'oklch(0.04 0 0 / 0.24)';
+            ctx.beginPath();
+            ctx.ellipse(tile * 0.04, tile * 0.15, tile * 0.36, tile * 0.12, 0, 0, TAU);
+            ctx.fill();
+            ctx.fillStyle = palette.rock;
+            ctx.beginPath();
+            ctx.moveTo(-tile * 0.33, tile * 0.12);
+            ctx.quadraticCurveTo(-tile * 0.31, -tile * 0.24, -tile * 0.02, -tile * 0.29);
+            ctx.quadraticCurveTo(tile * 0.31, -tile * 0.19, tile * 0.35, tile * 0.12);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = palette.rockLight;
+            ctx.lineWidth = Math.max(1, tile * 0.025);
+            ctx.beginPath();
+            ctx.moveTo(-tile * 0.18, -tile * 0.08);
+            ctx.quadraticCurveTo(0, -tile * 0.22, tile * 0.17, -tile * 0.08);
+            ctx.stroke();
+            ctx.restore();
+          });
+        }
+
+        function drawRoadSurface(top) {
+          ctx.fillStyle = palette.roadEdge;
+          ctx.fillRect(boardLeft, top, COLS * tile, Math.max(2, tile * 0.055));
+          ctx.fillRect(boardLeft, top + tile - Math.max(2, tile * 0.055), COLS * tile, Math.max(2, tile * 0.055));
+
+          ctx.fillStyle = palette.roadMark;
+          ctx.globalAlpha = 0.58;
+          for (let x = boardLeft + tile * 0.3; x < boardLeft + COLS * tile; x += tile * 1.15) {
+            ctx.fillRect(x, top + tile * 0.485, tile * 0.55, Math.max(1, tile * 0.03));
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        function drawVehicles(lane, top) {
+          laneObjectsAt(lane, elapsed).forEach((vehicle) => drawVehicle(lane, vehicle, top));
+        }
+
+        function drawVehicle(lane, vehicle, top) {
+          const x = boardLeft + vehicle.x * tile;
+          const w = vehicle.length * tile;
+          const y = top + tile * 0.2;
+          const h = tile * 0.6;
+          const vehicleColors = [
+            'oklch(0.64 0.21 27)', 'oklch(0.72 0.17 76)',
+            'oklch(0.62 0.18 253)', 'oklch(0.73 0.16 340)',
+            'oklch(0.72 0.12 196)'
+          ];
+          const colorIndex = Math.floor(hash(COURSE_SEED + lane.row * 4567 + vehicle.id * 971) * vehicleColors.length);
+          ctx.fillStyle = vehicleColors[colorIndex];
+          roundedRect(x, y, w, h, tile * 0.08);
+          ctx.fill();
+
+          const front = lane.direction > 0 ? x + w * 0.6 : x + w * 0.13;
+          ctx.fillStyle = 'oklch(0.88 0.035 230)';
+          roundedRect(front, y + h * 0.13, w * 0.27, h * 0.42, tile * 0.04);
+          ctx.fill();
+          ctx.fillStyle = palette.tire;
+          ctx.fillRect(x + w * 0.12, y + h * 0.82, Math.max(5, w * 0.18), h * 0.22);
+          ctx.fillRect(x + w * 0.7, y + h * 0.82, Math.max(5, w * 0.18), h * 0.22);
+        }
+
+        function drawRiverSurface(lane, top) {
+          ctx.strokeStyle = palette.waterLine;
+          ctx.lineWidth = Math.max(1, tile * 0.026);
+          ctx.globalAlpha = 0.52;
+          const drift = mod(elapsed * lane.speed * tile * 0.35, tile * 1.7);
+          for (let x = boardLeft - tile * 1.7 + drift; x < boardLeft + COLS * tile; x += tile * 1.7) {
+            ctx.beginPath();
+            ctx.moveTo(x, top + tile * 0.18);
+            ctx.lineTo(x + tile * 0.72, top + tile * 0.18);
+            ctx.moveTo(x + tile * 0.45, top + tile * 0.78);
+            ctx.lineTo(x + tile * 1.18, top + tile * 0.78);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        function drawRiverObjects(lane, top) {
+          riverObjectsAt(lane, elapsed).forEach((object) => {
+            if (object.kind === 'alligator') {
+              drawAlligator(lane, object, top);
+              return;
+            }
+            const log = object;
+            const x = boardLeft + log.x * tile;
+            const w = log.length * tile;
+            const y = top + tile * 0.2;
+            ctx.fillStyle = palette.log;
+            roundedRect(x, y, w, tile * 0.6, tile * 0.28);
+            ctx.fill();
+            ctx.strokeStyle = palette.logLight;
+            ctx.lineWidth = Math.max(1, tile * 0.035);
+            ctx.beginPath();
+            ctx.moveTo(x + tile * 0.35, y + tile * 0.22);
+            ctx.lineTo(x + w - tile * 0.25, y + tile * 0.22);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(x + tile * 0.2, y + tile * 0.3, tile * 0.1, 0, TAU);
+            ctx.stroke();
+          });
+        }
+
+        function drawAlligator(lane, gator, top) {
+          const x = boardLeft + gator.x * tile;
+          const w = gator.length * tile;
+          const y = top + tile * 0.25;
+          const h = tile * 0.5;
+          ctx.save();
+          if (lane.direction < 0) {
+            ctx.translate(x + w, 0);
+            ctx.scale(-1, 1);
+          } else {
+            ctx.translate(x, 0);
+          }
+          ctx.fillStyle = 'oklch(0.04 0 0 / 0.24)';
+          ctx.beginPath();
+          ctx.ellipse(w * 0.5, y + h * 0.76, w * 0.49, h * 0.24, 0, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = palette.gator;
+          ctx.beginPath();
+          ctx.moveTo(0, y + h * 0.52);
+          ctx.lineTo(w * 0.26, y + h * 0.12);
+          ctx.lineTo(w * 0.83, y + h * 0.08);
+          ctx.quadraticCurveTo(w, y + h * 0.15, w, y + h * 0.5);
+          ctx.quadraticCurveTo(w, y + h * 0.87, w * 0.82, y + h * 0.91);
+          ctx.lineTo(w * 0.26, y + h * 0.86);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = palette.gatorLight;
+          ctx.lineWidth = Math.max(1, tile * 0.03);
+          for (let sx = w * 0.29; sx < w * 0.76; sx += tile * 0.36) {
+            ctx.beginPath();
+            ctx.moveTo(sx, y + h * 0.17);
+            ctx.lineTo(sx + tile * 0.12, y - tile * 0.02);
+            ctx.lineTo(sx + tile * 0.23, y + h * 0.17);
+            ctx.stroke();
+          }
+          ctx.fillStyle = palette.gatorEye;
+          ctx.beginPath();
+          ctx.arc(w * 0.86, y + h * 0.25, tile * 0.055, 0, TAU);
+          ctx.arc(w * 0.86, y + h * 0.73, tile * 0.055, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = palette.void;
+          ctx.beginPath();
+          ctx.arc(w * 0.875, y + h * 0.25, tile * 0.021, 0, TAU);
+          ctx.arc(w * 0.875, y + h * 0.73, tile * 0.021, 0, TAU);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        function drawBloodStains() {
+          bloodStains.forEach((stain) => {
+            const x = worldToScreenX(stain.x);
+            const y = worldToScreenY(stain.y);
+            if (y < -tile || y > height + tile) return;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(stain.rotation);
+            ctx.scale(stain.scale, stain.scale);
+            ctx.fillStyle = stain.color;
+            ctx.globalAlpha = 0.82;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, tile * 0.27, tile * 0.13, 0, 0, TAU);
+            ctx.ellipse(tile * 0.12, -tile * 0.06, tile * 0.16, tile * 0.1, 0.4, 0, TAU);
+            ctx.ellipse(-tile * 0.15, tile * 0.05, tile * 0.13, tile * 0.09, -0.35, 0, TAU);
+            ctx.fill();
+            stain.droplets.forEach((drop) => {
+              ctx.beginPath();
+              ctx.arc(
+                Math.cos(drop.angle) * drop.distance * tile,
+                Math.sin(drop.angle) * drop.distance * tile,
+                drop.size * tile, 0, TAU
+              );
+              ctx.fill();
+            });
+            ctx.restore();
+          });
+          ctx.globalAlpha = 1;
+        }
+
+        function drawBoardEdges() {
+          if (boardLeft <= 0) return;
+          const edge = Math.min(boardLeft, 34);
+          ctx.fillStyle = palette.verge;
+          ctx.fillRect(boardLeft - edge, 0, edge, height);
+          ctx.fillRect(boardLeft + COLS * tile, 0, edge, height);
+          ctx.globalAlpha = 0.34;
+          ctx.fillStyle = frogColors[0];
+          ctx.fillRect(boardLeft - Math.min(4, edge), 0, Math.min(4, edge), height);
+          ctx.fillRect(boardLeft + COLS * tile, 0, Math.min(4, edge), height);
+          ctx.globalAlpha = 1;
+        }
+
+        function drawFrog(frog) {
+          if (!frog.alive) {
+            const age = elapsed - frog.deathAt;
+            if (age > 0.85 || frog.deathKind !== 'traffic') return;
+            ctx.globalAlpha = Math.max(0, 0.7 - age * 0.8);
+            ctx.fillStyle = frog.color;
+            ctx.beginPath();
+            ctx.ellipse(
+              worldToScreenX(frog.x), worldToScreenY(frog.y),
+              tile * (0.22 + age * 0.08), tile * 0.08, 0, 0, TAU
+            );
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            return;
+          }
+
+          const x = worldToScreenX(frog.x);
+          const baseY = worldToScreenY(frog.y);
+          const jump = frog.hop < 1 ? Math.sin(frog.hop * Math.PI) * tile * 0.18 : 0;
+          const y = baseY - jump;
+          const s = tile * 0.36;
+          const angle = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 }[frog.facing];
+
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(angle);
+          ctx.fillStyle = 'oklch(0.03 0 0 / 0.28)';
+          ctx.beginPath();
+          ctx.ellipse(0, tile * 0.17 + jump, s * 0.58, s * 0.24, 0, 0, TAU);
+          ctx.fill();
+
+          ctx.fillStyle = frog.color;
+          ctx.beginPath();
+          ctx.ellipse(-s * 0.42, s * 0.26, s * 0.27, s * 0.18, -0.5, 0, TAU);
+          ctx.ellipse(s * 0.42, s * 0.26, s * 0.27, s * 0.18, 0.5, 0, TAU);
+          ctx.ellipse(-s * 0.47, -s * 0.23, s * 0.18, s * 0.23, -0.15, 0, TAU);
+          ctx.ellipse(s * 0.47, -s * 0.23, s * 0.18, s * 0.23, 0.15, 0, TAU);
+          ctx.ellipse(0, 0, s * 0.53, s * 0.58, 0, 0, TAU);
+          ctx.fill();
+
+          ctx.fillStyle = palette.ink;
+          ctx.beginPath();
+          ctx.arc(-s * 0.24, -s * 0.38, s * 0.12, 0, TAU);
+          ctx.arc(s * 0.24, -s * 0.38, s * 0.12, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = palette.void;
+          ctx.beginPath();
+          ctx.arc(-s * 0.24, -s * 0.41, s * 0.052, 0, TAU);
+          ctx.arc(s * 0.24, -s * 0.41, s * 0.052, 0, TAU);
+          ctx.fill();
+
+          ctx.strokeStyle = 'oklch(0.2 0.075 160 / 0.78)';
+          ctx.lineWidth = Math.max(1, tile * 0.024);
+          ctx.beginPath();
+          ctx.arc(0, -s * 0.02, s * 0.26, 0.2, Math.PI - 0.2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        function drawParticles() {
+          particles.forEach((particle) => {
+            const age = elapsed - particle.born;
+            ctx.globalAlpha = Math.max(0, 1 - age / particle.life);
+            ctx.fillStyle = particle.color;
+            ctx.beginPath();
+            ctx.arc(
+              worldToScreenX(particle.x), worldToScreenY(particle.y),
+              particle.size * tile, 0, TAU
+            );
+            ctx.fill();
+          });
+          ctx.globalAlpha = 1;
+        }
+
+        function resize() {
+          width = Math.max(300, window.innerWidth);
+          height = Math.max(420, window.innerHeight);
+          dpr = Math.min(2, window.devicePixelRatio || 1);
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          tile = clamp(Math.min(48, width / COLS), 18, 48);
+          boardLeft = (width - COLS * tile) / 2;
+          visibleRows = height / tile;
+        }
+
+        function worldToScreenX(x) { return boardLeft + x * tile; }
+        function worldToScreenY(y) { return height * 0.72 - (y - cameraY) * tile; }
+
+        function roundedRect(x, y, w, h, radius) {
+          const r = Math.min(radius, Math.abs(w) / 2, Math.abs(h) / 2);
+          ctx.beginPath();
+          ctx.roundRect(x, y, w, h, r);
+        }
+
+        function brainRandom(frog, salt) {
+          return hash(roundSeed + frog.id * 8191 + frog.decision * 131 + salt * 977);
+        }
+
+        function hash(value) {
+          let x = (Number(value) || 0) | 0;
+          x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+          x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+          return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+        }
+
+        function hashString(value) {
+          let result = 2166136261;
+          for (let i = 0; i < value.length; i += 1) {
+            result ^= value.charCodeAt(i);
+            result = Math.imul(result, 16777619);
+          }
+          return result >>> 0;
+        }
+
+        function mod(value, divisor) { return ((value % divisor) + divisor) % divisor; }
+        function clamp(value, min, max) { return Math.min(max, Math.max(min, value)); }
+        function lerp(a, b, t) { return a + (b - a) * t; }
+        function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
+        function easeInOutCubic(t) {
+          return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        }
+
+        window.__manyFrogs = {
+          restart: startRound,
+          getState: () => ({
+            round,
+            live: frogs.filter((frog) => frog.alive).length,
+            cameraY,
+            columns: COLS,
+            visibleRows,
+            topFrogY: frogs.filter((frog) => frog.alive).reduce((top, frog) => Math.max(top, frog.y), -1),
+            gameOver: gameOverAt >= 0,
+            waiting: waitingFrogs.length,
+            bloodStains: bloodStains.length,
+            frogs: frogs.map((frog) => ({
+              id: frog.id,
+              alive: frog.alive,
+              x: frog.x,
+              y: frog.y,
+              decisions: frog.decision,
+              waitStreak: frog.waitStreak,
+              deathKind: frog.deathKind,
+              deathPhase: frog.deathPhase
+            }))
+          }),
+          eliminateAll: () => frogs.filter((frog) => frog.alive).forEach((frog) => killFrog(frog, 'traffic'))
+        };
+      })();
+    </script>
+  </body>
+</html>

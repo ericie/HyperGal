@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Cover Ups</title>
+  <desc id="desc">Rough blue-gray paint patches conceal black looping marks on a weathered white brick wall.</desc>
+  <rect width="512" height="512" fill="#d8dad7"/>
+  <g fill="none" stroke="#b3b8b5" stroke-width="2" opacity=".56">
+    <path d="M0 48H512M0 101H512M0 154H512M0 207H512M0 260H512M0 313H512M0 366H512M0 419H512M0 472H512"/>
+    <path d="M68 0V48M215 0V48M374 0V48M141 48V101M296 48V101M456 48V101M63 101V154M221 101V154M380 101V154M144 154V207M300 154V207M458 154V207M61 207V260M219 207V260M379 207V260M140 260V313M300 260V313M456 260V313M62 313V366M220 313V366M378 313V366M142 366V419M299 366V419M457 366V419M62 419V472M218 419V472M380 419V472M142 472V512M300 472V512M458 472V512"/>
+  </g>
+  <g fill="none" stroke="#f0f0ea" stroke-width="1" opacity=".6">
+    <path d="M0 51H512M0 157H512M0 263H512M0 369H512M0 475H512"/>
+  </g>
+  <g fill="none" stroke="#29272d" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-18 167C39 142 50 203 93 170C138 136 166 209 209 165C252 121 274 220 328 174C382 129 403 213 459 169C483 150 501 157 530 175"/>
+    <path d="M-14 336C42 319 72 362 113 329L155 282L190 372L232 300L275 363L320 306L362 350C413 294 452 371 530 330"/>
+  </g>
+  <path d="M-8 115L466 106L478 112L474 227L454 234L190 228L190 240L-7 232Z" fill="#aebbc3" opacity=".86"/>
+  <path d="M-5 278L338 270L351 278L347 386L329 395L-7 389Z" fill="#c7c9c4" opacity=".84"/>
+  <g fill="#eef0eb" opacity=".32">
+    <path d="M5 128H459V135H5zM-2 194H468V200H-2zM12 292H335V298H12zM-3 361H341V368H-3z"/>
+  </g>
+  <g fill="#87949d" opacity=".42">
+    <rect x="17" y="111" width="75" height="3"/><rect x="130" y="230" width="112" height="4"/>
+    <rect x="282" y="108" width="93" height="3"/><rect x="49" y="387" width="88" height="4"/>
+  </g>
+  <g fill="#747e82" opacity=".22">
+    <circle cx="39" cy="73" r="3"/><circle cx="472" cy="287" r="5"/><circle cx="107" cy="445" r="4"/>
+    <path d="M351 35h7v31h-4zM404 412h4v57h-3z"/>
+  </g>
+</svg>

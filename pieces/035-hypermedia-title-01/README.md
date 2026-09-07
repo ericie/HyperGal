@@ -1,14 +1,22 @@
-# Alphabet
+# Hypermedia Title 01
 
 A work-in-progress geometric alphabet assembled from a deliberately small kit
 of parts: circles, rectangles, triangles, overlaps, and cut-outs. The main
-piece drops the ten letters in `HYPERMEDIA` onto a raised ground line, with
-three angled platforms staggered through the space below it. Gravity,
-restitution, friction, rotation, wall collisions, and letter-to-letter impulses
-let the glyphs bounce, interrupt one another, and eventually settle. Once the
-pile is still, every letter rights itself, sprouts two color-matched rubbery
-legs, and begins patrolling the upper line. Walkers reverse at the edges and
-scatter when they meet.
+piece drops the ten letters in `HYPERMEDIA` onto a raised rule, well inside its
+ends so the whole word lands, with three angled platforms staggered through the
+space below it. Gravity, restitution, friction, rotation, wall collisions, and
+letter-to-letter impulses let the glyphs bounce, interrupt one another, and
+eventually settle. Once the pile is still, every letter rights itself, sprouts
+two color-matched rubbery legs, and begins patrolling.
+
+The top platform is a long teeter-totter balanced on a fixed triangular
+fulcrum. It begins level while the letters land, then rocks slowly through a
+thirteen-degree arc. The rendered plank and its collision surface share the
+same angle, so the letters lean with it and gravity pulls them toward the low
+end. They continue walking while they slide, which makes the line thin out
+more decisively on each swing. A dropped letter tumbles down the angled lower
+platforms, bouncing off each one it clips, and leaves the frame. When the top
+platform is bare the word falls again.
 
 The letterforms borrow the constructional playfulness of mid-century shape
 alphabets without tracing a single typeface. Each glyph has its own palette

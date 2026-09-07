@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Dark liquid begins halfway down a masonry depth map, filling recessed basins before overflowing through their lowest channels."
+    />
+    <title>Drips · HyperGal</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --wall: oklch(0.77 0.008 95);
+        --focus: oklch(0.42 0.09 225);
+      }
+
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: var(--wall);
+      }
+
+      body { min-width: 300px; }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: var(--wall);
+        cursor: crosshair;
+        touch-action: none;
+      }
+
+      canvas:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: -7px;
+      }
+
+      .instructions {
+        position: fixed;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="wall"
+      tabindex="0"
+      aria-describedby="instructions"
+      aria-label="Drips: dark liquid flowing down a colored masonry depth map, pooling in recesses and overflowing through lower channels."
+    ></canvas>
+    <p class="instructions" id="instructions">
+      Click or tap the wall to add ink. Press R, Space, or Enter to make a new wall.
+    </p>
+
+    <script>
+      (() => {
+        'use strict';
+
+        const canvas = document.querySelector('#wall');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+        const TAU = Math.PI * 2;
+        const STEP_SECONDS = 0.052;
+        const WATER_HEIGHT = 0.62;
+        const GRAVITY_DROP = 0.052;
+        const params = new URLSearchParams(location.search);
+
+        let width = 0;
+        let height = 0;
+        let dpr = 1;
+        let cell = 4;
+        let cols = 0;
+        let rows = 0;
+        let seed = Number(params.get('seed')) || Math.floor(Math.random() * 0x7fffffff);
+        let wet;
+        let stain;
+        let basin;
+        let terrain;
+        let porosity;
+        let inkImage;
+        let inkPixels;
+        let inkCanvas;
+        let inkCtx;
+        let maskCanvas;
+        let maskCtx;
+        let wallCanvas;
+        let wallCtx;
+        let brickWidth = 240;
+        let brickHeight = 88;
+        let mortar = 6;
+        let patches = [];
+        let sources = [];
+        let accumulator = 0;
+        let lastTime = performance.now();
+        let frame = 0;
+        let running = !document.hidden;
+        let flowSteps = 0;
+
+        resize();
+        resetWorld(seed);
+        frame = requestAnimationFrame(loop);
+
+        window.addEventListener('resize', resizeAndReset, { passive: true });
+        document.addEventListener('visibilitychange', () => {
+          running = !document.hidden;
+          lastTime = performance.now();
+          if (running && !frame) frame = requestAnimationFrame(loop);
+        });
+        reducedMotion.addEventListener('change', resizeAndReset);
+
+        canvas.addEventListener('pointerdown', (event) => {
+          canvas.focus({ preventScroll: true });
+          const rect = canvas.getBoundingClientRect();
+          addSpill(
+            Math.floor(((event.clientX - rect.left) / rect.width) * cols),
+            Math.floor(((event.clientY - rect.top) / rect.height) * rows)
+          );
+          draw();
+        });
+
+        canvas.addEventListener('keydown', (event) => {
+          if (!['r', 'R', ' ', 'Enter'].includes(event.key)) return;
+          event.preventDefault();
+          seed = (seed + 1 + Math.floor(Math.random() * 100000)) >>> 0;
+          resetWorld(seed);
+          draw();
+        });
+
+        function resize() {
+          width = Math.max(300, window.innerWidth);
+          height = Math.max(240, window.innerHeight);
+          dpr = Math.min(2, window.devicePixelRatio || 1);
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          cell = Math.max(2, Math.ceil(width / 520));
+          cols = Math.ceil(width / cell);
+          rows = Math.ceil(height / cell);
+          brickWidth = clamp(width / 3.15, 164, 310);
+          brickHeight = clamp(height / 10.2, 68, 104);
+          mortar = clamp(Math.min(width, height) * 0.007, 4, 8);
+
+          inkCanvas = document.createElement('canvas');
+          inkCanvas.width = cols;
+          inkCanvas.height = rows;
+          inkCtx = inkCanvas.getContext('2d');
+          inkImage = inkCtx.createImageData(cols, rows);
+          inkPixels = inkImage.data;
+
+          maskCanvas = document.createElement('canvas');
+          maskCanvas.width = cols;
+          maskCanvas.height = rows;
+          maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
+
+          wallCanvas = document.createElement('canvas');
+          wallCanvas.width = Math.round(width * dpr);
+          wallCanvas.height = Math.round(height * dpr);
+          wallCtx = wallCanvas.getContext('2d', { alpha: false });
+          wallCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        function resizeAndReset() {
+          resize();
+          resetWorld(seed);
+        }
+
+        function resetWorld(nextSeed) {
+          seed = nextSeed >>> 0;
+          wet = new Float32Array(cols * rows);
+          stain = new Float32Array(cols * rows);
+          basin = new Float32Array(cols * rows);
+          terrain = new Float32Array(cols * rows);
+          porosity = new Float32Array(cols * rows);
+          patches = [];
+          sources = [];
+          flowSteps = 0;
+          accumulator = 0;
+
+          for (let y = 0; y < rows; y += 1) {
+            for (let x = 0; x < cols; x += 1) {
+              porosity[indexOf(x, y)] = 0.68 + noise2(x * 0.19, y * 0.17, seed + 91) * 0.5;
+            }
+          }
+
+          makeSources();
+          makePatches();
+          rasterizeBasins();
+          buildDepthMap();
+          paintWall();
+
+          const previewSteps = reducedMotion.matches
+            ? Math.min(Math.ceil(rows * 0.95), 500)
+            : Math.min(Math.ceil(rows * 0.72), 390);
+          for (let i = 0; i < previewSteps; i += 1) stepFlow(3.2);
+          draw();
+        }
+
+        function makeSources() {
+          const count = Math.max(5, Math.min(9, Math.round(width / 170)));
+          const gap = cols / (count + 1);
+          for (let i = 0; i < count; i += 1) {
+            const jitter = (hash(seed + i * 1777) - 0.5) * gap * 0.9;
+            sources.push({
+              x: clamp(Math.round(gap * (i + 1) + jitter), 10, cols - 11),
+              radius: 8 + Math.floor(hash(seed + i * 6323) * 16),
+              rate: 0.016 + hash(seed + i * 811) * 0.022,
+              delay: Math.floor(hash(seed + i * 2267) * 28),
+              pulse: 0.72 + hash(seed + i * 4127) * 0.7
+            });
+          }
+        }
+
+        function makePatches() {
+          const brickRows = Math.ceil(height / brickHeight) + 1;
+          const count = clamp(Math.round((width * height) / 61000), 12, 28);
+          const interceptors = Math.min(sources.length * 2, Math.ceil(count * 0.58));
+
+          for (let i = 0; i < count; i += 1) {
+            const tied = i < interceptors;
+            const source = sources[i % sources.length];
+            const row = tied
+              ? 1 + Math.floor(hash(seed + i * 1543) * Math.max(2, brickRows - 3))
+              : Math.floor(hash(seed + i * 2017) * brickRows);
+            const rowOffset = row % 2 ? -brickWidth * 0.5 : 0;
+            const desiredX = tied ? source.x * cell : hash(seed + i * 1009) * width;
+            const column = Math.floor((desiredX - rowOffset) / brickWidth);
+            const brickLeft = column * brickWidth + rowOffset + mortar * 1.5;
+            const brickRight = brickLeft + brickWidth - mortar * 3;
+            const cxPx = clamp(
+              desiredX + (hash(seed + i * 919) - 0.5) * brickWidth * 0.22,
+              brickLeft + brickWidth * 0.2,
+              brickRight - brickWidth * 0.2
+            );
+            const cyPx = clamp(
+              row * brickHeight + brickHeight * lerp(0.42, 0.62, hash(seed + i * 2311)),
+              mortar * 2,
+              height - mortar * 2
+            );
+            const cx = cxPx / cell;
+            const cy = cyPx / cell;
+            const rx = lerp(brickWidth * 0.15, brickWidth * 0.34, hash(seed + i * 3011)) / cell;
+            const ry = lerp(brickHeight * 0.16, brickHeight * 0.34, hash(seed + i * 4021)) / cell;
+            const points = [];
+            const pointCount = 22 + Math.floor(hash(seed + i * 5023) * 10);
+            for (let p = 0; p < pointCount; p += 1) {
+              const angle = (p / pointCount) * TAU;
+              const rough = 0.7
+                + hash(seed + i * 7919 + p * 313) * 0.38
+                + Math.sin(angle * (4 + (i % 3)) + i) * 0.08;
+              points.push({
+                x: clamp(cx + Math.cos(angle) * rx * rough, 1, cols - 2),
+                y: clamp(cy + Math.sin(angle) * ry * rough, 5, rows - 2)
+              });
+            }
+            patches.push({ points });
+          }
+        }
+
+        function rasterizeBasins() {
+          maskCtx.clearRect(0, 0, cols, rows);
+          patches.forEach((patch, patchIndex) => {
+            const value = 110 + Math.round(hash(seed + patchIndex * 3571) * 120);
+            maskCtx.fillStyle = `rgb(${value}, ${value}, ${value})`;
+            pathPatch(maskCtx, patch, 1);
+            maskCtx.fill();
+          });
+          const data = maskCtx.getImageData(0, 0, cols, rows).data;
+          for (let i = 0; i < basin.length; i += 1) basin[i] = data[i * 4] / 255;
+        }
+
+        function buildDepthMap() {
+          for (let y = 0; y < rows; y += 1) {
+            const py = y * cell;
+            const brickRow = Math.floor(py / brickHeight);
+            const rowOffset = brickRow % 2 ? -brickWidth * 0.5 : 0;
+            for (let x = 0; x < cols; x += 1) {
+              const px = x * cell;
+              const localX = ((px - rowOffset) % brickWidth + brickWidth) % brickWidth;
+              const localY = py % brickHeight;
+              const distanceToJoint = Math.min(
+                localX,
+                brickWidth - localX,
+                localY,
+                brickHeight - localY
+              );
+              const jointDepth = clamp(1 - distanceToJoint / (mortar * 1.45), 0, 1);
+              const broad = noise2(x * 0.032, y * 0.036, seed + 1709);
+              const fine = noise2(x * 0.21, y * 0.19, seed + 7907);
+              const i = indexOf(x, y);
+              terrain[i] = 0.58 + broad * 0.24 + fine * 0.075
+                - jointDepth * 0.34
+                - basin[i] * 0.42;
+            }
+          }
+        }
+
+        function paintWall() {
+          const random = mulberry32(seed + 1447);
+          const depthImage = maskCtx.createImageData(cols, rows);
+          const pixels = depthImage.data;
+          for (let i = 0; i < terrain.length; i += 1) {
+            const normalized = clamp((terrain[i] - 0.12) / 0.76, 0, 1);
+            const eased = normalized * normalized * (3 - 2 * normalized);
+            const cool = basin[i] * 0.16;
+            const offset = i * 4;
+            pixels[offset] = Math.round(lerp(44, 215, eased) - cool * 22);
+            pixels[offset + 1] = Math.round(lerp(54, 211, eased) - cool * 7);
+            pixels[offset + 2] = Math.round(lerp(57, 198, eased) + cool * 19);
+            pixels[offset + 3] = 255;
+          }
+          maskCtx.putImageData(depthImage, 0, 0);
+          wallCtx.imageSmoothingEnabled = true;
+          wallCtx.drawImage(maskCanvas, 0, 0, width, height);
+
+          wallCtx.globalCompositeOperation = 'multiply';
+          for (let i = 0, count = Math.floor((width * height) / 155); i < count; i += 1) {
+            const x = random() * width;
+            const y = random() * height;
+            const alpha = 0.025 + random() * 0.095;
+            wallCtx.fillStyle = `rgba(35, 37, 35, ${alpha})`;
+            const size = 0.4 + Math.pow(random(), 2) * 2.1;
+            wallCtx.fillRect(x, y, size, size * (0.5 + random()));
+          }
+
+          wallCtx.globalAlpha = 0.2;
+          wallCtx.strokeStyle = '#242726';
+          wallCtx.lineWidth = 0.7;
+          for (let i = 0; i < Math.floor(width / 24); i += 1) {
+            const x = random() * width;
+            const y = random() * height;
+            wallCtx.beginPath();
+            wallCtx.moveTo(x, y);
+            wallCtx.quadraticCurveTo(x + random() * 5 - 2.5, y + random() * 14, x + random() * 7 - 3.5, y + 12 + random() * 34);
+            wallCtx.stroke();
+          }
+          wallCtx.globalAlpha = 1;
+          wallCtx.globalCompositeOperation = 'source-over';
+        }
+
+        function loop(now) {
+          const dt = Math.min(0.05, Math.max(0, (now - lastTime) / 1000));
+          lastTime = now;
+
+          if (running && !reducedMotion.matches) {
+            accumulator += dt;
+            while (accumulator >= STEP_SECONDS) {
+              stepFlow();
+              accumulator -= STEP_SECONDS;
+            }
+          }
+
+          draw();
+          frame = requestAnimationFrame(loop);
+        }
+
+        function stepFlow(speed = 1) {
+          flowSteps += 1;
+          feedSources(speed);
+
+          for (let y = rows - 2; y >= 0; y -= 1) {
+            const wind = hash(seed + y * 9187) < 0.5 ? -1 : 1;
+            const start = wind > 0 ? 0 : cols - 1;
+            const end = wind > 0 ? cols : -1;
+
+            for (let x = start; x !== end; x += wind) {
+              const i = indexOf(x, y);
+              let amount = wet[i];
+              if (amount < 0.007) continue;
+
+              stain[i] = Math.min(1, Math.max(stain[i], amount * 0.74 + 0.075));
+              const currentLevel = terrain[i] + amount * WATER_HEIGHT;
+              const localRate = 0.075 * porosity[i] * speed;
+              const preference = hash(seed + i * 101) < 0.5 ? -1 : 1;
+              const candidates = [];
+
+              for (const [dx, dy] of [
+                [0, 1], [preference, 1], [-preference, 1],
+                [preference, 0], [-preference, 0]
+              ]) {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (nx < 0 || nx >= cols || ny < 0 || ny >= rows) continue;
+                const to = indexOf(nx, ny);
+                const targetLevel = terrain[to] + wet[to] * WATER_HEIGHT - dy * GRAVITY_DROP;
+                candidates.push({ to, drop: currentLevel - targetLevel, dy });
+              }
+
+              candidates.sort((a, b) => b.drop - a.drop);
+              for (let c = 0; c < Math.min(3, candidates.length); c += 1) {
+                const candidate = candidates[c];
+                if (candidate.drop <= 0.003 || amount <= 0.006) break;
+                const slopeFlow = candidate.drop * (candidate.dy ? 0.34 : 0.22);
+                const requested = Math.min(
+                  amount * (candidate.dy ? 0.34 : 0.2),
+                  localRate,
+                  slopeFlow * speed
+                );
+                const moved = transfer(candidate.to, amount, requested);
+                amount -= moved;
+              }
+
+              wet[i] = Math.max(0, amount - 0.0002 * speed);
+            }
+          }
+
+          const bottom = rows - 1;
+          for (let x = 0; x < cols; x += 1) {
+            const i = indexOf(x, bottom);
+            if (wet[i] > 0.01) stain[i] = Math.min(1, Math.max(stain[i], wet[i]));
+            wet[i] *= 0.965;
+          }
+        }
+
+        function feedSources(speed = 1) {
+          sources.forEach((source, sourceIndex) => {
+            if (flowSteps < source.delay) return;
+            const pulse = 0.72 + Math.sin(flowSteps * 0.055 * source.pulse + sourceIndex) * 0.22;
+            for (let dx = -source.radius; dx <= source.radius; dx += 1) {
+              const x = clamp(source.x + dx, 0, cols - 1);
+              const taper = 1 - Math.abs(dx) / (source.radius + 1);
+              const i = indexOf(x, 0);
+              wet[i] = Math.min(1.45, wet[i] + source.rate * pulse * taper * speed);
+              stain[i] = Math.min(1, stain[i] + source.rate * taper * 0.8 * speed);
+            }
+          });
+        }
+
+        function transfer(to, available, requested) {
+          if (requested <= 0) return 0;
+          const capacity = Math.max(0, 1.5 - wet[to]);
+          const moved = Math.min(requested, capacity, available);
+          if (moved <= 0) return 0;
+          wet[to] += moved;
+          stain[to] = Math.min(1, Math.max(stain[to], moved * 1.6));
+          return moved;
+        }
+
+        function addSpill(x, y) {
+          const radius = Math.max(2, Math.round(7 / cell));
+          for (let oy = -radius; oy <= radius; oy += 1) {
+            for (let ox = -radius; ox <= radius; ox += 1) {
+              const px = x + ox;
+              const py = y + oy;
+              if (px < 0 || px >= cols || py < 0 || py >= rows) continue;
+              const i = indexOf(px, py);
+              const distance = Math.hypot(ox, oy);
+              if (distance > radius + hash(seed + i * 43)) continue;
+              const amount = Math.max(0, 1 - distance / (radius + 1));
+              wet[i] = Math.min(1.25, wet[i] + 0.48 + amount * 0.62);
+              stain[i] = Math.min(1, Math.max(stain[i], 0.32 + amount * 0.48));
+            }
+          }
+          if (reducedMotion.matches) {
+            for (let i = 0; i < Math.min(rows, 160); i += 1) stepFlow();
+          }
+        }
+
+        function draw() {
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.drawImage(wallCanvas, 0, 0, width, height);
+          drawInk();
+        }
+
+        function drawInk() {
+          for (let i = 0; i < stain.length; i += 1) {
+            const offset = i * 4;
+            const fixed = stain[i];
+            const mobile = wet[i];
+            const density = clamp(fixed * 0.8 + mobile * (0.48 + basin[i] * 0.16), 0, 1);
+            const texture = 0.84 + (porosity[i] - 0.68) * 0.32;
+            const alpha = Math.round(Math.pow(density, 0.57) * 252 * texture);
+            inkPixels[offset] = 5 + Math.round((1 - density) * 9);
+            inkPixels[offset + 1] = 10 + Math.round((1 - density) * 8);
+            inkPixels[offset + 2] = 12 + Math.round(mobile * 12);
+            inkPixels[offset + 3] = clamp(alpha, 0, 250);
+          }
+          inkCtx.putImageData(inkImage, 0, 0);
+          ctx.save();
+          ctx.imageSmoothingEnabled = true;
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.filter = `blur(${Math.max(0.7, cell * 0.46)}px)`;
+          ctx.globalAlpha = 0.76;
+          ctx.drawImage(inkCanvas, -cell * 0.85, -cell * 0.45, width + cell * 1.7, height + cell * 0.9);
+          ctx.filter = 'none';
+          ctx.globalAlpha = 0.93;
+          ctx.drawImage(inkCanvas, -cell * 0.35, -cell * 0.1, width + cell * 0.7, height + cell * 0.2);
+          ctx.globalAlpha = 1;
+          ctx.globalCompositeOperation = 'source-over';
+
+          ctx.fillStyle = 'rgba(170, 198, 202, 0.42)';
+          for (let y = 1; y < rows - 1; y += 1) {
+            for (let x = 1; x < cols - 1; x += 1) {
+              const i = indexOf(x, y);
+              if (basin[i] > 0.38 && wet[i] > 0.68 && hash(seed + i * 127) > 0.985) {
+                ctx.beginPath();
+                ctx.ellipse((x + 0.5) * cell, (y + 0.4) * cell, cell * 0.34, cell * 0.08, -0.08, 0, TAU);
+                ctx.fill();
+              }
+              if (wet[i] < 0.58 || wet[indexOf(x, y + 1)] > 0.1) continue;
+              if (hash(seed + i * 73) > 0.2) continue;
+              ctx.beginPath();
+              ctx.ellipse((x + 0.32) * cell, (y + 0.72) * cell, cell * 0.13, cell * 0.36, 0, 0, TAU);
+              ctx.fill();
+            }
+          }
+          ctx.restore();
+        }
+
+        function pathPatch(context, patch, scale) {
+          const points = patch.points;
+          context.beginPath();
+          for (let i = 0; i < points.length; i += 1) {
+            const point = points[i];
+            const next = points[(i + 1) % points.length];
+            const x = point.x * scale;
+            const y = point.y * scale;
+            const nextX = next.x * scale;
+            const nextY = next.y * scale;
+            if (i === 0) context.moveTo(x, y);
+            context.quadraticCurveTo(x, y, (x + nextX) * 0.5, (y + nextY) * 0.5);
+          }
+          context.closePath();
+        }
+
+        function indexOf(x, y) {
+          return y * cols + x;
+        }
+
+        function noise2(x, y, salt) {
+          const x0 = Math.floor(x);
+          const y0 = Math.floor(y);
+          const tx = x - x0;
+          const ty = y - y0;
+          const a = hash(salt + x0 * 374761393 + y0 * 668265263);
+          const b = hash(salt + (x0 + 1) * 374761393 + y0 * 668265263);
+          const c = hash(salt + x0 * 374761393 + (y0 + 1) * 668265263);
+          const d = hash(salt + (x0 + 1) * 374761393 + (y0 + 1) * 668265263);
+          const sx = tx * tx * (3 - 2 * tx);
+          const sy = ty * ty * (3 - 2 * ty);
+          return lerp(lerp(a, b, sx), lerp(c, d, sx), sy);
+        }
+
+        function hash(value) {
+          let x = value | 0;
+          x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+          x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+          x ^= x >>> 16;
+          return (x >>> 0) / 4294967295;
+        }
+
+        function mulberry32(value) {
+          let state = value >>> 0;
+          return () => {
+            state += 0x6d2b79f5;
+            let result = state;
+            result = Math.imul(result ^ (result >>> 15), result | 1);
+            result ^= result + Math.imul(result ^ (result >>> 7), result | 61);
+            return ((result ^ (result >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        function lerp(a, b, t) { return a + (b - a) * t; }
+        function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+      })();
+    </script>
+  </body>
+</html>

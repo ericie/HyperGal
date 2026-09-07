@@ -1,0 +1,1176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#c7c3bb" />
+    <meta
+      name="description"
+      content="Fantasy words appear on a weathered wall, then disappear beneath rough, mismatched coats of paint."
+    />
+    <title>Cover Ups · HyperGal</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ground: #c7c3bb;
+        --ink: #29272d;
+        --muted: #6f6a62;
+        --rule: #aaa294;
+        --ui: Arial, Helvetica, sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        width: 100%;
+        min-width: 300px;
+        min-height: 100%;
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+      }
+
+      body {
+        overflow: hidden;
+        font-family: var(--ui);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button { font: inherit; }
+
+      .stage {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        border: 0;
+        background: var(--ground);
+        color: inherit;
+        cursor: crosshair;
+        touch-action: manipulation;
+      }
+
+      .stage:focus-visible {
+        outline: 3px solid var(--ink);
+        outline-offset: -8px;
+      }
+
+      #drawing {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .debug-view[hidden],
+      body.is-debug .stage { display: none; }
+
+      body.is-debug {
+        height: auto;
+        min-height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+      }
+
+      .debug-view {
+        width: min(100%, 1500px);
+        margin: 0 auto;
+        padding:
+          max(20px, env(safe-area-inset-top))
+          max(14px, env(safe-area-inset-right))
+          max(48px, env(safe-area-inset-bottom))
+          max(14px, env(safe-area-inset-left));
+      }
+
+      .debug-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 24px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid var(--ink);
+      }
+
+      .debug-header h1,
+      .debug-header p { margin: 0; }
+
+      .debug-header h1 {
+        font-size: clamp(20px, 3vw, 36px);
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        line-height: 1;
+      }
+
+      .debug-header p {
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+
+      .glyph-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        border-left: 1px solid var(--rule);
+      }
+
+      .specimen {
+        min-width: 0;
+        margin: 0;
+        border-right: 1px solid var(--rule);
+        border-bottom: 1px solid var(--rule);
+      }
+
+      .artboard {
+        display: grid;
+        aspect-ratio: 1.12;
+        place-items: center;
+        overflow: hidden;
+      }
+
+      .symbol {
+        display: block;
+        width: 92%;
+        height: 88%;
+        overflow: visible;
+      }
+
+      .symbol path {
+        fill: none;
+        stroke: var(--ink);
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 0.024;
+      }
+
+      figcaption {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        min-height: 36px;
+        padding: 9px 10px;
+        border-top: 1px solid var(--rule);
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .ordinal {
+        color: var(--muted);
+        font-size: 9px;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.06em;
+      }
+
+      @media (max-width: 940px) {
+        .glyph-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      }
+
+      @media (max-width: 560px) {
+        .debug-header p { display: none; }
+        .glyph-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .artboard { aspect-ratio: 1.2; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .stage { cursor: default; }
+      }
+    </style>
+  </head>
+  <body>
+    <button class="stage" id="stage" type="button" aria-label="Redraw the Cover Ups fantasy alphabet">
+      <canvas id="drawing" aria-hidden="true"></canvas>
+    </button>
+
+    <section class="debug-view" id="debug-view" aria-label="Cover Ups alphabet specimen" hidden>
+      <header class="debug-header">
+        <h1>Cover Ups</h1>
+        <p>26 Latin letters · 26 illegible connected forms</p>
+      </header>
+      <div class="glyph-grid" id="glyph-grid"></div>
+    </section>
+
+    <script>
+      (() => {
+        'use strict';
+
+        const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const SOURCE_TEXT = "The greater whole is an illusion. Really it's nothing other than a collection of smaller pieces, joined together in such a way as to encourage the human tendency to see wholes.";
+        const SOURCE_WORDS = Array.from(new Set(
+          SOURCE_TEXT.toUpperCase().replace(/[^A-Z\s]/g, '').trim().split(/\s+/)
+        ));
+        const PARAMS = new URLSearchParams(window.location.search);
+        const DEBUG = PARAMS.get('debug') === 'true';
+        const GROUND = '#c7c3bb';
+        const INK = '#29272d';
+        const WRITE_TIME = 2400;
+        const PAINT_TIME = 1800;
+        const SURFACES = [
+          {
+            id: 'white-brick', kind: 'brick', base: [218, 220, 217],
+            line: '#b3b8b5', lift: '#f1f1eb', stain: '#778188',
+            paints: ['#eef0eb', '#aebbc3', '#c7c9c4', '#8f9ba4']
+          },
+          {
+            id: 'rolling-door', kind: 'ribs', base: [193, 189, 193],
+            line: '#7c7980', lift: '#e2dfe1', stain: '#59616e',
+            paints: ['#4f566b', '#777b8c', '#a9a8ad', '#d1ced0']
+          },
+          {
+            id: 'rose-block', kind: 'block', base: [174, 143, 126],
+            line: '#806e65', lift: '#ccb6a6', stain: '#725e57',
+            paints: ['#cfb39d', '#d9c4ac', '#a98473', '#e0c9ae']
+          },
+          {
+            id: 'red-brick', kind: 'brick', base: [164, 71, 55],
+            line: '#78372e', lift: '#c97a66', stain: '#773a31',
+            paints: ['#b8bcc3', '#d0d1ce', '#d36d4c', '#aeb7c1']
+          },
+          {
+            id: 'peeling-plaster', kind: 'plaster', base: [214, 211, 198],
+            line: '#a8aaa4', lift: '#f0ede1', stain: '#748188',
+            paints: ['#b9c4ce', '#d8d6ca', '#aab8c2', '#e7e2d3']
+          }
+        ];
+        const requestedSurface = PARAMS.get('surface');
+        const surface = SURFACES.find((item) => item.id === requestedSurface)
+          || SURFACES[Math.floor(Math.random() * SURFACES.length)];
+        const canvas = document.querySelector('#drawing');
+        const ctx = canvas.getContext('2d');
+        const stage = document.querySelector('#stage');
+        const debugView = document.querySelector('#debug-view');
+        const grid = document.querySelector('#glyph-grid');
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+        let width = 0;
+        let height = 0;
+        let dpr = 1;
+        let frame = 0;
+        let phaseStart = 0;
+        let phase = 'write';
+        let currentWord = '';
+        let activePath = null;
+        let activePaint = null;
+        let wordProgress = 0;
+        let paintProgress = 0;
+        let wallTexture = null;
+        let historyCanvas = null;
+        let historyContext = null;
+        let historyCount = 0;
+
+        stage.setAttribute(
+          'aria-label',
+          `Redraw Cover Ups on ${surface.id.replaceAll('-', ' ')}`
+        );
+        document.querySelector('meta[name="theme-color"]').content = (
+          `rgb(${surface.base.join(' ')})`
+        );
+
+        if (DEBUG) {
+          document.body.classList.add('is-debug');
+          debugView.hidden = false;
+          buildDebugGrid();
+        } else {
+          resize();
+          beginWord();
+          stage.addEventListener('click', completeAndAdvance);
+          window.addEventListener('resize', resize, { passive: true });
+          document.addEventListener('visibilitychange', () => {
+            if (document.hidden) cancelAnimationFrame(frame);
+            else if (!reducedMotion.matches) {
+              const duration = phase === 'write' ? WRITE_TIME : PAINT_TIME;
+              const progress = phase === 'write' ? wordProgress : paintProgress;
+              phaseStart = performance.now() - progress * duration;
+              frame = requestAnimationFrame(animate);
+            }
+          });
+        }
+
+        function glyphPoints(letter, steps = 128) {
+          const index = ALPHABET.indexOf(letter.toUpperCase());
+          const family = glyphFamily(letter);
+
+          if (family === 'loop') return loopGlyphPoints(index, steps);
+
+          const recipes = {
+            stem: [
+              [0, 0.5], [0.18, 0.54], [0.34, 0.8], [0.35, 0.12],
+              [0.38, 0.84], [0.6, 0.3], [0.43, 0.48], [0.74, 0.73],
+              [0.64, 0.4], [1, 0.5]
+            ],
+            bowl: [
+              [0, 0.5], [0.18, 0.48], [0.33, 0.18], [0.7, 0.2],
+              [0.79, 0.48], [0.59, 0.64], [0.33, 0.5], [0.69, 0.49],
+              [0.58, 0.84], [0.86, 0.7], [1, 0.5]
+            ],
+            cross: [
+              [0, 0.5], [0.27, 0.53], [0.57, 0.13], [0.51, 0.84],
+              [0.39, 0.35], [0.82, 0.34], [0.64, 0.7], [1, 0.5]
+            ],
+            hook: [
+              [0, 0.5], [0.2, 0.64], [0.39, 0.83], [0.53, 0.59],
+              [0.44, 0.14], [0.61, 0.18], [0.63, 0.72], [0.83, 0.62],
+              [1, 0.5]
+            ],
+            fold: [
+              [0, 0.5], [0.22, 0.3], [0.39, 0.73], [0.55, 0.22],
+              [0.73, 0.72], [0.46, 0.5], [0.81, 0.34], [1, 0.5]
+            ]
+          };
+          const random = seededRandom(index + 137);
+          const mirror = index % 4 === 1 || index % 4 === 2 ? -1 : 1;
+          const verticalScale = 0.88 + random() * 0.24;
+          const nodes = recipes[family].map((node, nodeIndex, source) => {
+            if (nodeIndex === 0 || nodeIndex === source.length - 1) {
+              return { x: node[0], y: node[1] };
+            }
+            return {
+              x: node[0] + (random() - 0.5) * 0.075,
+              y: 0.5 + (node[1] - 0.5) * mirror * verticalScale + (random() - 0.5) * 0.065
+            };
+          });
+
+          if (letter === 'Q') nodes.splice(-2, 0, { x: 0.68, y: 0.96 });
+          if (letter === 'R') nodes.splice(-2, 0, { x: 0.49, y: 0.82 });
+          if (letter === 'P') nodes.splice(5, 0, { x: 0.47, y: 0.34 });
+
+          return family === 'fold'
+            ? sampleLinear(nodes, steps)
+            : sampleCatmullRom(nodes, steps);
+        }
+
+        function glyphFamily(letter) {
+          if ('AGMSW'.includes(letter)) return 'loop';
+          if ('BHKY'.includes(letter)) return 'stem';
+          if ('CIOPQR'.includes(letter)) return 'bowl';
+          if ('DJTX'.includes(letter)) return 'cross';
+          if ('ENUV'.includes(letter)) return 'hook';
+          return 'fold';
+        }
+
+        function loopGlyphPoints(index, steps) {
+          const phase = ((index * 11) % 26) / 26 * Math.PI * 2;
+          const direction = index % 2 ? -1 : 1;
+          const turns = 1.72 + (index * 7 % 8) * 0.245 + Math.floor(index / 8) * 0.06;
+          const amplitudeX = 0.27 + (index * 5 % 7) * 0.019;
+          const amplitudeY = 0.31 + (index * 9 % 7) * 0.022;
+          const harmonic = 2 + (index * 3 % 4);
+          const points = [];
+
+          for (let step = 0; step <= steps; step++) {
+            const t = step / steps;
+            const envelope = Math.pow(Math.sin(Math.PI * t), 0.58);
+            const angle = phase + direction * turns * Math.PI * 2 * t;
+            const breathing = 0.74 + 0.26 * Math.cos((index % 3 + 1) * Math.PI * t + phase * 0.35);
+            const x = t
+              + amplitudeX * envelope * Math.cos(angle) * breathing
+              + 0.064 * envelope * Math.sin(harmonic * Math.PI * 2 * t + phase);
+            const y = 0.5
+              + amplitudeY * envelope * Math.sin(angle)
+              + 0.082 * envelope * Math.sin((harmonic + 1) * Math.PI * t - phase * 0.65);
+            points.push({ x, y });
+          }
+
+          points[0] = { x: 0, y: 0.5 };
+          points[points.length - 1] = { x: 1, y: 0.5 };
+          return points;
+        }
+
+        function sampleCatmullRom(nodes, steps) {
+          const points = [];
+          const segments = nodes.length - 1;
+          const stepsPerSegment = Math.max(8, Math.ceil(steps / segments));
+
+          for (let segment = 0; segment < segments; segment++) {
+            const p0 = nodes[Math.max(0, segment - 1)];
+            const p1 = nodes[segment];
+            const p2 = nodes[segment + 1];
+            const p3 = nodes[Math.min(nodes.length - 1, segment + 2)];
+
+            for (let step = 0; step < stepsPerSegment; step++) {
+              const t = step / stepsPerSegment;
+              const t2 = t * t;
+              const t3 = t2 * t;
+              points.push({
+                x: 0.5 * (
+                  2 * p1.x
+                  + (-p0.x + p2.x) * t
+                  + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2
+                  + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+                ),
+                y: 0.5 * (
+                  2 * p1.y
+                  + (-p0.y + p2.y) * t
+                  + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2
+                  + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+                )
+              });
+            }
+          }
+
+          points.push(nodes[nodes.length - 1]);
+          return points;
+        }
+
+        function sampleLinear(nodes, steps) {
+          const points = [];
+          const stepsPerSegment = Math.max(5, Math.ceil(steps / (nodes.length - 1)));
+          for (let segment = 0; segment < nodes.length - 1; segment++) {
+            for (let step = 0; step < stepsPerSegment; step++) {
+              const amount = step / stepsPerSegment;
+              points.push({
+                x: nodes[segment].x + (nodes[segment + 1].x - nodes[segment].x) * amount,
+                y: nodes[segment].y + (nodes[segment + 1].y - nodes[segment].y) * amount
+              });
+            }
+          }
+          points.push(nodes[nodes.length - 1]);
+          return points;
+        }
+
+        function seededRandom(seed) {
+          return () => {
+            seed |= 0;
+            seed = seed + 0x6d2b79f5 | 0;
+            let value = Math.imul(seed ^ seed >>> 15, 1 | seed);
+            value = value + Math.imul(value ^ value >>> 7, 61 | value) ^ value;
+            return ((value ^ value >>> 14) >>> 0) / 4294967296;
+          };
+        }
+
+        function buildDebugGrid() {
+          for (let index = 0; index < ALPHABET.length; index++) {
+            const letter = ALPHABET[index];
+            const figure = document.createElement('figure');
+            figure.className = 'specimen';
+
+            const artboard = document.createElement('div');
+            artboard.className = 'artboard';
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.classList.add('symbol');
+            svg.setAttribute('viewBox', '-0.38 -0.1 1.76 1.2');
+            svg.setAttribute('role', 'img');
+            svg.setAttribute('aria-label', `Fantasy symbol mapped to ${letter}`);
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', pointsToSvgPath(glyphPoints(letter)));
+            svg.append(path);
+            artboard.append(svg);
+
+            const caption = document.createElement('figcaption');
+            const label = document.createElement('span');
+            label.textContent = letter;
+            const ordinal = document.createElement('span');
+            ordinal.className = 'ordinal';
+            ordinal.textContent = `${glyphFamily(letter)} · ${String(index + 1).padStart(2, '0')}`;
+            caption.append(label, ordinal);
+            figure.append(artboard, caption);
+            grid.append(figure);
+          }
+        }
+
+        function pointsToSvgPath(points) {
+          return points.map((point, index) => {
+            const command = index ? 'L' : 'M';
+            return `${command}${point.x.toFixed(4)} ${point.y.toFixed(4)}`;
+          }).join(' ');
+        }
+
+        function resize() {
+          const previousHistory = historyCanvas;
+          width = window.innerWidth;
+          height = window.innerHeight;
+          dpr = Math.min(window.devicePixelRatio || 1, 2);
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          historyCanvas = document.createElement('canvas');
+          historyCanvas.width = Math.max(1, Math.ceil(width));
+          historyCanvas.height = Math.max(1, Math.ceil(height));
+          historyContext = historyCanvas.getContext('2d');
+          if (previousHistory) historyContext.drawImage(previousHistory, 0, 0);
+
+          buildWallTexture();
+          drawScene();
+        }
+
+        function buildWallTexture() {
+          const pixelSize = 2;
+          const texture = document.createElement('canvas');
+          texture.width = Math.max(1, Math.ceil(width / pixelSize));
+          texture.height = Math.max(1, Math.ceil(height / pixelSize));
+          const textureContext = texture.getContext('2d');
+          const image = textureContext.createImageData(texture.width, texture.height);
+          const seed = Array.from(surface.id).reduce((value, character) => (
+            Math.imul(value ^ character.charCodeAt(0), 16777619)
+          ), 2166136261);
+          const random = seededRandom(seed ^ (texture.width * 73856093) ^ (texture.height * 19349663));
+
+          for (let y = 0; y < texture.height; y++) {
+            for (let x = 0; x < texture.width; x++) {
+              const index = (y * texture.width + x) * 4;
+              const pit = random() < 0.018 ? -(5 + random() * 22) : 0;
+              const grit = (random() - 0.5) * (surface.kind === 'plaster' ? 19 : 11);
+              const cloud = (
+                Math.sin(x * 0.021 + Math.sin(y * 0.008)) * 2.2
+                + Math.sin(y * 0.017) * 1.8
+                + Math.sin((x + y) * 0.005) * 2.4
+              );
+              image.data[index] = clampChannel(surface.base[0] + grit + cloud + pit);
+              image.data[index + 1] = clampChannel(surface.base[1] + grit + cloud + pit);
+              image.data[index + 2] = clampChannel(surface.base[2] + grit + cloud + pit);
+              image.data[index + 3] = 255;
+            }
+          }
+
+          textureContext.putImageData(image, 0, 0);
+          drawWallStructure(textureContext, texture.width, texture.height, random);
+          drawWallHistory(textureContext, texture.width, texture.height, random);
+          wallTexture = texture;
+        }
+
+        function clampChannel(value) {
+          return Math.max(0, Math.min(255, Math.round(value)));
+        }
+
+        function drawWallStructure(context, textureWidth, textureHeight, random) {
+          context.save();
+          context.lineCap = 'round';
+
+          if (surface.kind === 'brick') {
+            const course = Math.max(18, Math.round(textureHeight / 18));
+            const brick = course * 2.65;
+            for (let row = -1; row <= textureHeight / course + 1; row++) {
+              const y = row * course + (random() - 0.5) * 1.8;
+              context.globalAlpha = 0.34;
+              context.strokeStyle = surface.line;
+              context.lineWidth = 1.25;
+              context.beginPath();
+              context.moveTo(0, y);
+              for (let x = 0; x <= textureWidth; x += 26) {
+                context.lineTo(x, y + (random() - 0.5) * 1.2);
+              }
+              context.stroke();
+
+              context.globalAlpha = 0.2;
+              context.strokeStyle = surface.lift;
+              context.lineWidth = 0.8;
+              context.beginPath();
+              context.moveTo(0, y + 1.3);
+              context.lineTo(textureWidth, y + 1.3);
+              context.stroke();
+
+              const stagger = row % 2 ? brick * 0.48 : 0;
+              for (let x = stagger; x < textureWidth + brick; x += brick) {
+                const jointX = x + (random() - 0.5) * brick * 0.12;
+                context.globalAlpha = 0.27;
+                context.strokeStyle = surface.line;
+                context.lineWidth = 1;
+                context.beginPath();
+                context.moveTo(jointX, y);
+                context.lineTo(jointX + (random() - 0.5) * 1.4, y + course);
+                context.stroke();
+              }
+            }
+          } else if (surface.kind === 'ribs') {
+            const rib = Math.max(6, Math.round(textureHeight / 76));
+            for (let y = 0; y < textureHeight; y += rib) {
+              context.globalAlpha = 0.46;
+              context.strokeStyle = surface.line;
+              context.lineWidth = 1;
+              context.beginPath();
+              context.moveTo(0, y);
+              context.lineTo(textureWidth, y + (random() - 0.5) * 0.5);
+              context.stroke();
+              context.globalAlpha = 0.3;
+              context.strokeStyle = surface.lift;
+              context.beginPath();
+              context.moveTo(0, y + 1.6);
+              context.lineTo(textureWidth, y + 1.6);
+              context.stroke();
+            }
+          } else if (surface.kind === 'block') {
+            const course = Math.max(52, Math.round(textureHeight / 5));
+            for (let row = 0; row <= textureHeight / course; row++) {
+              const y = row * course;
+              context.globalAlpha = 0.3;
+              context.strokeStyle = surface.line;
+              context.lineWidth = 1;
+              context.beginPath();
+              context.moveTo(0, y);
+              context.lineTo(textureWidth, y + (random() - 0.5));
+              context.stroke();
+              const offset = row % 2 ? textureWidth * 0.48 : 0;
+              for (let x = offset; x < textureWidth; x += textureWidth * 0.52) {
+                context.globalAlpha = 0.12;
+                context.beginPath();
+                context.moveTo(x, y);
+                context.lineTo(x, y + course);
+                context.stroke();
+              }
+            }
+          }
+          context.restore();
+        }
+
+        function drawWallHistory(context, textureWidth, textureHeight, random) {
+          context.save();
+          for (let stain = 0; stain < 28; stain++) {
+            context.globalAlpha = 0.018 + random() * 0.055;
+            context.fillStyle = random() < 0.66 ? surface.stain : surface.lift;
+            context.beginPath();
+            context.ellipse(
+              random() * textureWidth,
+              random() * textureHeight,
+              textureWidth * (0.02 + random() * 0.12),
+              textureHeight * (0.01 + random() * 0.055),
+              random() * Math.PI,
+              0,
+              Math.PI * 2
+            );
+            context.fill();
+          }
+
+          context.strokeStyle = surface.stain;
+          context.lineCap = 'round';
+          for (let run = 0; run < 12; run++) {
+            const x = random() * textureWidth;
+            const y = random() * textureHeight * 0.74;
+            context.globalAlpha = 0.035 + random() * 0.06;
+            context.lineWidth = 0.5 + random() * 1.8;
+            context.beginPath();
+            context.moveTo(x, y);
+            context.bezierCurveTo(
+              x + (random() - 0.5) * 2,
+              y + textureHeight * 0.04,
+              x + (random() - 0.5) * 4,
+              y + textureHeight * 0.08,
+              x + (random() - 0.5) * 7,
+              y + textureHeight * (0.1 + random() * 0.18)
+            );
+            context.stroke();
+          }
+
+          const chipCount = surface.kind === 'plaster' ? 90 : 24;
+          for (let chip = 0; chip < chipCount; chip++) {
+            const x = random() * textureWidth;
+            const y = random() * textureHeight;
+            const radius = 0.8 + random() * (surface.kind === 'plaster' ? 9 : 3.5);
+            context.globalAlpha = 0.12 + random() * 0.18;
+            context.fillStyle = random() < 0.55 ? surface.line : surface.lift;
+            context.beginPath();
+            const sides = 4 + Math.floor(random() * 5);
+            for (let side = 0; side < sides; side++) {
+              const angle = Math.PI * 2 * side / sides;
+              const localRadius = radius * (0.45 + random() * 0.7);
+              const pointX = x + Math.cos(angle) * localRadius;
+              const pointY = y + Math.sin(angle) * localRadius * 0.58;
+              if (side) context.lineTo(pointX, pointY);
+              else context.moveTo(pointX, pointY);
+            }
+            context.closePath();
+            context.fill();
+          }
+          context.restore();
+        }
+
+        function composeWord(word) {
+          const horizontalRoom = Math.max(1, width - 48);
+          const targetWidth = Math.min(
+            horizontalRoom,
+            width * (0.34 + Math.random() * 0.5)
+          );
+          const advance = Math.min(targetWidth / word.length, height * 0.34);
+          const scaleY = Math.min(
+            height * 0.3,
+            advance * (0.88 + Math.random() * 0.46)
+          );
+          const points = [];
+          let cursorX = 0;
+
+          for (const character of word) {
+            const local = glyphPoints(character);
+            for (let pointIndex = 0; pointIndex < local.length; pointIndex++) {
+              if (points.length && pointIndex === 0) continue;
+              const point = local[pointIndex];
+              points.push({
+                x: cursorX + point.x * advance,
+                y: (point.y - 0.5) * scaleY
+              });
+            }
+            cursorX += advance;
+          }
+
+          const localPath = measurePath(points);
+          const box = localPath.bounds;
+          const minimumLeft = -box.width * 0.48 - box.x;
+          const maximumLeft = width - box.width * 0.52 - box.x;
+          const minimumTop = -box.height * 0.48 - box.y;
+          const maximumTop = height - box.height * 0.52 - box.y;
+          const offsetX = minimumLeft + Math.random() * Math.max(0, maximumLeft - minimumLeft);
+          const offsetY = minimumTop + Math.random() * Math.max(0, maximumTop - minimumTop);
+
+          return measurePath(points.map((point) => ({
+            x: point.x + offsetX,
+            y: point.y + offsetY
+          })));
+        }
+
+        function pickRandomWord() {
+          let next = currentWord;
+          while (next === currentWord && SOURCE_WORDS.length > 1) {
+            next = SOURCE_WORDS[Math.floor(Math.random() * SOURCE_WORDS.length)];
+          }
+          return next;
+        }
+
+        function measurePath(points) {
+          const distances = [0];
+          let length = 0;
+          let minimumX = points[0]?.x || 0;
+          let maximumX = minimumX;
+          let minimumY = points[0]?.y || 0;
+          let maximumY = minimumY;
+          for (let index = 1; index < points.length; index++) {
+            length += Math.hypot(
+              points[index].x - points[index - 1].x,
+              points[index].y - points[index - 1].y
+            );
+            distances.push(length);
+            minimumX = Math.min(minimumX, points[index].x);
+            maximumX = Math.max(maximumX, points[index].x);
+            minimumY = Math.min(minimumY, points[index].y);
+            maximumY = Math.max(maximumY, points[index].y);
+          }
+          return {
+            points,
+            distances,
+            length,
+            bounds: {
+              x: minimumX,
+              y: minimumY,
+              width: maximumX - minimumX,
+              height: maximumY - minimumY
+            }
+          };
+        }
+
+        function createPaintLayer(path) {
+          const seed = Math.floor(Math.random() * 0x7fffffff);
+          const random = seededRandom(seed);
+          const stepped = surface.id === 'red-brick' && random() < 0.48;
+          const paddingX = Math.max(24, path.bounds.height * 0.2);
+          const paddingY = Math.max(18, path.bounds.height * 0.22);
+          const baseWidth = path.bounds.width + paddingX * 2;
+          const baseHeight = path.bounds.height + paddingY * 2;
+          const coverHeight = Math.min(
+            height * (surface.id === 'rose-block' ? 0.54 : 0.43),
+            Math.max(baseHeight, path.bounds.height * (1.26 + random() * 0.38))
+          );
+          const targetAspect = surface.id === 'rolling-door'
+            ? 4.2 + random() * 1.5
+            : 2.5 + random() * 2.1;
+          const coverWidth = Math.min(
+            width * 1.18,
+            Math.max(baseWidth * (1.12 + random() * 0.52), coverHeight * targetAspect)
+          );
+          const extraWidth = coverWidth - baseWidth;
+          const extraHeight = coverHeight - baseHeight;
+          const coverX = path.bounds.x - paddingX - extraWidth * (0.24 + random() * 0.52);
+          const coverY = path.bounds.y - paddingY - extraHeight * (0.32 + random() * 0.36);
+          const margin = Math.max(12, Math.min(28, coverHeight * 0.085));
+          const color = surface.paints[Math.floor(random() * surface.paints.length)];
+          const patch = (x, y, patchWidth, patchHeight, opacity = 1) => ({
+            opacity,
+            points: wallPatchOutline(
+              margin + x,
+              margin + y,
+              patchWidth,
+              patchHeight,
+              random
+            )
+          });
+          const patches = stepped
+            ? [
+                patch(0, 0, coverWidth * 0.72, coverHeight * 0.58, 1),
+                patch(coverWidth * 0.2, coverHeight * 0.42, coverWidth * 0.8, coverHeight * 0.58, 1),
+                patch(coverWidth * 0.13, coverHeight * 0.34, coverWidth * 0.74, coverHeight * 0.31, 0.62)
+              ]
+            : [patch(0, 0, coverWidth, coverHeight, 1)];
+          const swathCount = Math.max(4, Math.min(8, Math.round(coverHeight / 46)));
+          const paint = {
+            x: coverX - margin,
+            y: coverY - margin,
+            width: coverWidth + margin * 2,
+            height: coverHeight + margin * 2,
+            coverWidth,
+            coverHeight,
+            margin,
+            color,
+            alpha: surface.id === 'rose-block'
+              ? 0.58 + random() * 0.12
+              : 0.8 + random() * 0.12,
+            stepped,
+            patches,
+            swaths: Array.from({ length: swathCount }, (_, index) => ({
+              y: (coverHeight + margin * 2) * index / swathCount,
+              height: (coverHeight + margin * 2) / swathCount + 1,
+              direction: index % 2 ? -1 : 1
+            }))
+          };
+          paint.texture = renderPaintTexture(paint, seededRandom(seed ^ 0x5f3759df));
+          return paint;
+        }
+
+        function wallPatchOutline(x, y, patchWidth, patchHeight, random) {
+          const points = [];
+          const horizontalSteps = Math.max(6, Math.min(11, Math.round(patchWidth / 110)));
+          const verticalSteps = 3;
+          const roughX = Math.min(10, patchWidth * 0.018);
+          const roughY = Math.min(12, patchHeight * 0.055);
+          let drift = (random() - 0.5) * roughY;
+
+          for (let step = 0; step <= horizontalSteps; step++) {
+            const amount = step / horizontalSteps;
+            drift = Math.max(-roughY, Math.min(roughY, drift + (random() - 0.5) * roughY * 0.72));
+            points.push({
+              x: x + patchWidth * amount,
+              y: y + drift
+            });
+          }
+          for (let step = 1; step <= verticalSteps; step++) {
+            const amount = step / verticalSteps;
+            points.push({
+              x: x + patchWidth + (random() - 0.5) * roughX,
+              y: y + patchHeight * amount
+            });
+          }
+          drift = (random() - 0.5) * roughY;
+          for (let step = horizontalSteps - 1; step >= 0; step--) {
+            const amount = step / horizontalSteps;
+            drift = Math.max(-roughY, Math.min(roughY, drift + (random() - 0.5) * roughY * 0.72));
+            points.push({
+              x: x + patchWidth * amount,
+              y: y + patchHeight + drift
+            });
+          }
+          for (let step = verticalSteps - 1; step > 0; step--) {
+            const amount = step / verticalSteps;
+            points.push({
+              x: x + (random() - 0.5) * roughX,
+              y: y + patchHeight * amount
+            });
+          }
+          return points;
+        }
+
+        function tracePolygon(context, points) {
+          context.beginPath();
+          points.forEach((point, index) => {
+            if (index) context.lineTo(point.x, point.y);
+            else context.moveTo(point.x, point.y);
+          });
+          context.closePath();
+        }
+
+        function renderPaintTexture(paint, random) {
+          const texture = document.createElement('canvas');
+          texture.width = Math.max(1, Math.ceil(paint.width));
+          texture.height = Math.max(1, Math.ceil(paint.height));
+          const context = texture.getContext('2d');
+
+          paint.patches.forEach((patch) => {
+            tracePolygon(context, patch.points);
+            context.globalAlpha = paint.alpha * patch.opacity;
+            context.fillStyle = paint.color;
+            context.fill();
+
+            context.save();
+            tracePolygon(context, patch.points);
+            context.clip();
+            const bounds = polygonBounds(patch.points);
+            const bandHeight = bounds.height / (4 + Math.floor(random() * 3));
+            for (let y = bounds.y - bandHeight; y < bounds.y + bounds.height; y += bandHeight * 0.92) {
+              context.globalAlpha = 0.025 + random() * 0.055;
+              context.fillStyle = random() < 0.28 ? surface.lift : paint.color;
+              context.beginPath();
+              context.moveTo(bounds.x - 4, y + (random() - 0.5) * bandHeight * 0.18);
+              context.lineTo(bounds.x + bounds.width + 4, y + (random() - 0.5) * bandHeight * 0.18);
+              context.lineTo(bounds.x + bounds.width + 4, y + bandHeight * (0.92 + random() * 0.14));
+              context.lineTo(bounds.x - 4, y + bandHeight * (0.92 + random() * 0.14));
+              context.closePath();
+              context.fill();
+            }
+
+            for (let cloud = 0; cloud < 6; cloud++) {
+              context.globalAlpha = 0.018 + random() * 0.045;
+              context.fillStyle = random() < 0.56 ? surface.lift : surface.line;
+              context.beginPath();
+              context.ellipse(
+                bounds.x + random() * bounds.width,
+                bounds.y + random() * bounds.height,
+                bounds.width * (0.08 + random() * 0.18),
+                bounds.height * (0.08 + random() * 0.2),
+                (random() - 0.5) * 0.12,
+                0,
+                Math.PI * 2
+              );
+              context.fill();
+            }
+            context.restore();
+          });
+
+          context.save();
+          context.strokeStyle = paint.color;
+          context.lineCap = 'round';
+          for (let drag = 0; drag < 7; drag++) {
+            const fromLeft = random() < 0.5;
+            const x = fromLeft
+              ? paint.margin * (0.65 + random() * 0.55)
+              : paint.width - paint.margin * (0.65 + random() * 0.55);
+            const length = 4 + random() * Math.min(26, paint.coverWidth * 0.045);
+            const y = paint.margin + random() * paint.coverHeight * 0.96;
+            context.globalAlpha = 0.12 + random() * 0.17;
+            context.lineWidth = 0.6 + random() * 2.2;
+            context.beginPath();
+            context.moveTo(x, y);
+            context.lineTo(x + (fromLeft ? -length : length), y + (random() - 0.5) * 2);
+            context.stroke();
+          }
+
+          if (surface.id === 'peeling-plaster' && random() < 0.58) {
+            const dripCount = 1 + Math.floor(random() * 3);
+            for (let drip = 0; drip < dripCount; drip++) {
+              const x = paint.margin + random() * paint.coverWidth;
+              const y = paint.margin + paint.coverHeight * (0.78 + random() * 0.16);
+              const run = paint.coverHeight * (0.06 + random() * 0.18);
+              context.globalAlpha = 0.06 + random() * 0.11;
+              context.lineWidth = 0.5 + random() * 1.7;
+              context.beginPath();
+              context.moveTo(x, y);
+              context.bezierCurveTo(
+                x + (random() - 0.5) * 2,
+                y + run * 0.35,
+                x + (random() - 0.5) * 4,
+                y + run * 0.72,
+                x + (random() - 0.5) * 5,
+                Math.min(paint.height, y + run)
+              );
+              context.stroke();
+            }
+          }
+          context.restore();
+
+          context.save();
+          context.globalCompositeOperation = 'destination-out';
+          for (let spot = 0; spot < 7; spot++) {
+            context.globalAlpha = 0.025 + random() * 0.07;
+            context.beginPath();
+            context.ellipse(
+              paint.margin + random() * paint.coverWidth,
+              paint.margin + random() * paint.coverHeight,
+              26 + random() * Math.min(150, paint.coverWidth * 0.2),
+              8 + random() * Math.min(44, paint.coverHeight * 0.18),
+              (random() - 0.5) * 0.1,
+              0,
+              Math.PI * 2
+            );
+            context.fill();
+          }
+          context.lineCap = 'round';
+          for (let scrape = 0; scrape < 12; scrape++) {
+            const y = paint.margin + random() * paint.coverHeight;
+            context.globalAlpha = 0.035 + random() * 0.09;
+            context.lineWidth = 0.4 + random() * 1.4;
+            context.setLineDash([24 + random() * 90, 12 + random() * 52]);
+            context.lineDashOffset = random() * 140;
+            context.beginPath();
+            context.moveTo(paint.margin + random() * paint.coverWidth * 0.18, y);
+            context.lineTo(paint.margin + paint.coverWidth * (0.78 + random() * 0.22), y + (random() - 0.5) * 2);
+            context.stroke();
+          }
+          context.restore();
+          return texture;
+        }
+
+        function polygonBounds(points) {
+          const xs = points.map((point) => point.x);
+          const ys = points.map((point) => point.y);
+          const x = Math.min(...xs);
+          const y = Math.min(...ys);
+          return {
+            x,
+            y,
+            width: Math.max(...xs) - x,
+            height: Math.max(...ys) - y
+          };
+        }
+
+        function beginWord() {
+          cancelAnimationFrame(frame);
+          currentWord = pickRandomWord();
+          activePath = composeWord(currentWord);
+          activePaint = createPaintLayer(activePath);
+          wordProgress = reducedMotion.matches ? 1 : 0;
+          paintProgress = reducedMotion.matches ? 1 : 0;
+          phase = reducedMotion.matches ? 'paint' : 'write';
+          phaseStart = performance.now();
+
+          if (reducedMotion.matches) {
+            drawScene();
+          }
+          else frame = requestAnimationFrame(animate);
+        }
+
+        function archiveActive() {
+          if (!activePath || !activePaint) return;
+          if (historyCount >= 2) {
+            historyContext.clearRect(0, 0, historyCanvas.width, historyCanvas.height);
+            historyCount = 0;
+          }
+          drawWordPath(historyContext, activePath, 1);
+          drawPaintLayer(historyContext, activePaint, 1);
+          historyCount++;
+          activePath = null;
+          activePaint = null;
+        }
+
+        function completeAndAdvance() {
+          cancelAnimationFrame(frame);
+          wordProgress = 1;
+          paintProgress = 1;
+          archiveActive();
+          beginWord();
+        }
+
+        function animate(now) {
+          if (phase === 'write') {
+            wordProgress = Math.min(1, (now - phaseStart) / WRITE_TIME);
+            paintProgress = 0;
+            drawScene();
+            if (wordProgress >= 1) {
+              phase = 'paint';
+              phaseStart = now;
+            }
+          } else {
+            wordProgress = 1;
+            paintProgress = Math.min(1, (now - phaseStart) / PAINT_TIME);
+            drawScene();
+            if (paintProgress >= 1) {
+              archiveActive();
+              beginWord();
+              return;
+            }
+          }
+
+          if (!document.hidden) frame = requestAnimationFrame(animate);
+          else frame = 0;
+        }
+
+        function drawScene() {
+          ctx.clearRect(0, 0, width, height);
+          ctx.fillStyle = GROUND;
+          ctx.fillRect(0, 0, width, height);
+          if (wallTexture) {
+            ctx.save();
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(wallTexture, 0, 0, width, height);
+            ctx.restore();
+          }
+
+          ctx.save();
+          const light = ctx.createRadialGradient(
+            width * 0.5,
+            height * 0.42,
+            Math.min(width, height) * 0.08,
+            width * 0.5,
+            height * 0.46,
+            Math.max(width, height) * 0.72
+          );
+          light.addColorStop(0, 'rgba(255,255,255,0.075)');
+          light.addColorStop(0.72, 'rgba(255,255,255,0)');
+          light.addColorStop(1, 'rgba(28,24,25,0.12)');
+          ctx.fillStyle = light;
+          ctx.fillRect(0, 0, width, height);
+          ctx.restore();
+
+          if (historyCanvas) ctx.drawImage(historyCanvas, 0, 0);
+
+          if (activePath) drawWordPath(ctx, activePath, wordProgress);
+          if (activePaint && paintProgress > 0) drawPaintLayer(ctx, activePaint, paintProgress);
+        }
+
+        function drawWordPath(context, path, progress) {
+          context.save();
+          context.strokeStyle = INK;
+          context.lineWidth = Math.max(2.2, Math.min(4.4, Math.min(width, height) * 0.0042));
+          context.lineCap = 'round';
+          context.lineJoin = 'round';
+          drawPartialPath(context, path, progress);
+          context.restore();
+        }
+
+        function drawPaintLayer(context, paint, progress) {
+          if (progress <= 0) return;
+          if (progress >= 1) {
+            context.drawImage(paint.texture, paint.x, paint.y);
+            return;
+          }
+
+          const scaledProgress = progress * paint.swaths.length;
+          paint.swaths.forEach((swath, index) => {
+            const localProgress = Math.max(0, Math.min(1, scaledProgress - index));
+            if (localProgress <= 0) return;
+            const eased = 1 - Math.pow(1 - localProgress, 3);
+            const sourceWidth = Math.max(1, paint.width * eased);
+            const sourceX = swath.direction > 0 ? 0 : paint.width - sourceWidth;
+            const sourceHeight = Math.min(swath.height, paint.height - swath.y);
+            context.drawImage(
+              paint.texture,
+              sourceX,
+              swath.y,
+              sourceWidth,
+              sourceHeight,
+              paint.x + sourceX,
+              paint.y + swath.y,
+              sourceWidth,
+              sourceHeight
+            );
+          });
+        }
+
+        function drawPartialPath(context, path, progress) {
+          if (progress <= 0 || path.points.length < 2) return;
+          const target = path.length * progress;
+          context.beginPath();
+          context.moveTo(path.points[0].x, path.points[0].y);
+
+          for (let index = 1; index < path.points.length; index++) {
+            if (path.distances[index] <= target) {
+              context.lineTo(path.points[index].x, path.points[index].y);
+              continue;
+            }
+
+            const previousDistance = path.distances[index - 1];
+            const segmentLength = path.distances[index] - previousDistance;
+            const amount = segmentLength ? (target - previousDistance) / segmentLength : 0;
+            const previous = path.points[index - 1];
+            const current = path.points[index];
+            context.lineTo(
+              previous.x + (current.x - previous.x) * amount,
+              previous.y + (current.y - previous.y) * amount
+            );
+            break;
+          }
+
+          context.stroke();
+        }
+
+      })();
+    </script>
+  </body>
+</html>
