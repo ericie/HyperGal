@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Tiny segmented grazers eat branching, fern-like paths through a dense field of moss."
+    />
+    <title>Moss Eaters · HyperGal</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ground: #555b51;
+        --focus: #eef1eb;
+      }
+
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: var(--ground);
+      }
+
+      body {
+        min-width: 300px;
+        overscroll-behavior: none;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: var(--ground);
+        cursor: crosshair;
+        touch-action: none;
+      }
+
+      canvas:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: -8px;
+      }
+
+      .instructions {
+        position: fixed;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
+    <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
+  </head>
+  <body>
+    <canvas
+      id="field"
+      tabindex="0"
+      aria-describedby="instructions"
+      aria-label="Moss Eaters. Small caterpillar-like grazers eat branching pale paths through a dark moss surface."
+    ></canvas>
+    <p class="instructions" id="instructions">
+      The colony grazes automatically. Click or tap to hatch more grazers. Press R or Enter for a new field. Press Space to pause or resume.
+    </p>
+    <p class="instructions" id="status" aria-live="polite"></p>
+
+    <script>
+      (() => {
+        'use strict';
+
+        const canvas = document.querySelector('#field');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const status = document.querySelector('#status');
+        const groundCanvas = document.createElement('canvas');
+        const groundCtx = groundCanvas.getContext('2d', { alpha: false });
+        const trailCanvas = document.createElement('canvas');
+        const trailCtx = trailCanvas.getContext('2d');
+        const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+        const TAU = Math.PI * 2;
+        const CELL = 6;
+        const MAX_DPR = 1.5;
+
+        const mossColors = [
+          '#41473f', '#494f46', '#51574c', '#5a5f54',
+          '#62665a', '#3c443b', '#696c61', '#4b5248'
+        ];
+        const stoneColors = [
+          'rgba(202, 208, 205, .64)',
+          'rgba(218, 222, 219, .56)',
+          'rgba(185, 193, 188, .66)',
+          'rgba(228, 231, 227, .48)'
+        ];
+
+        let width = 0;
+        let height = 0;
+        let dpr = 1;
+        let columns = 0;
+        let rows = 0;
+        let food = new Float32Array(0);
+        let worms = [];
+        let random = Math.random;
+        let seed = readSeed();
+        let lastTime = 0;
+        let frameRequest = 0;
+        let running = !document.hidden;
+        let paused = false;
+        let nextId = 1;
+
+        resize();
+        startField();
+        frameRequest = requestAnimationFrame(loop);
+
+        window.addEventListener('resize', () => {
+          resize();
+          startField();
+        }, { passive: true });
+
+        document.addEventListener('visibilitychange', () => {
+          running = !document.hidden;
+          lastTime = performance.now();
+        });
+
+        reducedMotion.addEventListener('change', startField);
+
+        canvas.addEventListener('pointerdown', (event) => {
+          canvas.focus({ preventScroll: true });
+          const rect = canvas.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+          hatchClutch(x, y, reducedMotion.matches ? 7 : 4);
+
+          if (reducedMotion.matches) {
+            growStillLife(150);
+            draw();
+          }
+
+          announce('A new clutch began feeding.');
+        });
+
+        canvas.addEventListener('keydown', (event) => {
+          if (event.key === ' ' || event.code === 'Space') {
+            event.preventDefault();
+            paused = !paused;
+            announce(paused ? 'Grazing paused.' : 'Grazing resumed.');
+            return;
+          }
+
+          if (!['r', 'R', 'Enter'].includes(event.key)) return;
+          event.preventDefault();
+          seed = (seed + 1 + Math.floor(Math.random() * 0x7fffff)) >>> 0;
+          startField();
+          announce('A new moss field has grown.');
+        });
+
+        function resize() {
+          width = Math.max(300, innerWidth);
+          height = Math.max(240, innerHeight);
+          dpr = Math.min(MAX_DPR, devicePixelRatio || 1);
+
+          for (const target of [canvas, groundCanvas, trailCanvas]) {
+            target.width = Math.round(width * dpr);
+            target.height = Math.round(height * dpr);
+          }
+
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          groundCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          trailCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          columns = Math.ceil(width / CELL);
+          rows = Math.ceil(height / CELL);
+          food = new Float32Array(columns * rows);
+        }
+
+        function startField() {
+          random = mulberry32(seed);
+          nextId = 1;
+          paused = false;
+          food.fill(1);
+          worms = [];
+          paintGround();
+          clear(trailCtx);
+
+          const area = width * height;
+          const openingWorms = clamp(Math.round(area / 70000), 9, 16);
+          for (let i = 0; i < openingWorms; i += 1) {
+            worms.push(makeWorm(
+              random() * width,
+              random() * height,
+              random() * TAU,
+              true
+            ));
+          }
+
+          growStillLife(reducedMotion.matches ? 980 : 760);
+
+          // The oldest routes settle back into the surface instead of reading
+          // as freshly painted lines.
+          trailCtx.save();
+          trailCtx.globalCompositeOperation = 'source-over';
+          trailCtx.globalAlpha = 0.16;
+          trailCtx.fillStyle = '#596057';
+          const dust = Math.round(area / 980);
+          for (let i = 0; i < dust; i += 1) {
+            const x = random() * width;
+            const y = random() * height;
+            trailCtx.fillRect(x, y, random() * 1.6 + 0.35, random() * 1.2 + 0.25);
+          }
+          trailCtx.restore();
+
+          // Keep a smaller living edge after the opening history is made.
+          worms = worms.filter((worm, index) => index % 2 === 0).slice(0, 22);
+          while (worms.length < Math.min(12, openingWorms)) {
+            worms.push(makeWorm(random() * width, random() * height, random() * TAU));
+          }
+
+          lastTime = performance.now();
+          draw();
+        }
+
+        function paintGround() {
+          clear(groundCtx, '#5d6258');
+
+          // Large, low-contrast moss colonies establish the field.
+          const colonies = Math.round(width * height / 1900);
+          for (let i = 0; i < colonies; i += 1) {
+            const x = random() * width;
+            const y = random() * height;
+            const radius = 7 + random() * 34;
+            const points = 8 + Math.floor(random() * 8);
+            groundCtx.beginPath();
+            for (let p = 0; p < points; p += 1) {
+              const angle = (p / points) * TAU;
+              const r = radius * (0.6 + random() * 0.55);
+              const px = x + Math.cos(angle) * r;
+              const py = y + Math.sin(angle) * r * (0.55 + random() * 0.35);
+              if (p === 0) groundCtx.moveTo(px, py);
+              else groundCtx.lineTo(px, py);
+            }
+            groundCtx.closePath();
+            groundCtx.globalAlpha = 0.055 + random() * 0.095;
+            groundCtx.fillStyle = mossColors[Math.floor(random() * mossColors.length)];
+            groundCtx.fill();
+          }
+
+          // Moss is a granular carpet, not a smooth green fill.
+          const grains = Math.round(width * height / 19);
+          for (let i = 0; i < grains; i += 1) {
+            const x = random() * width;
+            const y = random() * height;
+            const size = 0.25 + Math.pow(random(), 2) * 1.85;
+            groundCtx.globalAlpha = 0.18 + random() * 0.42;
+            groundCtx.fillStyle = mossColors[Math.floor(random() * mossColors.length)];
+            if (random() < 0.76) {
+              groundCtx.fillRect(x, y, size, size * (0.45 + random() * 0.8));
+            } else {
+              groundCtx.beginPath();
+              groundCtx.arc(x, y, size, 0, TAU);
+              groundCtx.fill();
+            }
+          }
+
+          // A few pale flecks remain caught in the moss.
+          const flecks = Math.round(width * height / 610);
+          groundCtx.fillStyle = '#c7ccc7';
+          for (let i = 0; i < flecks; i += 1) {
+            groundCtx.globalAlpha = 0.08 + random() * 0.18;
+            const size = 0.35 + random() * 1.15;
+            groundCtx.fillRect(random() * width, random() * height, size, size);
+          }
+
+          groundCtx.globalAlpha = 1;
+        }
+
+        function makeWorm(x, y, angle, old = false) {
+          const radius = 2.15 + random() * 1.95;
+          const worm = {
+            id: nextId++,
+            x,
+            y,
+            previousX: x,
+            previousY: y,
+            angle,
+            radius,
+            speed: 10 + random() * 7,
+            turn: 0,
+            age: old ? random() * 12 : 0,
+            lifespan: 42 + random() * 62,
+            branchIn: 8 + random() * 17,
+            steerIn: 0,
+            targetTurn: 0,
+            coverageScore: 1,
+            curvature: (random() - 0.5) * 0.1,
+            stampDistance: random() * 4,
+            body: [],
+            bodyClock: 0,
+            tone: random(),
+            alive: true
+          };
+
+          for (let i = 0; i < 9; i += 1) {
+            worm.body.push({
+              x: x - Math.cos(angle) * i * radius * 0.5,
+              y: y - Math.sin(angle) * i * radius * 0.5
+            });
+          }
+
+          return worm;
+        }
+
+        function growStillLife(steps) {
+          for (let step = 0; step < steps; step += 1) {
+            const countAtStart = worms.length;
+            for (let i = 0; i < countAtStart; i += 1) updateWorm(worms[i], 0.12, true);
+            maintainColony(true);
+          }
+        }
+
+        function loop(now) {
+          const dt = Math.min(0.05, Math.max(0, (now - lastTime) / 1000));
+          lastTime = now;
+
+          if (running && !paused && !reducedMotion.matches && dt > 0) {
+            for (const worm of worms) updateWorm(worm, dt, false);
+            maintainColony(false);
+            softenOldTrails(dt);
+            draw();
+          }
+
+          frameRequest = requestAnimationFrame(loop);
+        }
+
+        function updateWorm(worm, dt, warming) {
+          if (!worm.alive) return;
+
+          worm.previousX = worm.x;
+          worm.previousY = worm.y;
+          worm.age += dt;
+          worm.branchIn -= dt;
+          worm.steerIn -= dt;
+
+          if (worm.steerIn <= 0) {
+            worm.targetTurn = chooseCoverageTurn(worm);
+            worm.steerIn = 0.12 + random() * 0.14;
+          }
+
+          let desire = worm.targetTurn + worm.curvature;
+
+          const edge = 28 + worm.radius * 2;
+          if (worm.x < edge) desire += angleDelta(worm.angle, 0) * 1.8;
+          if (worm.x > width - edge) desire += angleDelta(worm.angle, Math.PI) * 1.8;
+          if (worm.y < edge) desire += angleDelta(worm.angle, Math.PI / 2) * 1.8;
+          if (worm.y > height - edge) desire += angleDelta(worm.angle, -Math.PI / 2) * 1.8;
+
+          worm.turn += (desire - worm.turn) * Math.min(1, dt * 4.2);
+          worm.turn *= Math.pow(0.96, dt);
+          worm.angle += worm.turn * dt;
+
+          const speed = worm.speed * (0.82 + foodAt(worm.x, worm.y) * 0.34);
+          worm.x += Math.cos(worm.angle) * speed * dt;
+          worm.y += Math.sin(worm.angle) * speed * dt;
+          worm.x = clamp(worm.x, 5, width - 5);
+          worm.y = clamp(worm.y, 5, height - 5);
+
+          const traveled = Math.hypot(worm.x - worm.previousX, worm.y - worm.previousY);
+          worm.stampDistance += traveled;
+          worm.bodyClock += traveled;
+
+          consume(worm);
+
+          if (worm.bodyClock >= worm.radius * 0.4) {
+            worm.bodyClock = 0;
+            worm.body.unshift({ x: worm.x, y: worm.y });
+            worm.body.length = Math.min(worm.body.length, 10);
+          }
+
+          if (worm.branchIn <= 0 && worms.length < maximumWorms()) {
+            const side = branchSide(worm);
+            const child = makeWorm(
+              worm.x - Math.cos(worm.angle) * worm.radius * 2,
+              worm.y - Math.sin(worm.angle) * worm.radius * 2,
+              worm.angle + side * (0.68 + random() * 0.42)
+            );
+            child.speed = worm.speed * (0.9 + random() * 0.18);
+            child.radius = clamp(worm.radius * (0.82 + random() * 0.22), 2, 4.2);
+            child.curvature = -side * (0.015 + random() * 0.045);
+            worms.push(child);
+            worm.angle -= side * (0.12 + random() * 0.18);
+            worm.curvature = side * (0.012 + random() * 0.04);
+            worm.branchIn = 11 + random() * 24;
+          }
+
+          const localFood = foodAhead(worm, 0, 34);
+          if (worm.age > worm.lifespan) worm.alive = false;
+          if (worm.age > 8 && localFood < 0.06 && random() < dt * 0.14) worm.alive = false;
+          if (worm.age > 5 && worm.coverageScore < 0.24 && random() < dt * 1.8) worm.alive = false;
+        }
+
+        function consume(worm) {
+          const x0 = worm.previousX;
+          const y0 = worm.previousY;
+          const x1 = worm.x;
+          const y1 = worm.y;
+          const foodHere = foodAt(x1, y1);
+          markEaten(x1, y1, worm.radius * 2.65);
+
+          trailCtx.save();
+          trailCtx.lineCap = 'round';
+          trailCtx.lineJoin = 'round';
+
+          // Exposed damp stone appears through the eaten moss.
+          trailCtx.strokeStyle = stoneColors[Math.floor(worm.tone * stoneColors.length) % stoneColors.length];
+          trailCtx.lineWidth = worm.radius * (0.48 + foodHere * 0.28);
+          trailCtx.beginPath();
+          trailCtx.moveTo(x0, y0);
+          trailCtx.lineTo(x1, y1);
+          trailCtx.stroke();
+
+          trailCtx.strokeStyle = 'rgba(232, 236, 232, .34)';
+          trailCtx.lineWidth = 0.42 + worm.radius * 0.06;
+          trailCtx.beginPath();
+          trailCtx.moveTo(x0, y0);
+          trailCtx.lineTo(x1, y1);
+          trailCtx.stroke();
+
+          const spacing = 1.65 + worm.radius * 0.26;
+          if (worm.stampDistance >= spacing) {
+            worm.stampDistance %= spacing;
+            const tangentX = Math.cos(worm.angle);
+            const tangentY = Math.sin(worm.angle);
+            const normalX = -tangentY;
+            const normalY = tangentX;
+            const ribLength = worm.radius * (1.55 + random() * 0.9) * (0.58 + foodHere * 0.56);
+            const rootX = x1 - tangentX * worm.radius * 0.22;
+            const rootY = y1 - tangentY * worm.radius * 0.22;
+
+            trailCtx.strokeStyle = stoneColors[Math.floor(random() * stoneColors.length)];
+            trailCtx.lineWidth = 0.42 + random() * 0.56;
+
+            for (const side of [-1, 1]) {
+              const tipX = x1 - tangentX * worm.radius * (0.4 + random() * 0.34)
+                + normalX * ribLength * side;
+              const tipY = y1 - tangentY * worm.radius * (0.4 + random() * 0.34)
+                + normalY * ribLength * side;
+              trailCtx.beginPath();
+              trailCtx.moveTo(rootX, rootY);
+              trailCtx.quadraticCurveTo(
+                x1 + normalX * ribLength * side * 0.56,
+                y1 + normalY * ribLength * side * 0.56,
+                tipX,
+                tipY
+              );
+              trailCtx.stroke();
+
+              if (foodHere > 0.16 && random() < 0.7) {
+                trailCtx.globalAlpha = 0.46 + random() * 0.38;
+                trailCtx.fillStyle = '#e5e9e5';
+                trailCtx.beginPath();
+                trailCtx.arc(tipX, tipY, 0.45 + random() * 0.75, 0, TAU);
+                trailCtx.fill();
+                trailCtx.globalAlpha = 1;
+              }
+            }
+          }
+
+          trailCtx.restore();
+        }
+
+        function maintainColony(warming) {
+          worms = worms.filter(worm => worm.alive);
+          const minimum = warming
+            ? clamp(Math.round(width * height / 82000), 9, 14)
+            : Math.min(10, maximumWorms());
+          while (worms.length < minimum) {
+            let richest = { x: random() * width, y: random() * height, food: -1 };
+            for (let attempt = 0; attempt < 14; attempt += 1) {
+              const candidate = {
+                x: 12 + random() * (width - 24),
+                y: 12 + random() * (height - 24)
+              };
+              const candidateFood = foodAt(candidate.x, candidate.y);
+              if (candidateFood > richest.food) richest = { ...candidate, food: candidateFood };
+            }
+            worms.push(makeWorm(richest.x, richest.y, random() * TAU));
+          }
+        }
+
+        function hatchClutch(x, y, count) {
+          for (let i = 0; i < count && worms.length < maximumWorms() + 6; i += 1) {
+            const angle = (i / count) * TAU + random() * 0.55;
+            const distance = random() * 13;
+            worms.push(makeWorm(
+              clamp(x + Math.cos(angle) * distance, 5, width - 5),
+              clamp(y + Math.sin(angle) * distance, 5, height - 5),
+              angle
+            ));
+          }
+        }
+
+        function softenOldTrails(dt) {
+          // Slow, uneven regrowth keeps the work alive without erasing its history.
+          if (random() > dt * 3.1) return;
+          const x = random() * width;
+          const y = random() * height;
+          const radius = 2 + random() * 6;
+          trailCtx.save();
+          trailCtx.globalCompositeOperation = 'destination-out';
+          trailCtx.globalAlpha = 0.014 + random() * 0.026;
+          trailCtx.beginPath();
+          trailCtx.arc(x, y, radius, 0, TAU);
+          trailCtx.fill();
+          trailCtx.restore();
+
+          const gx = clamp(Math.floor(x / CELL), 0, columns - 1);
+          const gy = clamp(Math.floor(y / CELL), 0, rows - 1);
+          const index = gy * columns + gx;
+          food[index] = Math.min(1, food[index] + 0.006);
+        }
+
+        function draw() {
+          ctx.globalAlpha = 1;
+          ctx.drawImage(groundCanvas, 0, 0, width, height);
+          ctx.drawImage(trailCanvas, 0, 0, width, height);
+          drawWorms();
+        }
+
+        function drawWorms() {
+          ctx.save();
+          for (const worm of worms) {
+            if (!worm.alive || worm.body.length < 2) continue;
+
+            for (let i = worm.body.length - 1; i >= 0; i -= 1) {
+              const point = worm.body[i];
+              const t = 1 - i / worm.body.length;
+              const radius = worm.radius * (0.22 + t * 0.19);
+              ctx.fillStyle = i % 2 === 0
+                ? 'rgba(224, 228, 221, .72)'
+                : 'rgba(76, 81, 70, .82)';
+              ctx.beginPath();
+              ctx.arc(point.x, point.y, radius, 0, TAU);
+              ctx.fill();
+            }
+
+            ctx.fillStyle = '#363b33';
+            ctx.beginPath();
+            ctx.ellipse(
+              worm.x,
+              worm.y,
+              worm.radius * 0.48,
+              worm.radius * 0.36,
+              worm.angle,
+              0,
+              TAU
+            );
+            ctx.fill();
+
+            const antennaLength = worm.radius * 0.75;
+            const forwardX = Math.cos(worm.angle);
+            const forwardY = Math.sin(worm.angle);
+            const normalX = -forwardY;
+            const normalY = forwardX;
+            ctx.strokeStyle = 'rgba(42, 47, 39, .76)';
+            ctx.lineWidth = 0.55;
+            for (const side of [-1, 1]) {
+              ctx.beginPath();
+              ctx.moveTo(worm.x + forwardX * worm.radius * 0.25, worm.y + forwardY * worm.radius * 0.25);
+              ctx.lineTo(
+                worm.x + forwardX * antennaLength + normalX * worm.radius * 0.36 * side,
+                worm.y + forwardY * antennaLength + normalY * worm.radius * 0.36 * side
+              );
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
+        }
+
+        function foodAhead(worm, offset, distance) {
+          const angle = worm.angle + offset;
+          return foodPatch(
+            worm.x + Math.cos(angle) * distance,
+            worm.y + Math.sin(angle) * distance,
+            worm.radius * 2.4
+          );
+        }
+
+        function chooseCoverageTurn(worm) {
+          const offsets = [-1.34, -1.02, -0.72, -0.43, -0.2, 0, 0.2, 0.43, 0.72, 1.02, 1.34];
+          let bestOffset = 0;
+          let bestScore = -Infinity;
+
+          for (const offset of offsets) {
+            const angle = worm.angle + offset;
+            const nearDistance = 18 + worm.radius * 2;
+            const middleDistance = 38 + worm.radius * 3;
+            const farDistance = 68 + worm.radius * 4;
+            const farX = worm.x + Math.cos(angle) * farDistance;
+            const farY = worm.y + Math.sin(angle) * farDistance;
+
+            if (farX < 8 || farX > width - 8 || farY < 8 || farY > height - 8) continue;
+
+            const near = foodPatch(
+              worm.x + Math.cos(angle) * nearDistance,
+              worm.y + Math.sin(angle) * nearDistance,
+              worm.radius * 2.1
+            );
+            const middle = foodPatch(
+              worm.x + Math.cos(angle) * middleDistance,
+              worm.y + Math.sin(angle) * middleDistance,
+              worm.radius * 2.7
+            );
+            const far = foodPatch(farX, farY, worm.radius * 3.2);
+            const continuity = Math.cos(offset) * 0.065;
+            const score = near * 0.59 + middle * 0.27 + far * 0.14 + continuity + random() * 0.006;
+
+            if (score > bestScore) {
+              bestScore = score;
+              bestOffset = offset;
+            }
+          }
+
+          worm.coverageScore = bestScore;
+          return clamp(bestOffset * 1.65, -1.48, 1.48);
+        }
+
+        function branchSide(worm) {
+          const distance = 34 + worm.radius * 3;
+          const left = foodAhead(worm, -0.88, distance);
+          const right = foodAhead(worm, 0.88, distance);
+          if (Math.abs(left - right) < 0.025) return random() < 0.5 ? -1 : 1;
+          return left > right ? -1 : 1;
+        }
+
+        function foodPatch(x, y, radius) {
+          const samples = [
+            [0, 0], [-radius, 0], [radius, 0], [0, -radius], [0, radius],
+            [-radius * 0.7, -radius * 0.7], [radius * 0.7, -radius * 0.7],
+            [-radius * 0.7, radius * 0.7], [radius * 0.7, radius * 0.7]
+          ];
+          let total = 0;
+          for (const [dx, dy] of samples) total += foodAt(x + dx, y + dy);
+          return total / samples.length;
+        }
+
+        function foodAt(x, y) {
+          const gx = clamp(Math.floor(x / CELL), 0, columns - 1);
+          const gy = clamp(Math.floor(y / CELL), 0, rows - 1);
+          return food[gy * columns + gx] || 0;
+        }
+
+        function markEaten(x, y, radius) {
+          const minX = clamp(Math.floor((x - radius) / CELL), 0, columns - 1);
+          const maxX = clamp(Math.floor((x + radius) / CELL), 0, columns - 1);
+          const minY = clamp(Math.floor((y - radius) / CELL), 0, rows - 1);
+          const maxY = clamp(Math.floor((y + radius) / CELL), 0, rows - 1);
+          const radiusSquared = radius * radius;
+
+          for (let gy = minY; gy <= maxY; gy += 1) {
+            for (let gx = minX; gx <= maxX; gx += 1) {
+              const dx = gx * CELL + CELL * 0.5 - x;
+              const dy = gy * CELL + CELL * 0.5 - y;
+              const distanceSquared = dx * dx + dy * dy;
+              if (distanceSquared > radiusSquared) continue;
+              const index = gy * columns + gx;
+              const bite = 0.52 + (1 - distanceSquared / radiusSquared) * 0.48;
+              food[index] = Math.max(0, food[index] - bite);
+            }
+          }
+        }
+
+        function maximumWorms() {
+          return clamp(Math.round(width * height / 22000), 22, 48);
+        }
+
+        function announce(message) {
+          status.textContent = '';
+          requestAnimationFrame(() => { status.textContent = message; });
+        }
+
+        function clear(context, color) {
+          context.save();
+          context.setTransform(1, 0, 0, 1, 0, 0);
+          context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+          if (color) {
+            context.fillStyle = color;
+            context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+          }
+          context.restore();
+        }
+
+        function readSeed() {
+          const value = Number(new URLSearchParams(location.search).get('seed'));
+          return Number.isFinite(value) && value !== 0
+            ? value >>> 0
+            : Math.floor(Math.random() * 0xffffffff) >>> 0;
+        }
+
+        function angleDelta(from, to) {
+          let delta = (to - from) % TAU;
+          if (delta > Math.PI) delta -= TAU;
+          if (delta < -Math.PI) delta += TAU;
+          return delta;
+        }
+
+        function clamp(value, minimum, maximum) {
+          return Math.max(minimum, Math.min(maximum, value));
+        }
+
+        function mulberry32(value) {
+          return function next() {
+            value |= 0;
+            value = value + 0x6D2B79F5 | 0;
+            let result = Math.imul(value ^ value >>> 15, 1 | value);
+            result = result + Math.imul(result ^ result >>> 7, 61 | result) ^ result;
+            return ((result ^ result >>> 14) >>> 0) / 4294967296;
+          };
+        }
+      })();
+    </script>
+  </body>
+</html>

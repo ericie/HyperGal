@@ -5,558 +5,835 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="Dark liquid begins halfway down a masonry depth map, filling recessed basins before overflowing through their lowest channels."
+      content="Angled brush strikes and scattered splats release wet gravity drips that pool and overflow across a dark field."
     />
     <title>Drips · HyperGal</title>
     <style>
-      :root {
-        color-scheme: light;
-        --wall: oklch(0.77 0.008 95);
-        --focus: oklch(0.42 0.09 225);
-      }
-
+      :root { color-scheme: dark; --ground: oklch(0.09 0.018 265); --focus: oklch(0.82 0.08 85); }
       * { box-sizing: border-box; }
-
-      html,
-      body {
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        overflow: hidden;
-        background: var(--wall);
+      html, body {
+        width: 100%; height: 100%; margin: 0; overflow: hidden;
+        background: var(--ground);
       }
-
       body { min-width: 300px; }
-
       canvas {
-        position: fixed;
-        inset: 0;
-        display: block;
-        width: 100%;
-        height: 100%;
-        background: var(--wall);
+        position: fixed; inset: 0; display: block;
+        width: 100%; height: 100%;
+        background: var(--ground);
         cursor: crosshair;
         touch-action: none;
       }
-
-      canvas:focus-visible {
-        outline: 3px solid var(--focus);
-        outline-offset: -7px;
-      }
-
+      canvas:focus-visible { outline: 3px solid var(--focus); outline-offset: -7px; }
       .instructions {
-        position: fixed;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
+        position: fixed; width: 1px; height: 1px; padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
       }
     </style>
+    <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
   <body>
     <canvas
-      id="wall"
+      id="painting"
       tabindex="0"
       aria-describedby="instructions"
-      aria-label="Drips: dark liquid flowing down a colored masonry depth map, pooling in recesses and overflowing through lower channels."
+      aria-label="Drips: pale brush strikes and splats continually release flowing paint over a dark field."
     ></canvas>
     <p class="instructions" id="instructions">
-      Click or tap the wall to add ink. Press R, Space, or Enter to make a new wall.
+      The painting builds automatically. Click or tap to begin another pour. Press R, Space, or Enter to clear and begin again.
     </p>
 
     <script>
       (() => {
         'use strict';
 
-        const canvas = document.querySelector('#wall');
+        const canvas = document.querySelector('#painting');
         const ctx = canvas.getContext('2d', { alpha: false });
+        const historyCanvas = document.createElement('canvas');
+        const historyCtx = historyCanvas.getContext('2d');
+        const activeCanvas = document.createElement('canvas');
+        const activeCtx = activeCanvas.getContext('2d');
         const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-        const TAU = Math.PI * 2;
-        const STEP_SECONDS = 0.052;
-        const WATER_HEIGHT = 0.62;
-        const GRAVITY_DROP = 0.052;
-        const params = new URLSearchParams(location.search);
+        const palette = [
+          [239, 236, 220],
+          [203, 207, 216],
+          [177, 185, 204],
+          [226, 224, 211],
+          [133, 146, 177],
+          [244, 241, 226]
+        ];
 
         let width = 0;
         let height = 0;
         let dpr = 1;
-        let cell = 4;
-        let cols = 0;
-        let rows = 0;
-        let seed = Number(params.get('seed')) || Math.floor(Math.random() * 0x7fffffff);
-        let wet;
-        let stain;
-        let basin;
-        let terrain;
-        let porosity;
-        let inkImage;
-        let inkPixels;
-        let inkCanvas;
-        let inkCtx;
-        let maskCanvas;
-        let maskCtx;
-        let wallCanvas;
-        let wallCtx;
-        let brickWidth = 240;
-        let brickHeight = 88;
-        let mortar = 6;
-        let patches = [];
-        let sources = [];
-        let accumulator = 0;
-        let lastTime = performance.now();
-        let frame = 0;
+        let seed = Math.floor(Math.random() * 0x7fffffff);
+        let random = mulberry32(seed);
+        let ridges = [];
+        let currentLayer = null;
+        let layerCount = 0;
+        let layerStartedAt = 0;
+        let lastPaintAt = 0;
         let running = !document.hidden;
-        let flowSteps = 0;
+        let frame = 0;
 
         resize();
-        resetWorld(seed);
+        beginPainting();
         frame = requestAnimationFrame(loop);
 
-        window.addEventListener('resize', resizeAndReset, { passive: true });
+        window.addEventListener('resize', () => {
+          resize();
+          beginPainting();
+        }, { passive: true });
+
         document.addEventListener('visibilitychange', () => {
           running = !document.hidden;
-          lastTime = performance.now();
-          if (running && !frame) frame = requestAnimationFrame(loop);
         });
-        reducedMotion.addEventListener('change', resizeAndReset);
 
-        canvas.addEventListener('pointerdown', (event) => {
+        reducedMotion.addEventListener('change', beginPainting);
+
+        canvas.addEventListener('pointerdown', () => {
           canvas.focus({ preventScroll: true });
-          const rect = canvas.getBoundingClientRect();
-          addSpill(
-            Math.floor(((event.clientX - rect.left) / rect.width) * cols),
-            Math.floor(((event.clientY - rect.top) / rect.height) * rows)
-          );
-          draw();
+          if (reducedMotion.matches) {
+            commitLayer(makeLayer(), 1);
+            draw();
+          } else {
+            currentLayer = makeLayer();
+            layerStartedAt = performance.now();
+          }
         });
 
         canvas.addEventListener('keydown', (event) => {
           if (!['r', 'R', ' ', 'Enter'].includes(event.key)) return;
           event.preventDefault();
           seed = (seed + 1 + Math.floor(Math.random() * 100000)) >>> 0;
-          resetWorld(seed);
-          draw();
+          beginPainting();
         });
 
         function resize() {
           width = Math.max(300, window.innerWidth);
           height = Math.max(240, window.innerHeight);
-          dpr = Math.min(2, window.devicePixelRatio || 1);
-          canvas.width = Math.round(width * dpr);
-          canvas.height = Math.round(height * dpr);
+          dpr = Math.min(1.6, window.devicePixelRatio || 1);
+
+          for (const target of [canvas, historyCanvas, activeCanvas]) {
+            target.width = Math.round(width * dpr);
+            target.height = Math.round(height * dpr);
+          }
           canvas.style.width = `${width}px`;
           canvas.style.height = `${height}px`;
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-          cell = Math.max(2, Math.ceil(width / 520));
-          cols = Math.ceil(width / cell);
-          rows = Math.ceil(height / cell);
-          brickWidth = clamp(width / 3.15, 164, 310);
-          brickHeight = clamp(height / 10.2, 68, 104);
-          mortar = clamp(Math.min(width, height) * 0.007, 4, 8);
-
-          inkCanvas = document.createElement('canvas');
-          inkCanvas.width = cols;
-          inkCanvas.height = rows;
-          inkCtx = inkCanvas.getContext('2d');
-          inkImage = inkCtx.createImageData(cols, rows);
-          inkPixels = inkImage.data;
-
-          maskCanvas = document.createElement('canvas');
-          maskCanvas.width = cols;
-          maskCanvas.height = rows;
-          maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
-
-          wallCanvas = document.createElement('canvas');
-          wallCanvas.width = Math.round(width * dpr);
-          wallCanvas.height = Math.round(height * dpr);
-          wallCtx = wallCanvas.getContext('2d', { alpha: false });
-          wallCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          historyCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          activeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         }
 
-        function resizeAndReset() {
-          resize();
-          resetWorld(seed);
-        }
+        function beginPainting() {
+          random = mulberry32(seed);
+          layerCount = 0;
+          lastPaintAt = 0;
+          ridges = makeRidges();
+          currentLayer = null;
+          clearContext(historyCtx, '#080b12');
+          clearContext(activeCtx);
 
-        function resetWorld(nextSeed) {
-          seed = nextSeed >>> 0;
-          wet = new Float32Array(cols * rows);
-          stain = new Float32Array(cols * rows);
-          basin = new Float32Array(cols * rows);
-          terrain = new Float32Array(cols * rows);
-          porosity = new Float32Array(cols * rows);
-          patches = [];
-          sources = [];
-          flowSteps = 0;
-          accumulator = 0;
+          const openingLayers = reducedMotion.matches ? 24 : 14;
+          for (let i = 0; i < openingLayers; i += 1) commitLayer(makeLayer(), 1);
 
-          for (let y = 0; y < rows; y += 1) {
-            for (let x = 0; x < cols; x += 1) {
-              porosity[indexOf(x, y)] = 0.68 + noise2(x * 0.19, y * 0.17, seed + 91) * 0.5;
-            }
+          if (!reducedMotion.matches) {
+            currentLayer = makeLayer();
+            layerStartedAt = performance.now();
           }
-
-          makeSources();
-          makePatches();
-          rasterizeBasins();
-          buildDepthMap();
-          paintWall();
-
-          const previewSteps = reducedMotion.matches
-            ? Math.min(Math.ceil(rows * 0.95), 500)
-            : Math.min(Math.ceil(rows * 0.72), 390);
-          for (let i = 0; i < previewSteps; i += 1) stepFlow(3.2);
           draw();
-        }
-
-        function makeSources() {
-          const count = Math.max(5, Math.min(9, Math.round(width / 170)));
-          const gap = cols / (count + 1);
-          for (let i = 0; i < count; i += 1) {
-            const jitter = (hash(seed + i * 1777) - 0.5) * gap * 0.9;
-            sources.push({
-              x: clamp(Math.round(gap * (i + 1) + jitter), 10, cols - 11),
-              radius: 8 + Math.floor(hash(seed + i * 6323) * 16),
-              rate: 0.016 + hash(seed + i * 811) * 0.022,
-              delay: Math.floor(hash(seed + i * 2267) * 28),
-              pulse: 0.72 + hash(seed + i * 4127) * 0.7
-            });
-          }
-        }
-
-        function makePatches() {
-          const brickRows = Math.ceil(height / brickHeight) + 1;
-          const count = clamp(Math.round((width * height) / 61000), 12, 28);
-          const interceptors = Math.min(sources.length * 2, Math.ceil(count * 0.58));
-
-          for (let i = 0; i < count; i += 1) {
-            const tied = i < interceptors;
-            const source = sources[i % sources.length];
-            const row = tied
-              ? 1 + Math.floor(hash(seed + i * 1543) * Math.max(2, brickRows - 3))
-              : Math.floor(hash(seed + i * 2017) * brickRows);
-            const rowOffset = row % 2 ? -brickWidth * 0.5 : 0;
-            const desiredX = tied ? source.x * cell : hash(seed + i * 1009) * width;
-            const column = Math.floor((desiredX - rowOffset) / brickWidth);
-            const brickLeft = column * brickWidth + rowOffset + mortar * 1.5;
-            const brickRight = brickLeft + brickWidth - mortar * 3;
-            const cxPx = clamp(
-              desiredX + (hash(seed + i * 919) - 0.5) * brickWidth * 0.22,
-              brickLeft + brickWidth * 0.2,
-              brickRight - brickWidth * 0.2
-            );
-            const cyPx = clamp(
-              row * brickHeight + brickHeight * lerp(0.42, 0.62, hash(seed + i * 2311)),
-              mortar * 2,
-              height - mortar * 2
-            );
-            const cx = cxPx / cell;
-            const cy = cyPx / cell;
-            const rx = lerp(brickWidth * 0.15, brickWidth * 0.34, hash(seed + i * 3011)) / cell;
-            const ry = lerp(brickHeight * 0.16, brickHeight * 0.34, hash(seed + i * 4021)) / cell;
-            const points = [];
-            const pointCount = 22 + Math.floor(hash(seed + i * 5023) * 10);
-            for (let p = 0; p < pointCount; p += 1) {
-              const angle = (p / pointCount) * TAU;
-              const rough = 0.7
-                + hash(seed + i * 7919 + p * 313) * 0.38
-                + Math.sin(angle * (4 + (i % 3)) + i) * 0.08;
-              points.push({
-                x: clamp(cx + Math.cos(angle) * rx * rough, 1, cols - 2),
-                y: clamp(cy + Math.sin(angle) * ry * rough, 5, rows - 2)
-              });
-            }
-            patches.push({ points });
-          }
-        }
-
-        function rasterizeBasins() {
-          maskCtx.clearRect(0, 0, cols, rows);
-          patches.forEach((patch, patchIndex) => {
-            const value = 110 + Math.round(hash(seed + patchIndex * 3571) * 120);
-            maskCtx.fillStyle = `rgb(${value}, ${value}, ${value})`;
-            pathPatch(maskCtx, patch, 1);
-            maskCtx.fill();
-          });
-          const data = maskCtx.getImageData(0, 0, cols, rows).data;
-          for (let i = 0; i < basin.length; i += 1) basin[i] = data[i * 4] / 255;
-        }
-
-        function buildDepthMap() {
-          for (let y = 0; y < rows; y += 1) {
-            const py = y * cell;
-            const brickRow = Math.floor(py / brickHeight);
-            const rowOffset = brickRow % 2 ? -brickWidth * 0.5 : 0;
-            for (let x = 0; x < cols; x += 1) {
-              const px = x * cell;
-              const localX = ((px - rowOffset) % brickWidth + brickWidth) % brickWidth;
-              const localY = py % brickHeight;
-              const distanceToJoint = Math.min(
-                localX,
-                brickWidth - localX,
-                localY,
-                brickHeight - localY
-              );
-              const jointDepth = clamp(1 - distanceToJoint / (mortar * 1.45), 0, 1);
-              const broad = noise2(x * 0.032, y * 0.036, seed + 1709);
-              const fine = noise2(x * 0.21, y * 0.19, seed + 7907);
-              const i = indexOf(x, y);
-              terrain[i] = 0.58 + broad * 0.24 + fine * 0.075
-                - jointDepth * 0.34
-                - basin[i] * 0.42;
-            }
-          }
-        }
-
-        function paintWall() {
-          const random = mulberry32(seed + 1447);
-          const depthImage = maskCtx.createImageData(cols, rows);
-          const pixels = depthImage.data;
-          for (let i = 0; i < terrain.length; i += 1) {
-            const normalized = clamp((terrain[i] - 0.12) / 0.76, 0, 1);
-            const eased = normalized * normalized * (3 - 2 * normalized);
-            const cool = basin[i] * 0.16;
-            const offset = i * 4;
-            pixels[offset] = Math.round(lerp(44, 215, eased) - cool * 22);
-            pixels[offset + 1] = Math.round(lerp(54, 211, eased) - cool * 7);
-            pixels[offset + 2] = Math.round(lerp(57, 198, eased) + cool * 19);
-            pixels[offset + 3] = 255;
-          }
-          maskCtx.putImageData(depthImage, 0, 0);
-          wallCtx.imageSmoothingEnabled = true;
-          wallCtx.drawImage(maskCanvas, 0, 0, width, height);
-
-          wallCtx.globalCompositeOperation = 'multiply';
-          for (let i = 0, count = Math.floor((width * height) / 155); i < count; i += 1) {
-            const x = random() * width;
-            const y = random() * height;
-            const alpha = 0.025 + random() * 0.095;
-            wallCtx.fillStyle = `rgba(35, 37, 35, ${alpha})`;
-            const size = 0.4 + Math.pow(random(), 2) * 2.1;
-            wallCtx.fillRect(x, y, size, size * (0.5 + random()));
-          }
-
-          wallCtx.globalAlpha = 0.2;
-          wallCtx.strokeStyle = '#242726';
-          wallCtx.lineWidth = 0.7;
-          for (let i = 0; i < Math.floor(width / 24); i += 1) {
-            const x = random() * width;
-            const y = random() * height;
-            wallCtx.beginPath();
-            wallCtx.moveTo(x, y);
-            wallCtx.quadraticCurveTo(x + random() * 5 - 2.5, y + random() * 14, x + random() * 7 - 3.5, y + 12 + random() * 34);
-            wallCtx.stroke();
-          }
-          wallCtx.globalAlpha = 1;
-          wallCtx.globalCompositeOperation = 'source-over';
         }
 
         function loop(now) {
-          const dt = Math.min(0.05, Math.max(0, (now - lastTime) / 1000));
-          lastTime = now;
+          if (
+            running
+            && !reducedMotion.matches
+            && currentLayer
+            && now - lastPaintAt >= 1000 / 30
+          ) {
+            lastPaintAt = now;
+            const elapsed = (now - layerStartedAt) / 1000;
+            const progress = clamp(elapsed / currentLayer.duration, 0, 1);
+            renderLayer(activeCtx, currentLayer, easeOutQuint(progress));
+            draw();
 
-          if (running && !reducedMotion.matches) {
-            accumulator += dt;
-            while (accumulator >= STEP_SECONDS) {
-              stepFlow();
-              accumulator -= STEP_SECONDS;
+            if (progress >= 1) {
+              commitActive();
+              currentLayer = makeLayer();
+              layerStartedAt = now + 90 + random() * 280;
             }
           }
 
-          draw();
           frame = requestAnimationFrame(loop);
         }
 
-        function stepFlow(speed = 1) {
-          flowSteps += 1;
-          feedSources(speed);
+        function makeRidges() {
+          const count = height < 560 ? 2 : 3;
+          return Array.from({ length: count }, (_, index) => ({
+            y: height * (0.61 + index * 0.115) + (random() - 0.5) * height * 0.018
+          }));
+        }
 
-          for (let y = rows - 2; y >= 0; y -= 1) {
-            const wind = hash(seed + y * 9187) < 0.5 ? -1 : 1;
-            const start = wind > 0 ? 0 : cols - 1;
-            const end = wind > 0 ? cols : -1;
+        function ridgeY(ridge) {
+          return ridge.y;
+        }
 
-            for (let x = start; x !== end; x += wind) {
-              const i = indexOf(x, y);
-              let amount = wet[i];
-              if (amount < 0.007) continue;
+        function makeLayer() {
+          const color = palette[Math.floor(random() * palette.length)];
+          const mode = chooseWeighted([
+            ['veil', 0.34], ['threads', 0.29], ['wash', 0.2], ['dry', 0.17]
+          ]);
+          const sourceWidth = width * (0.16 + random() * 0.3);
+          const placement = (
+            hash(seed + 313) + layerCount * 0.61803398875 + (random() - 0.5) * 0.16 + 1
+          ) % 1;
+          const sourceCenter = lerp(width * 0.08, width * 0.92, placement);
+          const sourceLeft = clamp(sourceCenter - sourceWidth * 0.5, 0, width - sourceWidth);
+          const source = {
+            x: sourceLeft + sourceWidth * 0.5,
+            y: height * (0.025 + Math.pow(random(), 1.55) * 0.48),
+            width: sourceWidth,
+            height: height * (0.014 + random() * 0.036),
+            angle: (random() - 0.5) * 0.62
+          };
+          const layer = {
+            color,
+            mode,
+            source,
+            opacity: mode === 'wash' ? 0.09 + random() * 0.1 : 0.16 + random() * 0.27,
+            duration: 3.8 + random() * 4.8,
+            strokes: [],
+            sourceMarks: [],
+            splats: []
+          };
 
-              stain[i] = Math.min(1, Math.max(stain[i], amount * 0.74 + 0.075));
-              const currentLevel = terrain[i] + amount * WATER_HEIGHT;
-              const localRate = 0.075 * porosity[i] * speed;
-              const preference = hash(seed + i * 101) < 0.5 ? -1 : 1;
-              const candidates = [];
+          const sourceMarks = Math.max(9, Math.floor(sourceWidth / 14));
+          for (let i = 0; i < sourceMarks; i += 1) {
+            const center = (random() - 0.5) * sourceWidth;
+            const across = (random() - 0.5) * source.height;
+            const length = sourceWidth * (0.045 + random() * 0.24);
+            const bow = (random() - 0.5) * Math.min(10, source.height * 0.32);
+            layer.sourceMarks.push({
+              points: [
+                orientedPoint(source, center - length * 0.5, across + (random() - 0.5) * 3),
+                orientedPoint(source, center, across + bow),
+                orientedPoint(source, center + length * 0.5, across + (random() - 0.5) * 3)
+              ],
+              width: 1 + Math.pow(random(), 1.8) * 12,
+              alpha: 0.08 + random() * 0.25,
+              dryness: 0.25 + random() * 0.68,
+              seed: Math.floor(random() * 0x7fffffff)
+            });
+          }
 
-              for (const [dx, dy] of [
-                [0, 1], [preference, 1], [-preference, 1],
-                [preference, 0], [-preference, 0]
-              ]) {
-                const nx = x + dx;
-                const ny = y + dy;
-                if (nx < 0 || nx >= cols || ny < 0 || ny >= rows) continue;
-                const to = indexOf(nx, ny);
-                const targetLevel = terrain[to] + wet[to] * WATER_HEIGHT - dy * GRAVITY_DROP;
-                candidates.push({ to, drop: currentLevel - targetLevel, dy });
-              }
+          const splatCount = 3 + Math.floor(random() * 9);
+          for (let i = 0; i < splatCount; i += 1) {
+            const along = (random() - 0.5) * sourceWidth * 1.28;
+            let across = (random() - 0.5) * source.height * 3.2;
+            if (random() < 0.24) across *= 1.8 + random() * 2.6;
+            const point = orientedPoint(source, along, across);
+            layer.splats.push({
+              x: clamp(point.x, -20, width + 20),
+              y: clamp(point.y, -20, height * 0.58),
+              radius: 1.4 + Math.pow(random(), 1.8) * 12,
+              alpha: 0.18 + random() * 0.5,
+              delay: random() * 0.16,
+              seed: Math.floor(random() * 0x7fffffff)
+            });
+          }
 
-              candidates.sort((a, b) => b.drop - a.drop);
-              for (let c = 0; c < Math.min(3, candidates.length); c += 1) {
-                const candidate = candidates[c];
-                if (candidate.drop <= 0.003 || amount <= 0.006) break;
-                const slopeFlow = candidate.drop * (candidate.dy ? 0.34 : 0.22);
-                const requested = Math.min(
-                  amount * (candidate.dy ? 0.34 : 0.2),
-                  localRate,
-                  slopeFlow * speed
+          const strokeCount = Math.round(sourceWidth / lerp(9, 19, random()));
+          for (let i = 0; i < strokeCount; i += 1) {
+            const position = (i + random() * 0.9) / strokeCount;
+            const sourcePoint = orientedPoint(
+              source,
+              (position - 0.5) * sourceWidth,
+              source.height * (0.18 + random() * 0.48)
+            );
+            if (random() < (mode === 'dry' ? 0.4 : 0.18)) continue;
+            layer.strokes.push(makePourStroke(layer, sourcePoint.x, sourcePoint.y, i, 'brush'));
+          }
+
+          for (let i = 0; i < layer.splats.length; i += 1) {
+            const splat = layer.splats[i];
+            if (splat.radius < 2.2 || random() > 0.58) continue;
+            layer.strokes.push(makePourStroke(
+              layer,
+              splat.x + (random() - 0.5) * splat.radius,
+              splat.y + splat.radius * (0.42 + random() * 0.52),
+              i + 311,
+              'splat'
+            ));
+          }
+
+          return layer;
+        }
+
+        function orientedPoint(source, along, across) {
+          const cosine = Math.cos(source.angle);
+          const sine = Math.sin(source.angle);
+          return {
+            x: source.x + along * cosine - across * sine,
+            y: source.y + along * sine + across * cosine
+          };
+        }
+
+        function makePourStroke(layer, x, startY, index, origin) {
+          const weightRoll = random();
+          const lineWidth = weightRoll < 0.52
+            ? 0.55 + random() * 1.35
+            : weightRoll < 0.88
+              ? 1.8 + random() * 4.2
+              : 6 + random() * 12;
+          const eligibleRidges = ridges
+            .map((ridge, ridgeIndex) => ({ ridge, ridgeIndex }))
+            .filter(({ ridge }) => ridgeY(ridge) > startY + height * 0.045);
+          const chosen = eligibleRidges.length && random() < 0.78
+            ? eligibleRidges[Math.floor(Math.pow(random(), 1.45) * eligibleRidges.length)]
+            : null;
+          const chosenRidge = chosen
+            ? chosen.ridgeIndex
+            : -1;
+          const collisionY = chosen
+            ? ridgeY(chosen.ridge)
+            : Math.max(startY + height * 0.14, height * (0.76 + random() * 0.34));
+          const stopShort = random() < (origin === 'splat' ? 0.18 : layer.mode === 'dry' ? 0.34 : 0.14);
+          const endY = stopShort
+            ? lerp(startY + height * 0.035, collisionY, 0.22 + random() * 0.58)
+            : collisionY;
+          const points = verticalRun(x, startY, endY, lineWidth, index);
+          const deposits = [];
+          const strokeSeed = Math.floor(random() * 0x7fffffff);
+
+          if (!stopShort && chosenRidge >= 0) {
+            const direction = random() < 0.5 ? -1 : 1;
+            const spread = width * (0.018 + random() * 0.095);
+            const spillX = clamp(x + direction * spread, 0, width);
+            const shelfPoints = [];
+            const shelfSteps = 4 + Math.floor(random() * 5);
+            for (let step = 0; step <= shelfSteps; step += 1) {
+              const shelfX = lerp(x, spillX, step / shelfSteps);
+              shelfPoints.push({ x: shelfX, y: ridgeY(ridges[chosenRidge], shelfX) - lineWidth * 0.3 });
+            }
+            deposits.push({
+              kind: 'shelf',
+              points: shelfPoints,
+              width: lineWidth * (0.7 + random() * 2.4),
+              alpha: 0.2 + random() * 0.5,
+              delay: 0.58 + random() * 0.18,
+              dryness: 0.18 + random() * 0.56,
+              seed: strokeSeed + 701
+            });
+
+            if (random() < 0.62) {
+              const nextY = chosenRidge + 1 < ridges.length
+                ? ridgeY(ridges[chosenRidge + 1], spillX)
+                : height * (0.91 + random() * 0.16);
+              deposits.push({
+                kind: 'overflow',
+                points: verticalRun(spillX, shelfPoints.at(-1).y, nextY, lineWidth * 0.72, index + 117),
+                width: Math.max(0.4, lineWidth * (0.42 + random() * 0.72)),
+                alpha: 0.18 + random() * 0.48,
+                delay: 0.7 + random() * 0.2,
+                dryness: 0.12 + random() * 0.45,
+                seed: strokeSeed + 1409
+              });
+            }
+          }
+
+          return {
+            origin,
+            points,
+            deposits,
+            width: lineWidth,
+            alpha: 0.24 + random() * 0.68,
+            delay: 0.1 + random() * 0.2,
+            speed: 0.76 + random() * 0.46,
+            seed: strokeSeed
+          };
+        }
+
+        function verticalRun(x, fromY, toY, lineWidth, salt) {
+          const distance = Math.max(1, toY - fromY);
+          const steps = clamp(Math.ceil(distance / 34), 5, 28);
+          const drift = Math.min(9, 1.2 + lineWidth * 0.72);
+          const phase = random() * Math.PI * 2 + salt;
+          const points = [];
+          for (let step = 0; step <= steps; step += 1) {
+            const progress = step / steps;
+            const taper = Math.sin(progress * Math.PI);
+            points.push({
+              x: x + Math.sin(progress * Math.PI * 2 + phase) * drift * taper,
+              y: lerp(fromY, toY, progress)
+            });
+          }
+          return points;
+        }
+
+        function renderLayer(context, layer, progress) {
+          clearContext(context);
+          context.save();
+          context.globalCompositeOperation = 'source-over';
+
+          const sourceProgress = clamp(progress / 0.24, 0, 1);
+          for (const mark of layer.sourceMarks) {
+            const visible = clamp((sourceProgress - mark.alpha * 0.25) * 1.4, 0, 1);
+            if (visible <= 0) continue;
+            paintBrushPath(
+              context,
+              mark.points,
+              visible,
+              mark.width,
+              layer.opacity * (0.45 + mark.alpha * 1.2),
+              layer.color,
+              mark.dryness,
+              mark.seed
+            );
+          }
+
+          for (const splat of layer.splats) {
+            const visible = clamp((sourceProgress - splat.delay) / (1 - splat.delay), 0, 1);
+            if (visible <= 0) continue;
+            paintSplat(context, splat, easeOutQuart(visible), layer.color, layer.opacity * splat.alpha);
+          }
+
+          for (const stroke of layer.strokes) {
+            const local = clamp((progress - stroke.delay) * stroke.speed / (1 - stroke.delay), 0, 1);
+            if (local <= 0) continue;
+            paintFluidPath(
+              context,
+              stroke.points,
+              local,
+              stroke.width,
+              layer.opacity * stroke.alpha,
+              layer.color,
+              stroke.seed
+            );
+
+            for (const deposit of stroke.deposits) {
+              const depositProgress = clamp((progress - deposit.delay) / (1 - deposit.delay), 0, 1);
+              if (depositProgress <= 0) continue;
+              const easedDeposit = easeOutQuart(depositProgress);
+              if (deposit.kind === 'shelf') {
+                paintShelfDeposit(
+                  context,
+                  deposit.points,
+                  easedDeposit,
+                  deposit.width,
+                  layer.opacity * deposit.alpha,
+                  layer.color,
+                  deposit.dryness,
+                  deposit.seed
                 );
-                const moved = transfer(candidate.to, amount, requested);
-                amount -= moved;
+              } else {
+                paintFluidPath(
+                  context,
+                  deposit.points,
+                  easedDeposit,
+                  deposit.width,
+                  layer.opacity * deposit.alpha,
+                  layer.color,
+                  deposit.seed
+                );
               }
-
-              wet[i] = Math.max(0, amount - 0.0002 * speed);
             }
           }
+          context.restore();
+        }
 
-          const bottom = rows - 1;
-          for (let x = 0; x < cols; x += 1) {
-            const i = indexOf(x, bottom);
-            if (wet[i] > 0.01) stain[i] = Math.min(1, Math.max(stain[i], wet[i]));
-            wet[i] *= 0.965;
+        function paintFluidPath(context, points, progress, width, opacity, color, flowSeed) {
+          if (points.length < 2 || progress <= 0 || opacity <= 0) return;
+          const [r, g, b] = color;
+
+          context.save();
+          context.filter = `blur(${Math.min(1.8, 0.42 + width * 0.08)}px)`;
+          context.strokeStyle = `rgba(${r}, ${g}, ${b}, ${opacity * 0.3})`;
+          context.lineWidth = width * 1.42;
+          context.lineCap = 'round';
+          context.lineJoin = 'round';
+          context.setLineDash([]);
+          traceBrushPath(context, points, progress, 0, flowSeed + 43, 0.12 + width * 0.025);
+          context.stroke();
+          context.restore();
+
+          const currents = width < 1.1 ? 2 : clamp(3 + Math.floor(width * 0.3), 3, 7);
+          for (let current = 0; current < currents; current += 1) {
+            const currentSeed = flowSeed + 211 + current * 1291;
+            const placement = currents === 1 ? 0 : current / (currents - 1) - 0.5;
+            const offset = placement * width * (0.48 + hash(currentSeed + 3) * 0.28);
+            context.strokeStyle = `rgba(${r}, ${g}, ${b}, ${opacity * (0.24 + hash(currentSeed + 7) * 0.34)})`;
+            context.lineWidth = Math.max(
+              0.34,
+              width / currents * (0.68 + hash(currentSeed + 11) * 1.18)
+            );
+            context.lineCap = 'round';
+            context.lineJoin = 'round';
+            context.setLineDash([]);
+            traceBrushPath(
+              context,
+              points,
+              progress,
+              offset,
+              currentSeed,
+              0.12 + Math.min(0.42, width * 0.035)
+            );
+            context.stroke();
           }
-        }
 
-        function feedSources(speed = 1) {
-          sources.forEach((source, sourceIndex) => {
-            if (flowSteps < source.delay) return;
-            const pulse = 0.72 + Math.sin(flowSteps * 0.055 * source.pulse + sourceIndex) * 0.22;
-            for (let dx = -source.radius; dx <= source.radius; dx += 1) {
-              const x = clamp(source.x + dx, 0, cols - 1);
-              const taper = 1 - Math.abs(dx) / (source.radius + 1);
-              const i = indexOf(x, 0);
-              wet[i] = Math.min(1.45, wet[i] + source.rate * pulse * taper * speed);
-              stain[i] = Math.min(1, stain[i] + source.rate * taper * 0.8 * speed);
-            }
-          });
-        }
-
-        function transfer(to, available, requested) {
-          if (requested <= 0) return 0;
-          const capacity = Math.max(0, 1.5 - wet[to]);
-          const moved = Math.min(requested, capacity, available);
-          if (moved <= 0) return 0;
-          wet[to] += moved;
-          stain[to] = Math.min(1, Math.max(stain[to], moved * 1.6));
-          return moved;
-        }
-
-        function addSpill(x, y) {
-          const radius = Math.max(2, Math.round(7 / cell));
-          for (let oy = -radius; oy <= radius; oy += 1) {
-            for (let ox = -radius; ox <= radius; ox += 1) {
-              const px = x + ox;
-              const py = y + oy;
-              if (px < 0 || px >= cols || py < 0 || py >= rows) continue;
-              const i = indexOf(px, py);
-              const distance = Math.hypot(ox, oy);
-              if (distance > radius + hash(seed + i * 43)) continue;
-              const amount = Math.max(0, 1 - distance / (radius + 1));
-              wet[i] = Math.min(1.25, wet[i] + 0.48 + amount * 0.62);
-              stain[i] = Math.min(1, Math.max(stain[i], 0.32 + amount * 0.48));
-            }
+          if (width > 1.25) {
+            paintPigmentDaubs(context, points, progress, width * 1.12, opacity * 0.72, color, 0.04, flowSeed + 907);
           }
-          if (reducedMotion.matches) {
-            for (let i = 0; i < Math.min(rows, 160); i += 1) stepFlow();
-          }
-        }
 
-        function draw() {
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          ctx.drawImage(wallCanvas, 0, 0, width, height);
-          drawInk();
-        }
-
-        function drawInk() {
-          for (let i = 0; i < stain.length; i += 1) {
-            const offset = i * 4;
-            const fixed = stain[i];
-            const mobile = wet[i];
-            const density = clamp(fixed * 0.8 + mobile * (0.48 + basin[i] * 0.16), 0, 1);
-            const texture = 0.84 + (porosity[i] - 0.68) * 0.32;
-            const alpha = Math.round(Math.pow(density, 0.57) * 252 * texture);
-            inkPixels[offset] = 5 + Math.round((1 - density) * 9);
-            inkPixels[offset + 1] = 10 + Math.round((1 - density) * 8);
-            inkPixels[offset + 2] = 12 + Math.round(mobile * 12);
-            inkPixels[offset + 3] = clamp(alpha, 0, 250);
-          }
-          inkCtx.putImageData(inkImage, 0, 0);
-          ctx.save();
-          ctx.imageSmoothingEnabled = true;
-          ctx.globalCompositeOperation = 'multiply';
-          ctx.filter = `blur(${Math.max(0.7, cell * 0.46)}px)`;
-          ctx.globalAlpha = 0.76;
-          ctx.drawImage(inkCanvas, -cell * 0.85, -cell * 0.45, width + cell * 1.7, height + cell * 0.9);
-          ctx.filter = 'none';
-          ctx.globalAlpha = 0.93;
-          ctx.drawImage(inkCanvas, -cell * 0.35, -cell * 0.1, width + cell * 0.7, height + cell * 0.2);
-          ctx.globalAlpha = 1;
-          ctx.globalCompositeOperation = 'source-over';
-
-          ctx.fillStyle = 'rgba(170, 198, 202, 0.42)';
-          for (let y = 1; y < rows - 1; y += 1) {
-            for (let x = 1; x < cols - 1; x += 1) {
-              const i = indexOf(x, y);
-              if (basin[i] > 0.38 && wet[i] > 0.68 && hash(seed + i * 127) > 0.985) {
-                ctx.beginPath();
-                ctx.ellipse((x + 0.5) * cell, (y + 0.4) * cell, cell * 0.34, cell * 0.08, -0.08, 0, TAU);
-                ctx.fill();
-              }
-              if (wet[i] < 0.58 || wet[indexOf(x, y + 1)] > 0.1) continue;
-              if (hash(seed + i * 73) > 0.2) continue;
-              ctx.beginPath();
-              ctx.ellipse((x + 0.32) * cell, (y + 0.72) * cell, cell * 0.13, cell * 0.36, 0, 0, TAU);
-              ctx.fill();
-            }
-          }
-          ctx.restore();
-        }
-
-        function pathPatch(context, patch, scale) {
-          const points = patch.points;
+          const tip = pointOnPath(points, progress);
+          const bead = Math.max(1.15, width * (0.62 + hash(flowSeed + 101) * 0.34));
+          context.save();
+          context.filter = `blur(${Math.min(0.85, bead * 0.12)}px)`;
+          context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity * 0.46})`;
           context.beginPath();
-          for (let i = 0; i < points.length; i += 1) {
-            const point = points[i];
-            const next = points[(i + 1) % points.length];
-            const x = point.x * scale;
-            const y = point.y * scale;
-            const nextX = next.x * scale;
-            const nextY = next.y * scale;
-            if (i === 0) context.moveTo(x, y);
-            context.quadraticCurveTo(x, y, (x + nextX) * 0.5, (y + nextY) * 0.5);
+          context.ellipse(tip.x, tip.y + bead * 0.28, bead * 0.68, bead * 1.15, 0, 0, Math.PI * 2);
+          context.fill();
+          context.restore();
+
+          context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity * 0.42})`;
+          context.beginPath();
+          context.ellipse(
+            tip.x - bead * 0.12,
+            tip.y,
+            bead * 0.32,
+            bead * 0.62,
+            0,
+            0,
+            Math.PI * 2
+          );
+          context.fill();
+        }
+
+        function paintSplat(context, splat, progress, color, opacity) {
+          const [r, g, b] = color;
+          const radius = splat.radius * (0.35 + progress * 0.65);
+
+          context.save();
+          context.filter = `blur(${Math.min(1.1, 0.25 + radius * 0.06)}px)`;
+          context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity * 0.28})`;
+          traceSplat(context, splat.x, splat.y, radius * 1.18, splat.seed + 13);
+          context.fill();
+          context.restore();
+
+          context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity * 0.72})`;
+          traceSplat(context, splat.x, splat.y, radius, splat.seed + 29);
+          context.fill();
+
+          const satellites = 3 + Math.floor(hash(splat.seed + 37) * 7);
+          for (let index = 0; index < satellites; index += 1) {
+            const satelliteSeed = splat.seed + 101 + index * 809;
+            const angle = hash(satelliteSeed + 3) * Math.PI * 2;
+            const distance = radius * (1.45 + hash(satelliteSeed + 7) * 4.2);
+            const satelliteRadius = radius * (0.08 + hash(satelliteSeed + 11) * 0.2);
+            const x = splat.x + Math.cos(angle) * distance;
+            const y = splat.y + Math.sin(angle) * distance;
+            context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity * (0.28 + hash(satelliteSeed + 17) * 0.38)})`;
+            context.beginPath();
+            context.ellipse(
+              x,
+              y,
+              satelliteRadius * (0.72 + hash(satelliteSeed + 19) * 0.56),
+              satelliteRadius * (0.72 + hash(satelliteSeed + 23) * 0.72),
+              angle,
+              0,
+              Math.PI * 2
+            );
+            context.fill();
+          }
+        }
+
+        function traceSplat(context, x, y, radius, splatSeed) {
+          const points = [];
+          const pointCount = 13;
+          for (let index = 0; index < pointCount; index += 1) {
+            const angle = index / pointCount * Math.PI * 2;
+            const reach = radius * (0.72 + hash(splatSeed + index * 463) * 0.52);
+            points.push({
+              x: x + Math.cos(angle) * reach,
+              y: y + Math.sin(angle) * reach
+            });
+          }
+
+          const last = points.at(-1);
+          const first = points[0];
+          context.beginPath();
+          context.moveTo((last.x + first.x) * 0.5, (last.y + first.y) * 0.5);
+          for (let index = 0; index < pointCount; index += 1) {
+            const point = points[index];
+            const next = points[(index + 1) % pointCount];
+            context.quadraticCurveTo(
+              point.x,
+              point.y,
+              (point.x + next.x) * 0.5,
+              (point.y + next.y) * 0.5
+            );
           }
           context.closePath();
         }
 
-        function indexOf(x, y) {
-          return y * cols + x;
+        function pointOnPath(points, progress) {
+          const scaled = clamp(progress, 0, 1) * (points.length - 1);
+          const index = Math.floor(scaled);
+          if (index >= points.length - 1) return points.at(-1);
+          const fraction = scaled - index;
+          return {
+            x: lerp(points[index].x, points[index + 1].x, fraction),
+            y: lerp(points[index].y, points[index + 1].y, fraction)
+          };
         }
 
-        function noise2(x, y, salt) {
-          const x0 = Math.floor(x);
-          const y0 = Math.floor(y);
-          const tx = x - x0;
-          const ty = y - y0;
-          const a = hash(salt + x0 * 374761393 + y0 * 668265263);
-          const b = hash(salt + (x0 + 1) * 374761393 + y0 * 668265263);
-          const c = hash(salt + x0 * 374761393 + (y0 + 1) * 668265263);
-          const d = hash(salt + (x0 + 1) * 374761393 + (y0 + 1) * 668265263);
-          const sx = tx * tx * (3 - 2 * tx);
-          const sy = ty * ty * (3 - 2 * ty);
-          return lerp(lerp(a, b, sx), lerp(c, d, sx), sy);
+        function paintBrushPath(context, points, progress, width, opacity, color, dryness, brushSeed) {
+          if (points.length < 2 || progress <= 0 || opacity <= 0) return;
+          const [r, g, b] = color;
+
+          // A wet halo lets adjacent hairs merge without turning the mark into a
+          // mathematically uniform ribbon.
+          if (width > 0.7 && dryness < 0.82) {
+            context.save();
+            context.filter = `blur(${Math.min(1.35, 0.28 + width * 0.07)}px)`;
+            context.lineCap = 'round';
+            context.lineJoin = 'round';
+            context.setLineDash([]);
+            context.strokeStyle = `rgba(${r}, ${g}, ${b}, ${opacity * (0.1 + (1 - dryness) * 0.16)})`;
+            context.lineWidth = width * (1.08 + (1 - dryness) * 0.28);
+            traceBrushPath(context, points, progress, 0, brushSeed + 53, 0.16 + dryness * 0.28);
+            context.stroke();
+            context.restore();
+          }
+
+          const bristleCount = width < 0.78 ? 1 : clamp(2 + Math.floor(width * 0.78), 2, 11);
+          for (let bristle = 0; bristle < bristleCount; bristle += 1) {
+            const bristleSeed = brushSeed + bristle * 1543;
+            const placement = bristleCount === 1 ? 0.5 : bristle / (bristleCount - 1);
+            const spread = width * (0.72 + hash(bristleSeed + 3) * 0.28);
+            const offset = (placement - 0.5) * spread;
+            const pigment = 0.78 + hash(bristleSeed + 7) * 0.28;
+            const bristleOpacity = opacity * (
+              bristleCount === 1
+                ? 0.72 + hash(bristleSeed + 11) * 0.24
+                : 0.22 + hash(bristleSeed + 11) * 0.36
+            );
+
+            context.strokeStyle = `rgba(${Math.round(r * pigment)}, ${Math.round(g * pigment)}, ${Math.round(b * pigment)}, ${bristleOpacity})`;
+            context.lineWidth = bristleCount === 1
+              ? Math.max(0.28, width * (0.52 + hash(bristleSeed + 19) * 0.38))
+              : Math.max(0.22, width / bristleCount * (0.58 + hash(bristleSeed + 19) * 1.12));
+            context.lineCap = hash(bristleSeed + 23) > dryness * 0.62 ? 'round' : 'butt';
+            context.lineJoin = 'round';
+
+            if (dryness > 0.34 && hash(bristleSeed + 29) < dryness * 0.82) {
+              const fleck = 0.8 + hash(bristleSeed + 31) * 4.8;
+              const gap = 2.8 + dryness * 8 + hash(bristleSeed + 37) * 8;
+              context.setLineDash([fleck, gap]);
+              context.lineDashOffset = hash(bristleSeed + 41) * (fleck + gap);
+            } else {
+              context.setLineDash([]);
+              context.lineDashOffset = 0;
+            }
+
+            traceBrushPath(
+              context,
+              points,
+              progress,
+              offset,
+              bristleSeed,
+              0.42 + dryness * 1.65 + Math.min(0.7, width * 0.07)
+            );
+            context.stroke();
+          }
+          context.setLineDash([]);
+          context.lineDashOffset = 0;
+
+          if (width > 2.2) {
+            paintPigmentDaubs(context, points, progress, width, opacity, color, dryness, brushSeed);
+          }
+        }
+
+        function paintShelfDeposit(context, points, progress, width, opacity, color, dryness, brushSeed) {
+          const [r, g, b] = color;
+          const loadedWidth = width * (1.35 + hash(brushSeed + 59) * 0.85);
+          paintPigmentDaubs(
+            context,
+            points,
+            progress,
+            loadedWidth,
+            opacity * 1.5,
+            color,
+            Math.min(0.82, dryness + 0.12),
+            brushSeed + 67
+          );
+
+          const scratches = clamp(3 + Math.floor(width * 0.55), 3, 9);
+          for (let scratch = 0; scratch < scratches; scratch += 1) {
+            const scratchSeed = brushSeed + 503 + scratch * 1877;
+            const offset = (hash(scratchSeed + 3) - 0.5) * loadedWidth;
+            const fleck = 0.8 + hash(scratchSeed + 7) * 5.2;
+            const gap = 3 + hash(scratchSeed + 11) * 13 + dryness * 5;
+            context.strokeStyle = `rgba(${r}, ${g}, ${b}, ${opacity * (0.14 + hash(scratchSeed + 13) * 0.24)})`;
+            context.lineWidth = Math.max(0.24, width * (0.08 + hash(scratchSeed + 17) * 0.16));
+            context.lineCap = 'round';
+            context.lineJoin = 'round';
+            context.setLineDash([fleck, gap]);
+            context.lineDashOffset = hash(scratchSeed + 19) * (fleck + gap);
+            traceBrushPath(
+              context,
+              points,
+              progress,
+              offset,
+              scratchSeed,
+              0.8 + dryness * 2.2
+            );
+            context.stroke();
+          }
+          context.setLineDash([]);
+          context.lineDashOffset = 0;
+        }
+
+        function paintPigmentDaubs(context, points, progress, width, opacity, color, dryness, brushSeed) {
+          const [r, g, b] = color;
+          const scaled = clamp(progress, 0, 1) * (points.length - 1);
+          const whole = Math.floor(scaled);
+          const fraction = scaled - whole;
+          const visiblePoints = points.slice(0, whole + 1);
+          if (whole < points.length - 1 && fraction > 0) {
+            visiblePoints.push({
+              x: lerp(points[whole].x, points[whole + 1].x, fraction),
+              y: lerp(points[whole].y, points[whole + 1].y, fraction)
+            });
+          }
+
+          const spacing = Math.max(4.5, width * 0.72);
+          for (let segment = 1; segment < visiblePoints.length; segment += 1) {
+            const from = visiblePoints[segment - 1];
+            const to = visiblePoints[segment];
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const distance = Math.hypot(dx, dy);
+            const steps = Math.max(1, Math.ceil(distance / spacing));
+            const tangent = Math.atan2(dy, dx);
+            const normalX = distance ? -dy / distance : 0;
+            const normalY = distance ? dx / distance : 1;
+
+            for (let step = 0; step < steps; step += 1) {
+              const stampSeed = brushSeed + segment * 4001 + step * 137;
+              if (hash(stampSeed + 5) < dryness * 0.16) continue;
+              const t = (step + hash(stampSeed + 11) * 0.8) / steps;
+              const edge = (hash(stampSeed + 17) - 0.5) * width * 0.5;
+              const x = lerp(from.x, to.x, t) + normalX * edge;
+              const y = lerp(from.y, to.y, t) + normalY * edge;
+              const along = spacing * (0.34 + hash(stampSeed + 23) * 0.42);
+              const across = width * (0.13 + hash(stampSeed + 29) * 0.24);
+              const shade = 0.86 + hash(stampSeed + 31) * 0.16;
+              context.fillStyle = `rgba(${Math.round(r * shade)}, ${Math.round(g * shade)}, ${Math.round(b * shade)}, ${opacity * (0.05 + (1 - dryness) * 0.1)})`;
+              context.beginPath();
+              context.ellipse(x, y, along, across, tangent, 0, Math.PI * 2);
+              context.fill();
+            }
+          }
+        }
+
+        function traceBrushPath(context, points, progress, offset, brushSeed, jitter) {
+          const scaled = clamp(progress, 0, 1) * (points.length - 1);
+          const whole = Math.floor(scaled);
+          const fraction = scaled - whole;
+          const visiblePoints = points.slice(0, whole + 1);
+          if (whole < points.length - 1 && fraction > 0) {
+            visiblePoints.push({
+              x: lerp(points[whole].x, points[whole + 1].x, fraction),
+              y: lerp(points[whole].y, points[whole + 1].y, fraction)
+            });
+          }
+          if (visiblePoints.length < 2) return;
+
+          const brushed = visiblePoints.map((point, index) => {
+            const before = visiblePoints[Math.max(0, index - 1)];
+            const after = visiblePoints[Math.min(visiblePoints.length - 1, index + 1)];
+            const dx = after.x - before.x;
+            const dy = after.y - before.y;
+            const magnitude = Math.hypot(dx, dy) || 1;
+            const tangentX = dx / magnitude;
+            const tangentY = dy / magnitude;
+            const normalX = -tangentY;
+            const normalY = tangentX;
+            const edgeWander = (hash(brushSeed + index * 977 + 101) - 0.5) * jitter;
+            const grainDrag = (hash(brushSeed + index * 1481 + 211) - 0.5) * jitter * 0.32;
+            return {
+              x: point.x + normalX * (offset + edgeWander) + tangentX * grainDrag,
+              y: point.y + normalY * (offset + edgeWander) + tangentY * grainDrag
+            };
+          });
+
+          context.beginPath();
+          context.moveTo(brushed[0].x, brushed[0].y);
+          if (brushed.length === 2) {
+            context.lineTo(brushed[1].x, brushed[1].y);
+            return;
+          }
+          for (let i = 1; i < brushed.length - 1; i += 1) {
+            const point = brushed[i];
+            const next = brushed[i + 1];
+            context.quadraticCurveTo(
+              point.x,
+              point.y,
+              (point.x + next.x) * 0.5,
+              (point.y + next.y) * 0.5
+            );
+          }
+          context.lineTo(brushed.at(-1).x, brushed.at(-1).y);
+        }
+
+        function commitLayer(layer, progress) {
+          renderLayer(activeCtx, layer, progress);
+          commitActive();
+        }
+
+        function commitActive() {
+          historyCtx.save();
+          historyCtx.setTransform(1, 0, 0, 1, 0, 0);
+          historyCtx.drawImage(activeCanvas, 0, 0);
+          historyCtx.restore();
+          clearContext(activeCtx);
+          layerCount += 1;
+
+          if (layerCount % 28 === 0) {
+            historyCtx.save();
+            historyCtx.fillStyle = 'rgba(8, 11, 18, 0.12)';
+            historyCtx.fillRect(0, 0, width, height);
+            historyCtx.restore();
+          }
+        }
+
+        function draw() {
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.fillStyle = '#080b12';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(historyCanvas, 0, 0);
+          ctx.drawImage(activeCanvas, 0, 0);
+          ctx.restore();
+        }
+
+        function clearContext(context, fill) {
+          context.save();
+          context.setTransform(1, 0, 0, 1, 0, 0);
+          context.clearRect(0, 0, Math.round(width * dpr), Math.round(height * dpr));
+          if (fill) {
+            context.fillStyle = fill;
+            context.fillRect(0, 0, Math.round(width * dpr), Math.round(height * dpr));
+          }
+          context.restore();
+        }
+
+        function chooseWeighted(entries) {
+          let roll = random();
+          for (const [value, weight] of entries) {
+            roll -= weight;
+            if (roll <= 0) return value;
+          }
+          return entries.at(-1)[0];
         }
 
         function hash(value) {
@@ -578,6 +855,8 @@
           };
         }
 
+        function easeOutQuart(value) { return 1 - Math.pow(1 - value, 4); }
+        function easeOutQuint(value) { return 1 - Math.pow(1 - value, 5); }
         function lerp(a, b, t) { return a + (b - a) * t; }
         function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
       })();

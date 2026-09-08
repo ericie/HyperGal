@@ -104,7 +104,7 @@
         const RUN_SPEED = 266;
         const AIR_SPEED = 320;
         const JUMP_SPEED = 680;
-        const SPRING_SPEED = 1080;
+        const MAX_FALL_SPEED = 980;
         const HERO_W = 32;
         const HERO_H = 46;
         const LAUNCH_MARGIN = 20;
@@ -117,8 +117,6 @@
         const BUDDY_JUMP_SPEED = 650;
         const BUDDY_AIR_SPEED = 325;
         const BUDDY_RUN_SPEED = 162;
-        const DEATH_BOUNCE_SPEED = 470;
-        const SEARCH_PAN_SPEED = 72;
         const RUNNER_EDGE_GRACE = 13;
         const CRUMBLE_TILE_SIZE = 21;
         const ZONE_HEIGHT = 940;
@@ -163,7 +161,7 @@
         let worldWidth = 420;
         let worldLeft = 0;
         let cameraY = 0;
-        let highestCameraY = 0;
+        let cameraLeaderId = 0;
         let highestPlatformY = 0;
         let lastPlatform = null;
         let raf = 0;
@@ -197,8 +195,6 @@
         let platformCount = 0;
         let trunkCount = 0;
         let targetPlatformId = null;
-        let deathCount = 0;
-        let cameraSearchMode = false;
         let lastProgressAt = 0;
         let lastProgressHeight = 0;
 
@@ -299,13 +295,11 @@
           simTime = 0;
           lastFrameAt = 0;
           cameraY = 0;
-          highestCameraY = 0;
+          cameraLeaderId = 0;
           bestHeight = 0;
           platformCount = 0;
           trunkCount = 0;
           buddyCount = 0;
-          deathCount = 0;
-          cameraSearchMode = false;
           targetPlatformId = null;
           platforms = [];
           particles = [];
@@ -329,7 +323,7 @@
           raf = requestAnimationFrame(tick);
         }
 
-        function makeHero(platform, waitingForCamera = false) {
+        function makeHero(platform) {
           const x = safeLandingX(platform, platformCenter(platform));
           return {
             id: 0,
@@ -347,12 +341,6 @@
             jumpCooldownUntil: 0,
             stumbleUntil: 0,
             blinkUntil: 0,
-            dying: false,
-            dead: false,
-            deathStartedAt: 0,
-            deathSpin: 0,
-            waitingForCamera,
-            superJumpUntil: 0,
             desperateUntil: 0,
             autoTargetId: null,
             autoLaunchX: null,
@@ -400,7 +388,6 @@
           updateHero(dt);
           updateMarioBuddies(dt);
           updateParticles(dt);
-          ensureMarioPopulation();
           updateCamera(dt);
           recoverIfStalled();
           trimWorld();
@@ -408,7 +395,6 @@
         }
 
         function updateControls(dt) {
-          if (hero.dead || hero.dying || hero.waitingForCamera) return;
           if (keys.jump && simTime > jumpBufferedUntil) jumpBufferedUntil = simTime + 0.12;
           if (manualActive()) {
             targetPlatformId = null;
@@ -418,11 +404,6 @@
         }
 
         function updateHero(dt) {
-          if (hero.dead || hero.waitingForCamera) return;
-          if (hero.dying) {
-            updateDyingMario(hero, dt);
-            return;
-          }
           hero.previousY = hero.y;
           updateBlink();
           let desiredVx = 0;
@@ -446,19 +427,16 @@
             simTime >= hero.jumpCooldownUntil &&
             (hero.grounded || simTime - hero.lastGroundedAt < 0.09);
           if (canBufferedJump) {
-            jump(false);
+            jump();
             jumpBufferedUntil = 0;
           }
 
           hero.x += hero.vx * dt;
           hero.vy += GRAVITY * dt;
+          hero.vy = Math.max(hero.vy, -MAX_FALL_SPEED);
           hero.y += hero.vy * dt;
           if (hero.grounded) hero.stride += Math.abs(hero.vx) * dt;
           keepHeroInShaft();
-          if (!hero.grounded && screenY(hero.y) >= height - hudHeight()) {
-            beginMarioDeath(hero);
-            return;
-          }
           collidePlatforms();
         }
 
@@ -525,7 +503,7 @@
             : clamp(launchDx * 4.8, -RUN_SPEED, RUN_SPEED);
 
           if (atLaunch && simTime >= hero.jumpCooldownUntil) {
-            jump(false, route);
+            jump(route);
           }
         }
 
@@ -533,8 +511,7 @@
           const target = platformById(hero.autoTargetId);
           if (!target || !platformIsSolid(target)) return null;
           const missedBy = target.y - hero.y;
-          const targetRange = hero.superJumpUntil > simTime ? MAX_TARGET_GAP + 260 : MAX_TARGET_GAP;
-          if (missedBy > targetRange || hero.y < target.y - 52) return null;
+          if (missedBy > MAX_TARGET_GAP || hero.y < target.y - 52) return null;
           return target;
         }
 
@@ -778,6 +755,10 @@
           if (platform.zone === 'crumble') triggerCrumble(platform, actorX);
           if (platform.zoneSafe) return;
           if (platform.zone === 'shrink') breakCloudPlatform(platform);
+          if (platform.zone === 'trap' && platform.trapRole === 'trapdoor') {
+            openTrapdoor(platform);
+            return;
+          }
           if (platform.zone === 'trap' && platform.trapRole === 'lever') {
             const leverX = platformLeft(platform) + platform.w * 0.5;
             if (Math.abs(actorX - leverX) < platform.w * 0.32) triggerLever(platform);
@@ -895,12 +876,16 @@
             .filter((platform) => Math.floor(Math.max(0, platform.y - 88) / ZONE_HEIGHT) === band)
             .filter((platform) => platform.y < lever.y)
             .filter((platform) => occupiedPlatformIds.has(platform.id) && platform.trapOpenUntil <= simTime);
-          for (const trap of traps) {
-            trap.openedAt = simTime;
-            trap.trapOpenUntil = simTime + 2.2;
-            spawnDust(platformCenter(trap), trap.y, 14, C.mid);
-            releaseActorsFromPlatform(trap);
-          }
+          for (const trap of traps) openTrapdoor(trap);
+        }
+
+        function openTrapdoor(trap) {
+          if (!trap || trap.trapOpenUntil > simTime) return;
+          trap.openedAt = simTime;
+          trap.trapOpenUntil = simTime + 2.2;
+          trap.pulseUntil = simTime + 0.22;
+          spawnDust(platformCenter(trap), trap.y, 14, C.mid);
+          releaseActorsFromPlatform(trap);
         }
 
         function collapsePlatform(platform) {
@@ -979,8 +964,8 @@
           return keys.left || keys.right || keys.jump || pointer.active || simTime < manualUntil;
         }
 
-        function jump(superJump, route) {
-          hero.vy = superJump ? SPRING_SPEED : JUMP_SPEED;
+        function jump(route) {
+          hero.vy = JUMP_SPEED;
           const fromId = hero.groundId;
           hero.grounded = false;
           hero.groundId = null;
@@ -991,8 +976,7 @@
           hero.routeAttemptFromId = route ? fromId : null;
           hero.routeAttemptStartedAt = route ? simTime : 0;
           hero.jumpCooldownUntil = simTime + 0.11;
-          hero.superJumpUntil = superJump ? simTime + 1.7 : 0;
-          spawnDust(hero.x, hero.y, superJump ? 18 : 11, COLORS.smoke);
+          spawnDust(hero.x, hero.y, 11, COLORS.smoke);
         }
 
         function keepHeroInShaft() {
@@ -1048,9 +1032,6 @@
             landed.pulseUntil = simTime + 0.24;
             spawnDust(hero.x, hero.y, 8, COLORS.coin);
           }
-          if (landed.spring && Math.abs(hero.x - (platformLeft(landed) + landed.w * 0.5)) < landed.w * 0.35) {
-            jump(true, chooseTargetRoute(landed, SPRING_SPEED));
-          }
         }
 
         function markRouteAttemptResult(landed) {
@@ -1072,39 +1053,30 @@
         }
 
         function updateCamera(dt) {
-          if (cameraSearchMode) {
-            const target = hero.y - height * 0.18;
-            cameraY = Math.max(target, cameraY - SEARCH_PAN_SPEED * dt);
-            if (screenY(hero.y) <= height - hudHeight() - 28) {
-              cameraSearchMode = false;
-              hero.waitingForCamera = false;
-              for (const buddy of buddies) buddy.waitingForCamera = false;
-              for (const platform of platforms) platform.searchPlatform = false;
-              highestCameraY = cameraY;
-              lastProgressAt = simTime;
-              lastProgressHeight = hero.y;
-            }
-            return;
-          }
-
-          const activeRunners = [hero, ...buddies].filter(
-            (runner) => !runner.dead && !runner.dying && !runner.waitingForCamera
+          const runners = [hero, ...buddies];
+          const leader = runners.reduce(
+            (highest, runner) => runner.y > highest.y ? runner : highest,
+            runners[0]
           );
-          if (!activeRunners.length) return;
-          const highestRunnerY = activeRunners.reduce((highest, runner) => Math.max(highest, runner.y), activeRunners[0].y);
-          const target = highestRunnerY - height * 0.48;
-          highestCameraY = Math.max(highestCameraY, target);
-          cameraY += (highestCameraY - cameraY) * (1 - Math.exp(-2.7 * dt));
-          bestHeight = Math.max(bestHeight, Math.max(0, highestRunnerY - 88));
-          const heroHeight = Math.max(0, hero.y - 88);
-          if (heroHeight > lastProgressHeight + 38) {
-            lastProgressHeight = heroHeight;
+          cameraLeaderId = leader.id;
+
+          const target = leader.y - height * 0.48;
+          const followSpeed = !leader.grounded && leader.vy < 0 ? 4.8 : 2.7;
+          cameraY += (target - cameraY) * (1 - Math.exp(-followSpeed * dt));
+
+          /* A falling leader can pull the camera downward. This lower-frame
+             guard keeps that Mario visible even at terminal speed. */
+          cameraY = Math.min(cameraY, leader.y - height * 0.28);
+
+          const leaderHeight = Math.max(0, leader.y - 88);
+          bestHeight = Math.max(bestHeight, leaderHeight);
+          if (leaderHeight > lastProgressHeight + 38) {
+            lastProgressHeight = leaderHeight;
             lastProgressAt = simTime;
           }
         }
 
         function recoverIfStalled() {
-          if (hero.dead || hero.dying || hero.waitingForCamera || cameraSearchMode) return;
           if (manualActive()) return;
           if (simTime - lastProgressAt < STALL_SECONDS) return;
           if (!hero.grounded) return;
@@ -1112,7 +1084,7 @@
           if (!current) return;
           const route = chooseTargetRoute(current);
           if (route) {
-            jump(false, route);
+            jump(route);
           } else {
             desperateHeroJump(current);
           }
@@ -1124,80 +1096,12 @@
           const rightSpace = platformLeft(platform) + platform.w - hero.x;
           const direction = leftSpace > rightSpace ? -1 : 1;
           hero.facing = direction;
-          jump(false, null);
+          jump();
           hero.vx = direction * AIR_SPEED * 0.92;
           hero.autoVx = direction * AIR_SPEED;
           hero.desperateUntil = simTime + 1.15;
           hero.stumbleUntil = simTime + 0.45;
           hero.noRouteSince = 0;
-        }
-
-        function beginMarioDeath(actor) {
-          if (actor.dead || actor.dying || actor.waitingForCamera) return;
-          actor.y = cameraY;
-          actor.previousY = actor.y;
-          actor.grounded = false;
-          actor.groundId = null;
-          actor.platformId = null;
-          actor.targetId = null;
-          actor.autoTargetId = null;
-          actor.falling = true;
-          actor.dying = true;
-          actor.deathStartedAt = simTime;
-          actor.deathSpin = 0;
-          actor.vy = DEATH_BOUNCE_SPEED;
-          actor.vx *= 0.34;
-          deathCount += 1;
-          spawnDust(actor.x, actor.y + 4, 14, C.white);
-        }
-
-        function updateDyingMario(actor, dt) {
-          actor.previousY = actor.y;
-          actor.vy += GRAVITY * dt;
-          actor.x += actor.vx * dt;
-          actor.y += actor.vy * dt;
-          actor.deathSpin += dt * (actor.facing || 1) * 7.5;
-          if (simTime - actor.deathStartedAt > 0.22 && actor.vy < 0 && actor.y <= cameraY) {
-            actor.y = cameraY;
-            actor.dying = false;
-            actor.dead = true;
-          }
-        }
-
-        function ensureMarioPopulation() {
-          buddies = buddies.filter((buddy) => !buddy.dead);
-          if (!hero.dead || buddies.some((buddy) => !buddy.dead)) return;
-          const pocket = buildSearchPocket();
-          const startingPlatform = pocket[0];
-          hero = makeHero(startingPlatform, true);
-          addMarioBuddy(startingPlatform, buddyCount + 1);
-          for (const buddy of buddies) buddy.waitingForCamera = true;
-          cameraSearchMode = true;
-          targetPlatformId = null;
-        }
-
-        function buildSearchPocket() {
-          const platformsInPocket = [];
-          const startY = cameraY - Math.max(320, height * 0.58);
-          const endY = cameraY - 76;
-          let y = startY;
-          let index = 0;
-          while (y < endY) {
-            const w = clamp(worldWidth * (index === 0 ? 0.44 : 0.28), 132, index === 0 ? 270 : 210);
-            const sway = (index % 2 === 0 ? -1 : 1) * Math.min(worldWidth * 0.2, 150);
-            const center = clamp(worldWidth * 0.5 + sway, w * 0.5 - 28, worldWidth - w * 0.5 + 28);
-            const platform = makePlatform(center, y, w, 'ink', false);
-            platform.zone = 'ink';
-            platform.type = 'ink';
-            platform.zoneSafe = true;
-            platform.searchPlatform = true;
-            platform.spring = index === 2;
-            platforms.push(platform);
-            platformsInPocket.push(platform);
-            y += 94 + (index % 2) * 10;
-            index += 1;
-          }
-          return platformsInPocket;
         }
 
         function updateParticles(dt) {
@@ -1236,11 +1140,6 @@
             spin: 0,
             grounded: true,
             falling: false,
-            dying: false,
-            dead: false,
-            deathStartedAt: 0,
-            deathSpin: 0,
-            waitingForCamera: false,
             targetId: null,
             noRouteSince: 0,
             previousY: platform.y,
@@ -1254,11 +1153,6 @@
 
         function updateMarioBuddies(dt) {
           for (const buddy of buddies) {
-            if (buddy.dead || buddy.waitingForCamera) continue;
-            if (buddy.dying) {
-              updateDyingMario(buddy, dt);
-              continue;
-            }
             buddy.previousY = buddy.y;
             if (buddy.grounded) {
               const platform = platformById(buddy.platformId);
@@ -1271,14 +1165,11 @@
               }
             } else {
               buddy.vy += GRAVITY * dt;
+              buddy.vy = Math.max(buddy.vy, -MAX_FALL_SPEED);
               buddy.x += buddy.vx * dt;
               buddy.y += buddy.vy * dt;
               if (buddy.falling) buddy.spin += buddy.vx * dt * 0.003;
               else steerMarioBuddy(buddy, dt);
-              if (screenY(buddy.y) >= height - hudHeight()) {
-                beginMarioDeath(buddy);
-                continue;
-              }
               collideMarioBuddy(buddy);
             }
           }
@@ -1392,27 +1283,10 @@
           pulseCloud(landed);
           handlePlatformLanding(landed, buddy.x);
           spawnDust(buddy.x, buddy.y, 5, C.mint);
-          if (landed.spring && Math.abs(buddy.x - (platformLeft(landed) + landed.w * 0.5)) < landed.w * 0.35) {
-            launchMarioBuddyFromSpring(buddy, landed);
-          }
-        }
-
-        function launchMarioBuddyFromSpring(buddy, platform) {
-          const route = chooseMarioBuddyTarget(platform, buddy, SPRING_SPEED);
-          const landingX = route ? safeLandingX(route.target, route.landingX) : buddy.x;
-          buddy.platformId = null;
-          buddy.targetId = route ? route.target.id : null;
-          buddy.grounded = false;
-          buddy.falling = !route;
-          buddy.vy = SPRING_SPEED;
-          buddy.vx = route
-            ? clamp((landingX - buddy.x) / Math.max(0.4, route.flightTime), -BUDDY_AIR_SPEED, BUDDY_AIR_SPEED)
-            : buddy.facing * BUDDY_AIR_SPEED * 0.35;
-          spawnDust(buddy.x, buddy.y, 16, C.mid);
         }
 
         function dropMarioBuddy(buddy, direction = 0, speed = 0) {
-          if (buddy.falling || buddy.dying || buddy.dead) return;
+          if (buddy.falling) return;
           buddy.platformId = null;
           buddy.targetId = null;
           buddy.noRouteSince = 0;
@@ -1443,11 +1317,10 @@
         }
 
         function trimWorld() {
-          const cutoff = cameraY - 240;
+          const cutoff = cameraY - height * 3;
           platforms = platforms.filter(
-            (platform) => platform.y > cutoff || platform.id === hero.groundId || platform.searchPlatform
+            (platform) => platform.y > cutoff || platform.id === hero.groundId
           );
-          buddies = buddies.filter((buddy) => !buddy.dead && (buddy.dying || buddy.falling || buddy.y > cutoff - 220));
         }
 
         function addPlatform() {
@@ -1489,7 +1362,6 @@
           const moving = zone === 'ink' && y > 800 && w > 136 && rng() < 0.06;
           const platform = makePlatform(center, y, w, zone, moving);
           configurePlatformZone(platform, previous);
-          platform.spring = shouldHaveSpring(platform);
           platforms.push(platform);
           lastPlatform = platform;
           highestPlatformY = y;
@@ -1521,7 +1393,6 @@
             if (!chosen) continue;
             const platform = makePlatform(chosen.center, chosen.y, chosen.w, zoneForHeight(chosen.y), false);
             configurePlatformZone(platform, base);
-            platform.spring = shouldHaveSpring(platform);
             platform.branch = true;
             platforms.push(platform);
           }
@@ -1557,7 +1428,6 @@
             speed: rand(0.55, 0.92),
             visited: false,
             pulseUntil: 0,
-            spring: false,
           };
         }
 
@@ -1581,12 +1451,6 @@
           } else {
             platform.trapRole = 'trapdoor';
           }
-        }
-
-        function shouldHaveSpring(platform) {
-          if (platform.zone === 'crumble') return false;
-          if (platform.trapRole === 'trapdoor' || platform.trapRole === 'lever') return false;
-          return Math.floor(platform.y / 100) % 7 === 3 || rng() < 0.045;
         }
 
         function canPlacePlatform(candidate, mode = 'strict') {
@@ -1653,21 +1517,18 @@
 
         function updateHud() {
           if (DEBUG) {
-            const livingMarios = [hero, ...buddies].filter((runner) => !runner.dead).length;
             debugEl.textContent = [
               `seed ${seed}`,
               `height ${Math.floor(bestHeight)}`,
               `platforms ${platforms.length}`,
-              `marios ${livingMarios}`,
+              `marios ${buddies.length + 1}`,
               `falling ${buddies.filter((buddy) => buddy.falling).length + (!hero.grounded && hero.vy < 0 ? 1 : 0)}`,
+              `camera ${cameraLeaderId === 0 ? 'hero' : `mario ${cameraLeaderId}`}`,
               `target ${targetPlatformId || '-'}`,
               `ground ${hero.grounded ? hero.groundId || '-' : '-'}`,
               `y ${Math.round(hero.y)}`,
               `vy ${Math.round(hero.vy)}`,
               `noRoute ${hero.noRouteSince ? (simTime - hero.noRouteSince).toFixed(1) : '-'}`,
-              `deaths ${deathCount}`,
-              `search ${cameraSearchMode ? 'down' : 'no'}`,
-              `springs ${platforms.filter((platform) => platform.spring).length}`,
               `manual ${manualActive() ? 'yes' : 'no'}`,
             ].join('\n');
           }
@@ -1947,7 +1808,6 @@
             else if (platform.zone === 'crumble') drawCrumblePlatform(platform, sx, sy, pulse);
             else if (platform.zone === 'trap') drawTrapPlatform(platform, sx, sy, pulse);
             else drawCloudPlatform(platform, sx, sy, pulse);
-            if (platform.spring) drawSpring(sx + platform.w * 0.5, sy - 2);
           }
         }
 
@@ -2026,7 +1886,7 @@
           const isDoor = platform.trapRole === 'trapdoor';
           const isLever = platform.trapRole === 'lever';
           let open = 0;
-          if (isDoor && platform.openedAt) {
+          if (isDoor && platform.trapOpenUntil > 0) {
             if (platform.trapOpenUntil > simTime) open = clamp((simTime - platform.openedAt) / 0.22, 0, 1);
             else open = clamp(1 - (simTime - platform.trapOpenUntil) / 0.28, 0, 1);
           }
@@ -2130,22 +1990,6 @@
           ctx.closePath();
         }
 
-        function drawSpring(cx, sy) {
-          ctx.strokeStyle = C.mid;
-          ctx.lineWidth = 3;
-          ctx.lineCap = 'round';
-          ctx.beginPath();
-          for (let i = 0; i <= 5; i += 1) {
-            const x = cx + (i % 2 === 0 ? -8 : 8);
-            const y = sy - 6 - i * 4;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-          }
-          ctx.stroke();
-          fillRound(cx - 15, sy - 8, 30, 7, 3.5, C.deep);
-          fillRound(cx - 13, sy - 31, 26, 7, 3.5, C.deep);
-        }
-
         /* -- PARTICLES -- */
 
         function drawParticles() {
@@ -2240,11 +2084,10 @@
 
         function drawMarioBuddies() {
           for (const buddy of buddies) {
-            if (buddy.dead) continue;
             const sx = worldLeft + buddy.x;
             const sy = screenY(buddy.y);
             if (sy < -90 || sy > height + 120) continue;
-            const panic = buddy.falling || buddy.dying;
+            const panic = buddy.falling;
             const airborne = !buddy.grounded;
             const gait = buddy.grounded ? clamp(Math.abs(buddy.vx) / BUDDY_RUN_SPEED, 0, 1) : 0;
             const phase = simTime * (4.2 + gait * 4.4) + buddy.phase;
@@ -2255,13 +2098,11 @@
             const bob = -bounce * 2.6;
             ctx.translate(sx, sy + bob);
             ctx.rotate(
-              buddy.dying
-                ? buddy.deathSpin
-                : panic
-                  ? buddy.spin
-                  : airborne
-                    ? clamp(buddy.vx / BUDDY_AIR_SPEED, -1, 1) * 0.09
-                    : 0
+              panic
+                ? buddy.spin
+                : airborne
+                  ? clamp(buddy.vx / BUDDY_AIR_SPEED, -1, 1) * 0.09
+                  : 0
             );
             ctx.scale(buddy.facing * 0.9 * (1 + bounce * 0.08), 0.9 * (1 - bounce * 0.09));
             drawBuddyRunner(buddy, phase, gait, panic);
@@ -2316,21 +2157,9 @@
         }
 
         function drawHero() {
-          if (hero.dead) return;
           const sx = worldLeft + hero.x;
           const sy = screenY(hero.y);
           const hurt = hero.stumbleUntil > simTime;
-
-          if (hero.dying) {
-            const stretch = clamp(Math.abs(hero.vy) / DEATH_BOUNCE_SPEED, 0, 1);
-            ctx.save();
-            ctx.translate(sx, sy);
-            ctx.rotate(hero.deathSpin);
-            ctx.scale(hero.facing * (1 - stretch * 0.1), 1 + stretch * 0.14);
-            drawHeroRun(clamp(hero.vy / JUMP_SPEED, -0.9, 1));
-            ctx.restore();
-            return;
-          }
 
           /* Contact shadow, tighter once he leaves the ground. */
           if (hero.grounded) fillOval(sx, sy + 2, 14, 4, SHADOW);

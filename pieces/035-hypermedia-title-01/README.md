@@ -18,6 +18,20 @@ more decisively on each swing. A dropped letter tumbles down the angled lower
 platforms, bouncing off each one it clips, and leaves the frame. When the top
 platform is bare the word falls again.
 
+Every letter is weighed before it drops. Its artwork is sampled on a grid to
+find how much ink the glyph is actually drawn from and where that ink balances,
+with cut-outs in the ground colour taking mass away rather than adding it — so
+`D` lands about twice as heavy as `A`, `P` carries its weight left of centre,
+and `Y` rides high while `A` sits low. That mass is what the plank weighs: the
+beam answers to each letter's own weight times its distance from the fulcrum,
+so one heavy glyph out at the tip outbalances several light ones loitering near
+the middle. Mass also decides who wins a collision, how far a shove carries,
+and how readily a letter perched at the end tips over its own balance point.
+Each letter is dealt a grip score on every drop, which sets how much of the
+slope it gives away: a sure-footed one holds its line across a steep plank
+while a poor one is carried off it, so the same word thins out in a different
+order each time.
+
 The letterforms borrow the constructional playfulness of mid-century shape
 alphabets without tracing a single typeface. Each glyph has its own palette
 and construction, while all twenty-six share a 100 × 100 coordinate system and

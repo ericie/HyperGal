@@ -124,7 +124,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "One yellow arcade car hunts for the fastest lane through compact gray traffic, buses, and semi trucks, signaling, speeding up, surging, or backing off to make openings, but never exits. Other gray vehicles have wider speed personalities, from aggressive squeezers to conservative gap-waiters, and try to pass too. Slow traffic packs tighter while fast traffic leaves more room. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray vehicles can take diagonal ramps offscreen and leave the highway. Every vehicle claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car scores +1 for every pass, loses 1 when most vehicles pass it, and loses 5 when a semi passes it.",
-      "updated": "2026-08-20"
+      "updated": "2026-09-07"
     },
     {
       "slug": "013-paddle",
@@ -138,16 +138,15 @@ window.HYPERGAL_MANIFEST = {
       "updated": "2026-08-20"
     },
     {
-      "slug": "014-only-ghosts",
-      "title": "Only Ghosts",
+      "slug": "014-to-big-for-this-world",
+      "title": "To Big for This World",
       "year": 2026,
       "date": "2026-07-22",
       "category": "games",
       "type": "interactive",
-      "wip": true,
+      "wip": false,
       "thumbnail": "thumbnail.jpg",
-      "description": "Pac hunts every power pellet across a full-frame maze.",
-      "updated": "2026-08-20"
+      "description": "Pac hunts every power pellet across a full-frame maze."
     },
     {
       "slug": "015-growth-rings",
@@ -169,8 +168,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "Tiny chibi Marios make broad horizontal leaps between persistent pastel clouds, bracing face-to-face and shoving exposed backs over the edge.",
-      "updated": "2026-08-20"
+      "description": "Fat, hooded Marios bound sideways through a painted summer sky while the camera follows whichever runner is highest, even through a fall.",
+      "updated": "2026-09-07"
     },
     {
       "slug": "017-knot-work",
@@ -263,7 +262,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "generative",
       "wip": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "Sixty fuel bubbles grow color-shifting vine trails as they travel between four-port diamond stations. Exhausted oil deposits burn out permanently, forcing replacement stations into untouched parts of the field.",
+      "description": "Hermit-crab fuel shells cross an oil field between four-port diamond pumps, growing a wider whorl every time they drink. An emptied shell does not die; it lies inert until a pump releases an energy worm that moves in and carries it back onto the field.",
       "updated": "2026-08-20"
     },
     {
@@ -308,8 +307,8 @@ window.HYPERGAL_MANIFEST = {
       "category": "nature",
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
-      "description": "A dense botanical wallpaper on aged rag paper, covered by a white mount with a triangular window cut in it. Every plant that grows afterwards is rooted inside that window and climbs out over the board, until dye-pot hibiscus, chrysanthemums, fringed iris, quince, and palm and fern foliage have overrun the mount.",
-      "updated": "2026-08-20"
+      "description": "A dense botanical wallpaper on aged rag paper, seen only through a window cut in a white mount — a triangle, a square, a circle, or a word set in heavy square letters: GROW, RUIN, FEAR, VOTE, HOPE. Every plant that grows afterwards is rooted inside that window and climbs out over the board until the mount is overrun.",
+      "updated": "2026-09-07"
     },
     {
       "slug": "029-eyes-open",
@@ -356,7 +355,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "Black waves split at stone-to-stone junctions, rebound from the frame, and intensify where their nested, non-crossing samon overlap.",
-      "updated": "2026-08-20"
+      "updated": "2026-09-07"
     },
     {
       "slug": "033-the-greater-whole",
@@ -390,7 +389,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.svg",
-      "description": "Ten colorful geometric letters land on a center-pivoting teeter-totter, sprout legs, and slide or walk off as the platform tips."
+      "description": "Ten colorful geometric letters land on a center-pivoting teeter-totter, sprout legs, and slide or walk off as the platform tips under their own weight.",
+      "updated": "2026-09-07"
     },
     {
       "slug": "036-hypermedia-title-02",
@@ -401,7 +401,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": false,
       "thumbnail": "thumbnail.png",
-      "description": "Ten uniquely colored HYPERMEDIA disks fall through white Plinko pegs on black, painting every peg they strike."
+      "description": "Ten uniquely colored HYPERMEDIA disks fall through white Plinko pegs on black, painting every peg they strike.",
+      "updated": "2026-09-07"
     },
     {
       "slug": "037-cover-ups",
@@ -412,7 +413,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.svg",
-      "description": "Fantasy-alphabet words appear across a weathered wall, then vanish under broad horizontal repair patches with slowly wandering edges and thin, surface-revealing paint."
+      "description": "A permanent wall of varied-scale horizontal fantasy words accumulates tightly fitted repairs applied in horizontal or vertical roller passes.",
+      "updated": "2026-09-07"
     },
     {
       "slug": "038-many-frogs",
@@ -421,9 +423,10 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-09-03",
       "category": "games",
       "type": "interactive",
-      "wip": false,
+      "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "Twelve autonomous frogs cross an endless, obstacle-filled course of traffic, logs, and alligators, leaving permanent colorful stains before the camera returns to the next waiting group."
+      "description": "Twelve uniquely colored frogs begin on a monochrome lawn with moving mowers, then cross an endless grayscale course while leaving permanent, color-matched stains.",
+      "updated": "2026-09-07"
     },
     {
       "slug": "039-drips",
@@ -432,9 +435,32 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-09-07",
       "category": "generative",
       "type": "interactive",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "Angled brush strikes and scattered splats release wet gravity drips that pool and overflow across a dark field.",
+      "updated": "2026-09-07"
+    },
+    {
+      "slug": "040-moss-eaters",
+      "title": "Moss Eaters",
+      "year": 2026,
+      "date": "2026-09-08",
+      "category": "nature",
+      "type": "generative",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "Tiny segmented grazers seek untouched moss, eating pale herringbone trails into the living surface. Their paths fork, cross, fade, and slowly grow over again."
+    },
+    {
+      "slug": "041-broken-patterns",
+      "title": "Broken Patterns",
+      "year": 2022,
+      "date": "2022-02-28",
+      "category": "generative",
+      "type": "interactive",
       "wip": false,
       "thumbnail": "thumbnail.png",
-      "description": "Dark liquid starts halfway down a visible masonry depth map, filling cool recesses before overflowing through their lowest channels."
+      "description": "A spirograph that never lifts its pen. Five to seventeen hypotrochoids spread across the quadrants and advance one segment at a time in turn, so every stroke begins where the previous curve ended and the separate figures weave into a single translucent web."
     }
   ]
 };

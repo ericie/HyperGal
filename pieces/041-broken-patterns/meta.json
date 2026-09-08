@@ -1,0 +1,10 @@
+{
+  "title": "Broken Patterns",
+  "year": 2022,
+  "date": "2022-02-28",
+  "category": "generative",
+  "type": "interactive",
+  "wip": false,
+  "thumbnail": "thumbnail.png",
+  "description": "A spirograph that never lifts its pen. Five to seventeen hypotrochoids spread across the quadrants and advance one segment at a time in turn, so every stroke begins where the previous curve ended and the separate figures weave into a single translucent web."
+}

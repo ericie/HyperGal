@@ -1,4 +1,4 @@
-# Only Ghosts
+# To Big for This World
 
 An endless maze, one Pac, and power pellets.
 

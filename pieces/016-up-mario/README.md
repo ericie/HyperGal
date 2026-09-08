@@ -21,22 +21,21 @@ land, and look for the next step up.
 
 Runners carry horizontal momentum but do not collide with one another. A runner
 whose center loses a platform edge falls under gravity and can still catch a
-surface below. No runner is ever warped back into view. A Mario with no route
-makes one desperate physical jump instead of waiting forever; if it reaches the
-bottom edge, it performs a final upward death bounce before disappearing. When
-every Mario is gone, a new pair waits on ledges below the viewport and the
-camera slowly pans down until it finds them.
+surface below. No runner dies, disappears, or warps back into view at the bottom
+edge. A Mario with no route makes one desperate physical jump instead of
+waiting forever. If the highest Mario is falling, the camera follows that fall
+until another Mario becomes the highest.
 
 ## World
 
 Platforms are generated well above the camera from a seeded random stream. Four
 altitude zones repeat through the climb: stable black ink lines; square brick
 tiles that crack and fall one square at a time whenever a runner stands on
-them; trapdoors with their triggering lever on the next ledge above; and cloud
-platforms that shed painted chunks into drifting particles on every landing.
-Rare super springs fire runners several platform levels upward. The camera
-follows whichever living Mario has climbed highest, except for its deliberate
-downward search after the whole group has died.
+them; trapdoors that swing open the instant a runner lands, with a second
+triggering lever on the next ledge above; and cloud platforms that shed painted
+chunks into drifting particles on every landing.
+There are no spring launchers. The camera continuously follows whichever Mario
+is currently highest and is free to move downward as well as upward.
 
 ## Drawing
 

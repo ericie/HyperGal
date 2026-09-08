@@ -4,7 +4,7 @@
   "date": "2026-09-03",
   "category": "games",
   "type": "interactive",
-  "wip": false,
+  "wip": true,
   "thumbnail": "thumbnail.png",
-  "description": "Twelve autonomous frogs cross an endless, obstacle-filled course of traffic, logs, and alligators, leaving permanent colorful stains before the camera returns to the next waiting group."
+  "description": "Twelve uniquely colored frogs begin on a monochrome lawn with moving mowers, then cross an endless grayscale course while leaving permanent, color-matched stains."
 }

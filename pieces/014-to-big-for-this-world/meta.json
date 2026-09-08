@@ -1,10 +1,10 @@
 {
-  "title": "Only Ghosts",
+  "title": "To Big for This World",
   "year": 2026,
   "date": "2026-07-22",
   "category": "games",
   "type": "interactive",
-  "wip": true,
+  "wip": false,
   "thumbnail": "thumbnail.jpg",
   "description": "Pac hunts every power pellet across a full-frame maze."
 }

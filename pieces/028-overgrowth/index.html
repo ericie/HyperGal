@@ -22,7 +22,7 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: #e4d7ba;
+        background: #f6f4ee;
       }
 
       body {
@@ -214,18 +214,16 @@
         const FAST_GROWTH_INTERVAL = 1000 / 24;
         const MEDIUM_GROWTH_INTERVAL = 1000 / 20;
         const SLOW_GROWTH_INTERVAL = 1000 / 15;
-        const MAT_DELAY = 900;
-        const MAT_FADE = 520;
         const MAT = {
           board: '#f6f4ee',
           boardEdge: '#e6e1d4',
           bevel: '#fffefa',
           cut: '#cec7b6',
           shadow: '#4a3527',
-          boardRGB: '246, 244, 238',
         };
         const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
         const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === 'true';
+        const FRAME_PARAM = new URLSearchParams(location.search).get('frame');
 
         // `ctx` is swapped to an offscreen surface while the faded underprint
         // layer is drawn, so every draw routine reads this binding.
@@ -351,12 +349,282 @@
         let renderingGrowth = false;
         let growingPlants = [];
         let census = [];
+        const hitCtx = document.createElement('canvas').getContext('2d');
         let aperture = null;
-        let matApplied = false;
-        let matDropAt = 0;
         let rimWalk = 0;
-        // Inscribed text carries a halo of whatever it is printed on.
-        let textGround = P.paperRGB;
+
+        // A window is a set of closed contours, some of them holes, so the
+        // same machinery cuts a triangle, a circle, or a word.
+        const SHAPES = ['triangle', 'square', 'circle'];
+
+        // Words worth being overgrown. The garden either makes good on them
+        // or buries them, and both readings are the piece.
+        const WORDS = [
+          'HOPE', 'LOVE', 'GROW', 'WILD', 'FERAL', 'BLOOM', 'SEED', 'WEED',
+          'THORN', 'EDEN', 'STILL', 'QUIET', 'STAY', 'GONE', 'RUIN', 'DECAY',
+          'MOURN', 'FEAR', 'DIE', 'VOTE', 'RIOT', 'BURN', 'FUCK',
+        ];
+
+        // A heavy square face, cut as outlines on a unit box with counters
+        // carried as holes. x runs right, y runs down, both 0 to 1. STEM is
+        // the vertical stroke, BAR the lighter horizontal one.
+        const STEM = 0.3;
+        const BAR = 0.22;
+        const BOWL = 0.62;
+        const MIDLO = 0.5 - BAR / 2;
+        const MIDHI = 0.5 + BAR / 2;
+        const GLYPHS = {
+          A: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 },
+                { x: 1 - STEM, y: 1 }, { x: 1 - STEM, y: MIDHI },
+                { x: STEM, y: MIDHI }, { x: STEM, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+            { points: rect(STEM, BAR, 1 - STEM * 2, MIDLO - BAR), hole: true },
+          ],
+          B: () => [
+            { points: rect(0, 0, 1, 1) },
+            { points: rect(STEM, BAR, 1 - STEM * 2, MIDLO - BAR), hole: true },
+            { points: rect(STEM, MIDHI, 1 - STEM * 2, 1 - BAR - MIDHI), hole: true },
+          ],
+          C: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: BAR },
+                { x: STEM, y: BAR }, { x: STEM, y: 1 - BAR },
+                { x: 1, y: 1 - BAR }, { x: 1, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+          ],
+          D: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 0.8, y: 0 }, { x: 1, y: 0.24 },
+                { x: 1, y: 0.76 }, { x: 0.8, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+            {
+              points: [
+                { x: STEM, y: BAR }, { x: 0.62, y: BAR }, { x: 0.76, y: 0.34 },
+                { x: 0.76, y: 0.66 }, { x: 0.62, y: 1 - BAR }, { x: STEM, y: 1 - BAR },
+              ],
+              hole: true,
+            },
+          ],
+          E: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: BAR },
+                { x: STEM, y: BAR }, { x: STEM, y: MIDLO },
+                { x: 0.88, y: MIDLO }, { x: 0.88, y: MIDHI },
+                { x: STEM, y: MIDHI }, { x: STEM, y: 1 - BAR },
+                { x: 1, y: 1 - BAR }, { x: 1, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+          ],
+          F: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: BAR },
+                { x: STEM, y: BAR }, { x: STEM, y: MIDLO },
+                { x: 0.88, y: MIDLO }, { x: 0.88, y: MIDHI },
+                { x: STEM, y: MIDHI }, { x: STEM, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+          ],
+          G: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: BAR },
+                { x: STEM, y: BAR }, { x: STEM, y: 1 - BAR },
+                { x: 1 - STEM, y: 1 - BAR }, { x: 1 - STEM, y: BOWL },
+                { x: 1, y: BOWL }, { x: 1, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+          ],
+          H: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: STEM, y: 0 },
+                { x: STEM, y: MIDLO }, { x: 1 - STEM, y: MIDLO },
+                { x: 1 - STEM, y: 0 }, { x: 1, y: 0 },
+                { x: 1, y: 1 }, { x: 1 - STEM, y: 1 },
+                { x: 1 - STEM, y: MIDHI }, { x: STEM, y: MIDHI },
+                { x: STEM, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+          ],
+          I: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: BAR },
+                { x: 0.65, y: BAR }, { x: 0.65, y: 1 - BAR },
+                { x: 1, y: 1 - BAR }, { x: 1, y: 1 }, { x: 0, y: 1 },
+                { x: 0, y: 1 - BAR }, { x: 0.35, y: 1 - BAR },
+                { x: 0.35, y: BAR }, { x: 0, y: BAR },
+              ],
+            },
+          ],
+          J: () => [
+            {
+              points: [
+                { x: 1 - STEM, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 },
+                { x: 0, y: 1 }, { x: 0, y: 1 - BAR }, { x: 1 - STEM, y: 1 - BAR },
+              ],
+            },
+          ],
+          K: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: STEM, y: 0 }, { x: STEM, y: 0.4 },
+                { x: 0.68, y: 0 }, { x: 1, y: 0 }, { x: 0.46, y: 0.5 },
+                { x: 1, y: 1 }, { x: 0.66, y: 1 }, { x: STEM, y: 0.62 },
+                { x: STEM, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+          ],
+          L: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: STEM, y: 0 }, { x: STEM, y: 1 - BAR },
+                { x: 1, y: 1 - BAR }, { x: 1, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+          ],
+          M: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 0.27, y: 0 }, { x: 0.5, y: 0.55 },
+                { x: 0.73, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 },
+                { x: 1 - STEM, y: 1 }, { x: 1 - STEM, y: 0.34 },
+                { x: 0.5, y: 0.86 }, { x: STEM, y: 0.34 },
+                { x: STEM, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+          ],
+          N: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: STEM, y: 0 }, { x: 1 - STEM, y: 0.62 },
+                { x: 1 - STEM, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 },
+                { x: 1 - STEM, y: 1 }, { x: STEM, y: 0.38 },
+                { x: STEM, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+          ],
+          O: () => [
+            { points: rect(0, 0, 1, 1) },
+            { points: rect(STEM, BAR, 1 - STEM * 2, 1 - BAR * 2), hole: true },
+          ],
+          P: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: BOWL },
+                { x: STEM, y: BOWL }, { x: STEM, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+            { points: rect(STEM, BAR, 1 - STEM * 2, BOWL - BAR * 2), hole: true },
+          ],
+          Q: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 },
+                { x: 0.88, y: 1 }, { x: 0.88, y: 1.16 }, { x: 0.58, y: 1.16 },
+                { x: 0.58, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+            { points: rect(STEM, BAR, 1 - STEM * 2, 1 - BAR * 2), hole: true },
+          ],
+          R: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 0.58 },
+                { x: 0.66, y: 0.58 }, { x: 1, y: 1 }, { x: 0.62, y: 1 },
+                { x: STEM, y: 0.58 }, { x: STEM, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+            { points: rect(STEM, BAR, 1 - STEM * 2, 0.58 - BAR * 2), hole: true },
+          ],
+          S: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: BAR },
+                { x: STEM, y: BAR }, { x: STEM, y: MIDLO }, { x: 1, y: MIDLO },
+                { x: 1, y: 1 }, { x: 0, y: 1 }, { x: 0, y: 1 - BAR },
+                { x: 1 - STEM, y: 1 - BAR }, { x: 1 - STEM, y: MIDHI },
+                { x: 0, y: MIDHI },
+              ],
+            },
+          ],
+          T: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: BAR },
+                { x: 0.65, y: BAR }, { x: 0.65, y: 1 }, { x: 0.35, y: 1 },
+                { x: 0.35, y: BAR }, { x: 0, y: BAR },
+              ],
+            },
+          ],
+          U: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: STEM, y: 0 }, { x: STEM, y: 1 - BAR },
+                { x: 1 - STEM, y: 1 - BAR }, { x: 1 - STEM, y: 0 },
+                { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 },
+              ],
+            },
+          ],
+          V: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: STEM, y: 0 }, { x: 0.5, y: 0.74 },
+                { x: 1 - STEM, y: 0 }, { x: 1, y: 0 },
+                { x: 0.66, y: 1 }, { x: 0.34, y: 1 },
+              ],
+            },
+          ],
+          W: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 0.24, y: 0 }, { x: 0.34, y: 0.72 },
+                { x: 0.5, y: 0.3 }, { x: 0.66, y: 0.72 }, { x: 0.76, y: 0 },
+                { x: 1, y: 0 }, { x: 0.82, y: 1 }, { x: 0.62, y: 1 },
+                { x: 0.5, y: 0.66 }, { x: 0.38, y: 1 }, { x: 0.18, y: 1 },
+              ],
+            },
+          ],
+          X: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: STEM, y: 0 }, { x: 0.5, y: 0.36 },
+                { x: 1 - STEM, y: 0 }, { x: 1, y: 0 }, { x: 0.66, y: 0.5 },
+                { x: 1, y: 1 }, { x: 1 - STEM, y: 1 }, { x: 0.5, y: 0.64 },
+                { x: STEM, y: 1 }, { x: 0, y: 1 }, { x: 0.34, y: 0.5 },
+              ],
+            },
+          ],
+          Y: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: STEM, y: 0 }, { x: 0.5, y: 0.42 },
+                { x: 1 - STEM, y: 0 }, { x: 1, y: 0 }, { x: 0.65, y: 0.6 },
+                { x: 0.65, y: 1 }, { x: 0.35, y: 1 }, { x: 0.35, y: 0.6 },
+              ],
+            },
+          ],
+          Z: () => [
+            {
+              points: [
+                { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: BAR },
+                { x: 0.34, y: 1 - BAR }, { x: 1, y: 1 - BAR }, { x: 1, y: 1 },
+                { x: 0, y: 1 }, { x: 0, y: 1 - BAR }, { x: 0.66, y: BAR },
+                { x: 0, y: BAR },
+              ],
+            },
+          ],
+        };
 
         if (DEBUG_MODE) {
           showDebugCatalog();
@@ -569,10 +837,12 @@
 
           const area = width * height;
           const unit = clamp(Math.min(width, height) / 560, 0.95, 1.75);
+          aperture = buildAperture();
+          rimWalk = random();
 
           // A faded underprint: flat silhouettes that give the ground the
           // depth of a two-plate impression.
-          const ghostCount = Math.round(clamp(area / 60000, 10, 24));
+          const ghostCount = Math.round(clamp(area / 34000, 16, 40));
           for (let i = 0; i < ghostCount; i += 1) {
             const plant = createPlant(
               random() * width,
@@ -588,7 +858,7 @@
           // The main growth uses weighted selection rather than forcing a
           // checklist pass through every species. A denser grid gives the
           // opening frame the already-established fullness of the garden.
-          const count = clamp(Math.round(area / 10500), 48, 120);
+          const count = clamp(Math.round(area / 4600), 96, 260);
           const cols = Math.max(4, Math.round(Math.sqrt((count * width) / height)));
           const rows = Math.ceil(count / cols);
           const cellW = width / cols;
@@ -612,7 +882,7 @@
           let fillIndex = 0;
           for (let row = 0; row <= rows; row += 1) {
             for (let col = 0; col <= cols; col += 1) {
-              if (random() > 0.84) continue;
+              if (random() > 0.95) continue;
               const plant = createPlant(
                 (col + 0.72 + lerp(-0.22, 0.22, random())) * cellW,
                 (row + 0.56 + lerp(-0.22, 0.22, random())) * cellH,
@@ -629,7 +899,7 @@
           // Long twining stems that traverse the plate and tie it together,
           // the way a Morris repeat is carried by its meander.
           const vineIndex = SPECIES.findIndex((s) => s.vine);
-          const vines = Math.round(clamp(area / 125000, 5, 12));
+          const vines = Math.round(clamp(area / 78000, 8, 20));
           for (let i = 0; i < vines; i += 1) {
             const edge = i % 4;
             const origin = edgePlantOrigin(edge, width * 0.06 + random() * 40, random);
@@ -647,10 +917,14 @@
 
           // Stems entering from beyond the sheet, so the growth reads as cut
           // from something larger.
-          for (let i = 0; i < 10; i += 1) {
+          const solidSpecies = SPECIES.reduce((indices, spec, index) => {
+            if (!spec.pale) indices.push(index);
+            return indices;
+          }, []);
+          for (let i = 0; i < 18; i += 1) {
             const edge = i % 4;
             const origin = edgePlantOrigin(edge, edge === 3 ? 70 : 14, random);
-            const plant = createPlant(origin.x, origin.y, i % SPECIES.length, unit, {
+            const plant = createPlant(origin.x, origin.y, solidSpecies[i % solidSpecies.length], unit, {
               rotation: origin.rotation,
               bloomBoost: 1,
             });
@@ -666,7 +940,7 @@
             if (spec.pale) indices.push(index);
             return indices;
           }, []);
-          const creamPlants = Math.round(clamp(area / 450000, 2, 3));
+          const creamPlants = Math.round(clamp(area / 820000, 1, 3));
           for (let i = 0; i < creamPlants; i += 1) {
             const plant = createPlant(
               lerp(width * 0.06, width * 0.94, random()),
@@ -674,8 +948,8 @@
               creamSpecies[Math.floor(random() * creamSpecies.length)],
               unit
             );
-            plant.scale *= lerp(1.08, 1.44, random());
-            plant.depth = count + 24 + i;
+            plant.scale *= lerp(0.82, 1.1, random());
+            plant.depth = Math.round(count * 0.45) + i;
             plants.push(plant);
           }
 
@@ -683,7 +957,7 @@
 
           // Foreground specimens drawn last, over the ruled border.
           const anchorTypes = [0, 1, 3, 6, 5, 4, 0, 7, 3, 1];
-          const anchors = Math.round(clamp(area / 190000, 5, 9));
+          const anchors = Math.round(clamp(area / 145000, 7, 13));
           const anchorPlants = [];
           for (let i = 0; i < anchors; i += 1) {
             const plant = createPlant(
@@ -706,10 +980,6 @@
           growthPaintInterval = FAST_GROWTH_INTERVAL;
           nextGrowthAt = performance.now() + 350;
 
-          aperture = buildAperture();
-          rimWalk = random();
-          matApplied = false;
-          matDropAt = performance.now() + (reducedMotion.matches ? 0 : MAT_DELAY);
         }
 
         // An edge specimen points into the sheet, but every edge is treated
@@ -734,9 +1004,30 @@
         // climb out over the board.
         // ---------------------------------------------------------------
 
-        // An upward triangle to start with. The window is only ever read as a
-        // polygon, so a different opening is just a different point list.
         function buildAperture() {
+          // ?frame= asks for one window by name, or for any word the face
+          // can set. Otherwise the plate draws its own.
+          const asked = FRAME_PARAM ? FRAME_PARAM.trim().toUpperCase() : '';
+          if (asked) {
+            const shape = SHAPES.find((name) => name.toUpperCase() === asked);
+            if (shape) return shapeAperture(shape);
+            if ([...asked].every((ch) => GLYPHS[ch])) {
+              return measureShape(wordContours(asked));
+            }
+          }
+          if (random() < 0.4) {
+            return shapeAperture(SHAPES[Math.floor(random() * SHAPES.length)]);
+          }
+          return measureShape(wordContours(WORDS[Math.floor(random() * WORDS.length)]));
+        }
+
+        function shapeAperture(name) {
+          if (name === 'square') return measureShape([{ points: squarePoints() }]);
+          if (name === 'circle') return measureShape([{ points: circlePoints() }]);
+          return measureShape([{ points: trianglePoints() }]);
+        }
+
+        function trianglePoints() {
           const halfBase = Math.min(
             width * 0.36,
             (height * 0.74) / Math.sqrt(3),
@@ -745,77 +1036,145 @@
           const tall = halfBase * Math.sqrt(3);
           const cx = width / 2;
           const cy = height * 0.5;
-          return measurePolygon([
+          return [
             { x: cx, y: cy - tall / 2 },
             { x: cx + halfBase, y: cy + tall / 2 },
             { x: cx - halfBase, y: cy + tall / 2 },
-          ]);
+          ];
         }
 
-        // Fan the window from its centroid so a root can be picked with even
-        // density inside it, and measure the rim so one can be picked on it.
-        function measurePolygon(points) {
-          let cx = 0;
-          let cy = 0;
-          for (const p of points) {
-            cx += p.x;
-            cy += p.y;
-          }
-          cx /= points.length;
-          cy /= points.length;
+        function squarePoints() {
+          const half = Math.min(width * 0.34, height * 0.38, Math.min(width, height) * 0.33);
+          const cx = width / 2;
+          const cy = height * 0.5;
+          return [
+            { x: cx - half, y: cy - half },
+            { x: cx + half, y: cy - half },
+            { x: cx + half, y: cy + half },
+            { x: cx - half, y: cy + half },
+          ];
+        }
 
-          const fans = [];
+        // Sampled fine enough that the same edge walk that handles a triangle
+        // handles a circle without knowing the difference.
+        function circlePoints() {
+          const radius = Math.min(width * 0.34, height * 0.38, Math.min(width, height) * 0.35);
+          const cx = width / 2;
+          const cy = height * 0.5;
+          const steps = 96;
+          const points = [];
+          for (let i = 0; i < steps; i += 1) {
+            const a = (i / steps) * TAU;
+            points.push({ x: cx + Math.cos(a) * radius, y: cy + Math.sin(a) * radius });
+          }
+          return points;
+        }
+
+        function rect(x, y, w, h) {
+          return [
+            { x, y },
+            { x: x + w, y },
+            { x: x + w, y: y + h },
+            { x, y: y + h },
+          ];
+        }
+
+        function wordContours(word) {
+          const glyphW = 0.78;
+          const gap = 0.17;
+          const span = word.length * glyphW + (word.length - 1) * gap;
+          const em = Math.min((width * 0.8) / span, height * 0.34);
+          const totalW = span * em;
+          const left = (width - totalW) / 2;
+          const top = height * 0.5 - em / 2;
+
+          const contours = [];
+          for (let i = 0; i < word.length; i += 1) {
+            const build = GLYPHS[word[i]];
+            if (!build) continue;
+            const ox = left + i * (glyphW + gap) * em;
+            for (const contour of build()) {
+              contours.push({
+                hole: !!contour.hole,
+                points: contour.points.map((pt) => ({
+                  x: ox + pt.x * glyphW * em,
+                  y: top + pt.y * em,
+                })),
+              });
+            }
+          }
+          return contours;
+        }
+
+        // Measure the window once: a hit-testable path, a flat edge list with
+        // cumulative length so a rim point can be picked, and the outward
+        // normal of every edge so a specimen can be aimed away from the glass.
+        function measureShape(contours) {
+          const path = new Path2D();
+          let minX = Infinity;
+          let minY = Infinity;
+          let maxX = -Infinity;
+          let maxY = -Infinity;
+          for (const contour of contours) {
+            const pts = contour.points;
+            path.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i += 1) path.lineTo(pts[i].x, pts[i].y);
+            path.closePath();
+            for (const pt of pts) {
+              minX = Math.min(minX, pt.x);
+              minY = Math.min(minY, pt.y);
+              maxX = Math.max(maxX, pt.x);
+              maxY = Math.max(maxY, pt.y);
+            }
+          }
+
           const edges = [];
-          let area = 0;
           let perimeter = 0;
-          let radius = 0;
-          for (let i = 0; i < points.length; i += 1) {
-            const a = points[i];
-            const b = points[(i + 1) % points.length];
-            area += Math.abs((a.x - cx) * (b.y - cy) - (b.x - cx) * (a.y - cy)) * 0.5;
-            fans.push({ a, b, upTo: area });
-            const from = perimeter;
-            perimeter += Math.hypot(b.x - a.x, b.y - a.y);
-            edges.push({ a, b, from, to: perimeter });
-            radius = Math.max(radius, Math.hypot(a.x - cx, a.y - cy));
+          for (const contour of contours) {
+            const pts = contour.points;
+            for (let i = 0; i < pts.length; i += 1) {
+              const a = pts[i];
+              const b = pts[(i + 1) % pts.length];
+              const len = Math.hypot(b.x - a.x, b.y - a.y);
+              if (len < 0.01) continue;
+              // Probe just off the edge rather than reasoning about winding:
+              // whichever side is not inside the window is the way out.
+              let nx = (b.y - a.y) / len;
+              let ny = -(b.x - a.x) / len;
+              const mx = (a.x + b.x) / 2;
+              const my = (a.y + b.y) / 2;
+              if (hitCtx.isPointInPath(path, mx + nx * 1.5, my + ny * 1.5, 'evenodd')) {
+                nx = -nx;
+                ny = -ny;
+              }
+              const from = perimeter;
+              perimeter += len;
+              edges.push({ a, b, mx, my, from, to: perimeter, heading: Math.atan2(ny, nx) });
+            }
           }
 
-          let top = Infinity;
-          let bottom = -Infinity;
-          for (const p of points) {
-            top = Math.min(top, p.y);
-            bottom = Math.max(bottom, p.y);
-          }
-          return { points, centroid: { x: cx, y: cy }, fans, edges, area, perimeter, radius, top, bottom };
+          return { contours, path, edges, perimeter, minX, minY, maxX, maxY };
         }
 
         function traceAperture(poly) {
-          ctx.moveTo(poly.points[0].x, poly.points[0].y);
-          for (let i = 1; i < poly.points.length; i += 1) {
-            ctx.lineTo(poly.points[i].x, poly.points[i].y);
+          for (const contour of poly.contours) {
+            const pts = contour.points;
+            ctx.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i += 1) ctx.lineTo(pts[i].x, pts[i].y);
+            ctx.closePath();
           }
-          ctx.closePath();
         }
 
+        // Rejection sampling inside the bounding box. A letter is far too
+        // concave to fan from a centre, and the window is only sampled a
+        // couple of times a second.
         function pointInAperture(poly, r) {
-          const pick = r() * poly.area;
-          let fan = poly.fans[poly.fans.length - 1];
-          for (const candidate of poly.fans) {
-            if (pick <= candidate.upTo) {
-              fan = candidate;
-              break;
-            }
+          for (let i = 0; i < 200; i += 1) {
+            const x = lerp(poly.minX, poly.maxX, r());
+            const y = lerp(poly.minY, poly.maxY, r());
+            if (hitCtx.isPointInPath(poly.path, x, y, 'evenodd')) return { x, y };
           }
-          let u = r();
-          let v = r();
-          if (u + v > 1) {
-            u = 1 - u;
-            v = 1 - v;
-          }
-          return {
-            x: poly.centroid.x + (fan.a.x - poly.centroid.x) * u + (fan.b.x - poly.centroid.x) * v,
-            y: poly.centroid.y + (fan.a.y - poly.centroid.y) * u + (fan.b.y - poly.centroid.y) * v,
-          };
+          return { x: (poly.minX + poly.maxX) / 2, y: (poly.minY + poly.maxY) / 2 };
         }
 
         function pointOnRim(poly, t) {
@@ -828,32 +1187,47 @@
             }
           }
           const k = (at - edge.from) / Math.max(1e-6, edge.to - edge.from);
-          return { x: lerp(edge.a.x, edge.b.x, k), y: lerp(edge.a.y, edge.b.y, k) };
+          return {
+            x: lerp(edge.a.x, edge.b.x, k),
+            y: lerp(edge.a.y, edge.b.y, k),
+            heading: edge.heading,
+          };
+        }
+
+        function nearestEdge(poly, x, y) {
+          let best = poly.edges[0];
+          let bestDist = Infinity;
+          for (const edge of poly.edges) {
+            const d = (edge.mx - x) * (edge.mx - x) + (edge.my - y) * (edge.my - y);
+            if (d < bestDist) {
+              bestDist = d;
+              best = edge;
+            }
+          }
+          return best;
         }
 
         // Most specimens are rooted against the rim of the window and aimed
-        // outward, so the growth has nowhere to go but over the mount.
+        // straight out of it, so the growth has nowhere to go but over the
+        // mount. A golden-ratio walk keeps every flank colonised at the same
+        // rate; pure chance leaves one side bare for minutes.
         function apertureOrigin(r) {
           let p;
+          let heading;
           if (r() < 0.62) {
             rimWalk = (rimWalk + GOLDEN) % 1;
             const rim = pointOnRim(aperture, rimWalk);
-            const pull = lerp(0.02, 0.24, r());
-            p = {
-              x: lerp(rim.x, aperture.centroid.x, pull),
-              y: lerp(rim.y, aperture.centroid.y, pull),
-            };
+            const pull = lerp(0.02, 0.22, r());
+            p = { x: rim.x - Math.cos(rim.heading) * pull * 40, y: rim.y - Math.sin(rim.heading) * pull * 40 };
+            heading = rim.heading;
           } else {
             p = pointInAperture(aperture, r);
+            heading = nearestEdge(aperture, p.x, p.y).heading;
           }
-          const dx = p.x - aperture.centroid.x;
-          const dy = p.y - aperture.centroid.y;
-          const heading =
-            Math.hypot(dx, dy) > aperture.radius * 0.14 ? Math.atan2(dy, dx) : r() * TAU;
           return { x: p.x, y: p.y, rotation: heading + Math.PI / 2 + lerp(-0.6, 0.6, r()) };
         }
 
-        function drawMat(alpha) {
+        function drawMat() {
           if (!aperture) return;
           const poly = aperture;
           const bevel = clamp(Math.min(width, height) * 0.006, 2.4, 7);
@@ -867,7 +1241,7 @@
           ctx.clip();
           ctx.strokeStyle = MAT.shadow;
           for (let i = 0; i < 6; i += 1) {
-            ctx.globalAlpha = alpha * (0.15 - i * 0.022);
+            ctx.globalAlpha = 0.15 - i * 0.022;
             ctx.lineWidth = 2 + i * 6;
             ctx.beginPath();
             traceAperture(poly);
@@ -882,7 +1256,7 @@
           traceAperture(poly);
           ctx.clip('evenodd');
 
-          ctx.globalAlpha = alpha;
+          ctx.globalAlpha = 1;
           ctx.fillStyle = MAT.board;
           ctx.fillRect(0, 0, width, height);
 
@@ -901,7 +1275,7 @@
 
           // The tooth of the board, so it is not a flat digital white.
           const r = mulberry32((seed ^ 0x6d1f7723) >>> 0);
-          ctx.globalAlpha = alpha * 0.05;
+          ctx.globalAlpha = 0.05;
           ctx.fillStyle = '#a79d86';
           for (let i = 0; i < Math.round((width * height) / 2600); i += 1) {
             ctx.fillRect(r() * width, r() * height, lerp(0.5, 1.5, r()), lerp(0.5, 1.5, r()));
@@ -909,14 +1283,14 @@
 
           // A forty-five degree cut: a faint shoulder, then the bright core
           // of the board where the knife went through.
-          ctx.globalAlpha = alpha * 0.55;
+          ctx.globalAlpha = 0.55;
           ctx.strokeStyle = MAT.boardEdge;
           ctx.lineWidth = bevel * 2 + 2.4;
           ctx.beginPath();
           traceAperture(poly);
           ctx.stroke();
 
-          ctx.globalAlpha = alpha;
+          ctx.globalAlpha = 1;
           ctx.strokeStyle = MAT.bevel;
           ctx.lineWidth = bevel * 2;
           ctx.beginPath();
@@ -925,7 +1299,7 @@
           ctx.restore();
 
           // The cut line itself, half of it falling over the plate.
-          ctx.globalAlpha = alpha * 0.5;
+          ctx.globalAlpha = 0.5;
           ctx.strokeStyle = MAT.cut;
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -933,31 +1307,6 @@
           ctx.stroke();
 
           ctx.restore();
-        }
-
-        // The board goes down a beat after the plate, so the covering reads
-        // as a second act rather than part of the first impression.
-        function dropMat(now) {
-          const fade = reducedMotion.matches ? 0 : MAT_FADE;
-          const t = fade ? clamp((now - matDropAt) / fade, 0, 1) : 1;
-
-          growthCtx.setTransform(1, 0, 0, 1, 0, 0);
-          growthCtx.clearRect(0, 0, growthCanvas.width, growthCanvas.height);
-
-          if (t >= 1) {
-            ctx = mainCtx;
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            drawMat(1);
-            drawInscription();
-            matApplied = true;
-            nextGrowthAt = now + 240;
-            return;
-          }
-
-          ctx = growthCtx;
-          ctx.setTransform(growthDpr, 0, 0, growthDpr, 0, 0);
-          drawMat(t * t * (3 - 2 * t));
-          ctx = mainCtx;
         }
 
         // The plate never reaches a finished state. New specimens are stamped
@@ -969,11 +1318,6 @@
         }
 
         function growForever(now) {
-          if (!matApplied) {
-            if (now >= matDropAt) dropMat(now);
-            growthFrame = requestAnimationFrame(growForever);
-            return;
-          }
           // Detailed flowers can be expensive while several specimens overlap.
           // Bound the transient work instead of letting a slow species create
           // an ever-growing redraw queue.
@@ -1078,6 +1422,10 @@
           for (const plant of anchorPlants) drawPlant(plant);
 
           drawFoxing();
+
+          // The mount is laid in the same impression as the plate. The
+          // window is the first thing anyone sees, never the wallpaper.
+          drawMat();
         }
 
         // ---------------------------------------------------------------
@@ -1224,88 +1572,6 @@
               ctx.lineTo(lerp(ax, bx, t) + nx * off, lerp(ay, by, t) + ny * off);
             }
           }
-        }
-
-        // Written on the mount, the way a mounted print is titled below its
-        // window in pencil. The growth will bury it soon enough.
-        function drawInscription() {
-          if (height < 320 || width < 300 || !aperture) return;
-          const size = clamp(Math.min(width, height) * 0.021, 10, 17);
-          const ranked = census
-            .map((n, i) => ({ n, i }))
-            .sort((a, b) => b.n - a.n || a.i - b.i)
-            .slice(0, 2)
-            .map((entry) => SPECIES[entry.i].latin);
-
-          const caption = ranked.join('  ·  ');
-          const captionY = aperture.bottom + (height - aperture.bottom) * 0.54;
-          const plateY = aperture.top * 0.56;
-
-          ctx.save();
-          ctx.textAlign = 'center';
-          textGround = MAT.boardRGB;
-
-          if (height - aperture.bottom > size * 2.6) {
-            ctx.font = `italic ${size}px Georgia, "Times New Roman", Times, serif`;
-            inscribe(caption, width / 2, captionY, size, 0.62);
-          }
-          if (aperture.top > size * 2.6) {
-            ctx.font = `${size * 0.72}px Georgia, "Times New Roman", Times, serif`;
-            spacedText(`PLATE ${roman((seed % 240) + 1)}`, width / 2, plateY, size * 0.3, size * 0.72, 0.5);
-          }
-
-          textGround = P.paperRGB;
-          ctx.restore();
-        }
-
-        function paperHalo(cx, cy, radius) {
-          ctx.save();
-          ctx.translate(cx, cy);
-          ctx.scale(1, 0.3);
-          const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-          halo.addColorStop(0, `rgba(${P.paperRGB}, 0.6)`);
-          halo.addColorStop(0.5, `rgba(${P.paperRGB}, 0.42)`);
-          halo.addColorStop(1, `rgba(${P.paperRGB}, 0)`);
-          ctx.fillStyle = halo;
-          ctx.beginPath();
-          ctx.arc(0, 0, radius, 0, TAU);
-          ctx.fill();
-          ctx.restore();
-        }
-
-        // Text on a plate sits in clean paper. Carrying that paper as a halo
-        // around the glyphs themselves keeps it legible over growth without
-        // veiling the flower behind it.
-        function inscribe(text, x, y, size, alpha) {
-          ctx.save();
-          ctx.lineJoin = 'round';
-          ctx.lineWidth = size * 0.3;
-          ctx.strokeStyle = `rgba(${textGround}, 0.92)`;
-          ctx.globalAlpha = 0.9;
-          ctx.strokeText(text, x, y);
-          ctx.globalAlpha = alpha;
-          ctx.fillStyle = P.ink;
-          ctx.fillText(text, x, y);
-          ctx.restore();
-        }
-
-        function spacedText(text, cx, y, spacing, size, alpha) {
-          const widths = [];
-          let total = 0;
-          for (const ch of text) {
-            const w = ctx.measureText(ch).width;
-            widths.push(w);
-            total += w + spacing;
-          }
-          let x = cx - (total - spacing) / 2;
-          let i = 0;
-          ctx.textAlign = 'left';
-          for (const ch of text) {
-            inscribe(ch, x, y, size, alpha);
-            x += widths[i] + spacing;
-            i += 1;
-          }
-          ctx.textAlign = 'center';
         }
 
         function drawFoxing() {
@@ -2152,7 +2418,8 @@
         // A leaf is an arrangement, not always a single blade: roses come in
         // threes on a petiole, honeysuckle in opposite pairs.
         function drawLeaf(leaf, growth) {
-          const unfurl = developmentProgress(growth === undefined ? 1 : growth);
+          const unfurlRaw = growth === undefined ? 1 : clamp(growth, 0, 1);
+          const unfurl = developmentProgress(unfurlRaw);
           if (unfurl <= 0) return;
           const open = smoothstep(clamp((unfurl - 0.12) / 0.88, 0, 1));
           ctx.save();
@@ -2162,22 +2429,22 @@
           ctx.rotate(leaf.angle - Math.sign(leaf.curl || 1) * (1 - open) * 0.72);
 
           if (leaf.conf.fatsia) {
-            drawFatsiaLeaf(developLeaf(leaf, unfurl));
+            drawFatsiaLeaf(developLeaf(leaf, unfurlRaw));
           } else if (leaf.conf.fig) {
-            drawFigLeaf(developLeaf(leaf, unfurl));
+            drawFigLeaf(developLeaf(leaf, unfurlRaw));
           } else if (leaf.conf.palm) {
-            drawCompoundFrond(developLeaf(leaf, unfurl), 'palm');
+            drawCompoundFrond(developLeaf(leaf, unfurlRaw), 'palm');
           } else if (leaf.conf.fern) {
-            drawCompoundFrond(developLeaf(leaf, unfurl), 'fern');
+            drawCompoundFrond(developLeaf(leaf, unfurlRaw), 'fern');
           } else if (leaf.conf.pinnate) {
-            drawPinnateLeaf(developLeaf(leaf, unfurl));
+            drawPinnateLeaf(developLeaf(leaf, unfurlRaw));
           } else if (leaf.conf.trio) {
             const stalk = leaf.length * 0.34 * smoothstep(clamp(unfurl / 0.56, 0, 1));
             drawPetiole(stalk, leaf.curl);
             const tip = { x: stalk, y: -stalk * leaf.curl * 0.9 };
             for (let i = 0; i < 2; i += 1) {
               const s = i === 0 ? 1 : -1;
-              const bladeGrowth = stagedGrowth(unfurl, 0.16 + i * 0.08);
+              const bladeGrowth = stagedGrowth(unfurlRaw, 0.16 + i * 0.08);
               if (bladeGrowth <= 0) continue;
               ctx.save();
               ctx.translate(tip.x * 0.42, tip.y * 0.42);
@@ -2190,7 +2457,7 @@
               );
               ctx.restore();
             }
-            const tipGrowth = stagedGrowth(unfurl, 0.3);
+            const tipGrowth = stagedGrowth(unfurlRaw, 0.3);
             ctx.save();
             ctx.translate(tip.x, tip.y);
             if (tipGrowth > 0) {
@@ -2205,7 +2472,7 @@
           } else if (leaf.conf.pair) {
             for (let i = 0; i < 2; i += 1) {
               const s = i === 0 ? 1 : -1;
-              const bladeGrowth = stagedGrowth(unfurl, i * 0.1);
+              const bladeGrowth = stagedGrowth(unfurlRaw, i * 0.1);
               if (bladeGrowth <= 0) continue;
               ctx.save();
               ctx.rotate(s * 0.52 * smoothstep(bladeGrowth));
@@ -2223,7 +2490,7 @@
               ctx.restore();
             }
           } else {
-            drawBlade(developLeaf(leaf, unfurl));
+            drawBlade(developLeaf(leaf, unfurlRaw));
           }
           ctx.restore();
         }
@@ -2241,7 +2508,14 @@
               leaf.turnover &&
               t >= (LEAF_DEVELOPMENT_FRAMES - 2) / (LEAF_DEVELOPMENT_FRAMES - 1),
             development: t,
+            developmentRaw: clamp(progress, 0, 1),
           };
+        }
+
+        // Each staged part gets the full pose grid across its own window,
+        // rather than the leftovers of the parent leaf's grid.
+        function leafStage(leaf, delay) {
+          return stagedGrowth(leaf.developmentRaw == null ? 1 : leaf.developmentRaw, delay);
         }
 
         function variant(leaf, length, curl, turnover) {
@@ -2648,7 +2922,7 @@
             const p = leafRib(leaf, t);
             const q = leafRib(leaf, Math.min(1, t + 0.016));
             const tangent = Math.atan2(q.y - p.y, q.x - p.x);
-            const leafletGrowth = stagedGrowth(leaf.development || 1, i * 0.03);
+            const leafletGrowth = leafStage(leaf, i * 0.03);
             if (leafletGrowth <= 0) continue;
 
             const crown = Math.pow(Math.sin(Math.PI * t), palm ? 0.38 : 0.62);
@@ -2786,7 +3060,7 @@
           const pairs = 3;
           const fill = leafFill(leaf);
           for (let i = 1; i <= pairs + 1; i += 1) {
-            const leafletGrowth = stagedGrowth(leaf.development || 1, (i - 1) * 0.12);
+            const leafletGrowth = leafStage(leaf, (i - 1) * 0.12);
             if (leafletGrowth <= 0) continue;
             const t = Math.min(1, i / (pairs + 0.6));
             const p = leafRib(leaf, t);
@@ -3892,22 +4166,6 @@
 
         function sortPlants() {
           plants.sort((a, b) => a.depth - b.depth || a.id - b.id);
-        }
-
-        function roman(n) {
-          const map = [
-            [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
-            [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
-          ];
-          let value = n;
-          let out = '';
-          for (const [v, s] of map) {
-            while (value >= v) {
-              out += s;
-              value -= v;
-            }
-          }
-          return out;
         }
 
         function announce(message) {

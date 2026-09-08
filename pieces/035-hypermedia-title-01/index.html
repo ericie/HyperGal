@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#e8ebea" />
     <meta
       name="description"
-      content="Ten colorful geometric letters land on a center-pivoting teeter-totter, sprout legs, and slide or walk off as the platform tips."
+      content="Ten colorful geometric letters land on a center-pivoting teeter-totter, sprout legs, and slide or walk off as the platform tips under their own weight."
     />
     <title>Hypermedia Title 01 · HyperGal</title>
     <style>
@@ -314,6 +314,7 @@
         .glyph .construction { transition: none; }
       }
     </style>
+    <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
   <body>
     <main
@@ -665,6 +666,77 @@
           });
         }
 
+        // Samples a glyph's artwork on a grid to find how much ink it carries
+        // and where that ink sits. Shapes paint in order, so the topmost one
+        // under a sample decides it: a cut-out in the ground colour takes mass
+        // away rather than adding it.
+        function weighGlyph(letter, probe) {
+          if (typeof DOMPoint !== 'function') return null;
+          probe.replaceChildren();
+          glyphBuilders[letter](probe);
+          const shapes = [...probe.querySelectorAll('*')].filter(
+            node => typeof node.isPointInFill === 'function'
+          );
+          if (!shapes.length) return null;
+
+          const GRID = 26;
+          const step = 100 / GRID;
+          let hits = 0;
+          let sumX = 0;
+          let sumY = 0;
+          for (let row = 0; row < GRID; row++) {
+            for (let column = 0; column < GRID; column++) {
+              const x = (column + 0.5) * step;
+              const y = (row + 0.5) * step;
+              const point = new DOMPoint(x, y);
+              let paint = null;
+              for (const shape of shapes) {
+                try {
+                  if (shape.isPointInFill(point)) paint = shape;
+                } catch (error) {
+                  return null;
+                }
+              }
+              if (!paint || paint.getAttribute('fill') === C.paper) continue;
+              hits += 1;
+              sumX += x;
+              sumY += y;
+            }
+          }
+          if (!hits) return null;
+          return { ink: hits / (GRID * GRID), x: sumX / hits, y: sumY / hits };
+        }
+
+        function weighGlyphs(letters) {
+          const stats = {};
+          const probe = el('svg', { viewBox: '0 0 100 100', width: '100', height: '100' });
+          probe.style.cssText =
+            'position:absolute;left:-9999px;top:0;visibility:hidden;pointer-events:none';
+          document.body.append(probe);
+
+          let total = 0;
+          let counted = 0;
+          for (const letter of new Set(letters)) {
+            const weighed = weighGlyph(letter, probe);
+            if (!weighed) continue;
+            stats[letter] = weighed;
+            total += weighed.ink;
+            counted += 1;
+          }
+          probe.remove();
+
+          const average = counted ? total / counted : 1;
+          for (const letter of Object.keys(stats)) {
+            const weighed = stats[letter];
+            // Mass against the average letter, where the ink balances across the
+            // body, and how high it rides — both as a share of the body size.
+            weighed.mass = Math.max(0.6, Math.min(1.6, weighed.ink / average));
+            weighed.balance = (weighed.x - 50) / 100;
+            weighed.rise = (50 - weighed.y) / 100;
+          }
+          return stats;
+        }
+
         function startPhysics() {
           const WORD = [...'HYPERMEDIA'];
           // Odds that a walker reaching an end keeps going instead of turning.
@@ -677,10 +749,18 @@
           const stepOffChance = walking =>
             STEP_OFF_CHANCE * (1 + (WORD.length - walking) * 0.9);
           const TEETER_MAX_ANGLE = (13 * Math.PI) / 180;
-          const TEETER_PERIOD = 6200;
-          const TEETER_DELAY = 1800;
+          // The plank is a balance, not a metronome. The walkers' combined
+          // leverage about the fulcrum sets the angle it wants to hold, and it
+          // swings toward that angle with the weight of a real beam: a letter
+          // out at the tip moves it far more than one loitering by the pivot.
+          const TEETER_LEVERAGE = 3.4;
+          const TEETER_STIFFNESS = 6.5;
+          const TEETER_DAMPING = 0.955;
           const TEETER_RAMP = 1400;
+          // Zero until the word is up and walking; the plank is locked level
+          // while the letters are still falling and growing legs.
           let teeterStartedAt = 0;
+          let teeterVelocity = 0;
           const LEG_ANCHORS = {
             A: [24, 76],
             D: [30, 61],
@@ -703,6 +783,7 @@
             R: ['#1b82bd', '#126da4'],
             Y: [C.slate, C.slate],
           };
+          const GLYPHS = weighGlyphs(WORD);
           const motion = matchMedia('(prefers-reduced-motion: reduce)');
           const world = {
             width: 0,
@@ -811,15 +892,48 @@
             );
           }
 
-          function updateTeeter(now) {
-            if (motion.matches || now <= teeterStartedAt + TEETER_DELAY) {
+          // Where the standing letters put their weight, as a share of the arm:
+          // -1 is the whole word bearing down on the left tip, +1 on the right.
+          // Each letter pulls with its own mass — how much ink its glyph is
+          // drawn from — so a heavy E out at the tip outweighs a light A, and
+          // the weight sits under the glyph's own balance point rather than the
+          // middle of its box.
+          function teeterBalance() {
+            const half = world.ledge * 0.5;
+            let load = 0;
+            let carried = 0;
+            for (const body of bodies) {
+              if (body.gone || body.dropping || !body.active) continue;
+              // A letter already past the end presses on nothing.
+              if (!Number.isFinite(groundAt(body.x))) continue;
+              const centre =
+                body.x +
+                (Math.cos(body.angle) * body.balance - Math.sin(body.angle) * body.rise) *
+                  body.size;
+              load += body.mass * clamp((centre - world.ledgeCenter) / half, -1, 1);
+              carried += body.mass;
+            }
+            return carried ? load / carried : 0;
+          }
+
+          function updateTeeter(step, now) {
+            if (motion.matches || !teeterStartedAt) {
+              teeterVelocity = 0;
               applyTeeter(0);
               return;
             }
-            const movingFor = now - teeterStartedAt - TEETER_DELAY;
-            const ramp = clamp(movingFor / TEETER_RAMP, 0, 1);
-            const phase = (movingFor / TEETER_PERIOD) * Math.PI * 2;
-            applyTeeter(Math.sin(phase) * TEETER_MAX_ANGLE * ramp);
+            // Ease the beam free over the first stride or two so the word does
+            // not get pitched off the instant it finds its feet.
+            const ramp = clamp((now - teeterStartedAt) / TEETER_RAMP, 0, 1);
+            const target =
+              clamp(teeterBalance() * TEETER_LEVERAGE * ramp, -1, 1) * TEETER_MAX_ANGLE;
+            teeterVelocity += (target - world.teeterAngle) * TEETER_STIFFNESS * step;
+            teeterVelocity *= Math.pow(TEETER_DAMPING, step * 60);
+            applyTeeter(clamp(
+              world.teeterAngle + teeterVelocity * step,
+              -TEETER_MAX_ANGLE,
+              TEETER_MAX_ANGLE
+            ));
           }
 
           function addWalkerLegs(svg, letter) {
@@ -950,12 +1064,14 @@
             const spacing = (world.ledge - world.size * 2) / WORD.length;
             const start = performance.now() + 120;
             emptyAt = 0;
-            teeterStartedAt = start;
+            teeterStartedAt = 0;
+            teeterVelocity = 0;
             applyTeeter(0);
             fallStartedAt = start;
             bodies = WORD.map((letter, index) => {
               const size = world.size;
               const parts = makeFallingGlyph(letter, index);
+              const weighed = GLYPHS[letter] || { mass: 1, balance: 0, rise: 0 };
               return {
                 index,
                 letter,
@@ -965,6 +1081,11 @@
                 rightLeg: parts.legs.right,
                 size,
                 radius: size * 0.36,
+                mass: weighed.mass,
+                balance: weighed.balance,
+                rise: weighed.rise,
+                // How well this one keeps its footing on this drop.
+                grip: 0.42 + Math.random() * 0.58,
                 x:
                   world.ledgeLeft + world.size + spacing * (index + 0.5) +
                   (Math.sin(index * 2.3) * 0.05 + toss() * 0.1) * size,
@@ -1025,29 +1146,48 @@
             body.y = top - extent;
             body.grounded = true;
             if (body.vy > 34) {
-              body.vy = -body.vy * body.bounce;
+              body.vy = -body.vy * body.bounce * (1.25 - body.mass * 0.25);
               body.angularVelocity += (body.vx / body.size) * 0.035;
             } else if (body.vy > 0) {
               body.vy = 0;
             }
-            body.vx *= 0.88;
-            body.angularVelocity *= 0.78;
+            body.vx *= 0.72 + body.grip * 0.2;
+            body.angularVelocity *= 0.86 - body.grip * 0.1;
           }
 
+          // A grounded letter balances on whatever is still under it: the ink
+          // has to hang past the last supported point before it goes over.
           function tipOverEdge(body, step) {
             if (!body.grounded) return;
             const extent = bodyExtent(body);
             const here = groundAt(body.x);
-            const fall = side => {
-              const beyond = groundAt(body.x + side * extent * 0.85);
-              return (Number.isFinite(beyond) ? beyond : world.height) - here;
+            if (!Number.isFinite(here)) return;
+
+            const carry = side => {
+              let reach = 0;
+              for (let out = 0.25; out <= 1.0001; out += 0.25) {
+                const beyond = groundAt(body.x + side * extent * out);
+                if (!Number.isFinite(beyond) || beyond - here > extent * 0.45) break;
+                reach = extent * out;
+              }
+              return reach;
             };
-            const bias = fall(1) - fall(-1);
-            if (Math.abs(bias) < extent * 0.6) return;
-            const direction = Math.sign(bias);
-            const lean = clamp(Math.abs(bias) / (extent * 2.5), 0, 1);
-            body.vx += direction * lean * body.size * 2.6 * step;
-            body.angularVelocity += direction * lean * 7 * step;
+
+            // Where the letter's own ink balances, swung round by its rotation.
+            const lean =
+              Math.cos(body.angle) * body.balance - Math.sin(body.angle) * body.rise;
+            const centre = body.x + lean * body.size;
+            const overRight = centre - (body.x + carry(1));
+            const overLeft = body.x - carry(-1) - centre;
+            if (overRight <= 0 && overLeft <= 0) return;
+
+            const direction = overRight > overLeft ? 1 : -1;
+            const hang = clamp(Math.max(overRight, overLeft) / (extent * 0.9), 0, 1.4);
+            // Heavy, top-heavy letters go over sooner; grip holds them a little longer.
+            const topple =
+              (hang * body.mass * (1 + body.rise * 0.8)) / (0.55 + body.grip * 0.65);
+            body.vx += direction * topple * body.size * 2.2 * step;
+            body.angularVelocity += direction * topple * 6 * step;
           }
 
           function resolveSlabs(body) {
@@ -1094,34 +1234,39 @@
             const distance = Math.sqrt(distanceSquared) || 0.001;
             const nx = dx / distance;
             const ny = dy / distance;
-            const overlap = minimum - distance;
-            const correction = overlap * 0.5 + 0.02;
-            a.x -= nx * correction;
-            a.y -= ny * correction;
-            b.x += nx * correction;
-            b.y += ny * correction;
+            const overlap = minimum - distance + 0.04;
+            const share = b.mass / (a.mass + b.mass);
+            a.x -= nx * overlap * share;
+            a.y -= ny * overlap * share;
+            b.x += nx * overlap * (1 - share);
+            b.y += ny * overlap * (1 - share);
 
             const relativeX = b.vx - a.vx;
             const relativeY = b.vy - a.vy;
             const normalSpeed = relativeX * nx + relativeY * ny;
             if (normalSpeed >= 0) return;
 
-            const impulse = -(1 + 0.28) * normalSpeed * 0.5;
-            a.vx -= impulse * nx;
-            a.vy -= impulse * ny;
-            b.vx += impulse * nx;
-            b.vy += impulse * ny;
+            const impulse = (-(1 + 0.28) * normalSpeed) / (1 / a.mass + 1 / b.mass);
+            a.vx -= (impulse / a.mass) * nx;
+            a.vy -= (impulse / a.mass) * ny;
+            b.vx += (impulse / b.mass) * nx;
+            b.vy += (impulse / b.mass) * ny;
 
             const tx = -ny;
             const ty = nx;
             const tangentSpeed = relativeX * tx + relativeY * ty;
-            const friction = clamp(-tangentSpeed * 0.18, -Math.abs(impulse) * 0.2, Math.abs(impulse) * 0.2);
-            a.vx -= friction * tx;
-            a.vy -= friction * ty;
-            b.vx += friction * tx;
-            b.vy += friction * ty;
-            a.angularVelocity -= friction / a.size * 0.14;
-            b.angularVelocity += friction / b.size * 0.14;
+            const grab = (a.grip + b.grip) * 0.5;
+            const friction = clamp(
+              -tangentSpeed * 0.12 * grab,
+              -Math.abs(impulse) * 0.2,
+              Math.abs(impulse) * 0.2
+            );
+            a.vx -= (friction / a.mass) * tx;
+            a.vy -= (friction / a.mass) * ty;
+            b.vx += (friction / b.mass) * tx;
+            b.vy += (friction / b.mass) * ty;
+            a.angularVelocity -= (friction / (a.size * a.mass)) * 0.14;
+            b.angularVelocity += (friction / (b.size * b.mass)) * 0.14;
           }
 
           function simulate(step) {
@@ -1139,7 +1284,9 @@
               resolveBounds(body);
               resolveGround(body);
               if (body.grounded) {
-                body.vx += gravity * Math.sin(world.teeterAngle) * 0.32 * step;
+                // A letter lying on the plank slides by however little it grips.
+                const slack = 1.5 - body.grip;
+                body.vx += gravity * Math.sin(world.teeterAngle) * 0.32 * slack * step;
               }
               resolveSlabs(body);
               tipOverEdge(body, step);
@@ -1203,6 +1350,7 @@
             if (progress >= 1) {
               phase = 'running';
               phaseStarted = now;
+              teeterStartedAt = now;
             }
           }
 
@@ -1236,8 +1384,9 @@
 
                 const direction = dx === 0 ? (a.index < b.index ? 1 : -1) : Math.sign(dx);
                 const overlap = minimum - Math.abs(dx);
-                a.x -= direction * overlap * 0.5;
-                b.x += direction * overlap * 0.5;
+                const share = b.mass / (a.mass + b.mass);
+                a.x -= direction * overlap * share;
+                b.x += direction * overlap * (1 - share);
                 a.runDirection = -direction;
                 b.runDirection = direction;
                 shovedOff(a);
@@ -1306,9 +1455,16 @@
                 }
               }
 
-              body.slideVx += gravity * Math.sin(world.teeterAngle) * 0.5 * step;
-              body.slideVx *= Math.pow(0.989, step * 60);
-              body.slideVx = clamp(body.slideVx, -body.runSpeed * 1.5, body.runSpeed * 1.5);
+              // Grip is what a letter keeps of the slope: a sure-footed one
+              // holds its line, a poor one is carried away down the plank.
+              const slack = 1.5 - body.grip;
+              body.slideVx += gravity * Math.sin(world.teeterAngle) * 0.5 * slack * step;
+              body.slideVx *= Math.pow(0.955 + body.grip * 0.04, step * 60);
+              body.slideVx = clamp(
+                body.slideVx,
+                -body.runSpeed * 2.4 * slack,
+                body.runSpeed * 2.4 * slack
+              );
               body.x += (body.runDirection * body.runSpeed + body.slideVx) * step;
               const surface = groundAt(body.x);
               if (!Number.isFinite(surface)) {
@@ -1324,7 +1480,7 @@
               const tilt =
                 (Number.isFinite(behind) ? behind : surface) -
                 (Number.isFinite(front) ? front : surface);
-              if (Math.abs(tilt) > body.size * 1.3) {
+              if (Math.abs(tilt) > body.size * (0.85 + body.grip * 0.85)) {
                 startDropping(body, tilt > 0 ? 1 : -1);
                 continue;
               }
@@ -1343,7 +1499,7 @@
             const elapsed = Math.min((now - lastTime) / 1000, 0.034);
             lastTime = now;
 
-            updateTeeter(now);
+            updateTeeter(elapsed, now);
 
             if (phase === 'falling') {
               for (const body of bodies) {

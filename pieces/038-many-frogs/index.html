@@ -19,6 +19,7 @@
         width: 100%; height: 100%; background: var(--void);
       }
     </style>
+    <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
   <body>
     <canvas id="game" aria-hidden="true"></canvas>
@@ -35,6 +36,8 @@
         const HAZARD_COLLISION_Y = 0.58;
         const FROG_HIT_RADIUS = 0.24;
         const FROG_CLEARANCE = 0.52;
+        const ROUTE_DEPTH = 3;
+        const ROUTE_BEAM_WIDTH = 7;
         const TAU = Math.PI * 2;
         const COURSE_SEED = hashString('many-frogs-038-course');
         const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -43,39 +46,43 @@
 
         const palette = {
           void: 'oklch(0.08 0 0)',
-          verge: 'oklch(0.14 0.025 160)',
-          grassA: 'oklch(0.35 0.077 160)',
-          grassB: 'oklch(0.39 0.095 153)',
-          grassLine: 'oklch(0.55 0.12 151)',
-          road: 'oklch(0.19 0.018 250)',
-          roadEdge: 'oklch(0.38 0.03 245)',
-          roadMark: 'oklch(0.76 0.055 88)',
-          water: 'oklch(0.34 0.105 232)',
-          waterLine: 'oklch(0.63 0.11 218)',
-          log: 'oklch(0.38 0.095 58)',
-          logLight: 'oklch(0.58 0.13 65)',
-          gator: 'oklch(0.31 0.075 132)',
-          gatorLight: 'oklch(0.53 0.12 123)',
-          gatorEye: 'oklch(0.88 0.17 94)',
-          rock: 'oklch(0.36 0.025 226)',
-          rockLight: 'oklch(0.55 0.035 218)',
-          ink: 'oklch(0.97 0.015 145)',
-          tire: 'oklch(0.09 0 0)'
+          verge: 'oklch(0.12 0 0)',
+          grassA: 'oklch(0.23 0 0)',
+          grassB: 'oklch(0.26 0 0)',
+          grassLine: 'oklch(0.42 0 0)',
+          road: 'oklch(0.16 0 0)',
+          roadEdge: 'oklch(0.36 0 0)',
+          roadMark: 'oklch(0.7 0 0)',
+          water: 'oklch(0.29 0 0)',
+          waterLine: 'oklch(0.53 0 0)',
+          log: 'oklch(0.33 0 0)',
+          logLight: 'oklch(0.51 0 0)',
+          gator: 'oklch(0.21 0 0)',
+          gatorLight: 'oklch(0.44 0 0)',
+          gatorEye: 'oklch(0.86 0 0)',
+          rock: 'oklch(0.34 0 0)',
+          rockLight: 'oklch(0.52 0 0)',
+          mower: 'oklch(0.66 0 0)',
+          mowerLight: 'oklch(0.84 0 0)',
+          ink: 'oklch(0.97 0 0)',
+          tire: 'oklch(0.07 0 0)'
         };
 
         const frogColors = [
-          'oklch(0.76 0.21 145)', 'oklch(0.82 0.18 127)',
-          'oklch(0.71 0.22 157)', 'oklch(0.78 0.17 171)',
-          'oklch(0.84 0.16 103)', 'oklch(0.7 0.2 136)',
-          'oklch(0.75 0.19 182)', 'oklch(0.87 0.14 119)',
-          'oklch(0.69 0.21 149)', 'oklch(0.8 0.18 155)',
-          'oklch(0.73 0.18 112)', 'oklch(0.81 0.16 139)'
+          'oklch(0.68 0.24 25)', 'oklch(0.75 0.2 55)',
+          'oklch(0.84 0.18 92)', 'oklch(0.78 0.21 125)',
+          'oklch(0.7 0.22 150)', 'oklch(0.72 0.18 178)',
+          'oklch(0.76 0.17 205)', 'oklch(0.67 0.22 245)',
+          'oklch(0.65 0.24 275)', 'oklch(0.69 0.24 305)',
+          'oklch(0.7 0.25 335)', 'oklch(0.75 0.21 5)'
         ];
 
-        const stainColors = [
-          'oklch(0.54 0.24 25)', 'oklch(0.58 0.25 350)',
-          'oklch(0.59 0.24 300)', 'oklch(0.62 0.23 225)',
-          'oklch(0.63 0.22 155)', 'oklch(0.7 0.2 83)'
+        const moveOptions = [
+          { direction: 'up', dx: 0, dy: 1, base: 10 },
+          { direction: 'left', dx: -1, dy: 0, base: 2 },
+          { direction: 'right', dx: 1, dy: 0, base: 2 },
+          { direction: 'down', dx: 0, dy: -1, base: -5 },
+          { direction: 'wait', dx: 0, dy: 0, base: 0 }
         ];
 
         let width = 0;
@@ -97,6 +104,9 @@
         let lastTime = performance.now();
         let gameOverAt = -1;
         let gameOverCameraY = 0;
+        const terrainTypes = new Map();
+        let terrainGeneratedThrough = 5;
+        let terrainSegmentIndex = 0;
         let running = !document.hidden;
         let frame = 0;
 
@@ -192,12 +202,12 @@
 
             const lane = getLane(Math.round(frog.y));
             if (lane.type === 'river') {
-              if (alligatorAt(lane, frog.x, elapsed)) {
+              if (alligatorHeadAt(lane, frog.x, elapsed)) {
                 killFrog(frog, 'gator');
                 return;
               }
-              const log = supportingLogAt(lane, frog.x, elapsed);
-              if (!log) {
+              const support = supportingRiverObjectAt(lane, frog.x, elapsed);
+              if (!support) {
                 killFrog(frog, 'splash');
                 return;
               }
@@ -210,6 +220,9 @@
               }
             } else if (lane.type === 'road' && hitsVehicleAt(lane, frog.x, elapsed)) {
               killFrog(frog, 'traffic');
+              return;
+            } else if (lane.type === 'grass' && lane.mower && hitsMowerAt(lane, frog.x, elapsed)) {
+              killFrog(frog, 'mower');
               return;
             }
 
@@ -230,7 +243,7 @@
             }
           } else if (alive.length) {
             const lead = Math.max(...alive.map((frog) => frog.y));
-            targetCameraY = Math.max(0, lead - visibleRows * 0.47);
+            targetCameraY = Math.max(0, lead - visibleRows * 0.72);
             cameraY = reducedMotion.matches
               ? targetCameraY
               : lerp(cameraY, targetCameraY, 1 - Math.pow(0.0008, dt));
@@ -255,23 +268,10 @@
         function chooseMove(frog) {
           if (!frog.alive || frog.hop < 1 || gameOverAt >= 0) return;
 
-          if (frog.decision === 0) {
-            beginHop(frog, 'up');
-            return;
-          }
-
-          const choices = [
-            { direction: 'up', dx: 0, dy: 1, base: 10 },
-            { direction: 'left', dx: -1, dy: 0, base: 2 },
-            { direction: 'right', dx: 1, dy: 0, base: 2 },
-            { direction: 'down', dx: 0, dy: -1, base: -5 },
-            { direction: 'wait', dx: 0, dy: 0, base: 0 }
-          ];
-
           const currentLane = getLane(Math.round(frog.y));
           const evaluated = [];
 
-          choices.forEach((choice, index) => {
+          moveOptions.forEach((choice, index) => {
             const arrival = elapsed + (choice.direction === 'wait' ? 0.11 : HOP_TIME);
             let x = frog.x + choice.dx;
             const y = Math.max(-1, frog.y + choice.dy);
@@ -281,7 +281,7 @@
             if (x < 0.25 || x > COLS - 0.25) return;
 
             const lane = getLane(Math.round(y));
-            const dwell = lane.type === 'road' ? 0.15 : lane.type === 'river' ? 0.2 : 0.05;
+            const dwell = lane.type === 'road' ? 0.15 : lane.type === 'river' ? 0.2 : lane.mower ? 0.18 : 0.05;
             const danger = moveDanger(frog, choice, x, y, arrival, dwell);
             const riskWeight = lerp(2.3, 1.55, frog.boldness);
             let score = choice.base - danger * riskWeight;
@@ -289,7 +289,9 @@
             if (choice.dy > 0) score += frog.boldness * 1.2;
             if (choice.dx === frog.lateralPreference) score += 0.4;
             if (choice.direction === 'wait') {
-              score += currentLane.type === 'grass'
+              score += currentLane.mower
+                ? -4
+                : currentLane.type === 'grass'
                 ? 3.7 + frog.patience * 1.4
                 : currentLane.type === 'river' ? 0.8 : -18;
               score -= Math.min(11, frog.waitStreak * 0.65);
@@ -297,7 +299,7 @@
             if (currentLane.type !== 'grass' && choice.dy > 0) score += 2.2;
             if (choice.dy > 0 && danger < 40) score += Math.min(7, frog.waitStreak * 0.45);
 
-            const thinkDelay = lane.type === 'grass' ? 0.28 : 0.075;
+            const thinkDelay = lane.mower ? 0.08 : lane.type === 'grass' ? 0.28 : 0.075;
             const carriedX = lane.type === 'river' ? x + lane.speed * thinkDelay : x;
             const escapeAt = arrival + thinkDelay + HOP_TIME;
             const escapeMoves = [[0, 1], [-1, 0], [1, 0], [0, -1]];
@@ -308,7 +310,7 @@
               const nextY = Math.max(-1, y + nextDy);
               if (nextX < 0.25 || nextX > COLS - 0.25) return;
               const nextLane = getLane(Math.round(nextY));
-              const nextDwell = nextLane.type === 'road' ? 0.13 : nextLane.type === 'river' ? 0.18 : 0.04;
+              const nextDwell = nextLane.type === 'road' ? 0.13 : nextLane.type === 'river' ? 0.18 : nextLane.mower ? 0.16 : 0.04;
               escapeDanger = Math.min(
                 escapeDanger,
                 laneDanger(nextLane, nextX, escapeAt, nextDwell)
@@ -318,12 +320,23 @@
             if (escapeDanger >= 50) score -= 35;
             else score += Math.max(0, 6 - escapeDanger) * 0.55;
 
+            const routeScore = forecastRouteScore(
+              frog,
+              carriedX,
+              y,
+              arrival + thinkDelay,
+              choice.direction
+            );
+            if (routeScore <= -70) score -= 48;
+            else score += routeScore * 0.5;
+
             score += brainRandom(frog, index + 1) * 0.9;
-            evaluated.push({ ...choice, score, danger, escapeDanger });
+            evaluated.push({ ...choice, score, danger, escapeDanger, routeScore });
           });
 
           const escapeLimit = frog.waitStreak > 8 ? 101 : 60;
-          const safe = evaluated.filter((choice) => choice.danger < 40 && choice.escapeDanger < escapeLimit);
+          const safe = evaluated.filter((choice) =>
+            choice.danger < 40 && choice.escapeDanger < escapeLimit && choice.routeScore > -70);
           const pool = safe.length ? safe : evaluated;
           pool.sort((a, b) => b.score - a.score);
           beginHop(frog, pool.length ? pool[0].direction : 'wait');
@@ -333,7 +346,14 @@
           if (frogSpaceBlocked(frog, targetX, targetY, arrival, frog.x, frog.y)) return 100;
           const targetLane = getLane(Math.round(targetY));
           const landingDanger = laneDanger(targetLane, targetX, arrival, dwell);
-          if (choice.direction === 'wait' || landingDanger >= 100) return landingDanger;
+          if (choice.direction === 'wait') {
+            const currentLane = getLane(Math.round(frog.y));
+            return Math.max(
+              landingDanger,
+              laneDanger(currentLane, frog.x, elapsed, arrival - elapsed)
+            );
+          }
+          if (landingDanger >= 100) return landingDanger;
 
           const steps = Math.max(2, Math.ceil(HOP_TIME / 0.025));
           for (let step = 1; step <= steps; step += 1) {
@@ -345,6 +365,104 @@
             if (frogSpaceBlocked(frog, x, y, atTime, frog.x, frog.y)) return 100;
           }
           return landingDanger;
+        }
+
+        function forecastRouteScore(frog, startX, startY, startTime, previousDirection) {
+          if (startX < 0.25 || startX > COLS - 0.25) return -100;
+          let beam = [{
+            x: startX,
+            y: startY,
+            atTime: startTime,
+            score: 0,
+            previousDirection
+          }];
+
+          for (let depth = 0; depth < ROUTE_DEPTH; depth += 1) {
+            const branches = [];
+            beam.forEach((state) => {
+              moveOptions.forEach((move, index) => {
+                const result = forecastMove(frog, state, move, depth, index);
+                if (result) branches.push(result);
+              });
+            });
+            if (!branches.length) return -100;
+            branches.sort((a, b) => b.score - a.score);
+            beam = branches.slice(0, ROUTE_BEAM_WIDTH);
+          }
+
+          return beam.length ? beam[0].score : -100;
+        }
+
+        function forecastMove(frog, state, move, depth, moveIndex) {
+          const currentLane = getLane(Math.round(state.y));
+          const duration = move.direction === 'wait' ? 0.12 : HOP_TIME;
+          const arrival = state.atTime + duration;
+          let targetX = state.x + move.dx;
+          const targetY = Math.max(-1, state.y + move.dy);
+
+          if (move.direction === 'wait' && currentLane.type === 'river') {
+            targetX += currentLane.speed * duration;
+          }
+          if (targetX < 0.25 || targetX > COLS - 0.25) return null;
+
+          if (move.direction === 'wait') {
+            if (laneDanger(currentLane, state.x, state.atTime, duration) >= 100) return null;
+          } else {
+            const steps = Math.max(3, Math.ceil(duration / 0.03));
+            for (let step = 1; step <= steps; step += 1) {
+              const progress = step / steps;
+              const sampleX = lerp(state.x, targetX, progress);
+              const sampleY = lerp(state.y, targetY, progress);
+              const sampleTime = state.atTime + duration * progress;
+              if (hazardAt(sampleX, sampleY, sampleTime)) return null;
+              if (frogSpaceBlocked(frog, sampleX, sampleY, sampleTime, state.x, state.y)) return null;
+            }
+          }
+
+          if (frogSpaceBlocked(frog, targetX, targetY, arrival, state.x, state.y)) return null;
+          const targetLane = getLane(Math.round(targetY));
+          const reaction = targetLane.mower
+            ? 0.08
+            : targetLane.type === 'grass' ? 0.2 : targetLane.type === 'road' ? 0.045 : 0.055;
+          const danger = laneDanger(targetLane, targetX, arrival, reaction);
+          if (danger >= 100) return null;
+
+          const nextTime = arrival + reaction;
+          const nextX = targetLane.type === 'river'
+            ? targetX + targetLane.speed * reaction
+            : targetX;
+          if (nextX < 0.25 || nextX > COLS - 0.25) return null;
+          if (frogSpaceBlocked(frog, nextX, targetY, nextTime, state.x, state.y)) return null;
+
+          let localScore = move.dy > 0
+            ? 12
+            : move.dy < 0 ? -10 : move.direction === 'wait' ? -0.8 : 1.1;
+          localScore -= danger * 1.8;
+          if (targetLane.type === 'grass' && !targetLane.mower) localScore += 1.2;
+          if (targetLane.mower) localScore -= 1.5;
+          if (nextX < 0.8 || nextX > COLS - 0.8) localScore -= 5;
+          if (isReverseMove(state.previousDirection, move.direction)) localScore -= 3.5;
+          if (move.direction === 'wait' && currentLane.type !== 'grass') localScore -= 2.5;
+          if (move.direction === 'wait' && currentLane.mower) localScore -= 3;
+          localScore += hash(
+            roundSeed + frog.id * 8191 + depth * 1193 + moveIndex * 379 +
+            Math.round(targetX * 31) + Math.round(targetY * 101)
+          ) * 0.12;
+
+          return {
+            x: nextX,
+            y: targetY,
+            atTime: nextTime,
+            score: state.score + localScore * Math.pow(0.78, depth),
+            previousDirection: move.direction
+          };
+        }
+
+        function isReverseMove(previous, next) {
+          return (previous === 'up' && next === 'down') ||
+            (previous === 'down' && next === 'up') ||
+            (previous === 'left' && next === 'right') ||
+            (previous === 'right' && next === 'left');
         }
 
         function frogSpaceBlocked(frog, x, y, atTime = elapsed, fromX = frog.x, fromY = frog.y) {
@@ -401,10 +519,27 @@
         }
 
         function laneDanger(lane, x, atTime, duration = 0.12) {
-          if (lane.type === 'grass') return blockedByGrassObstacle(lane.row, x) ? 100 : 0;
+          if (lane.type === 'grass') {
+            if (blockedByGrassObstacle(lane.row, x)) return 100;
+            if (!lane.mower) return 0;
+            let clearance = Infinity;
+            const steps = Math.max(1, Math.ceil(duration / 0.035));
+            for (let step = 0; step <= steps; step += 1) {
+              const sampleTime = atTime + duration * (step / steps);
+              if (hitsMowerAt(lane, x, sampleTime)) return 100;
+              const mower = mowerObjectAt(lane, sampleTime);
+              const distance = x < mower.x
+                ? mower.x - x
+                : x > mower.x + mower.length
+                  ? x - mower.x - mower.length
+                  : 0;
+              clearance = Math.min(clearance, distance);
+            }
+            return clearance < 0.72 ? (0.72 - clearance) * 10 : 0;
+          }
           if (lane.type === 'river') {
-            if (alligatorAt(lane, x, atTime)) return 100;
-            if (!supportingLogAt(lane, x, atTime)) return 100;
+            if (alligatorHeadAt(lane, x, atTime)) return 100;
+            if (!supportingRiverObjectAt(lane, x, atTime)) return 100;
             const futureX = x + lane.speed * duration;
             return futureX < 0.3 || futureX > COLS - 0.3 ? 65 : 0.15;
           }
@@ -491,15 +626,19 @@
           const lane = getLane(Math.round(frog.y));
 
           if (lane.type === 'grass' && blockedByGrassObstacle(lane.row, frog.x)) {
-            frog.x = frog.fromX;
-            frog.y = frog.fromY;
+            cancelHop(frog);
+            return;
+          }
+          if (lane.type === 'grass' && lane.mower && hitsMowerAt(lane, frog.x, elapsed)) {
+            killFrog(frog, 'mower');
+            return;
           }
           if (lane.type === 'river') {
-            if (alligatorAt(lane, frog.x, elapsed)) {
+            if (alligatorHeadAt(lane, frog.x, elapsed)) {
               killFrog(frog, 'gator');
               return;
             }
-            if (!supportingLogAt(lane, frog.x, elapsed)) {
+            if (!supportingRiverObjectAt(lane, frog.x, elapsed)) {
               killFrog(frog, 'splash');
               return;
             }
@@ -509,8 +648,8 @@
             return;
           }
 
-          const urgency = lane.type === 'grass' ? 0.24 : lane.type === 'road' ? 0.035 : 0.05;
-          const variation = lane.type === 'grass' ? 0.3 : lane.type === 'road' ? 0.045 : 0.07;
+          const urgency = lane.mower ? 0.045 : lane.type === 'grass' ? 0.24 : lane.type === 'road' ? 0.035 : 0.05;
+          const variation = lane.mower ? 0.07 : lane.type === 'grass' ? 0.3 : lane.type === 'road' ? 0.045 : 0.07;
           frog.nextMoveAt = elapsed + urgency + brainRandom(frog, 117) * variation;
         }
 
@@ -558,7 +697,8 @@
           bloodStains.push({
             x: frog.x,
             y: frog.y,
-            color: stainColors[(frog.id + round) % stainColors.length],
+            frogId: frog.id,
+            color: frog.color,
             rotation: hash(seed + 17) * TAU,
             scale: 0.72 + hash(seed + 29) * 0.55,
             droplets
@@ -566,12 +706,23 @@
         }
 
         function getLane(row) {
-          if (row < 2 || row % 7 === 0 || row % 13 === 0) {
-            return { type: 'grass', row, variant: hash(row * 31 + COURSE_SEED) };
+          if (row < 6) {
+            const mower = row === 2 || row === 4;
+            return {
+              type: 'grass',
+              row,
+              variant: hash(row * 31 + COURSE_SEED),
+              mower,
+              mowerLength: 1.28,
+              mowerSpeed: row === 2 ? 0.92 : 0.76,
+              mowerOffset: row === 2 ? 2.2 : 10.4
+            };
+          }
+          const type = terrainTypeAt(row);
+          if (type === 'grass') {
+            return { type: 'grass', row, variant: hash(row * 31 + COURSE_SEED), mower: false };
           }
 
-          const seed = hash(row * 7919 + COURSE_SEED);
-          const type = seed < 0.57 ? 'road' : 'river';
           const direction = hash(row * 1181 + COURSE_SEED * 3) < 0.5 ? -1 : 1;
           const climb = Math.max(0, row) * 0.008;
           const speedBase = type === 'road' ? 1.45 : 0.72;
@@ -589,6 +740,26 @@
               : 4.8 + hash(row * 1213 + COURSE_SEED) * 2.5,
             offset: hash(row * 3301 + COURSE_SEED) * 20
           };
+        }
+
+        function terrainTypeAt(row) {
+          if (row < 6) return 'grass';
+          while (terrainGeneratedThrough < row) {
+            const isHazardBand = terrainSegmentIndex % 2 === 0;
+            const segmentSeed = COURSE_SEED + terrainSegmentIndex * 104729;
+            const type = isHazardBand
+              ? (hash(segmentSeed + 811) < 0.58 ? 'road' : 'river')
+              : 'grass';
+            const length = isHazardBand
+              ? 1 + Math.floor(hash(segmentSeed + 1877) * 3)
+              : 2 + Math.floor(hash(segmentSeed + 3571) * 3);
+            for (let index = 0; index < length; index += 1) {
+              terrainGeneratedThrough += 1;
+              terrainTypes.set(terrainGeneratedThrough, type);
+            }
+            terrainSegmentIndex += 1;
+          }
+          return terrainTypes.get(row);
         }
 
         function laneObjectsAt(lane, atTime) {
@@ -609,20 +780,52 @@
           }));
         }
 
-        function supportingLogAt(lane, frogX, atTime) {
-          return riverObjectsAt(lane, atTime).find((log) => log.kind === 'log' &&
-            frogX > log.x + FROG_HIT_RADIUS &&
-            frogX < log.x + log.length - FROG_HIT_RADIUS);
+        function supportingRiverObjectAt(lane, frogX, atTime) {
+          return riverObjectsAt(lane, atTime).find((object) => {
+            if (object.kind === 'log') {
+              return frogX > object.x + FROG_HIT_RADIUS &&
+                frogX < object.x + object.length - FROG_HIT_RADIUS;
+            }
+
+            const headBoundary = lane.direction > 0
+              ? object.x + object.length * 0.72
+              : object.x + object.length * 0.28;
+            return lane.direction > 0
+              ? frogX > object.x + FROG_HIT_RADIUS && frogX < headBoundary - FROG_HIT_RADIUS
+              : frogX > headBoundary + FROG_HIT_RADIUS && frogX < object.x + object.length - FROG_HIT_RADIUS;
+          });
         }
 
-        function alligatorAt(lane, frogX, atTime) {
+        function alligatorHeadAt(lane, frogX, atTime) {
           return riverObjectsAt(lane, atTime).find((gator) => gator.kind === 'alligator' &&
-            frogX > gator.x - FROG_HIT_RADIUS &&
-            frogX < gator.x + gator.length + FROG_HIT_RADIUS);
+            (lane.direction > 0
+              ? frogX > gator.x + gator.length * 0.72 - FROG_HIT_RADIUS &&
+                frogX < gator.x + gator.length + FROG_HIT_RADIUS
+              : frogX > gator.x - FROG_HIT_RADIUS &&
+                frogX < gator.x + gator.length * 0.28 + FROG_HIT_RADIUS));
+        }
+
+        function mowerObjectAt(lane, atTime) {
+          const edge = 0.42;
+          const range = COLS - lane.mowerLength - edge * 2;
+          const phase = mod(lane.mowerOffset + lane.mowerSpeed * atTime, range * 2);
+          const movingRight = phase <= range;
+          return {
+            x: edge + (movingRight ? phase : range * 2 - phase),
+            length: lane.mowerLength,
+            direction: movingRight ? 1 : -1
+          };
+        }
+
+        function hitsMowerAt(lane, frogX, atTime) {
+          if (!lane.mower) return false;
+          const mower = mowerObjectAt(lane, atTime);
+          return frogX > mower.x - FROG_HIT_RADIUS &&
+            frogX < mower.x + mower.length + FROG_HIT_RADIUS;
         }
 
         function grassObstacles(row) {
-          if (row < 2) return [];
+          if (row < 6) return [];
           const count = hash(COURSE_SEED + row * 421) < 0.58 ? 1 : 2;
           const obstacles = [];
           for (let index = 0; index < count; index += 1) {
@@ -654,9 +857,10 @@
           for (let row = firstRow; row <= lastRow; row += 1) {
             if (Math.abs(frogY - row) > HAZARD_COLLISION_Y) continue;
             const lane = getLane(row);
+            if (lane.type === 'grass' && lane.mower && hitsMowerAt(lane, frogX, atTime)) return 'mower';
             if (lane.type === 'road' && hitsVehicleAt(lane, frogX, atTime)) return 'traffic';
-            if (lane.type === 'river' && alligatorAt(lane, frogX, atTime)) return 'gator';
-            if (lane.type === 'river' && !supportingLogAt(lane, frogX, atTime)) return 'splash';
+            if (lane.type === 'river' && alligatorHeadAt(lane, frogX, atTime)) return 'gator';
+            if (lane.type === 'river' && !supportingRiverObjectAt(lane, frogX, atTime)) return 'splash';
           }
           return '';
         }
@@ -704,7 +908,10 @@
           const lane = getLane(row);
           const top = worldToScreenY(row + 0.5);
           if (top > height || top + tile + 1 < 0) return;
-          if (lane.type === 'grass') drawGrassObstacles(row, top);
+          if (lane.type === 'grass') {
+            drawGrassObstacles(row, top);
+            if (lane.mower) drawMower(lane, top);
+          }
           else if (lane.type === 'road') drawVehicles(lane, top);
           else drawRiverObjects(lane, top);
         }
@@ -753,6 +960,49 @@
           });
         }
 
+        function drawMower(lane, top) {
+          const mower = mowerObjectAt(lane, elapsed);
+          const x = boardLeft + mower.x * tile;
+          const w = mower.length * tile;
+          const y = top + tile * 0.22;
+          ctx.save();
+          if (mower.direction < 0) {
+            ctx.translate(x + w, 0);
+            ctx.scale(-1, 1);
+          } else {
+            ctx.translate(x, 0);
+          }
+
+          ctx.strokeStyle = palette.mowerLight;
+          ctx.lineWidth = Math.max(2, tile * 0.055);
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(w * 0.22, y + tile * 0.3);
+          ctx.lineTo(w * 0.05, y - tile * 0.02);
+          ctx.lineTo(-w * 0.12, y - tile * 0.02);
+          ctx.stroke();
+
+          ctx.fillStyle = palette.mower;
+          roundedRect(w * 0.1, y + tile * 0.25, w * 0.82, tile * 0.25, tile * 0.07);
+          ctx.fill();
+          ctx.fillStyle = palette.mowerLight;
+          roundedRect(w * 0.47, y + tile * 0.08, w * 0.28, tile * 0.25, tile * 0.04);
+          ctx.fill();
+
+          ctx.fillStyle = palette.tire;
+          ctx.beginPath();
+          ctx.arc(w * 0.24, y + tile * 0.5, tile * 0.115, 0, TAU);
+          ctx.arc(w * 0.8, y + tile * 0.5, tile * 0.115, 0, TAU);
+          ctx.fill();
+          ctx.strokeStyle = palette.mowerLight;
+          ctx.lineWidth = Math.max(1, tile * 0.025);
+          ctx.beginPath();
+          ctx.moveTo(w * 0.02, y + tile * 0.55);
+          ctx.lineTo(w * 0.98, y + tile * 0.55);
+          ctx.stroke();
+          ctx.restore();
+        }
+
         function drawRoadSurface(top) {
           ctx.fillStyle = palette.roadEdge;
           ctx.fillRect(boardLeft, top, COLS * tile, Math.max(2, tile * 0.055));
@@ -776,9 +1026,9 @@
           const y = top + tile * 0.2;
           const h = tile * 0.6;
           const vehicleColors = [
-            'oklch(0.64 0.21 27)', 'oklch(0.72 0.17 76)',
-            'oklch(0.62 0.18 253)', 'oklch(0.73 0.16 340)',
-            'oklch(0.72 0.12 196)'
+            'oklch(0.42 0 0)', 'oklch(0.5 0 0)',
+            'oklch(0.58 0 0)', 'oklch(0.66 0 0)',
+            'oklch(0.74 0 0)'
           ];
           const colorIndex = Math.floor(hash(COURSE_SEED + lane.row * 4567 + vehicle.id * 971) * vehicleColors.length);
           ctx.fillStyle = vehicleColors[colorIndex];
@@ -786,7 +1036,7 @@
           ctx.fill();
 
           const front = lane.direction > 0 ? x + w * 0.6 : x + w * 0.13;
-          ctx.fillStyle = 'oklch(0.88 0.035 230)';
+          ctx.fillStyle = 'oklch(0.88 0 0)';
           roundedRect(front, y + h * 0.13, w * 0.27, h * 0.42, tile * 0.04);
           ctx.fill();
           ctx.fillStyle = palette.tire;
@@ -920,7 +1170,7 @@
           ctx.fillRect(boardLeft - edge, 0, edge, height);
           ctx.fillRect(boardLeft + COLS * tile, 0, edge, height);
           ctx.globalAlpha = 0.34;
-          ctx.fillStyle = frogColors[0];
+          ctx.fillStyle = palette.roadMark;
           ctx.fillRect(boardLeft - Math.min(4, edge), 0, Math.min(4, edge), height);
           ctx.fillRect(boardLeft + COLS * tile, 0, Math.min(4, edge), height);
           ctx.globalAlpha = 1;
@@ -977,7 +1227,7 @@
           ctx.arc(s * 0.24, -s * 0.41, s * 0.052, 0, TAU);
           ctx.fill();
 
-          ctx.strokeStyle = 'oklch(0.2 0.075 160 / 0.78)';
+          ctx.strokeStyle = 'oklch(0.18 0 0 / 0.78)';
           ctx.lineWidth = Math.max(1, tile * 0.024);
           ctx.beginPath();
           ctx.arc(0, -s * 0.02, s * 0.26, 0.2, Math.PI - 0.2);
@@ -1016,7 +1266,7 @@
         }
 
         function worldToScreenX(x) { return boardLeft + x * tile; }
-        function worldToScreenY(y) { return height * 0.72 - (y - cameraY) * tile; }
+        function worldToScreenY(y) { return height - tile * 0.72 - (y - cameraY) * tile; }
 
         function roundedRect(x, y, w, h, radius) {
           const r = Math.min(radius, Math.abs(w) / 2, Math.abs(h) / 2);
