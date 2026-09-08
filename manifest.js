@@ -146,7 +146,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": false,
       "thumbnail": "thumbnail.jpg",
-      "description": "Pac hunts every power pellet across a full-frame maze."
+      "description": "Pac hunts every power pellet across a full-frame maze.",
+      "updated": "2026-09-08"
     },
     {
       "slug": "015-growth-rings",
@@ -169,7 +170,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "Fat, hooded Marios bound sideways through a painted summer sky while the camera follows whichever runner is highest, even through a fall.",
-      "updated": "2026-09-07"
+      "updated": "2026-09-08"
     },
     {
       "slug": "017-knot-work",
@@ -263,7 +264,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.jpg",
       "description": "Hermit-crab fuel shells cross an oil field between four-port diamond pumps, growing a wider whorl every time they drink. An emptied shell does not die; it lies inert until a pump releases an energy worm that moves in and carries it back onto the field.",
-      "updated": "2026-08-20"
+      "updated": "2026-09-08"
     },
     {
       "slug": "025-cloudcutter",
@@ -308,7 +309,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "generative",
       "thumbnail": "thumbnail.jpg",
       "description": "A dense botanical wallpaper on aged rag paper, seen only through a window cut in a white mount — a triangle, a square, a circle, or a word set in heavy square letters: GROW, RUIN, FEAR, VOTE, HOPE. Every plant that grows afterwards is rooted inside that window and climbs out over the board until the mount is overrun.",
-      "updated": "2026-09-07"
+      "updated": "2026-09-08"
     },
     {
       "slug": "029-eyes-open",
@@ -390,7 +391,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.svg",
       "description": "Ten colorful geometric letters land on a center-pivoting teeter-totter, sprout legs, and slide or walk off as the platform tips under their own weight.",
-      "updated": "2026-09-07"
+      "updated": "2026-09-08"
     },
     {
       "slug": "036-hypermedia-title-02",
@@ -402,7 +403,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": false,
       "thumbnail": "thumbnail.png",
       "description": "Ten uniquely colored HYPERMEDIA disks fall through white Plinko pegs on black, painting every peg they strike.",
-      "updated": "2026-09-07"
+      "updated": "2026-09-08"
     },
     {
       "slug": "037-cover-ups",
@@ -414,7 +415,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.svg",
       "description": "A permanent wall of varied-scale horizontal fantasy words accumulates tightly fitted repairs applied in horizontal or vertical roller passes.",
-      "updated": "2026-09-07"
+      "updated": "2026-09-08"
     },
     {
       "slug": "038-many-frogs",
@@ -426,7 +427,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.png",
       "description": "Twelve uniquely colored frogs begin on a monochrome lawn with moving mowers, then cross an endless grayscale course while leaving permanent, color-matched stains.",
-      "updated": "2026-09-07"
+      "updated": "2026-09-08"
     },
     {
       "slug": "039-drips",
@@ -437,8 +438,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "Angled brush strikes and scattered splats release wet gravity drips that pool and overflow across a dark field.",
-      "updated": "2026-09-07"
+      "description": "Brush strikes and splats release broad, paper-soaked oozes; each pigment fills the field before the next color begins.",
+      "updated": "2026-09-08"
     },
     {
       "slug": "040-moss-eaters",
@@ -449,7 +450,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "generative",
       "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "Tiny segmented grazers seek untouched moss, eating pale herringbone trails into the living surface. Their paths fork, cross, fade, and slowly grow over again."
+      "description": "Tiny segmented grazers seek untouched moss, eating pale herringbone trails into the living surface. Their paths fork, cross, fade, and slowly grow over again.",
+      "updated": "2026-09-08"
     },
     {
       "slug": "041-broken-patterns",
@@ -460,7 +462,41 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": false,
       "thumbnail": "thumbnail.png",
-      "description": "A spirograph that never lifts its pen. Five to seventeen hypotrochoids spread across the quadrants and advance one segment at a time in turn, so every stroke begins where the previous curve ended and the separate figures weave into a single translucent web."
+      "description": "A spirograph that never lifts its pen. Five to seventeen hypotrochoids spread across the quadrants and advance one segment at a time in turn, so every stroke begins where the previous curve ended and the separate figures weave into a single translucent web.",
+      "updated": "2026-09-08"
+    },
+    {
+      "slug": "042-patchwork-geometry",
+      "title": "Patchwork Geometry",
+      "year": 2023,
+      "date": "2023-02-23",
+      "category": "generative",
+      "type": "interactive",
+      "wip": false,
+      "thumbnail": "thumbnail.png",
+      "description": "A quilt that keeps re-piecing itself. A grid of half-square triangles, bars, and notched blocks is folded through mirror symmetry, then cells retire and return in slow waves so the pattern never fully settles."
+    },
+    {
+      "slug": "043-mountains-waves-and-valleys",
+      "title": "Mountains Waves and Valleys",
+      "year": 2024,
+      "date": "2024-03-23",
+      "category": "generative",
+      "type": "interactive",
+      "wip": false,
+      "thumbnail": "thumbnail.png",
+      "description": "Layered noise lines drifting across the field as ridgelines. Eleven controls — palette, chaos, peak height, layout, line weight and spacing — reshape it from calm waves to mountain ranges to dense interference."
+    },
+    {
+      "slug": "044-no-empty-places",
+      "title": "No Empty Places",
+      "year": 2026,
+      "date": "2026-09-08",
+      "category": "generative",
+      "type": "interactive",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "An invisible current guides indigo brush paths into every available opening, packing the field with eddies, parallel runs, and tight hairpin turns."
     }
   ]
 };

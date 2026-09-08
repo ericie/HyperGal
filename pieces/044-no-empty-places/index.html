@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="An invisible current guides indigo brush paths into every available opening, packing the field with eddies, parallel runs, and tight hairpin turns."
+    />
+    <title>No Empty Places · HyperGal</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ground: #eeeee9;
+        --focus: #bd4e27;
+      }
+
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: var(--ground);
+      }
+
+      body { min-width: 300px; }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: var(--ground);
+        cursor: crosshair;
+        touch-action: manipulation;
+      }
+
+      canvas:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: -7px;
+      }
+
+      .instructions {
+        position: fixed;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
+    <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
+  </head>
+  <body>
+    <canvas
+      id="painting"
+      tabindex="0"
+      role="img"
+      aria-describedby="instructions"
+    ></canvas>
+    <p class="instructions" id="instructions">
+      Indigo brush paths grow through an off-white field until the surface is
+      full. Click, tap, press Space, or press Enter for a new painting. Press R
+      to repaint the current seed.
+    </p>
+
+    <script>
+      (() => {
+        'use strict';
+
+        const canvas = document.querySelector('#painting');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const query = new URLSearchParams(location.search);
+        const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+        const TAU = Math.PI * 2;
+        const GROUND = '#eeeee9';
+        const INKS = ['#29486e', '#2c4b70', '#304f74', '#274569', '#325176'];
+
+        let width = 1;
+        let height = 1;
+        let dpr = 1;
+        let seed = query.get('seed') || randomSeed();
+        let scene = null;
+        let frame = 0;
+        let resizeTimer = 0;
+
+        resize();
+        addEventListener('resize', scheduleResize, { passive: true });
+        canvas.addEventListener('pointerdown', newPainting);
+        canvas.addEventListener('keydown', onKeyDown);
+        reducedMotion.addEventListener('change', compose);
+
+        function randomSeed() {
+          const values = new Uint32Array(2);
+          crypto.getRandomValues(values);
+          return values[0].toString(36) + values[1].toString(36);
+        }
+
+        function xmur3(text) {
+          let h = 1779033703 ^ text.length;
+          for (let i = 0; i < text.length; i += 1) {
+            h = Math.imul(h ^ text.charCodeAt(i), 3432918353);
+            h = (h << 13) | (h >>> 19);
+          }
+          return () => {
+            h = Math.imul(h ^ (h >>> 16), 2246822507);
+            h = Math.imul(h ^ (h >>> 13), 3266489909);
+            return (h ^= h >>> 16) >>> 0;
+          };
+        }
+
+        function mulberry32(a) {
+          return () => {
+            let t = (a += 0x6d2b79f5);
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        function randomFor(label) {
+          return mulberry32(xmur3(seed + ':' + label)());
+        }
+
+        function clamp(value, min, max) {
+          return Math.max(min, Math.min(max, value));
+        }
+
+        function lerp(a, b, t) {
+          return a + (b - a) * t;
+        }
+
+        function fade(t) {
+          return t * t * (3 - 2 * t);
+        }
+
+        function scheduleResize() {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(resize, 120);
+        }
+
+        function resize() {
+          width = Math.max(1, innerWidth);
+          height = Math.max(1, innerHeight);
+          dpr = Math.min(2, devicePixelRatio || 1);
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+          canvas.style.width = width + 'px';
+          canvas.style.height = height + 'px';
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          compose();
+        }
+
+        function newPainting() {
+          seed = randomSeed();
+          const next = new URL(location.href);
+          next.searchParams.set('seed', seed);
+          history.replaceState(null, '', next);
+          compose();
+        }
+
+        function onKeyDown(event) {
+          const key = event.key.toLowerCase();
+          if (key === 'r') {
+            event.preventDefault();
+            compose();
+          } else if (key === ' ' || key === 'enter') {
+            event.preventDefault();
+            newPainting();
+          }
+        }
+
+        function compose() {
+          cancelAnimationFrame(frame);
+          scene = buildScene();
+          paintGround();
+          canvas.setAttribute(
+            'aria-label',
+            'No Empty Places, seed ' + seed + ': ' + scene.paths.length +
+            ' indigo brush paths packed across a pale mineral field.'
+          );
+
+          if (reducedMotion.matches) {
+            paintAll();
+          } else {
+            animatePainting();
+          }
+        }
+
+        function buildScene() {
+          const random = randomFor('scene:' + Math.round(width) + 'x' + Math.round(height));
+          const minSide = Math.min(width, height);
+          const spacing = clamp(minSide * 0.016, 11, 18);
+          const lineWidth = spacing * 0.66;
+          const step = clamp(spacing * 0.18, 2.7, 4.2);
+          const cell = spacing * 0.24;
+          const cols = Math.ceil(width / cell);
+          const rows = Math.ceil(height / cell);
+          const occupied = new Uint8Array(cols * rows);
+          const phases = Array.from({ length: 8 }, () => random() * TAU);
+          const fieldScale = spacing * (6.6 + random() * 1.5);
+          const detailScale = fieldScale * (0.48 + random() * 0.08);
+          const drift = random() * TAU;
+          const paths = [];
+
+          function lattice(ix, iy, salt) {
+            let h = Math.imul(ix ^ (salt * 374761393), 668265263);
+            h = Math.imul(h ^ iy, 2246822519);
+            h ^= h >>> 13;
+            return ((h >>> 0) / 4294967295) * 2 - 1;
+          }
+
+          function valueNoise(x, y, scale, salt) {
+            const gx = x / scale;
+            const gy = y / scale;
+            const ix = Math.floor(gx);
+            const iy = Math.floor(gy);
+            const tx = fade(gx - ix);
+            const ty = fade(gy - iy);
+            const a = lattice(ix, iy, salt);
+            const b = lattice(ix + 1, iy, salt);
+            const c = lattice(ix, iy + 1, salt);
+            const d = lattice(ix + 1, iy + 1, salt);
+            return lerp(lerp(a, b, tx), lerp(c, d, tx), ty);
+          }
+
+          function directionAt(x, y) {
+            const broad = valueNoise(x, y, fieldScale, 17);
+            const detail = valueNoise(x, y, detailScale, 43);
+            const sweep = Math.sin(
+              (x * Math.cos(drift + 1.2) + y * Math.sin(drift + 1.2)) /
+              (fieldScale * 1.7) + phases[0]
+            );
+            const angle = drift + broad * 2.45 + detail * 0.72 + sweep * 0.32;
+            return { x: Math.cos(angle), y: Math.sin(angle) };
+          }
+
+          function openAt(x, y) {
+            if (x < -step || y < -step || x > width + step || y > height + step) return false;
+            const col = clamp(Math.floor(x / cell), 0, cols - 1);
+            const row = clamp(Math.floor(y / cell), 0, rows - 1);
+            return occupied[row * cols + col] === 0;
+          }
+
+          function claim(path) {
+            const radius = spacing * 0.86;
+            const reach = Math.ceil(radius / cell);
+            const rr = radius * radius;
+            for (let p = 0; p < path.length; p += 2) {
+              const point = path[p];
+              const col = Math.floor(point.x / cell);
+              const row = Math.floor(point.y / cell);
+              for (let oy = -reach; oy <= reach; oy += 1) {
+                const cy = row + oy;
+                if (cy < 0 || cy >= rows) continue;
+                for (let ox = -reach; ox <= reach; ox += 1) {
+                  const cx = col + ox;
+                  if (cx < 0 || cx >= cols) continue;
+                  const px = (cx + 0.5) * cell;
+                  const py = (cy + 0.5) * cell;
+                  if ((px - point.x) ** 2 + (py - point.y) ** 2 <= rr) {
+                    occupied[cy * cols + cx] = 1;
+                  }
+                }
+              }
+            }
+          }
+
+          function trace(sx, sy, sign) {
+            const points = [{ x: sx, y: sy }];
+            let x = sx;
+            let y = sy;
+            let prior = directionAt(x, y);
+            prior.x *= sign;
+            prior.y *= sign;
+            const maxSteps = Math.ceil((width + height) * 3.2 / step);
+
+            for (let i = 0; i < maxSteps; i += 1) {
+              let flow = directionAt(x, y);
+              if (flow.x * prior.x + flow.y * prior.y < 0) {
+                flow.x *= -1;
+                flow.y *= -1;
+              }
+
+              const midX = x + flow.x * step * 0.5;
+              const midY = y + flow.y * step * 0.5;
+              let refined = directionAt(midX, midY);
+              if (refined.x * prior.x + refined.y * prior.y < 0) {
+                refined.x *= -1;
+                refined.y *= -1;
+              }
+
+              let dx = prior.x * 0.34 + refined.x * 0.66;
+              let dy = prior.y * 0.34 + refined.y * 0.66;
+              const length = Math.hypot(dx, dy) || 1;
+              dx /= length;
+              dy /= length;
+
+              const nx = x + dx * step;
+              const ny = y + dy * step;
+              if (!openAt(nx, ny)) break;
+              if (
+                i > Math.ceil(spacing * 2.2 / step) &&
+                Math.hypot(nx - sx, ny - sy) < step * 1.35
+              ) break;
+
+              x = nx;
+              y = ny;
+              prior = { x: dx, y: dy };
+              points.push({ x, y });
+            }
+            return points;
+          }
+
+          const candidates = [];
+          const seedStep = spacing * 0.64;
+          for (let y = -seedStep * 0.25; y < height + seedStep; y += seedStep) {
+            for (let x = -seedStep * 0.25; x < width + seedStep; x += seedStep) {
+              candidates.push({
+                x: x + (random() - 0.5) * seedStep * 0.68,
+                y: y + (random() - 0.5) * seedStep * 0.68,
+                order: random(),
+              });
+            }
+          }
+          candidates.sort((a, b) => a.order - b.order);
+
+          for (const candidate of candidates) {
+            if (!openAt(candidate.x, candidate.y)) continue;
+            const forward = trace(candidate.x, candidate.y, 1);
+            const end = forward[forward.length - 1];
+            const closed =
+              forward.length > Math.ceil(spacing * 2.2 / step) &&
+              Math.hypot(end.x - candidate.x, end.y - candidate.y) < step * 1.6;
+            const backward = closed ? [] : trace(candidate.x, candidate.y, -1).reverse();
+            const path = closed ? forward : backward.slice(0, -1).concat(forward);
+            claim(path);
+
+            if (path.length < Math.max(8, spacing * 2.4 / step)) continue;
+            paths.push({
+              points: path,
+              width: lineWidth * (0.88 + random() * 0.22),
+              ink: INKS[Math.floor(random() * INKS.length)],
+              edgeAlpha: 0.12 + random() * 0.1,
+              fleckSeed: Math.floor(random() * 0xffffffff),
+            });
+          }
+
+          paths.sort((a, b) => b.points.length - a.points.length);
+          return { paths, spacing, lineWidth, random, phases };
+        }
+
+        function paintGround() {
+          ctx.save();
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.fillStyle = GROUND;
+          ctx.fillRect(0, 0, width, height);
+
+          const random = randomFor('ground:' + Math.round(width) + 'x' + Math.round(height));
+          const flecks = Math.ceil(width * height / 105);
+          ctx.fillStyle = '#526276';
+          for (let i = 0; i < flecks; i += 1) {
+            ctx.globalAlpha = 0.015 + random() * 0.026;
+            const x = random() * width;
+            const y = random() * height;
+            const length = 0.4 + random() * 2.1;
+            ctx.fillRect(x, y, length, 0.25 + random() * 0.45);
+          }
+          ctx.globalAlpha = 1;
+          ctx.restore();
+        }
+
+        function strokePath(path) {
+          const points = path.points;
+          if (points.length < 2) return;
+
+          ctx.save();
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          ctx.globalAlpha = path.edgeAlpha;
+          ctx.strokeStyle = '#18324f';
+          ctx.lineWidth = path.width + 1.5;
+          traceSmooth(points);
+          ctx.stroke();
+
+          ctx.globalAlpha = 0.97;
+          ctx.strokeStyle = path.ink;
+          ctx.lineWidth = path.width;
+          traceSmooth(points);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        function traceSmooth(points) {
+          ctx.beginPath();
+          ctx.moveTo(points[0].x, points[0].y);
+          for (let i = 1; i < points.length - 1; i += 1) {
+            const point = points[i];
+            const next = points[i + 1];
+            ctx.quadraticCurveTo(
+              point.x,
+              point.y,
+              (point.x + next.x) * 0.5,
+              (point.y + next.y) * 0.5
+            );
+          }
+          const last = points[points.length - 1];
+          ctx.lineTo(last.x, last.y);
+        }
+
+        function addDryFlecks(path) {
+          const random = mulberry32(path.fleckSeed);
+          const count = Math.floor(path.points.length * 0.045);
+          ctx.save();
+          ctx.fillStyle = GROUND;
+          for (let i = 0; i < count; i += 1) {
+            const point = path.points[Math.floor(random() * path.points.length)];
+            const radius = path.width * (0.035 + random() * 0.075);
+            ctx.globalAlpha = 0.12 + random() * 0.28;
+            ctx.beginPath();
+            ctx.ellipse(
+              point.x + (random() - 0.5) * path.width * 0.42,
+              point.y + (random() - 0.5) * path.width * 0.42,
+              radius * (0.7 + random()),
+              radius,
+              random() * TAU,
+              0,
+              TAU
+            );
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        function paintAll() {
+          for (const path of scene.paths) strokePath(path);
+          for (const path of scene.paths) addDryFlecks(path);
+        }
+
+        function animatePainting() {
+          const paths = scene.paths;
+          const headStart = Math.min(10, paths.length);
+          for (let i = 0; i < headStart; i += 1) strokePath(paths[i]);
+          let index = headStart;
+          const started = performance.now();
+          const duration = 2400;
+
+          function tick(now) {
+            const progress = clamp((now - started) / duration, 0, 1);
+            const target = headStart + Math.ceil((paths.length - headStart) * progress);
+            while (index < target && index < paths.length) {
+              strokePath(paths[index]);
+              index += 1;
+            }
+
+            if (index < paths.length) {
+              frame = requestAnimationFrame(tick);
+            } else {
+              for (const path of paths) addDryFlecks(path);
+              frame = 0;
+            }
+          }
+
+          frame = requestAnimationFrame(tick);
+        }
+      })();
+    </script>
+  </body>
+</html>

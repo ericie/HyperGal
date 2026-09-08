@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Layered noise lines drifting across the field as ridgelines. Eleven controls — palette, chaos, peak height, layout, line weight and spacing — reshape it from waves to mountains to interference."
+    />
+    <title>Mountains Waves and Valleys · HyperGal</title>
+
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      /* Page chrome and the control panel. The palettes live in styles.css. */
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; background: #0b0b0c; }
+      canvas { cursor: pointer; touch-action: manipulation; }
+      canvas:focus-visible { outline: 3px solid #f5c542; outline-offset: -6px; }
+
+      .instructions {
+        position: fixed; width: 1px; height: 1px; padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+      }
+
+      .panel-root {
+        position: fixed; top: 0; right: 0; z-index: 10;
+        display: flex; flex-direction: column; align-items: flex-end;
+        gap: 6px; padding: 12px;
+        max-height: 100%;
+        font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #f2f2f2;
+      }
+      .panel-toggle {
+        font: inherit; letter-spacing: 0.04em;
+        padding: 6px 12px; border-radius: 999px; cursor: pointer;
+        color: #f2f2f2; background: rgba(12, 12, 14, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        backdrop-filter: blur(6px);
+      }
+      .panel-toggle:hover { background: rgba(12, 12, 14, 0.9); }
+      .panel-toggle:focus-visible { outline: 2px solid #f5c542; outline-offset: 2px; }
+
+      .panel-body {
+        width: min(19rem, calc(100vw - 24px));
+        max-height: calc(100vh - 72px);
+        overflow-y: auto;
+        padding: 14px;
+        border-radius: 10px;
+        background: rgba(12, 12, 14, 0.86);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        backdrop-filter: blur(10px);
+      }
+      .panel-row {
+        display: grid; grid-template-columns: 1fr auto;
+        gap: 4px 8px; align-items: center;
+        margin-bottom: 10px;
+      }
+      .panel-row label { grid-column: 1 / -1; color: #b9b9be; }
+      .panel-row input[type="range"] { width: 100%; accent-color: #f5c542; }
+      .panel-row.is-boolean { grid-template-columns: 1fr auto; }
+      .panel-row.is-boolean label { grid-column: 1; margin: 0; }
+      .panel-row input[type="checkbox"] { accent-color: #f5c542; width: 16px; height: 16px; }
+      .panel-row select {
+        grid-column: 1 / -1; width: 100%;
+        font: inherit; padding: 4px 6px; border-radius: 6px;
+        color: #f2f2f2; background: #1b1b1f;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .panel-value { font-variant-numeric: tabular-nums; color: #f5c542; }
+      .panel-row :focus-visible, .panel-body button:focus-visible {
+        outline: 2px solid #f5c542; outline-offset: 2px;
+      }
+
+      .panel-actions { display: flex; gap: 8px; margin: 14px 0 10px; }
+      .panel-actions button {
+        flex: 1; font: inherit; padding: 6px 8px; border-radius: 6px; cursor: pointer;
+        color: #f2f2f2; background: #26262b;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .panel-actions button:hover { background: #33333a; }
+
+      .panel-hash-row { color: #75757e; word-break: break-all; }
+      .panel-hash { color: #9a9aa3; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .panel-toggle, .panel-body { backdrop-filter: none; }
+      }
+    </style>
+
+    <script src="fx.js"></script>
+    <script src="runtime.js"></script>
+    <script src="params.js"></script>
+    <script src="sketch.js"></script>
+    <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
+  </head>
+  <body>
+    <p class="instructions" id="instructions">
+      Ridgelines drift continuously. Click or tap the artwork for a new
+      iteration, or press R. Press S to save an image. Open Controls to shape
+      the piece by hand.
+    </p>
+
+    <div class="panel-root">
+      <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="panel-body">
+        Controls
+      </button>
+      <div class="panel-body" id="panel-body">
+        <div class="panel-fields"></div>
+        <div class="panel-actions">
+          <button type="button" class="panel-random">Randomise</button>
+          <button type="button" class="panel-reseed">New hash</button>
+        </div>
+        <p class="panel-hash-row">hash <span class="panel-hash"></span></p>
+      </div>
+    </div>
+
+    <script src="panel.js"></script>
+  </body>
+</html>

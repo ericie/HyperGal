@@ -1,7 +1,7 @@
 # Drips
 
-Drips is a continuously accumulating gravity painting. Fourteen completed
-pours are present when the piece opens, so the surface begins with a history
+Drips is a continuously accumulating gravity painting. Nine completed pours
+are present when the piece opens, so the surface begins with a history
 rather than a single fresh gesture. New layers then arrive automatically and
 remain in the raster field.
 
@@ -11,11 +11,16 @@ from the gesture. Paint then releases from both the lower brush edge and the
 larger splats, separating the dry, fibrous source marks from their liquid
 response.
 
-The descending paint has a soft wet halo, overlapping fluid currents, variable
-density, and a rounded moving bead. It may become a translucent veil, a field
-of hairline runs, or a heavier stream. Width, opacity, reach, and timing vary
-within each layer. The palette moves among chalk, silver, smoke-blue, and cold
-white over a blue-black ground.
+The descending paint is built from filled, width-changing bodies rather than
+stroked centerlines. Asymmetric edges, translucent capillary blooms, denser
+inner pigment, and swollen moving fronts make it read as liquid soaking into
+paper. Width, opacity, reach, and timing vary within each layer.
+
+The opening nine-pour fill completes the first pigment cycle, so the next live
+ooze immediately introduces a clearly different color. Later pigments remain
+active for ten to twelve pours—long enough to occupy most of the field—before
+changing again. Bone, ultramarine, carmine, ochre, green, and violet build up
+in successive cycles over the blue-black ground.
 
 Invisible horizontal ledges occupy the lower portion of the field. Many
 vertical runs stop on a ledge, spread laterally, accumulate into pale shelves,

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="Angled brush strikes and scattered splats release wet gravity drips that pool and overflow across a dark field."
+      content="Brush strikes and splats release broad paper-soaked oozes; each pigment fills the field before the next color begins."
     />
     <title>Drips · HyperGal</title>
     <style>
@@ -36,7 +36,7 @@
       id="painting"
       tabindex="0"
       aria-describedby="instructions"
-      aria-label="Drips: pale brush strikes and splats continually release flowing paint over a dark field."
+      aria-label="Drips: brush strikes and splats release paper-soaked paint in successive color cycles."
     ></canvas>
     <p class="instructions" id="instructions">
       The painting builds automatically. Click or tap to begin another pour. Press R, Space, or Enter to clear and begin again.
@@ -54,12 +54,12 @@
         const activeCtx = activeCanvas.getContext('2d');
         const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
         const palette = [
-          [239, 236, 220],
-          [203, 207, 216],
-          [177, 185, 204],
-          [226, 224, 211],
-          [133, 146, 177],
-          [244, 241, 226]
+          [236, 233, 211],
+          [102, 145, 224],
+          [204, 78, 98],
+          [220, 158, 68],
+          [91, 178, 150],
+          [181, 120, 207]
         ];
 
         let width = 0;
@@ -70,6 +70,9 @@
         let ridges = [];
         let currentLayer = null;
         let layerCount = 0;
+        let colorIndex = 0;
+        let layersInColor = 0;
+        let colorLayerTarget = 11;
         let layerStartedAt = 0;
         let lastPaintAt = 0;
         let running = !document.hidden;
@@ -127,13 +130,16 @@
         function beginPainting() {
           random = mulberry32(seed);
           layerCount = 0;
+          colorIndex = Math.floor(random() * palette.length);
+          layersInColor = 0;
           lastPaintAt = 0;
           ridges = makeRidges();
           currentLayer = null;
           clearContext(historyCtx, '#080b12');
           clearContext(activeCtx);
 
-          const openingLayers = reducedMotion.matches ? 24 : 14;
+          const openingLayers = reducedMotion.matches ? 22 : 9;
+          colorLayerTarget = openingLayers;
           for (let i = 0; i < openingLayers; i += 1) commitLayer(makeLayer(), 1);
 
           if (!reducedMotion.matches) {
@@ -148,7 +154,7 @@
             running
             && !reducedMotion.matches
             && currentLayer
-            && now - lastPaintAt >= 1000 / 30
+            && now - lastPaintAt >= 1000 / 24
           ) {
             lastPaintAt = now;
             const elapsed = (now - layerStartedAt) / 1000;
@@ -178,7 +184,7 @@
         }
 
         function makeLayer() {
-          const color = palette[Math.floor(random() * palette.length)];
+          const color = palette[colorIndex];
           const mode = chooseWeighted([
             ['veil', 0.34], ['threads', 0.29], ['wash', 0.2], ['dry', 0.17]
           ]);
@@ -199,8 +205,8 @@
             color,
             mode,
             source,
-            opacity: mode === 'wash' ? 0.09 + random() * 0.1 : 0.16 + random() * 0.27,
-            duration: 3.8 + random() * 4.8,
+            opacity: mode === 'wash' ? 0.15 + random() * 0.14 : 0.22 + random() * 0.25,
+            duration: 2.8 + random() * 3.2,
             strokes: [],
             sourceMarks: [],
             splats: []
@@ -241,7 +247,7 @@
             });
           }
 
-          const strokeCount = Math.round(sourceWidth / lerp(9, 19, random()));
+          const strokeCount = Math.round(sourceWidth / lerp(15, 28, random()));
           for (let i = 0; i < strokeCount; i += 1) {
             const position = (i + random() * 0.9) / strokeCount;
             const sourcePoint = orientedPoint(
@@ -279,11 +285,11 @@
 
         function makePourStroke(layer, x, startY, index, origin) {
           const weightRoll = random();
-          const lineWidth = weightRoll < 0.52
-            ? 0.55 + random() * 1.35
-            : weightRoll < 0.88
-              ? 1.8 + random() * 4.2
-              : 6 + random() * 12;
+          const lineWidth = weightRoll < 0.34
+            ? 1.4 + random() * 2.8
+            : weightRoll < 0.82
+              ? 4 + random() * 9
+              : 13 + random() * 20;
           const eligibleRidges = ridges
             .map((ridge, ridgeIndex) => ({ ridge, ridgeIndex }))
             .filter(({ ridge }) => ridgeY(ridge) > startY + height * 0.045);
@@ -320,7 +326,6 @@
               width: lineWidth * (0.7 + random() * 2.4),
               alpha: 0.2 + random() * 0.5,
               delay: 0.58 + random() * 0.18,
-              dryness: 0.18 + random() * 0.56,
               seed: strokeSeed + 701
             });
 
@@ -334,7 +339,6 @@
                 width: Math.max(0.4, lineWidth * (0.42 + random() * 0.72)),
                 alpha: 0.18 + random() * 0.48,
                 delay: 0.7 + random() * 0.2,
-                dryness: 0.12 + random() * 0.45,
                 seed: strokeSeed + 1409
               });
             }
@@ -421,7 +425,6 @@
                   deposit.width,
                   layer.opacity * deposit.alpha,
                   layer.color,
-                  deposit.dryness,
                   deposit.seed
                 );
               } else {
@@ -443,68 +446,138 @@
         function paintFluidPath(context, points, progress, width, opacity, color, flowSeed) {
           if (points.length < 2 || progress <= 0 || opacity <= 0) return;
           const [r, g, b] = color;
+          const visible = partialPath(points, progress);
+          if (visible.length < 2) return;
 
-          context.save();
-          context.filter = `blur(${Math.min(1.8, 0.42 + width * 0.08)}px)`;
-          context.strokeStyle = `rgba(${r}, ${g}, ${b}, ${opacity * 0.3})`;
-          context.lineWidth = width * 1.42;
-          context.lineCap = 'round';
-          context.lineJoin = 'round';
-          context.setLineDash([]);
-          traceBrushPath(context, points, progress, 0, flowSeed + 43, 0.12 + width * 0.025);
-          context.stroke();
-          context.restore();
+          paintOozeRibbon(context, visible, width * 1.82, opacity * 0.08, color, flowSeed + 19);
+          paintOozeRibbon(context, visible, width * 1.48, opacity * 0.16, color, flowSeed + 43);
 
-          const currents = width < 1.1 ? 2 : clamp(3 + Math.floor(width * 0.3), 3, 7);
-          for (let current = 0; current < currents; current += 1) {
-            const currentSeed = flowSeed + 211 + current * 1291;
-            const placement = currents === 1 ? 0 : current / (currents - 1) - 0.5;
-            const offset = placement * width * (0.48 + hash(currentSeed + 3) * 0.28);
-            context.strokeStyle = `rgba(${r}, ${g}, ${b}, ${opacity * (0.24 + hash(currentSeed + 7) * 0.34)})`;
-            context.lineWidth = Math.max(
-              0.34,
-              width / currents * (0.68 + hash(currentSeed + 11) * 1.18)
-            );
-            context.lineCap = 'round';
-            context.lineJoin = 'round';
-            context.setLineDash([]);
-            traceBrushPath(
-              context,
-              points,
-              progress,
-              offset,
-              currentSeed,
-              0.12 + Math.min(0.42, width * 0.035)
-            );
-            context.stroke();
+          paintOozeRibbon(context, visible, width * 1.08, opacity * 0.64, color, flowSeed + 211);
+          paintOozeRibbon(context, visible, width * 0.52, opacity * 0.24, [
+            Math.min(255, r + 18),
+            Math.min(255, g + 18),
+            Math.min(255, b + 18)
+          ], flowSeed + 907);
+          paintCapillaryBlooms(context, visible, width, opacity, color, flowSeed + 1201);
+
+          const tip = visible.at(-1);
+          const bead = Math.max(2.2, width * (0.72 + hash(flowSeed + 101) * 0.42));
+          context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity * 0.25})`;
+          traceSplat(context, tip.x, tip.y + bead * 0.32, bead * 1.28, flowSeed + 1601);
+          context.fill();
+
+          context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity * 0.7})`;
+          traceSplat(context, tip.x, tip.y + bead * 0.18, bead * 0.84, flowSeed + 1907);
+          context.fill();
+        }
+
+        function paintOozeRibbon(context, points, width, opacity, color, oozeSeed) {
+          if (points.length < 2 || width <= 0 || opacity <= 0) return;
+          const [r, g, b] = color;
+          const sampled = resamplePath(points, clamp(width * 0.58, 8, 18));
+          const left = [];
+          const right = [];
+
+          for (let index = 0; index < sampled.length; index += 1) {
+            const point = sampled[index];
+            const before = sampled[Math.max(0, index - 1)];
+            const after = sampled[Math.min(sampled.length - 1, index + 1)];
+            const dx = after.x - before.x;
+            const dy = after.y - before.y;
+            const magnitude = Math.hypot(dx, dy) || 1;
+            const normalX = -dy / magnitude;
+            const normalY = dx / magnitude;
+            const pulse = 0.68
+              + hash(oozeSeed + index * 683 + 3) * 0.52
+              + Math.sin(index * 1.7 + hash(oozeSeed + 7) * 6) * 0.08;
+            const centerWander = (hash(oozeSeed + index * 991 + 11) - 0.5) * width * 0.16;
+            const leftReach = width * 0.5 * pulse * (0.78 + hash(oozeSeed + index * 1229 + 17) * 0.42);
+            const rightReach = width * 0.5 * pulse * (0.78 + hash(oozeSeed + index * 1553 + 23) * 0.42);
+            const centerX = point.x + normalX * centerWander;
+            const centerY = point.y + normalY * centerWander;
+            left.push({ x: centerX + normalX * leftReach, y: centerY + normalY * leftReach });
+            right.push({ x: centerX - normalX * rightReach, y: centerY - normalY * rightReach });
           }
 
-          if (width > 1.25) {
-            paintPigmentDaubs(context, points, progress, width * 1.12, opacity * 0.72, color, 0.04, flowSeed + 907);
+          const outline = left.concat(right.reverse());
+          const last = outline.at(-1);
+          const first = outline[0];
+          context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+          context.beginPath();
+          context.moveTo((last.x + first.x) * 0.5, (last.y + first.y) * 0.5);
+          for (let index = 0; index < outline.length; index += 1) {
+            const point = outline[index];
+            const next = outline[(index + 1) % outline.length];
+            context.quadraticCurveTo(
+              point.x,
+              point.y,
+              (point.x + next.x) * 0.5,
+              (point.y + next.y) * 0.5
+            );
           }
-
-          const tip = pointOnPath(points, progress);
-          const bead = Math.max(1.15, width * (0.62 + hash(flowSeed + 101) * 0.34));
-          context.save();
-          context.filter = `blur(${Math.min(0.85, bead * 0.12)}px)`;
-          context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity * 0.46})`;
-          context.beginPath();
-          context.ellipse(tip.x, tip.y + bead * 0.28, bead * 0.68, bead * 1.15, 0, 0, Math.PI * 2);
+          context.closePath();
           context.fill();
-          context.restore();
+        }
 
-          context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity * 0.42})`;
-          context.beginPath();
-          context.ellipse(
-            tip.x - bead * 0.12,
-            tip.y,
-            bead * 0.32,
-            bead * 0.62,
-            0,
-            0,
-            Math.PI * 2
-          );
-          context.fill();
+        function paintCapillaryBlooms(context, points, width, opacity, color, bloomSeed) {
+          if (width < 1.4) return;
+          const [r, g, b] = color;
+          const sampled = resamplePath(points, clamp(width * 1.35, 14, 30));
+          for (let index = 1; index < sampled.length; index += 1) {
+            const point = sampled[index];
+            const before = sampled[index - 1];
+            const dx = point.x - before.x;
+            const dy = point.y - before.y;
+            const magnitude = Math.hypot(dx, dy) || 1;
+            const normalX = -dy / magnitude;
+            const normalY = dx / magnitude;
+            const side = hash(bloomSeed + index * 1297 + 3) < 0.5 ? -1 : 1;
+            const reach = width * (0.18 + hash(bloomSeed + index * 1297 + 7) * 0.48);
+            const bloom = width * (0.16 + hash(bloomSeed + index * 1297 + 11) * 0.3);
+            context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity * (0.055 + hash(bloomSeed + index * 1297 + 17) * 0.075)})`;
+            context.beginPath();
+            context.ellipse(
+              point.x + normalX * reach * side,
+              point.y + normalY * reach * side,
+              bloom,
+              bloom * (1.1 + hash(bloomSeed + index * 1297 + 23) * 1.15),
+              Math.atan2(dy, dx),
+              0,
+              Math.PI * 2
+            );
+            context.fill();
+          }
+        }
+
+        function partialPath(points, progress) {
+          const scaled = clamp(progress, 0, 1) * (points.length - 1);
+          const whole = Math.floor(scaled);
+          const fraction = scaled - whole;
+          const visible = points.slice(0, whole + 1);
+          if (whole < points.length - 1 && fraction > 0) {
+            visible.push({
+              x: lerp(points[whole].x, points[whole + 1].x, fraction),
+              y: lerp(points[whole].y, points[whole + 1].y, fraction)
+            });
+          }
+          return visible;
+        }
+
+        function resamplePath(points, spacing) {
+          const sampled = [points[0]];
+          for (let index = 1; index < points.length; index += 1) {
+            const from = points[index - 1];
+            const to = points[index];
+            const distance = Math.hypot(to.x - from.x, to.y - from.y);
+            const steps = Math.max(1, Math.ceil(distance / spacing));
+            for (let step = 1; step <= steps; step += 1) {
+              sampled.push({
+                x: lerp(from.x, to.x, step / steps),
+                y: lerp(from.y, to.y, step / steps)
+              });
+            }
+          }
+          return sampled;
         }
 
         function paintSplat(context, splat, progress, color, opacity) {
@@ -574,17 +647,6 @@
           context.closePath();
         }
 
-        function pointOnPath(points, progress) {
-          const scaled = clamp(progress, 0, 1) * (points.length - 1);
-          const index = Math.floor(scaled);
-          if (index >= points.length - 1) return points.at(-1);
-          const fraction = scaled - index;
-          return {
-            x: lerp(points[index].x, points[index + 1].x, fraction),
-            y: lerp(points[index].y, points[index + 1].y, fraction)
-          };
-        }
-
         function paintBrushPath(context, points, progress, width, opacity, color, dryness, brushSeed) {
           if (points.length < 2 || progress <= 0 || opacity <= 0) return;
           const [r, g, b] = color;
@@ -652,44 +714,15 @@
           }
         }
 
-        function paintShelfDeposit(context, points, progress, width, opacity, color, dryness, brushSeed) {
-          const [r, g, b] = color;
-          const loadedWidth = width * (1.35 + hash(brushSeed + 59) * 0.85);
-          paintPigmentDaubs(
-            context,
-            points,
-            progress,
-            loadedWidth,
-            opacity * 1.5,
-            color,
-            Math.min(0.82, dryness + 0.12),
-            brushSeed + 67
-          );
+        function paintShelfDeposit(context, points, progress, width, opacity, color, oozeSeed) {
+          const visible = partialPath(points, progress);
+          if (visible.length < 2) return;
+          const loadedWidth = width * (1.45 + hash(oozeSeed + 59) * 0.9);
 
-          const scratches = clamp(3 + Math.floor(width * 0.55), 3, 9);
-          for (let scratch = 0; scratch < scratches; scratch += 1) {
-            const scratchSeed = brushSeed + 503 + scratch * 1877;
-            const offset = (hash(scratchSeed + 3) - 0.5) * loadedWidth;
-            const fleck = 0.8 + hash(scratchSeed + 7) * 5.2;
-            const gap = 3 + hash(scratchSeed + 11) * 13 + dryness * 5;
-            context.strokeStyle = `rgba(${r}, ${g}, ${b}, ${opacity * (0.14 + hash(scratchSeed + 13) * 0.24)})`;
-            context.lineWidth = Math.max(0.24, width * (0.08 + hash(scratchSeed + 17) * 0.16));
-            context.lineCap = 'round';
-            context.lineJoin = 'round';
-            context.setLineDash([fleck, gap]);
-            context.lineDashOffset = hash(scratchSeed + 19) * (fleck + gap);
-            traceBrushPath(
-              context,
-              points,
-              progress,
-              offset,
-              scratchSeed,
-              0.8 + dryness * 2.2
-            );
-            context.stroke();
-          }
-          context.setLineDash([]);
-          context.lineDashOffset = 0;
+          paintOozeRibbon(context, visible, loadedWidth * 1.55, opacity * 0.1, color, oozeSeed + 67);
+          paintOozeRibbon(context, visible, loadedWidth * 1.28, opacity * 0.2, color, oozeSeed + 211);
+          paintOozeRibbon(context, visible, loadedWidth, opacity * 0.72, color, oozeSeed + 503);
+          paintCapillaryBlooms(context, visible, loadedWidth, opacity * 1.2, color, oozeSeed + 1877);
         }
 
         function paintPigmentDaubs(context, points, progress, width, opacity, color, dryness, brushSeed) {
@@ -797,6 +830,13 @@
           historyCtx.restore();
           clearContext(activeCtx);
           layerCount += 1;
+          layersInColor += 1;
+
+          if (layersInColor >= colorLayerTarget) {
+            colorIndex = (colorIndex + 1 + Math.floor(random() * (palette.length - 1))) % palette.length;
+            layersInColor = 0;
+            colorLayerTarget = 10 + Math.floor(random() * 3);
+          }
 
           if (layerCount % 28 === 0) {
             historyCtx.save();

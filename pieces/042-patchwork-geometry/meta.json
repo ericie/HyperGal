@@ -1,0 +1,10 @@
+{
+  "title": "Patchwork Geometry",
+  "year": 2023,
+  "date": "2023-02-23",
+  "category": "generative",
+  "type": "interactive",
+  "wip": false,
+  "thumbnail": "thumbnail.png",
+  "description": "A quilt that keeps re-piecing itself. A grid of half-square triangles, bars, and notched blocks is folded through mirror symmetry, then cells retire and return in slow waves so the pattern never fully settles."
+}

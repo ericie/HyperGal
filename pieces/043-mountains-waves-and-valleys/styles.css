@@ -1,0 +1,226 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Prevents scrollbars from appearing when resizing the canvas */
+}
+
+canvas {
+    display: block; /* Removes the default canvas margin and allows it to be truly fullscreen */
+}
+
+/* Custom CSS Color Variables */
+:root {
+    /* Rainbow Palette */
+    --rainbow-background: #000000;
+    --rainbow-color-0: #FE0000;
+    --rainbow-color-1: #FFA600;
+    --rainbow-color-2: #FFFF00;
+    --rainbow-color-3: #008101;
+    --rainbow-color-4: #0000FE;
+    --rainbow-color-5: #3b004b;
+  }
+
+:root {
+    /* Hokusai Palette */
+    --hokusai-background: #273b4b;
+    --hokusai-color-0: #FFFFFF;
+    --hokusai-color-1: #003366;
+    --hokusai-color-2: #4671A3;
+    --hokusai-color-3: #72A0C1;
+    --hokusai-color-4: #E3DAC9;
+    --hokusai-color-5: #C3B091;
+    --hokusai-color-6: #5a9d4d;
+  }
+  
+:root {
+    /* Monet Palette */
+    --monet-background: #A8D0DB;
+    --monet-color-0: #f4e5e5;
+    --monet-color-1: #707ba9;
+    --monet-color-2: #7ba1d7;
+    --monet-color-3: #bf93b5;
+    --monet-color-4: #2c5a39;
+    --monet-color-5: #427c51;
+}
+
+:root {
+    /* Fire Palette */
+    --fire-background: #330000;
+    --fire-color-0: #b50000;
+    --fire-color-1: #f72626;
+    --fire-color-2: #993333;
+    --fire-color-3: #CC6633;
+    --fire-color-4: #FF6347;
+    --fire-color-5: #FF4500;
+    --fire-color-6: #FFD700;
+  }
+
+  :root {
+    /* Monotone Cool Palette */
+    --monotone-cool-background: #142453;
+    --monotone-cool-color-0: #339999;
+    --monotone-cool-color-1: #336666;
+    --monotone-cool-color-2: #3399FF;
+    --monotone-cool-color-3: #00CED1;
+    --monotone-cool-color-4: #4682B4;
+    --monotone-cool-color-5: #B0E0E6;
+    --monotone-cool-color-6: #006666;
+  }
+
+  :root {
+    /* Crimson Clash Palette */
+    --crimson-clash-background: #660000;
+    --crimson-clash-color-0: #5a04a5;
+    --crimson-clash-color-1: #FFFF00;
+    --crimson-clash-color-2: #FF00FF;
+    --crimson-clash-color-3: #00FFFF;
+    --crimson-clash-color-4: #0022FF;
+  }
+
+  :root {
+    /* Color Clash Palette */
+    --color-clash-background: #110011;
+    --color-clash-color-0: #00FF00;
+    --color-clash-color-1: #FFFF00;
+    --color-clash-color-2: #FF00FF;
+    --color-clash-color-3: #00FFFF;
+    --color-clash-color-4: #0022FF;
+  }
+
+  :root {
+    /* Nordic Palette */
+    --nordic-background: #e2e2e2;
+    --nordic-color-0: #655854;
+    --nordic-color-1: #375653;
+    --nordic-color-2: #5e8859;
+    --nordic-color-3: #8b6c58;
+    --nordic-color-4: #292e5c;
+  }
+
+  :root {
+    /* Constructivist Palette */
+    --constructivist-background: #ffffff;
+    --constructivist-color-0: #AA0601;
+    --constructivist-color-1: #000000;
+    --constructivist-color-2: #AA0601;
+  }
+
+  :root {
+    /* Black and White Palette */
+    --black-and-white-background: #ffffff;
+    --black-and-white-color-0: #000000;
+    --black-and-white-color-1: #ffffff;
+  }
+
+
+  :root {
+    /* Cotton Candy Palette */
+    --cotton-candy-background: #fbd2e7;
+    --cotton-candy-color-0: #912134;
+    --cotton-candy-color-1: #e19bbf;
+    --cotton-candy-color-2: #3185b9;
+    --cotton-candy-color-3: #bb35a5;
+    --cotton-candy-color-4: #422fbd;
+  }
+  
+  :root {
+    /* Fauvism Palette */
+    --fauvism-background: #3D2C2E;
+    --fauvism-color-0: #aa4a4a;
+    --fauvism-color-1: #fd563c;
+    --fauvism-color-2: #e7be2a;
+    --fauvism-color-3: #cd3b24;
+    --fauvism-color-4: #2F97C1;
+  }
+
+  :root {
+    /* Art Deco Palette */
+    --art-deco-background: #786d3d;
+    --art-deco-color-0: #b19277;
+    --art-deco-color-1: #969178;
+    --art-deco-color-2: #E5E4DB;
+    --art-deco-color-3: #E5E4DB;
+    --art-deco-color-4: #353718;
+  }
+  
+  :root {
+    /* Mint Watermelon Palette */
+    --mint-watermelon-background: #155309;
+    --mint-watermelon-color-0: #16be6d;
+    --mint-watermelon-color-1: #f8a4b2;
+    --mint-watermelon-color-2: #eb68b0;
+    --mint-watermelon-color-3: #DB7093;
+    --mint-watermelon-color-4: #42fea0;
+    --mint-watermelon-color-5: #eec1cb;
+  }
+  
+  :root {
+    /* Viking Palette */
+    --viking-background: #520459;
+    --viking-color-0: #ecdf8d;
+    --viking-color-1: #FFFF00;
+    --viking-color-2: #FFD700;
+    --viking-color-3: #DAA520;
+    --viking-color-4: #EEAA00;
+    --viking-color-5: #E5B210;
+  }
+  
+  :root {
+    /* Camouflage Palette */
+    --camouflage-background: #343a0e;
+    --camouflage-color-0: #5a6422;
+    --camouflage-color-1: #869974;
+    --camouflage-color-2: #4b6026;
+    --camouflage-color-3: #729923;
+    --camouflage-color-4: #757e5c;
+    --camouflage-color-5: #c2d7b3;
+    --camouflage-color-6: #b4a26c;
+  }
+
+  :root {
+    /* Arctic Palette */
+    --arctic-background: #54a3a2;
+    --arctic-color-1: #a2eaea;
+    --arctic-color-2: #67aeae;
+    --arctic-color-0: #6eb9b9;
+    --arctic-color-3: #418183;
+    --arctic-color-5: #54a3a2;
+    --arctic-color-4: #a1d7de;
+  }
+  
+  :root {
+    /* Terminal Green Palette */
+    --terminal-green-background: #123007;
+    --terminal-green-color-0: #15ff19;
+    --terminal-green-color-1: #05d809;
+    --terminal-green-color-2: #0fa611;
+  }
+
+  :root {
+    /* Terminal Amber Palette */
+    --terminal-amber-background: #211703;
+    --terminal-amber-color-1: #ffbf00;
+    --terminal-amber-color-0: #c98300;
+    --terminal-amber-color-2: #ffaa17;
+    --terminal-amber-color-2: #e58d00;
+  }
+
+  :root {
+    /* Hot Pink Palette */
+    --hot-pink-background: #44002f;
+    --hot-pink-color-1: #b10079;
+    --hot-pink-color-0: #fd00ad;
+    --hot-pink-color-2: #ff1fb8;
+    --hot-pink-color-2: #fa54c6;
+  }
+
+  :root {
+    /* Cyberpunk Palette */
+    --cyberpunk-background: #000724; /* Deep, dark background */
+    --cyberpunk-color-0: #66fcf1; /* Electric blue, reminiscent of neon lights */
+    --cyberpunk-color-1: #f700ff; /* Vibrant pink, standing out against the dark */
+    --cyberpunk-color-2: #5758bb; /* Deep purple, adding to the palette's richness */
+    --cyberpunk-color-3: #45a29e; /* Neon green, evoking digital interfaces */
+    --cyberpunk-color-4: #ffffff; /* Silver for a futuristic touch */
+    --cyberpunk-color-5: #ffff00; /* Deep purple, adding to the palette's richness */
+  }
