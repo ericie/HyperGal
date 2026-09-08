@@ -474,7 +474,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": false,
       "thumbnail": "thumbnail.png",
-      "description": "A quilt that keeps re-piecing itself. A grid of half-square triangles, bars, and notched blocks is folded through mirror symmetry, then cells retire and return in slow waves so the pattern never fully settles."
+      "description": "A quilt that keeps re-piecing itself. A grid of half-square triangles, bars, and notched blocks is folded through mirror symmetry, then cells retire and return in slow waves so the pattern never fully settles.",
+      "updated": "2026-09-08"
     },
     {
       "slug": "043-mountains-waves-and-valleys",
@@ -485,7 +486,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": false,
       "thumbnail": "thumbnail.png",
-      "description": "Layered noise lines drifting across the field as ridgelines. Eleven controls — palette, chaos, peak height, layout, line weight and spacing — reshape it from calm waves to mountain ranges to dense interference."
+      "description": "Layered noise lines drifting across the field as ridgelines. Eleven controls — palette, chaos, peak height, layout, line weight and spacing — reshape it from calm waves to mountain ranges to dense interference.",
+      "updated": "2026-09-08"
     },
     {
       "slug": "044-no-empty-places",
@@ -494,9 +496,21 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-09-08",
       "category": "generative",
       "type": "interactive",
-      "wip": true,
+      "wip": false,
       "thumbnail": "thumbnail.png",
-      "description": "An invisible current guides indigo brush paths into every available opening, packing the field with eddies, parallel runs, and tight hairpin turns."
+      "description": "Chalk-white currents grow through a deep blue painted field, bending into an irregular edge-to-edge labyrinth.",
+      "updated": "2026-09-08"
+    },
+    {
+      "slug": "045-a-record-of-pursuit",
+      "title": "A Record of Pursuit",
+      "year": 2022,
+      "date": "2022-03-22",
+      "category": "generative",
+      "type": "interactive",
+      "wip": false,
+      "thumbnail": "thumbnail.png",
+      "description": "Thirty-two lines chase sixteen targets across a grid, orbiting, spiralling and wandering after them. Half the swarm draws sharp; the other half never resolves and survives only as the glow it leaves behind."
     }
   ]
 };

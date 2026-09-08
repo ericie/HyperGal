@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="A grid of cells filling with line marks, each row denser than the last. An exercise in process over composition — growing, filling, containment, and breaking loose."
+    />
+    <title>From Growth · HyperGal</title>
+    <style>
+      :root { color-scheme: light dark; --focus: oklch(0.6 0.2 25); }
+      * { box-sizing: border-box; }
+      html, body {
+        width: 100%; height: 100%; margin: 0;
+        overflow: hidden; background: #111;
+      }
+      /* The ground is set from the palette once the hash has picked one. */
+      body { display: flex; justify-content: center; align-items: center; }
+      #canvasWrapper {
+        width: 100vw; height: 100vh;
+        display: flex; justify-content: center; align-items: center;
+      }
+      canvas {
+        width: 100%; height: 100%;
+        max-width: min(100vw, 100vh); max-height: min(100vw, 100vh);
+        object-fit: contain;
+        cursor: pointer; touch-action: manipulation;
+      }
+      canvas:focus-visible { outline: 3px solid var(--focus); outline-offset: -6px; }
+
+      .instructions {
+        position: fixed; width: 1px; height: 1px; padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+      }
+
+      .panel-root {
+        position: fixed; top: 0; right: 0; z-index: 10;
+        display: flex; flex-direction: column; align-items: flex-end;
+        gap: 6px; padding: 12px; max-height: 100%;
+        font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #f2f2f2;
+      }
+      .panel-toggle {
+        font: inherit; letter-spacing: 0.04em;
+        padding: 6px 12px; border-radius: 999px; cursor: pointer;
+        color: #f2f2f2; background: rgba(12, 12, 14, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        backdrop-filter: blur(6px);
+      }
+      .panel-toggle:hover { background: rgba(12, 12, 14, 0.9); }
+      .panel-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+      .panel-body {
+        width: min(19rem, calc(100vw - 24px));
+        max-height: calc(100vh - 72px); overflow-y: auto;
+        padding: 14px; border-radius: 10px;
+        background: rgba(12, 12, 14, 0.88);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        backdrop-filter: blur(10px);
+      }
+      .panel-row {
+        display: grid; grid-template-columns: 1fr auto;
+        gap: 4px 8px; align-items: center; margin-bottom: 10px;
+      }
+      .panel-row label { grid-column: 1 / -1; color: #b9b9be; }
+      .panel-row input[type="range"] { width: 100%; accent-color: #e2725b; }
+      .panel-row.is-boolean label { grid-column: 1; margin: 0; }
+      .panel-row input[type="checkbox"] { accent-color: #e2725b; width: 16px; height: 16px; }
+      .panel-row select {
+        grid-column: 1 / -1; width: 100%; font: inherit;
+        padding: 4px 6px; border-radius: 6px;
+        color: #f2f2f2; background: #1b1b1f;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .panel-value { font-variant-numeric: tabular-nums; color: #e2725b; }
+      .panel-row :focus-visible, .panel-body button:focus-visible {
+        outline: 2px solid var(--focus); outline-offset: 2px;
+      }
+      .panel-actions { display: flex; gap: 8px; margin: 14px 0 10px; }
+      .panel-actions button {
+        flex: 1; font: inherit; padding: 6px 8px; border-radius: 6px; cursor: pointer;
+        color: #f2f2f2; background: #26262b;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .panel-actions button:hover { background: #33333a; }
+      .panel-hash-row { color: #75757e; word-break: break-all; }
+      .panel-hash { color: #9a9aa3; }
+    </style>
+
+    <script src="fx.js"></script>
+    <script src="runtime.js"></script>
+    <script src="sketch.js"></script>
+    <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
+  </head>
+  <body>
+    <div id="canvasWrapper"></div>
+
+    <p class="instructions" id="instructions">
+      The grid fills itself row by row. Click or tap for a new iteration, or
+      press R. Open Controls to shape it by hand.
+    </p>
+
+    <div class="panel-root">
+      <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="panel-body">
+        Controls
+      </button>
+      <div class="panel-body" id="panel-body">
+        <div class="panel-fields"></div>
+        <div class="panel-actions">
+          <button type="button" class="panel-random">Randomise</button>
+          <button type="button" class="panel-reseed">New hash</button>
+        </div>
+        <p class="panel-hash-row">hash <span class="panel-hash"></span></p>
+      </div>
+    </div>
+
+    <script>
+      // The runtime creates the canvas from its own DOMContentLoaded handler,
+      // which it registered first — so this one runs after setup() has drawn.
+      document.addEventListener('DOMContentLoaded', () => {
+        'use strict';
+        const canvas = document.querySelector('canvas');
+        canvas.setAttribute('tabindex', '0');
+        canvas.setAttribute('aria-describedby', 'instructions');
+
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+        function describe() {
+          canvas.setAttribute(
+            'aria-label',
+            'From Growth: a ' + rows + ' by ' + cols + ' grid of cells filling with line marks, ' +
+            paletteName + ' palette, ' + evolutionDirection.toLowerCase() + '.'
+          );
+        }
+
+        // Re-derive the parameters and rebuild from them. The control panel
+        // calls this; so does a new hash.
+        window.reformPiece = () => {
+          applyParams();
+          buildPiece();
+          describe();
+          if (!isLooping()) redraw();
+          if (reduced.matches) settle();
+        };
+
+        // Reduced motion: run the growth forward without animating, and stop on
+        // the finished grid rather than filling it in front of the viewer.
+        function settle() {
+          noLoop();
+          for (let i = 0; i < 420; i++) { window.frameCount++; draw(); }
+        }
+
+        window.newIteration = () => {
+          $fx._reseed();
+          window.reformPiece();
+          if (window.syncPanel) window.syncPanel();
+        };
+
+        canvas.addEventListener('click', (event) => {
+          if (event.target.closest && event.target.closest('.panel-root')) return;
+          window.newIteration();
+        });
+        canvas.addEventListener('keydown', (event) => {
+          if (document.activeElement && document.activeElement.closest &&
+              document.activeElement.closest('.panel-root')) return;
+          const key = event.key.toLowerCase();
+          if (key === 'r' || key === ' ' || key === 'enter') {
+            event.preventDefault();
+            window.newIteration();
+          }
+        });
+
+        describe();
+        if (reduced.matches) settle();
+      });
+    </script>
+    <script src="panel.js"></script>
+  </body>
+</html>

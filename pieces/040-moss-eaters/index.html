@@ -186,7 +186,7 @@
           random = mulberry32(seed);
           nextId = 1;
           paused = false;
-          food.fill(1);
+          initializeMoss();
           worms = [];
           paintGround();
           clear(trailCtx);
@@ -194,9 +194,10 @@
           const area = width * height;
           const openingWorms = clamp(Math.round(area / 42000), 16, 28);
           for (let i = 0; i < openingWorms; i += 1) {
+            const start = findRichMoss(32);
             worms.push(makeWorm(
-              random() * width,
-              random() * height,
+              start.x,
+              start.y,
               random() * TAU,
               true
             ));
@@ -221,7 +222,8 @@
           // Keep a smaller living edge after the opening history is made.
           worms = worms.filter((worm, index) => index % 2 === 0).slice(0, 22);
           while (worms.length < Math.min(12, openingWorms)) {
-            worms.push(makeWorm(random() * width, random() * height, random() * TAU));
+            const start = findRichMoss(24);
+            worms.push(makeWorm(start.x, start.y, random() * TAU));
           }
 
           lastTime = performance.now();
@@ -229,13 +231,14 @@
         }
 
         function paintGround() {
-          clear(groundCtx, '#5d6258');
+          clear(groundCtx, '#73776d');
 
           // Large, low-contrast moss colonies establish the field.
           const colonies = Math.round(width * height / 1900);
           for (let i = 0; i < colonies; i += 1) {
             const x = random() * width;
             const y = random() * height;
+            const density = foodAt(x, y);
             const radius = 7 + random() * 34;
             const points = 8 + Math.floor(random() * 8);
             groundCtx.beginPath();
@@ -248,18 +251,20 @@
               else groundCtx.lineTo(px, py);
             }
             groundCtx.closePath();
-            groundCtx.globalAlpha = 0.055 + random() * 0.095;
+            groundCtx.globalAlpha = (0.035 + random() * 0.12) * (0.3 + density);
             groundCtx.fillStyle = mossColors[Math.floor(random() * mossColors.length)];
             groundCtx.fill();
           }
 
           // Moss is a granular carpet, not a smooth green fill.
-          const grains = Math.round(width * height / 19);
+          const grains = Math.round(width * height / 11);
           for (let i = 0; i < grains; i += 1) {
             const x = random() * width;
             const y = random() * height;
+            const density = foodAt(x, y);
+            if (random() > 0.08 + density * 0.92) continue;
             const size = 0.25 + Math.pow(random(), 2) * 1.85;
-            groundCtx.globalAlpha = 0.18 + random() * 0.42;
+            groundCtx.globalAlpha = (0.13 + random() * 0.44) * (0.36 + density * 0.82);
             groundCtx.fillStyle = mossColors[Math.floor(random() * mossColors.length)];
             if (random() < 0.76) {
               groundCtx.fillRect(x, y, size, size * (0.45 + random() * 0.8));
@@ -282,6 +287,61 @@
           groundCtx.globalAlpha = 1;
         }
 
+        function initializeMoss() {
+          for (let gy = 0; gy < rows; gy += 1) {
+            for (let gx = 0; gx < columns; gx += 1) {
+              const x = gx * CELL + CELL * 0.5;
+              const y = gy * CELL + CELL * 0.5;
+              const broad = valueNoise(x / 118, y / 118, 0);
+              const middle = valueNoise(x / 52, y / 52, 41);
+              const fine = valueNoise(x / 23, y / 23, 97);
+              const density = clamp(
+                0.08 + Math.pow(broad * 0.58 + middle * 0.29 + fine * 0.13, 1.12) * 1.08,
+                0.08,
+                1
+              );
+              food[gy * columns + gx] = density;
+            }
+          }
+        }
+
+        function valueNoise(x, y, salt) {
+          const x0 = Math.floor(x);
+          const y0 = Math.floor(y);
+          const tx = x - x0;
+          const ty = y - y0;
+          const sx = tx * tx * (3 - 2 * tx);
+          const sy = ty * ty * (3 - 2 * ty);
+          const a = hashCell(x0, y0, salt);
+          const b = hashCell(x0 + 1, y0, salt);
+          const c = hashCell(x0, y0 + 1, salt);
+          const d = hashCell(x0 + 1, y0 + 1, salt);
+          const top = a + (b - a) * sx;
+          const bottom = c + (d - c) * sx;
+          return top + (bottom - top) * sy;
+        }
+
+        function hashCell(x, y, salt) {
+          let value = Math.imul(x + salt + 0x7ed55d16, 0x85ebca6b)
+            ^ Math.imul(y - salt + 0x165667b1, 0xc2b2ae35)
+            ^ seed;
+          value ^= value >>> 16;
+          value = Math.imul(value, 0x7feb352d);
+          value ^= value >>> 15;
+          return (value >>> 0) / 4294967295;
+        }
+
+        function findRichMoss(attempts) {
+          let best = { x: random() * width, y: random() * height, density: -1 };
+          for (let i = 0; i < attempts; i += 1) {
+            const x = 12 + random() * (width - 24);
+            const y = 12 + random() * (height - 24);
+            const density = foodPatch(x, y, 10);
+            if (density > best.density) best = { x, y, density };
+          }
+          return best;
+        }
+
         function makeWorm(x, y, angle, old = false) {
           const radius = 2.15 + random() * 1.95;
           const worm = {
@@ -301,6 +361,7 @@
             steerIn: 0,
             targetTurn: 0,
             coverageScore: 1,
+            foraging: false,
             curvatureIn: random() * 7,
             curvature: (random() - 0.5) * 0.12,
             weavePhase: random() * TAU,
@@ -379,11 +440,12 @@
           worm.turn += (desire - worm.turn) * Math.min(1, dt * 4.2);
           worm.turn *= Math.pow(0.96, dt);
           worm.travelAngle += worm.turn * dt;
-          const weave = Math.sin(worm.weavePhase) * worm.weaveAmplitude
-            + Math.sin(worm.weavePhase * 0.47 + worm.id * 1.13) * worm.weaveAmplitude * 0.18;
+          const feedingAmplitude = worm.weaveAmplitude * (worm.foraging ? 0.12 : 1);
+          const weave = Math.sin(worm.weavePhase) * feedingAmplitude
+            + Math.sin(worm.weavePhase * 0.47 + worm.id * 1.13) * feedingAmplitude * 0.18;
           worm.angle = worm.travelAngle + weave;
 
-          const speed = worm.speed * (0.82 + foodAt(worm.x, worm.y) * 0.34);
+          const speed = worm.speed * (worm.foraging ? 1.28 : 0.82 + foodAt(worm.x, worm.y) * 0.34);
           worm.x += Math.cos(worm.angle) * speed * dt;
           worm.y += Math.sin(worm.angle) * speed * dt;
           worm.x = clamp(worm.x, 5, width - 5);
@@ -401,7 +463,7 @@
             worm.body.length = Math.min(worm.body.length, 10);
           }
 
-          if (worm.branchIn <= 0 && worms.length < maximumWorms()) {
+          if (worm.branchIn <= 0 && !worm.foraging && worms.length < maximumWorms()) {
             const side = branchSide(worm);
             const child = makeWorm(
               worm.x - Math.cos(worm.angle) * worm.radius * 2,
@@ -419,8 +481,8 @@
 
           const localFood = foodAhead(worm, 0, 34);
           if (worm.age > worm.lifespan) worm.alive = false;
-          if (worm.age > 8 && localFood < 0.06 && random() < dt * 0.14) worm.alive = false;
-          if (worm.age > 5 && worm.coverageScore < 0.24 && random() < dt * 1.8) worm.alive = false;
+          if (!worm.foraging && worm.age > 8 && localFood < 0.035 && random() < dt * 0.14) worm.alive = false;
+          if (!worm.foraging && worm.age > 5 && worm.coverageScore < 0.16 && random() < dt * 1.8) worm.alive = false;
         }
 
         function consume(worm) {

@@ -91,6 +91,8 @@
       const PACKING_SHORTCUT_REWARD = 0.9;
       const VICTORY_DURATION = 2.8;
       const VICTORY_REDUCED_DURATION = 0.7;
+      const GOLDEN_HEIR_RATIO = 0.1;
+      const GOLDEN_HEIR_MIN = 2;
 
       // Mega Man underground: near-black navy, tile indigo, electric cobalt,
       // water cyan, mineral violet and the small amber energy pickup.
@@ -157,6 +159,20 @@
         return `${mixChannel(a[0], b[0], amount)},${mixChannel(a[1], b[1], amount)},${mixChannel(a[2], b[2], amount)}`;
       };
       const victoryDuration = () => reducedMotion ? VICTORY_REDUCED_DURATION : VICTORY_DURATION;
+      const winnerHeadLength = (totalLength) => {
+        let headLength = Math.min(
+          totalLength,
+          Math.max(GOLDEN_HEIR_MIN, Math.ceil(totalLength * GOLDEN_HEIR_RATIO))
+        );
+        while (headLength < totalLength) {
+          const remainder = totalLength - headLength;
+          const fragments = Math.min(START_SNAKES - 1, remainder);
+          const largestFragment = fragments ? Math.ceil(remainder / fragments) : 0;
+          if (headLength > largestFragment) break;
+          headLength++;
+        }
+        return headLength;
+      };
       const winnerGoldAmount = (s) => {
         if (!s.winner) return 0;
         if (!s.victoryActive || reducedMotion) return 1;
@@ -362,7 +378,7 @@
       function splitWinner(winner) {
         const source = copyBody(winner.body);
         if (!source.length) return;
-        const goldenLength = Math.min(2, source.length);
+        const goldenLength = winnerHeadLength(source.length);
         const offspring = [winnerFragment(winner, source, 0, goldenLength, true)];
         const remainder = source.length - goldenLength;
         const fragmentCount = Math.min(START_SNAKES - 1, remainder);
@@ -1465,7 +1481,7 @@
           circleAt(head.x, head.y, CELL * 0.38, colors.head, 14, colors.glow);
           if (gold > 0) {
             const heirColors = winnerHeadColor(s, gold);
-            const heirBody = s.body.slice(0, Math.min(2, s.body.length));
+            const heirBody = s.body.slice(0, winnerHeadLength(s.body.length));
             const heirPoints = points.slice(0, heirBody.length);
             const heirPath = orthogonalSnakePath(heirPoints, heirBody);
             strokePath(heirPath, heirColors.head, CELL * 0.94, 12 + gold * 10, heirColors.glow);

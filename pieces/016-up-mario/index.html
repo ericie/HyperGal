@@ -117,8 +117,11 @@
         const BUDDY_JUMP_SPEED = 650;
         const BUDDY_AIR_SPEED = 325;
         const BUDDY_RUN_SPEED = 162;
+        const BUDDY_MAX_LIVE = 7;
+        const BUDDY_SPAWN_SECONDS = 3.1;
         const RUNNER_EDGE_GRACE = 13;
         const CRUMBLE_TILE_SIZE = 21;
+        const CRUMBLE_REGROW_SECONDS = 5.4;
         const ZONE_HEIGHT = 940;
         const ZONES = ['ink', 'crumble', 'trap', 'shrink'];
 
@@ -176,6 +179,7 @@
         let buddies = [];
         let cloudscapeLayout = [];
         let buddyCount = 0;
+        let nextBuddySpawnAt = 0;
         let keys = {
           left: false,
           right: false,
@@ -300,6 +304,7 @@
           platformCount = 0;
           trunkCount = 0;
           buddyCount = 0;
+          nextBuddySpawnAt = 0;
           targetPlatformId = null;
           platforms = [];
           particles = [];
@@ -389,6 +394,7 @@
           updateMarioBuddies(dt);
           updateParticles(dt);
           updateCamera(dt);
+          spawnRisingMarios();
           recoverIfStalled();
           trimWorld();
           updateHud();
@@ -699,6 +705,8 @@
             hitAt: 0,
             breakAt: 0,
             broken: false,
+            regrowAt: 0,
+            regrownAt: 0,
           }));
           return platform.crumbleBricks;
         }
@@ -723,10 +731,8 @@
             if (platform.zone === 'crumble' && platform.crumbleBricks) {
               for (const brick of platform.crumbleBricks) {
                 if (!brick.broken && brick.breakAt && simTime >= brick.breakAt) breakCrumbleBrick(platform, brick);
+                else if (brick.broken && brick.regrowAt && simTime >= brick.regrowAt) regrowCrumbleBrick(platform, brick);
               }
-            }
-            if (platform.zone === 'trap' && platform.trapRole === 'lever' && platform.activatedUntil > simTime) {
-              openTrapdoorsUnderMarios(platform);
             }
           }
 
@@ -755,10 +761,8 @@
           if (platform.zone === 'crumble') triggerCrumble(platform, actorX);
           if (platform.zoneSafe) return;
           if (platform.zone === 'shrink') breakCloudPlatform(platform);
-          if (platform.zone === 'trap' && platform.trapRole === 'trapdoor') {
-            openTrapdoor(platform);
-            return;
-          }
+          /* A trapdoor is ordinary ground until its lever is thrown -- landing
+             on one does nothing. */
           if (platform.zone === 'trap' && platform.trapRole === 'lever') {
             const leverX = platformLeft(platform) + platform.w * 0.5;
             if (Math.abs(actorX - leverX) < platform.w * 0.32) triggerLever(platform);
@@ -784,8 +788,20 @@
         function breakCrumbleBrick(platform, brick) {
           brick.broken = true;
           brick.breakAt = 0;
+          /* Staggered per brick, so a course rebuilds itself raggedly rather
+             than snapping back all at once. */
+          brick.regrowAt = simTime + CRUMBLE_REGROW_SECONDS * (0.72 + hash01(platform.id * 421 + brick.index * 53) * 0.62);
           spawnBrickDebris(platform, brick);
           platform.pulseUntil = simTime + 0.2;
+        }
+
+        function regrowCrumbleBrick(platform, brick) {
+          brick.broken = false;
+          brick.regrowAt = 0;
+          brick.regrownAt = simTime;
+          brick.hitAt = 0;
+          brick.breakAt = 0;
+          spawnDust(platformLeft(platform) + brick.x + brick.w * 0.5, platform.y - 4, 4, '#EEA2A7');
         }
 
         function ensureCloudChunks(platform) {
@@ -857,25 +873,27 @@
           }
         }
 
+        /* Edge triggered: throwing the lever is one event, so standing on it
+           does not keep re-firing it frame after frame. */
         function triggerLever(lever) {
-          const wasActive = lever.activatedUntil > simTime;
-          lever.activatedUntil = Math.max(lever.activatedUntil, simTime + 2.4);
-          if (!wasActive) spawnDust(platformCenter(lever), lever.y + 4, 10, C.lemon);
-          openTrapdoorsUnderMarios(lever);
+          if (lever.activatedUntil > simTime) {
+            lever.activatedUntil = simTime + 2.4;
+            return;
+          }
+          lever.activatedUntil = simTime + 2.4;
+          spawnDust(platformCenter(lever), lever.y + 4, 10, C.lemon);
+          openTrapdoorsForLever(lever);
         }
 
-        function openTrapdoorsUnderMarios(lever) {
+        /* Every trapdoor the lever governs swings the instant it is thrown,
+           whether or not anyone happens to be standing on it. */
+        function openTrapdoorsForLever(lever) {
           const band = Math.floor(Math.max(0, lever.y - 88) / ZONE_HEIGHT);
-          const occupiedPlatformIds = new Set();
-          if (hero.grounded && hero.groundId) occupiedPlatformIds.add(hero.groundId);
-          for (const buddy of buddies) {
-            if (buddy.grounded && buddy.platformId) occupiedPlatformIds.add(buddy.platformId);
-          }
           const traps = platforms
             .filter((platform) => platform.zone === 'trap' && platform.trapRole === 'trapdoor')
             .filter((platform) => Math.floor(Math.max(0, platform.y - 88) / ZONE_HEIGHT) === band)
             .filter((platform) => platform.y < lever.y)
-            .filter((platform) => occupiedPlatformIds.has(platform.id) && platform.trapOpenUntil <= simTime);
+            .filter((platform) => platform.trapOpenUntil <= simTime);
           for (const trap of traps) openTrapdoor(trap);
         }
 
@@ -1122,6 +1140,23 @@
           for (let i = 0; i < picks.length; i += 1) addMarioBuddy(picks[i], i);
         }
 
+        /* New runners keep arriving from under the frame and climbing up into
+           it, so a long ascent never empties out behind the leader. */
+        function spawnRisingMarios() {
+          if (simTime < nextBuddySpawnAt) return;
+          nextBuddySpawnAt = simTime + BUDDY_SPAWN_SECONDS * (0.7 + hash01(Math.round(simTime * 60) * 37) * 0.9);
+          if (buddies.filter((buddy) => !buddy.falling).length >= BUDDY_MAX_LIVE) return;
+          const taken = new Set(buddies.map((buddy) => buddy.platformId).filter(Boolean));
+          /* Just under the bottom edge, nearest first, so the climb into view
+             is short. */
+          const platform = platforms
+            .filter((candidate) => candidate.y < cameraY - 40 && candidate.y > cameraY - height * 0.85)
+            .filter((candidate) => platformIsSolid(candidate) && !taken.has(candidate.id))
+            .sort((a, b) => b.y - a.y)[0];
+          if (!platform) return;
+          addMarioBuddy(platform);
+        }
+
         function addMarioBuddy(platform, variant = buddyCount) {
           if (!platform || buddies.some((buddy) => buddy.platformId === platform.id)) return;
           const edge = Math.min(28, platform.w * 0.24);
@@ -1321,6 +1356,7 @@
           platforms = platforms.filter(
             (platform) => platform.y > cutoff || platform.id === hero.groundId
           );
+          buddies = buddies.filter((buddy) => buddy.y > cameraY - height * 1.5);
         }
 
         function addPlatform() {
@@ -1862,6 +1898,15 @@
             const left = sx + brick.x + 1 + shake;
             const top = sy - 10 + Math.abs(shake) * 0.35;
             const size = Math.max(5, brick.w - 2);
+            /* Freshly regrown bricks drop back into the course. */
+            const settle = brick.regrownAt ? clamp((simTime - brick.regrownAt) / 0.3, 0, 1) : 1;
+            ctx.save();
+            if (settle < 1) {
+              ctx.globalAlpha = settle;
+              ctx.translate(left + size * 0.5, top + 9.5);
+              ctx.scale(0.55 + settle * 0.45, 0.4 + settle * 0.6);
+              ctx.translate(-(left + size * 0.5), -(top + 9.5));
+            }
             ctx.fillStyle = brick.index % 2 ? '#D97882' : '#EEA2A7';
             ctx.fillRect(left, top, size, 19);
             ctx.strokeStyle = '#6C4555';
@@ -1876,6 +1921,7 @@
               ctx.strokeStyle = SKIN.outline;
               ctx.stroke();
             }
+            ctx.restore();
           }
           ctx.restore();
         }

@@ -133,6 +133,9 @@
 
   // ---- drawing state -----------------------------------------------------
   let canvas = null, ctx = null;
+  // p5 backs the canvas at the display's pixel density and scales the context,
+  // so strokes land on the same subpixels they did under p5.
+  const density = Math.ceil(window.devicePixelRatio) || 1;
   let doFill = true, doStroke = true;
   let fillColour = colour(255), strokeColour = colour(0);
   let vertices = [], isCurve = false;
@@ -143,8 +146,6 @@
   const api = {
     createCanvas(w, h) {
       canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
       canvas.style.display = 'block';
       document.body.appendChild(canvas);
       ctx = canvas.getContext('2d');
@@ -154,15 +155,22 @@
     },
 
     resizeCanvas(w, h) {
-      canvas.width = w;
-      canvas.height = h;
       api._sizeChanged(w, h);
-      // A resized 2D context loses its state; restore what the sketch set.
+      // Resizing clears the 2D context state; put back what the sketch set.
       applyFill();
       applyStroke();
     },
 
-    _sizeChanged(w, h) { window.width = w; window.height = h; },
+    _sizeChanged(w, h) {
+      window.width = w;
+      window.height = h;
+      canvas.width = w * density;
+      canvas.height = h * density;
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      // Setting .width resets the transform, so re-establish the density scale.
+      ctx.setTransform(density, 0, 0, density, 0, 0);
+    },
 
     background(...args) {
       const c = colour(...args);

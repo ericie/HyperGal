@@ -55,8 +55,28 @@ generator are kept verbatim and the parameter defaults are drawn in the original
 order, so an original `oo…` hash passed as `?hash=` produces that iteration's
 starting configuration.
 
-`sketch.js` and `styles.css` are the shipped files. p5.js is vendored in `libs/`
-and pinned forever, per the archival rule.
+`sketch.js` and `styles.css` are the shipped files.
+
+**p5.js is gone.** `runtime.js` replaces it with about 300 lines of vanilla
+canvas code implementing only what this sketch calls. Two parts are
+transcriptions of p5 1.5.0 rather than substitutes, because they decide what the
+artwork looks like:
+
+- `noise()` / `noiseSeed()` — p5's Perlin implementation: four octaves at 0.5
+  amplitude falloff over a 4096-entry table filled from a Lehmer LCG. Any other
+  noise function draws a different piece.
+- `curveVertex()` — p5 converts Catmull-Rom control points to cubic Béziers
+  inside `endShape()`. The Curved Lines parameter depends on that exact
+  conversion, including its habit of drawing nothing under four control points.
+
+The canvas is also backed at the display's pixel density with a scaled context,
+matching p5's default, so strokes land on the same subpixels.
+
+Verified against the p5 build before it was deleted: both were loaded side by
+side and driven through 72 configurations — six palettes by six line weights by
+curved and straight, cycling every layout mode, peak height, spacing and the
+valleys toggle — hashing the full canvas after each. Every one matched, and the
+digest over all 72 was identical (`7a1432f5`).
 
 **The repository copy of this piece did not run.** `10-SL01/index.js` in the
 source repo is pre-bundle code missing its `rand()`, `randint()`, `randchoice()`

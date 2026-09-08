@@ -9,6 +9,10 @@ of drivers are sprinters that run well past anything the hero can do, even
 surging. Slow
 traffic packs tighter; fast traffic leaves more room. When the road opens up,
 the hero sometimes surges forward. The hero never exits.
+Cars the hero passes flash green; cars that pass the hero flash red.
+If the hero remains trapped in a traffic jam for six seconds, the nearest
+obstacle ahead is cleared. Further obstacles clear one at a time, 1.1 seconds
+apart, only while the hero remains stuck.
 
 If packed traffic leaves the hero stopped, it holds its turn signal on and
 requests space in an adjacent lane. The closest following driver makes a
@@ -35,7 +39,8 @@ screen, so a diagonal ramp stays a full lane wide.
 Obstacles appear on the highway: construction, police cars, accidents, and
 road animals. The yellow car is the only car that scores: each gray car it
 passes adds one point, each car that passes it costs one point, and a semi
-truck passing it costs five. Scores can go negative. Gray cars can take
+truck passing it costs five. A car that takes an exit while still ahead of the
+hero costs ten points. Scores can go negative. Gray cars can take
 diagonal exit ramps and leave the highway. Click the piece to reseed the
 traffic.
 

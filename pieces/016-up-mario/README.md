@@ -30,10 +30,20 @@ until another Mario becomes the highest.
 
 Platforms are generated well above the camera from a seeded random stream. Four
 altitude zones repeat through the climb: stable black ink lines; square brick
-tiles that crack and fall one square at a time whenever a runner stands on
-them; trapdoors that swing open the instant a runner lands, with a second
-triggering lever on the next ledge above; and cloud platforms that shed painted
-chunks into drifting particles on every landing.
+tiles that crack and fall one square at a time whenever a runner stands on them,
+then rebuild themselves a few seconds later so a course is worn down rather than
+destroyed; trapdoors with a triggering lever on the ledge above; and cloud
+platforms that shed painted chunks into drifting particles on every landing.
+
+A trapdoor is ordinary ground until its lever is thrown. Runners can stand and
+walk on a closed one indefinitely, and landing on one does nothing. Throwing the
+lever swings every trapdoor it governs open on that same frame, whether or not
+anyone is standing on them, dropping whoever is. The lever is edge triggered, so
+holding it down does not keep re-firing; the doors fall shut again shortly after.
+
+The climb does not empty out behind the leader. New runners keep entering from
+just under the bottom edge and climbing up into the frame, and ones that fall
+far below the camera are released.
 There are no spring launchers. The camera continuously follows whichever Mario
 is currently highest and is free to move downward as well as upward.
 

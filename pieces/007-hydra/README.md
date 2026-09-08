@@ -48,23 +48,24 @@ never cuts diagonally between grid cells. The rule set stays small:
 - touching **another snake** kills one snake,
 - death burns visibly from the snake's head to its tail,
 - abstract cross-hatching appears segment by segment wherever the body recedes,
-- the last survivor pauses while only its first two segments blink golden,
-- after the pause, the golden head becomes a two-segment heir and the remaining
-  body is divided into the small snakes that start the next round.
+- the last survivor pauses while its future head section blinks golden,
+- after the pause, that golden head becomes the largest heir and the remaining
+  body is divided into smaller snakes that start the next round.
 
 ## The look
 
 An underground Mega Man palette: near-black cavern navy, tile indigo, electric
 cobalt, water cyan, mineral violet and pink, with one tiny amber energy pickup.
 Living snakes are continuous, rounded bands of light rather than linked boxes.
-The final survivor freezes for a short victory beat while its two-segment head
-blinks six times between its original palette and a warm, luminous gold. At the
-end of the beat, the whole winning body cleaves into the next field: the head
-becomes a permanently golden heir, and every remaining segment is distributed
-across as many contiguous offspring as the twenty-snake field allows. No outside
-contenders enter. One-segment offspring carry enough latent growth to establish
-a short body as they move. Reduced-motion mode replaces the blink with an
-immediate golden head and a short static pause.
+The final survivor freezes for a short victory beat while its future head
+section blinks six times between its original palette and a warm, luminous
+gold. At the end of the beat, the whole winning body cleaves into the next
+field. Roughly the leading tenth becomes the permanently golden heir—always
+strictly longer than every individual offspring—while every remaining segment
+is distributed across as many smaller contiguous snakes as the twenty-snake
+field allows. No outside contenders enter. One-segment offspring carry enough
+latent growth to establish a short body as they move. Reduced-motion mode
+replaces the blink with an immediate golden head and a short static pause.
 On death, a bright sparking front travels down the body. Each segment crossfades
 directly from living pigment into dry, desaturated cross-hatching as the front
 passes it, but the full sweep now finishes in 0.28–0.72 seconds with a wider

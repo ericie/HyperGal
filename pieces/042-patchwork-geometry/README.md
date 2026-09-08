@@ -27,8 +27,29 @@ Reduced-motion preferences render one completed quilt and stop.
 
 Packaged for fxhash as `PatchworkGeom` in February 2023. This is that shipped
 package with the platform boilerplate removed. `colors.js`, `particles.js`,
-`grid.js`, and `sketch.js` are the shipped files; p5.js is vendored in `libs/`
-and pinned forever, per the archival rule.
+`grid.js`, and `sketch.js` are the shipped files.
+
+**p5.js is gone.** `runtime.js` replaces it with about 300 lines of vanilla
+canvas code implementing only what this sketch calls. Three details had to
+follow p5 1.5.0 exactly, because the output is visibly different otherwise:
+
+- `endShape(CLOSE)` appends the first vertex to the path *twice* before calling
+  `closePath()`, so the closing corner is stroked as a join rather than as two
+  caps meeting. Without it every shape loses a little edge coverage.
+- every renderer opens with `strokeCap(ROUND)`; the raw canvas default is `butt`.
+- colour keeps p5's rounded 0–255 levels *and* its unrounded internal array,
+  because p5 prints `rgb()` from the rounded values but alpha from the unrounded
+  one. The per-frame background fade depends on that alpha.
+- `tint()` + `image()` follow p5 1.5's compositing pipeline — luminosity, then
+  color, then multiply, then destination-in to restore alpha — against a canvas
+  cached on the source. Recolouring the full-size quilt happens every frame, and
+  the obvious per-pixel multiply is around a hundred times too slow for it.
+
+Verified against the p5 build before it was deleted: both were loaded side by
+side and driven through the same eight hashes in both their settled and
+transitioning states, comparing full canvas pixel data. All sixteen frames came
+out identical — zero differing pixels out of 3,240,000, maximum channel delta
+zero — with matching feature records throughout.
 
 fxhash's base58 hash format and sfc32 generator are kept verbatim in
 `index.html`, so an original `oo…` hash passed as `?hash=` reproduces that exact

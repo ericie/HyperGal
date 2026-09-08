@@ -1,0 +1,10 @@
+{
+  "title": "A Record of Pursuit",
+  "year": 2022,
+  "date": "2022-03-22",
+  "category": "generative",
+  "type": "interactive",
+  "wip": false,
+  "thumbnail": "thumbnail.png",
+  "description": "Thirty-two lines chase sixteen targets across a grid, orbiting, spiralling and wandering after them. Half the swarm draws sharp; the other half never resolves and survives only as the glow it leaves behind."
+}

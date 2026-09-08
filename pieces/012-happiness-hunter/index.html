@@ -68,6 +68,9 @@
         const LANES = 5;
         const ROAD_PATTERN = [5, 4, 2, 5, 3, 2, 4, 5];
         const ROAD_TRANSITION_METERS = 88;
+        const MAX_TRAFFIC_JAM_WAIT_SECONDS = 6;
+        const JAM_CLEAR_INTERVAL_SECONDS = 1.1;
+        const JAM_CLEAR_LOOKAHEAD_METERS = 360;
         const HERO_YELLOW = '#ffd21f';
         const TRAFFIC_GRAYS = ['#545b65', '#656d78', '#777f8a', '#8a929d', '#9da4ae'];
         const FIELD_COLORS = ['#173b27', '#244d31', '#315b36', '#3d622f'];
@@ -198,6 +201,7 @@
             mergeRequestSince: 0,
             mergeRequestUntil: 0,
             stuckSince: 0,
+            nextJamClearAt: 0,
           };
           cameraS = hero.s;
           cars = [];
@@ -255,6 +259,7 @@
           enforceObstacleStops();
           enforceRoadLaneStops();
           preventOverlaps();
+          clearJamObstacles(t);
           updateCamera(dt);
           resolveExits(t);
           updateScore(t);
@@ -458,9 +463,13 @@
           hero.gapTargetSpeed = null;
           hero.pathTargetLane = hero.lane;
           if (hero.speed < 2.2) {
-            if (!hero.stuckSince) hero.stuckSince = t;
+            if (!hero.stuckSince) {
+              hero.stuckSince = t;
+              hero.nextJamClearAt = t + MAX_TRAFFIC_JAM_WAIT_SECONDS;
+            }
           } else if (hero.speed > 6) {
             hero.stuckSince = 0;
+            hero.nextJamClearAt = 0;
           }
           const obstacle = nearestObstacleAheadFor(hero, hero.lane, 150);
           let requestedLane = hero.lane;
@@ -543,6 +552,27 @@
           hero.mergeRequestUntil = 0;
         }
 
+        // A blocked queue gets time to solve itself through normal merging.
+        // If the hero is still trapped after that wait, remove only the nearest
+        // obstacle ahead, then wait again before considering the next one.
+        function clearJamObstacles(t) {
+          if (!hero.stuckSince || !hero.nextJamClearAt || t < hero.nextJamClearAt) return;
+
+          const heroFront = hero.s + hero.length * 0.5;
+          let nearestIndex = -1;
+          let nearestGap = Infinity;
+          for (let i = 0; i < obstacles.length; i += 1) {
+            const obstacle = obstacles[i];
+            const gap = obstacle.s - obstacle.length * 0.5 - heroFront;
+            if (gap < -1 || gap > JAM_CLEAR_LOOKAHEAD_METERS || gap >= nearestGap) continue;
+            nearestIndex = i;
+            nearestGap = gap;
+          }
+
+          if (nearestIndex >= 0) obstacles.splice(nearestIndex, 1);
+          hero.nextJamClearAt = t + JAM_CLEAR_INTERVAL_SECONDS;
+        }
+
         function bestCourtesyLane() {
           const options = [hero.lane - 1, hero.lane + 1]
             .filter(laneExists)
@@ -575,10 +605,15 @@
 
           if (car.exitTarget != null && exitDistance < -8) {
             if (car.lane === exitLane) {
+              const exitedAheadOfHero = car.s > hero.s;
               car.exiting = true;
               car.exitProgress = 0;
               car.signal = 0;
               car.stoppedForObstacle = false;
+              if (exitedAheadOfHero) {
+                registerScore(-10, car, t, 'exit');
+                car.scoreFlash = -1;
+              }
               return;
             }
             car.exitTarget = null;
@@ -976,7 +1011,11 @@
           const delta = targetSpeed - vehicle.speed;
           vehicle.speed += clamp(delta * (vehicle.isHero ? 0.92 : 0.76) * dt, -brake * dt, accel * dt);
           vehicle.speed = clamp(vehicle.speed, 0, vehicle.isHero ? 46 : 88);
-          if (!vehicle.isHero) vehicle.scoreFlash = Math.max(0, vehicle.scoreFlash - dt * 2.4);
+          if (!vehicle.isHero && vehicle.scoreFlash !== 0) {
+            const direction = Math.sign(vehicle.scoreFlash);
+            const strength = Math.max(0, Math.abs(vehicle.scoreFlash) - dt * 2);
+            vehicle.scoreFlash = direction * strength;
+          }
         }
 
         function updateHeroSurge(t) {
@@ -1132,13 +1171,13 @@
               car.scoreFlash = 1;
             } else if (car.prevDelta < 0 && delta >= 0) {
               registerScore(car.kind === 'semi' ? -5 : -1, car, t);
-              car.scoreFlash = 1;
+              car.scoreFlash = -1;
             }
             car.prevDelta = delta;
           }
         }
 
-        function registerScore(amount, car, t) {
+        function registerScore(amount, car, t, event = 'pass') {
           score += amount;
           const sign = Math.sign(amount);
           if (scoreRun.sign === sign) {
@@ -1156,6 +1195,7 @@
             chainTotal: scoreRun.total,
             milestone: scoreRun.count % 5 === 0,
             kind: car.kind,
+            event,
             lane: car.drawLane ?? car.lane,
             side: (car.drawLane ?? car.lane) <= hero.drawLane ? -1 : 1,
             variant: mod(scoreRun.count + car.id + (sign < 0 ? 2 : 0), 5),
@@ -1488,13 +1528,21 @@
         function drawRoad() {
           const shoulder = Math.max(16, laneWidth * 0.22);
           const stripH = 6;
+          const stripMeters = stripH / metersToPixels;
           const bandH = 20;
           const dashH = clamp(laneWidth * 0.52, 24, 46);
           const gap = clamp(laneWidth * 0.42, 18, 38);
           const dashCycle = dashH + gap;
+          const nearestStrip = Math.floor(screenToWorldY(height + stripH) / stripMeters) - 1;
+          const farthestStrip = Math.ceil(screenToWorldY(-stripH) / stripMeters) + 1;
 
-          for (let y = -stripH; y < height + stripH; y += stripH) {
-            const s = screenToWorldY(y + stripH * 0.5);
+          // Rasterize at fixed world-space samples. Previously the samples were
+          // fixed to screen rows, so every fractional camera move recomputed the
+          // transition staircase, shoulder edges, and dash membership. Anchoring
+          // each strip to the road makes the whole raster travel as one object.
+          for (let strip = nearestStrip; strip <= farthestStrip; strip += 1) {
+            const s = (strip + 0.5) * stripMeters;
+            const y = worldToY(s) - stripH * 0.5;
             const rawBounds = roadBoundsAt(s);
             const bounds = pixelBounds(rawBounds, stripH);
             rect(bounds.left - shoulder, y, bounds.width + shoulder * 2, stripH + 1, COLORS.shoulder);
@@ -1538,19 +1586,21 @@
 
         // Same strip height, palette, and edge line as drawRoad, so the ramp
         // reads as the highway continuing rather than as a separate object.
-        // Nothing here is keyed to a moving screen coordinate: the old dashed
-        // centre line was phased off ramp.endY, which shifts every frame, and
-        // that is what made the ramp strobe.
+        // Rows are fixed relative to the ramp mouth; camera movement only moves
+        // the completed raster instead of rebuilding its staircase every frame.
         function drawPixelExitRamp(ramp) {
           const strip = 6;
-          const top = Math.floor(ramp.endY / strip) * strip;
-          const bottom = Math.ceil(ramp.startY / strip) * strip;
+          const anchorY = Math.round(ramp.startY);
+          const rowCount = Math.ceil((ramp.startY - ramp.endY) / strip) + 1;
           const seamX = ramp.roadRight;
           const outer = [];
           const inner = [];
 
-          for (let y = top; y <= bottom; y += strip) {
-            const center = exitRampCenterAtY(ramp, y + strip * 0.5);
+          for (let row = 0; row < rowCount; row += 1) {
+            const logicalCenterY = ramp.startY - (row + 0.5) * strip;
+            const drawY = anchorY - (row + 1) * strip;
+            const drawCenterY = drawY + strip * 0.5;
+            const center = exitRampCenterAtY(ramp, logicalCenterY);
             const asphaltLeft = Math.max(seamX, center - ramp.half);
             const asphaltRight = center + ramp.half;
             // Skip the slivers behind the road edge; they used to leave a stray
@@ -1559,12 +1609,12 @@
 
             const shoulderLeft = Math.max(seamX, asphaltLeft - ramp.shoulder);
             const shoulderRight = asphaltRight + ramp.shoulder;
-            rect(shoulderLeft, y, shoulderRight - shoulderLeft, strip + 1, COLORS.shoulder);
-            rect(asphaltLeft, y, asphaltRight - asphaltLeft, strip + 1, COLORS.asphalt);
+            rect(shoulderLeft, drawY, shoulderRight - shoulderLeft, strip + 1, COLORS.shoulder);
+            rect(asphaltLeft, drawY, asphaltRight - asphaltLeft, strip + 1, COLORS.asphalt);
 
-            outer.push([asphaltRight + ramp.shoulder * 0.6, y + strip * 0.5]);
+            outer.push([asphaltRight + ramp.shoulder * 0.6, drawCenterY]);
             if (asphaltLeft - seamX > strip) {
-              inner.push([asphaltLeft - ramp.shoulder * 0.6, y + strip * 0.5]);
+              inner.push([asphaltLeft - ramp.shoulder * 0.6, drawCenterY]);
             }
           }
 
@@ -1748,7 +1798,18 @@
         }
 
         function drawCarShape(x, y, w, h, fill, signal, blinkOn, isHero, flash = 0, kind = 'car') {
-          const bodyFill = flash > 0 ? '#fff7c7' : fill;
+          const flashStrength = Math.abs(flash);
+          const flashColor = flash > 0 ? COLORS.green : COLORS.red;
+          const bodyFill = flashStrength > 0 ? flashColor : fill;
+          if (flashStrength > 0) {
+            const pulse = prefersReducedMotion
+              ? 1
+              : 0.72 + Math.sin((1 - flashStrength) * Math.PI * 3) ** 2 * 0.28;
+            ctx.save();
+            ctx.globalAlpha *= clamp(flashStrength * 1.6, 0, 1) * pulse;
+            rect(x - w / 2 - 6, y - h / 2 - 6, w + 12, h + 12, flashColor);
+            ctx.restore();
+          }
           rect(x - w / 2 + 4, y - h / 2 + 7, w, h, 'rgba(0, 0, 0, 0.34)');
           rect(x - w / 2, y - h / 2, w, h, COLORS.ink);
 
@@ -2114,6 +2175,10 @@
             'TRUCKED', 'EIGHTEEN WHEELS', 'BIG RIG WINS', 'FLATTENED',
             'THE RIG GOT YOU', 'SEMI TROUBLE', 'ROLLED RIGHT OVER', 'THAT ONE HURT',
           ],
+          exit: [
+            'ESCAPED AHEAD', 'LOST TO THE EXIT', 'OFF RAMP LOSS', 'TEN POINT ESCAPE',
+            'SLIPPED AWAY', 'MISSED THE CHASE', 'GONE AT THE RAMP',
+          ],
           // Milestones escalate by tier, so twenty straight cannot read the
           // same as five.
           runs: [
@@ -2137,6 +2202,7 @@
             const index = clamp(Math.floor(burst.chain / 5) - 1, 0, tiers.length - 1);
             return pickCopy(tiers[index], burst);
           }
+          if (burst.event === 'exit') return pickCopy(CHAIN_COPY.exit, burst);
           if (!positive && burst.amount <= -5) return pickCopy(CHAIN_COPY.trucked, burst);
           if (positive && burst.kind !== 'car') return pickCopy(CHAIN_COPY.bigPass, burst);
           return pickCopy(positive ? CHAIN_COPY.pass : CHAIN_COPY.lost, burst);
