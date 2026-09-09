@@ -90,5 +90,13 @@ explores freely; `?hash=` still pins anything specific.
 It also means the site never shows a minted iteration: the fxhash edition drew
 from the old palette table, which no longer exists here.
 
-The canvas is the original fixed 1920 × 1920. It scales to fit the viewport
-rather than reflowing, so the composition is the same on every screen.
+The canvas is the window. The original drew into a fixed 1920 square that the
+browser letterboxed; the piece now sizes itself to the viewport at the display's
+pixel density and places its curves across that whole frame, so the quadrant
+spread means the corners of the browser rather than the corners of a square
+floating inside it.
+
+The curve maths is still expressed in the original 1920 units — that is what
+keeps the feature labels meaningful — and a single scale carries it onto
+whatever shape the window is, taken from the narrower side so a curve always
+fits. Resizing redraws the current pattern against the new shape.

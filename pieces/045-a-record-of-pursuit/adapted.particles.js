@@ -222,13 +222,20 @@ function layoutTargets(w, h) {
 	travelScale = Math.max(w, h) / 1920;
 	centerX = w / 2;
 	centerY = h / 2;
+	// The grid itself stays square and centred. The canvas fills the window so
+	// the lines can enter from the real edges, but stretching the grid to the
+	// window's aspect pulls the composition out of shape.
+	const span = Math.min(w, h);
+	const originX = (w - span) / 2;
+	const originY = (h - span) / 2;
+
 	for (const key in targetList) {
 		const t = targetList[key];
 		if (t.basisParent === undefined) {
 			t.basisParent = { x: t.parent.x, y: t.parent.y };
 		}
-		t.parent.x = (t.basisParent.x / 1920) * w;
-		t.parent.y = (t.basisParent.y / 1920) * h;
+		t.parent.x = originX + (t.basisParent.x / 1920) * span;
+		t.parent.y = originY + (t.basisParent.y / 1920) * span;
 	}
 }
 

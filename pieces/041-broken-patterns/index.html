@@ -15,11 +15,11 @@
         width: 100%; height: 100%; margin: 0; overflow: hidden;
         background: #111;
       }
-      body { display: grid; place-items: center; }
       canvas {
         display: block;
-        width: min(100vw, 100vh);
-        height: min(100vw, 100vh);
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
         cursor: pointer;
         touch-action: manipulation;
       }
@@ -35,8 +35,6 @@
   <body>
     <canvas
       id="patterns"
-      width="1920"
-      height="1920"
       tabindex="0"
       aria-describedby="instructions"
     ></canvas>
@@ -58,7 +56,23 @@
         // all — see the notes on the shared pen and the line count below.
 
         const ALPHABET = '123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
-        const SIZE = 1920;
+        // The curve maths was written against a 1920 square. The canvas is now
+        // the window, so BASIS stays the unit the geometry is expressed in and
+        // SCALE carries it onto whatever shape the browser actually is.
+        const BASIS = 1920;
+        let W = BASIS;
+        let H = BASIS;
+        let SCALE = 1;
+
+        function sizeCanvas() {
+          const dpr = Math.min(2, window.devicePixelRatio || 1);
+          W = Math.max(320, Math.round(window.innerWidth * dpr));
+          H = Math.max(320, Math.round(window.innerHeight * dpr));
+          canvas.width = W;
+          canvas.height = H;
+          // A curve has to fit the narrow direction, so the smaller side sets it.
+          SCALE = Math.min(W, H) / BASIS;
+        }
 
         // fxhash's hash format and sfc32 generator, kept verbatim. Every random
         // value below is drawn in the original order, so an original "oo…" hash
@@ -132,7 +146,19 @@
         let penX = 150;
         let penY = 150;
 
+        sizeCanvas();
         start(search.get('hash') || hashForToday());
+
+        // Resizing clears the canvas, so the current pattern is drawn again
+        // against the new shape rather than left half-erased.
+        let resizeTimer = 0;
+        window.addEventListener('resize', () => {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => {
+            sizeCanvas();
+            start(iteration.hash);
+          }, 180);
+        }, { passive: true });
 
         canvas.addEventListener('click', () => start(randomHash()));
         canvas.addEventListener('keydown', (event) => {
@@ -154,14 +180,14 @@
           rand = seeded;
           iteration = buildIteration(hash);
           lines = placeLines(iteration);
-          penX = 150;
-          penY = 150;
+          penX = 150 * SCALE;
+          penY = 150 * SCALE;
 
           const bg = iteration.iro.bg;
           const ground = 'rgb(' + bg[0] + ',' + bg[1] + ',' + bg[2] + ')';
           document.body.style.backgroundColor = ground;
           canvas.style.backgroundColor = ground;
-          ctx.clearRect(0, 0, SIZE, SIZE);
+          ctx.clearRect(0, 0, W, H);
 
           canvas.setAttribute('aria-label', 'Broken Patterns: ' + title(iteration) + '.');
           if (debug) console.log(report(iteration));
@@ -200,14 +226,15 @@
         }
 
         function placeLines(it) {
-          const pad = it.circSize * 1.2;
-          const centre = SIZE / 2;
+          const pad = it.circSize * 1.2 * SCALE;
+          const centreX = W / 2;
+          const centreY = H / 2;
           const hit = [false, false, false, false];
           const list = [];
 
           const pick = () => ({
-            x: rand() * (SIZE - pad * 2) + pad,
-            y: rand() * (SIZE - pad * 2) + pad
+            x: rand() * (W - pad * 2) + pad,
+            y: rand() * (H - pad * 2) + pad
           });
 
           // The original builds systemSize + 1 curves and only ever advances
@@ -219,10 +246,10 @@
             // that would crowd one that is already occupied.
             let placed = hit[0] && hit[1] && hit[2] && hit[3];
             while (!placed) {
-              if (at.x < centre && at.y < centre && !hit[0]) { hit[0] = placed = true; }
-              else if (at.x > centre && at.y < centre && !hit[1]) { hit[1] = placed = true; }
-              else if (at.x <= centre && at.y >= centre && !hit[2]) { hit[2] = placed = true; }
-              else if (at.x >= centre && at.y >= centre && !hit[3]) { hit[3] = placed = true; }
+              if (at.x < centreX && at.y < centreY && !hit[0]) { hit[0] = placed = true; }
+              else if (at.x > centreX && at.y < centreY && !hit[1]) { hit[1] = placed = true; }
+              else if (at.x <= centreX && at.y >= centreY && !hit[2]) { hit[2] = placed = true; }
+              else if (at.x >= centreX && at.y >= centreY && !hit[3]) { hit[3] = placed = true; }
               else { at = pick(); }
             }
             list.push({ offsetX: at.x, offsetY: at.y, theta: 0, t: 0 });
@@ -250,8 +277,8 @@
           let x = rR * Math.cos(it.m * line.theta) + rp * Math.cos(s * it.m * line.theta);
           let y = rR * Math.sin(it.m * line.theta) + rp * Math.sin(s * it.m * line.theta);
 
-          x = x * it.amplitude + line.offsetX;
-          y = y * it.amplitude + line.offsetY;
+          x = x * it.amplitude * SCALE + line.offsetX;
+          y = y * it.amplitude * SCALE + line.offsetY;
 
           // Only a curve's first segment lifts the pen. Every other segment
           // starts wherever the *previous curve* just ended, because all of
@@ -262,7 +289,7 @@
           if (line.t === 0) { penX = x; penY = y; }
 
           const c = it.iro.color;
-          ctx.lineWidth = it.thickness;
+          ctx.lineWidth = Math.max(0.5, it.thickness * SCALE);
           ctx.strokeStyle = 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + it.alpha + ')';
           ctx.beginPath();
           ctx.moveTo(penX, penY);

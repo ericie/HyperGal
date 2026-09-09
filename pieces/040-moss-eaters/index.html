@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta
+        <meta
       name="description"
-      content="Tiny segmented grazers eat branching, fern-like paths through a dense field of moss."
+      content="One tiny grazer mines an efficient pale path through dark, noise-grown clouds of moss."
     />
     <title>Moss Eaters · HyperGal</title>
     <style>
       :root {
         color-scheme: dark;
-        --ground: #555b51;
+        --ground: #6d7168;
         --focus: #eef1eb;
       }
 
@@ -66,10 +66,10 @@
       id="field"
       tabindex="0"
       aria-describedby="instructions"
-      aria-label="Moss Eaters. Small caterpillar-like grazers eat branching pale paths through a dark moss surface."
+      aria-label="Moss Eaters. One small caterpillar-like grazer mines a pale, non-overlapping path through dark pixel clouds of moss."
     ></canvas>
     <p class="instructions" id="instructions">
-      The colony grazes automatically. Click or tap to hatch more grazers. Press R or Enter for a new field. Press Space to pause or resume.
+      The grazer feeds automatically. Click or tap to relocate it. Press R or Enter for a new field. Press Space to pause or resume.
     </p>
     <p class="instructions" id="status" aria-live="polite"></p>
 
@@ -91,8 +91,8 @@
         const MAX_DPR = 1.5;
 
         const mossColors = [
-          '#41473f', '#494f46', '#51574c', '#5a5f54',
-          '#62665a', '#3c443b', '#696c61', '#4b5248'
+          '#252c26', '#2d352d', '#343c32', '#3b4338',
+          '#202820', '#444a3d', '#30382f', '#1d251f'
         ];
         const stoneColors = [
           'rgba(202, 208, 205, .64)',
@@ -148,14 +148,14 @@
           const rect = canvas.getBoundingClientRect();
           const x = event.clientX - rect.left;
           const y = event.clientY - rect.top;
-          hatchClutch(x, y, reducedMotion.matches ? 7 : 4);
+          placeGrazer(x, y);
 
           if (reducedMotion.matches) {
             growStillLife(150);
             draw();
           }
 
-          announce('A new clutch began feeding.');
+          announce('The grazer moved to a new patch.');
         });
 
         canvas.addEventListener('keydown', (event) => {
@@ -207,17 +207,8 @@
           paintGround();
           clear(trailCtx);
 
-          const area = width * height;
-          const openingWorms = clamp(Math.round(area / 175000), 3, 6);
-          for (let i = 0; i < openingWorms; i += 1) {
-            const start = findRichMoss(32);
-            worms.push(makeWorm(
-              start.x,
-              start.y,
-              random() * TAU,
-              true
-            ));
-          }
+          const start = findRichMoss(32);
+          worms.push(makeWorm(start.x, start.y, random() * TAU));
 
           // The public piece always begins untouched. This opt-in state exists
           // only to make a representative catalog thumbnail.
@@ -228,74 +219,43 @@
         }
 
         function paintGround() {
-          clear(groundCtx, '#666b61');
+          clear(groundCtx, '#70746b');
 
-          // Large, low-contrast moss colonies establish the field.
-          const colonies = Math.round(width * height / 1900);
-          for (let i = 0; i < colonies; i += 1) {
-            const x = random() * width;
-            const y = random() * height;
-            const density = mossAt(x, y);
-            const radius = 7 + random() * 34;
-            const points = 8 + Math.floor(random() * 8);
-            groundCtx.beginPath();
-            for (let p = 0; p < points; p += 1) {
-              const angle = (p / points) * TAU;
-              const r = radius * (0.6 + random() * 0.55);
-              const px = x + Math.cos(angle) * r;
-              const py = y + Math.sin(angle) * r * (0.55 + random() * 0.35);
-              if (p === 0) groundCtx.moveTo(px, py);
-              else groundCtx.lineTo(px, py);
-            }
-            groundCtx.closePath();
-            groundCtx.globalAlpha = (0.075 + random() * 0.19) * (0.38 + density);
-            groundCtx.fillStyle = mossColors[Math.floor(random() * mossColors.length)];
-            groundCtx.fill();
-          }
-
-          // Moss is a granular carpet, not a smooth green fill.
-          const grains = Math.round(width * height / 11);
-          for (let i = 0; i < grains; i += 1) {
-            const x = random() * width;
-            const y = random() * height;
-            const density = mossAt(x, y);
-            if (random() > 0.08 + density * 0.92) continue;
-            const size = 0.25 + Math.pow(random(), 2) * 1.85;
-            groundCtx.globalAlpha = (0.13 + random() * 0.44) * (0.36 + density * 0.82);
-            groundCtx.fillStyle = mossColors[Math.floor(random() * mossColors.length)];
-            if (random() < 0.76) {
-              groundCtx.fillRect(x, y, size, size * (0.45 + random() * 0.8));
-            } else {
-              groundCtx.beginPath();
-              groundCtx.arc(x, y, size, 0, TAU);
-              groundCtx.fill();
+          // Each noise cell becomes a small cloud of dark square pixels. Dense
+          // cells receive more, larger, and more opaque pixels; sparse cells
+          // remain mostly exposed stone rather than becoming a smooth wash.
+          for (let gy = 0; gy < rows; gy += 1) {
+            for (let gx = 0; gx < columns; gx += 1) {
+              const density = moss[gy * columns + gx];
+              const pixels = Math.floor(density * 5 + random() * density * 5);
+              for (let i = 0; i < pixels; i += 1) {
+                const x = Math.round(gx * CELL + random() * CELL);
+                const y = Math.round(gy * CELL + random() * CELL);
+                const size = 0.45 + random() * (0.7 + density * 1.55);
+                groundCtx.globalAlpha = 0.26 + density * 0.5 + random() * 0.18;
+                groundCtx.fillStyle = mossColors[Math.floor(random() * mossColors.length)];
+                groundCtx.fillRect(x, y, size, size * (0.55 + random() * 0.8));
+              }
             }
           }
 
-          // Rich patches rise into clustered tufts; sparse patches leave the
-          // underlying stone comparatively bare.
-          const tufts = Math.round(width * height / 105);
-          for (let i = 0; i < tufts; i += 1) {
+          // Rich regions carry compact satellite clusters, giving the cloud
+          // ragged local edges without introducing soft blobs or polygons.
+          const clusters = Math.round(width * height / 82);
+          for (let i = 0; i < clusters; i += 1) {
             const x = random() * width;
             const y = random() * height;
             const density = mossAt(x, y);
-            if (random() > Math.pow(density, 1.55)) continue;
-            const tuftSize = 1.2 + density * (2.4 + random() * 3.8);
-            const dots = 3 + Math.floor(density * 6);
-            groundCtx.fillStyle = mossColors[Math.floor(random() * 5)];
-            groundCtx.globalAlpha = 0.13 + density * 0.28;
-            for (let dot = 0; dot < dots; dot += 1) {
-              const angle = random() * TAU;
-              const distance = random() * tuftSize;
-              groundCtx.beginPath();
-              groundCtx.arc(
-                x + Math.cos(angle) * distance,
-                y + Math.sin(angle) * distance,
-                0.35 + random() * 1.05,
-                0,
-                TAU
-              );
-              groundCtx.fill();
+            if (random() > Math.pow(density, 1.35)) continue;
+            const count = 2 + Math.floor(density * 7);
+            const spread = 1 + density * 4.5;
+            for (let pixel = 0; pixel < count; pixel += 1) {
+              const px = Math.round(x + (random() - 0.5) * spread * 2);
+              const py = Math.round(y + (random() - 0.5) * spread * 2);
+              const size = 0.6 + random() * (0.8 + density * 1.7);
+              groundCtx.globalAlpha = 0.3 + density * 0.48;
+              groundCtx.fillStyle = mossColors[Math.floor(random() * mossColors.length)];
+              groundCtx.fillRect(px, py, size, size);
             }
           }
 
@@ -320,8 +280,8 @@
               const middle = valueNoise(x / 52, y / 52, 41);
               const fine = valueNoise(x / 23, y / 23, 97);
               const rawDensity = broad * 0.6 + middle * 0.28 + fine * 0.12;
-              const contrasted = clamp((rawDensity - 0.25) / 0.5, 0, 1);
-              const density = 0.035 + Math.pow(contrasted, 1.42) * 0.965;
+              const contrasted = clamp((rawDensity - 0.23) / 0.46, 0, 1);
+              const density = 0.035 + Math.pow(contrasted, 1.08) * 0.965;
               food[gy * columns + gx] = density;
               moss[gy * columns + gx] = density;
             }
@@ -371,7 +331,7 @@
           return best;
         }
 
-        function makeWorm(x, y, angle, old = false) {
+        function makeWorm(x, y, angle) {
           const radius = 2.15 + random() * 1.95;
           const worm = {
             id: nextId++,
@@ -383,16 +343,18 @@
             travelAngle: angle,
             radius,
             speed: 10 + random() * 7,
-            age: old ? random() * 12 : 0,
-            lifespan: 180 + random() * 170,
             steerIn: 0,
             targetTurn: 0,
             coverageScore: 1,
             foraging: false,
             turnRemaining: 0,
             turnDirection: 1,
-            turnRadius: radius * 3.7 + 4,
-            laneRemaining: 54 + random() * 86,
+            turnRadius: radius * 3.35 + 0.75,
+            laneRemaining: 40 + random() * 70,
+            brownianTurn: 0,
+            brownianIn: random() * 0.7,
+            avoidanceTurn: 0,
+            avoidanceIn: 0,
             drift: (random() - 0.5) * 0.025,
             driftIn: 7 + random() * 12,
             stampDistance: random() * 4,
@@ -417,7 +379,7 @@
           for (let step = 0; step < steps; step += 1) {
             const countAtStart = worms.length;
             for (let i = 0; i < countAtStart; i += 1) updateWorm(worms[i], 0.12, true);
-            maintainColony(true);
+            maintainColony();
           }
         }
 
@@ -427,7 +389,7 @@
 
           if (running && !paused && !reducedMotion.matches && dt > 0) {
             for (const worm of worms) updateWorm(worm, dt, false);
-            maintainColony(false);
+            maintainColony();
             softenOldTrails(dt);
             draw();
           }
@@ -440,9 +402,10 @@
 
           worm.previousX = worm.x;
           worm.previousY = worm.y;
-          worm.age += dt;
           worm.steerIn -= dt;
           worm.driftIn -= dt;
+          worm.brownianIn -= dt;
+          worm.avoidanceIn -= dt;
 
           if (worm.driftIn <= 0) {
             worm.drift = (random() - 0.5) * 0.04;
@@ -466,7 +429,7 @@
             worm.foraging = false;
           } else {
             const maximumRate = worm.foraging
-              ? worm.speed / 46
+              ? worm.speed / 20
               : worm.speed / 118;
             worm.angle += clamp(worm.targetTurn + worm.drift, -maximumRate, maximumRate) * dt;
           }
@@ -475,11 +438,16 @@
           worm.x += Math.cos(worm.angle) * worm.speed * dt;
           worm.y += Math.sin(worm.angle) * worm.speed * dt;
 
-          // Planning should keep animals inside. Clamping is only an emergency
-          // guard against a coarse preview step at the canvas boundary.
+          // Planning turns them before the edge. This clamp is a non-lethal
+          // fallback for unusually coarse frames; the insect is redirected
+          // inward and continues at the same speed on the following frame.
           if (worm.x < 4 || worm.x > width - 4 || worm.y < 4 || worm.y > height - 4) {
-            worm.alive = false;
-            return;
+            worm.x = clamp(worm.x, 4, width - 4);
+            worm.y = clamp(worm.y, 4, height - 4);
+            worm.angle = Math.atan2(height * 0.5 - worm.y, width * 0.5 - worm.x);
+            worm.travelAngle = worm.angle;
+            worm.foraging = true;
+            worm.steerIn = 0;
           }
 
           const traveled = Math.hypot(worm.x - worm.previousX, worm.y - worm.previousY);
@@ -496,9 +464,6 @@
             worm.body.length = Math.min(worm.body.length, 10);
           }
 
-          const localFood = foodAhead(worm, 0, 34);
-          if (worm.age > worm.lifespan) worm.alive = false;
-          if (!worm.foraging && worm.turnRemaining <= 0 && worm.age > 8 && localFood < 0.025 && random() < dt * 0.18) worm.alive = false;
         }
 
         function consume(worm) {
@@ -568,12 +533,10 @@
           trailCtx.restore();
         }
 
-        function maintainColony(warming) {
+        function maintainColony() {
           worms = worms.filter(worm => worm.alive);
-          const minimum = warming
-            ? clamp(Math.round(width * height / 175000), 3, 6)
-            : Math.min(4, maximumWorms());
-          while (worms.length < minimum) {
+          worms.length = Math.min(worms.length, 1);
+          while (worms.length < 1) {
             let richest = { x: random() * width, y: random() * height, food: -1 };
             for (let attempt = 0; attempt < 14; attempt += 1) {
               const candidate = {
@@ -587,16 +550,13 @@
           }
         }
 
-        function hatchClutch(x, y, count) {
-          for (let i = 0; i < count && worms.length < maximumWorms() + 6; i += 1) {
-            const angle = (i / count) * TAU + random() * 0.55;
-            const distance = random() * 13;
-            worms.push(makeWorm(
-              clamp(x + Math.cos(angle) * distance, 5, width - 5),
-              clamp(y + Math.sin(angle) * distance, 5, height - 5),
-              angle
-            ));
-          }
+        function placeGrazer(x, y) {
+          const angle = random() * TAU;
+          worms = [makeWorm(
+            clamp(x, 5, width - 5),
+            clamp(y, 5, height - 5),
+            angle
+          )];
         }
 
         function softenOldTrails(dt) {
@@ -676,27 +636,27 @@
           ctx.restore();
         }
 
-        function foodAhead(worm, offset, distance) {
-          const angle = worm.travelAngle + offset;
-          return foodPatch(
-            worm.x + Math.cos(angle) * distance,
-            worm.y + Math.sin(angle) * distance,
-            worm.radius * 2.4
-          );
-        }
-
         function planCourse(worm) {
           const straight = corridorStats(worm, 0);
-          const minedBarrier = straight.capacity > 0.07 && straight.freshness < 0.46;
+          const minedBarrier = straight.blocked > 0.04
+            || (straight.capacity > 0.07 && straight.freshness < 0.46);
           const boundaryAhead = straight.outside > 0.08;
           const laneComplete = worm.laneRemaining <= 0;
 
-          // When a lane ends, preview the whole left and right semicircle. The
-          // animal commits only to an arc whose footprint and exit lane remain
-          // uneaten; otherwise it retires rather than crossing an old route.
-          if (minedBarrier || boundaryAhead) {
-            if (!beginClearUTurn(worm)) worm.alive = false;
+          // At an edge, prefer a fully clear turn and fall back to the tighter
+          // in-bounds arc. The animal is never removed from the simulation.
+          if (boundaryAhead) {
+            if (!beginClearUTurn(worm)) beginBoundaryUTurn(worm);
             return 0;
+          }
+
+          // An eaten lane ahead triggers the same clear-turn preview. If both
+          // semicircles are occupied, use local Brownian avoidance until a gap
+          // opens rather than crossing deliberately or killing the insect.
+          if (minedBarrier) {
+            if (beginClearUTurn(worm)) return 0;
+            worm.foraging = true;
+            return avoidPathTurn(worm);
           }
 
           if (laneComplete) {
@@ -704,12 +664,12 @@
             worm.laneRemaining = 28 + random() * 34;
           }
 
-          // Thin, previously untouched moss calls for a broad, direct search.
-          // It still uses forward motion and a capped radius, never a pivot.
-          if (straight.capacity < 0.27) {
+          // Thin moss produces rotational Brownian motion: constant translation
+          // with locally changing angular velocity, not long-range targeting.
+          if (straight.capacity < 0.32) {
             worm.foraging = true;
             worm.coverageScore = straight.remaining;
-            return seekDenseMossTurn(worm);
+            return brownianWanderTurn(worm);
           }
 
           worm.foraging = false;
@@ -732,8 +692,9 @@
           }
 
           if (bestScore === -Infinity) {
-            if (!beginClearUTurn(worm)) worm.alive = false;
-            return 0;
+            if (beginClearUTurn(worm)) return 0;
+            worm.foraging = true;
+            return avoidPathTurn(worm);
           }
 
           worm.coverageScore = bestScore;
@@ -747,17 +708,18 @@
           const normalX = -forwardY;
           const normalY = forwardX;
           const distances = [
-            12 + worm.radius * 2,
-            20 + worm.radius * 2,
-            29 + worm.radius * 2,
-            40 + worm.radius * 2,
-            53 + worm.radius * 2
+            8 + worm.radius * 1.6,
+            14 + worm.radius * 1.6,
+            21 + worm.radius * 1.6,
+            29 + worm.radius * 1.6,
+            37 + worm.radius * 1.6
           ];
           const halfFootprint = worm.radius * 2.7;
           const laterals = [-halfFootprint, 0, halfFootprint];
           let remaining = 0;
           let capacity = 0;
           let freshness = 0;
+          let blocked = 0;
           let outside = 0;
           let samples = 0;
 
@@ -772,10 +734,11 @@
               }
               const available = foodAt(x, y);
               const possible = mossAt(x, y);
-              const blocked = pathOccupiedNear(x, y, worm.radius * 5.4);
+              const occupied = pathOccupiedNear(x, y, worm.radius * 3.2);
               remaining += available;
               capacity += possible;
-              freshness += blocked ? 0 : (possible > 0.045 ? available / possible : 1);
+              if (occupied) blocked += 1;
+              freshness += occupied ? 0 : (possible > 0.045 ? available / possible : 1);
             }
           }
 
@@ -783,14 +746,15 @@
             remaining: remaining / samples,
             capacity: capacity / samples,
             freshness: freshness / samples,
+            blocked: blocked / samples,
             outside: outside / samples
           };
         }
 
         function beginClearUTurn(worm) {
-          // Two radii become the next lane's offset. This leaves a small safety
-          // margin beyond the 6.7-radius eaten footprint without wasting moss.
-          const radius = worm.radius * 3.7 + 4;
+          // Two radii become the next lane's offset: almost exactly one eaten
+          // footprint, with a sub-pixel safety margin between adjacent lanes.
+          const radius = worm.radius * 3.35 + 0.75;
           const left = uTurnScore(worm, -1, radius);
           const right = uTurnScore(worm, 1, radius);
           const best = left > right
@@ -799,14 +763,49 @@
 
           if (!Number.isFinite(best.score) || best.score < 0.18) return false;
 
+          commitUTurn(worm, best.side, radius);
+          return true;
+        }
+
+        function beginBoundaryUTurn(worm) {
+          const radius = worm.radius * 3.35 + 0.75;
+          const left = boundaryArcScore(worm, -1, radius);
+          const right = boundaryArcScore(worm, 1, radius);
+          const side = left === right
+            ? (random() < 0.5 ? -1 : 1)
+            : (left > right ? -1 : 1);
+          commitUTurn(worm, side, radius);
+        }
+
+        function boundaryArcScore(worm, side, radius) {
+          const forwardX = Math.cos(worm.angle);
+          const forwardY = Math.sin(worm.angle);
+          const normalX = -forwardY;
+          const normalY = forwardX;
+          let nearestEdge = Infinity;
+
+          for (let i = 1; i <= 16; i += 1) {
+            const theta = i / 16 * Math.PI;
+            const x = worm.x
+              + forwardX * radius * Math.sin(theta)
+              + normalX * side * radius * (1 - Math.cos(theta));
+            const y = worm.y
+              + forwardY * radius * Math.sin(theta)
+              + normalY * side * radius * (1 - Math.cos(theta));
+            nearestEdge = Math.min(nearestEdge, x - 4, width - 4 - x, y - 4, height - 4 - y);
+          }
+          return nearestEdge;
+        }
+
+        function commitUTurn(worm, side, radius) {
           worm.turnRadius = radius;
-          worm.turnDirection = best.side;
+          worm.turnDirection = side;
           worm.turnRemaining = Math.PI;
           worm.targetTurn = 0;
           worm.steerIn = Math.PI * radius / worm.speed;
-          worm.laneRemaining = 54 + random() * 86;
+          worm.laneRemaining = 40 + random() * 70;
+          worm.foraging = false;
           pathMetrics.turns += 1;
-          return true;
         }
 
         function uTurnScore(worm, side, radius) {
@@ -843,7 +842,7 @@
 
           const exitX = worm.x + normalX * side * radius * 2;
           const exitY = worm.y + normalY * side * radius * 2;
-          for (const distance of [16, 34, 54]) {
+          for (const distance of [12, 24, 38]) {
             const x = exitX - forwardX * distance;
             const y = exitY - forwardY * distance;
             const sample = resourceSample(x, y, worm.radius * 2.4, worm.radius * 5.4);
@@ -889,33 +888,31 @@
           return false;
         }
 
-        function seekDenseMossTurn(worm) {
-          let bestOffset = 0;
-          let bestScore = -Infinity;
-          const distances = [42, 72, 112, 158];
-
-          for (let step = 0; step < 24; step += 1) {
-            const offset = -Math.PI + step / 23 * TAU;
-            const angle = worm.travelAngle + offset;
-
-            for (const distance of distances) {
-              const x = worm.x + Math.cos(angle) * distance;
-              const y = worm.y + Math.sin(angle) * distance;
-              if (x < 8 || x > width - 8 || y < 8 || y > height - 8) continue;
-              const density = foodPatch(x, y, 13 + distance * 0.045);
-              const movementCost = distance * 0.00235;
-              const reversalCost = Math.abs(offset) / Math.PI * 0.055;
-              const score = density * 1.12 - movementCost - reversalCost + random() * 0.004;
-
-              if (score > bestScore) {
-                bestScore = score;
-                bestOffset = offset;
-              }
-            }
+        function brownianWanderTurn(worm) {
+          if (worm.brownianIn <= 0) {
+            // Summed uniform samples approximate rotational Brownian noise while
+            // avoiding an artificial left-right oscillation.
+            const noise = random() + random() + random() - 1.5;
+            worm.brownianTurn = noise * worm.speed / 8.5;
+            worm.brownianIn = 0.32 + random() * 0.78;
           }
 
-          worm.coverageScore = bestScore;
-          return clamp(bestOffset * 1.45, -1.62, 1.62);
+          return worm.brownianTurn;
+        }
+
+        function avoidPathTurn(worm) {
+          if (worm.avoidanceIn <= 0) {
+            const left = corridorStats(worm, -0.68);
+            const right = corridorStats(worm, 0.68);
+            const leftScore = left.freshness + left.capacity * 0.3 - left.blocked * 2;
+            const rightScore = right.freshness + right.capacity * 0.3 - right.blocked * 2;
+            const side = leftScore === rightScore
+              ? (random() < 0.5 ? -1 : 1)
+              : (leftScore > rightScore ? -1 : 1);
+            worm.avoidanceTurn = side * worm.speed / 17;
+            worm.avoidanceIn = 1.25 + random() * 0.75;
+          }
+          return worm.avoidanceTurn;
         }
 
         function foodPatch(x, y, radius) {
@@ -981,10 +978,6 @@
               food[index] = Math.max(0, food[index] - bite);
             }
           }
-        }
-
-        function maximumWorms() {
-          return clamp(Math.round(width * height / 22000), 22, 48);
         }
 
         function announce(message) {

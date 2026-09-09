@@ -1,7 +1,6 @@
 # A Record of Pursuit
 
-Sixteen targets sit on a four-by-four grid spanning the window, from a fifth of
-the way in to four fifths across both axes. Thirty-two lines enter from beyond
+Sixteen targets sit on a four-by-four grid — square, and centred in the window. Thirty-two lines enter from beyond
 the frame — each from a random point on a random edge — and converge on it. As
 each one arrives it takes up its own manner of waiting: some orbiting, some
 spiralling in and out, some wandering. Every so often a line gives up on its
@@ -65,8 +64,9 @@ on the record made by then.
 The original drew into a fixed 1920 square and let the browser letterbox it, so
 the lines entered from the edge of that square rather than the edge of the
 window — they appeared to pop into existence in mid-air. The piece now sizes
-its five layers to the viewport at the display's pixel density, and the grid is
-rescaled onto whatever shape that is.
+its five layers to the viewport at the display's pixel density. The grid itself
+stays square and centred: stretching it to the window's aspect pulled the
+composition out of shape, so only the field around it grows.
 
 Everything measured in pixels had been tuned against the 1920 square, so it all
 hangs off one scale now: the tighter of the two grid spacings sets the orbit

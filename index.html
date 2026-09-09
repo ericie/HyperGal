@@ -421,7 +421,6 @@
         function dateMeta(p) {
           const dates = el('span', 'dates');
           dates.append(dateItem('Published', p.date || (p.year ? String(p.year) : '')));
-          dates.append(dateItem('Updated', updatedOn(p)));
           if (p.wip) dates.append(el('span', '', 'In progress'));
           return dates;
         }
@@ -441,7 +440,6 @@
           a.href = `./pieces/${p.slug}/index.html`;
           a.setAttribute('aria-label',
             `${title(p)}${p.date ? ', published ' + fmtDate(p.date) : ''}` +
-            `, updated ${fmtDate(updatedOn(p))}` +
             `${p.wip ? ', in progress' : ''}`);
           return a;
         }
