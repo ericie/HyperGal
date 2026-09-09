@@ -5,6 +5,7 @@
   "category": "generative",
   "type": "interactive",
   "wip": false,
+  "rating": 60,
   "thumbnail": "thumbnail.png",
-  "description": "Thirty-two lines chase sixteen targets across a grid, orbiting, spiralling and wandering after them. Half the swarm draws sharp; the other half never resolves and survives only as the glow it leaves behind."
+  "description": "Thirty-two lines enter from beyond the edges of the window and converge on a grid of sixteen targets, then orbit, spiral and wander around them. Half the swarm draws sharp; the other half never resolves and survives only as the glow it leaves behind."
 }

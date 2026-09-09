@@ -10,6 +10,11 @@ turn back, and settle into a dense labyrinth. The pattern has no prescribed
 turns or underlying grid, so broad bends, tight hairpins, enclosed pockets, and
 quiet parallel runs arise at different scales in every iteration.
 
+Once formed, the currents keep moving. Four overlapping displacement waves
+cross the painting in different directions and at separately seeded speeds.
+Their interference makes neighboring passages drift, lag, and overtake one
+another instead of moving as a synchronized sheet.
+
 The simulation wraps at the boundaries before being enlarged with smooth
 sampling, allowing the pattern to reach every edge without a visible frame.
 Subtle pigment variation and softened transitions keep the two-color surface
@@ -22,5 +27,5 @@ closer to paint than to a binary diagram.
 - **R** — replay the current seed
 - `?seed=` — revisit a particular painting
 
-Reduced-motion preferences render the completed field immediately. The piece
-uses vanilla HTML, CSS, and Canvas with no rendering dependencies.
+Reduced-motion preferences render a still, completed field immediately. The
+piece uses vanilla HTML, CSS, and Canvas with no rendering dependencies.

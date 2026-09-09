@@ -4,6 +4,7 @@
   "date": "2026-08-07",
   "category": "nature",
   "type": "interactive",
+  "rating": 70,
   "thumbnail": "thumbnail.jpg",
   "description": "Nine still, finely pixelated fields include zebra, leopard, ocelot, tiger, giraffe, fawn, crocodile, woodland, and desert camouflage. A shuffled cycle synchronizes each palette shift with a hard-edged distance-field morph that splits, merges, expands, and contracts each region into the next pattern."
 }

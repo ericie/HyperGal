@@ -5,6 +5,7 @@
   "category": "generative",
   "type": "generative",
   "wip": true,
+  "rating": 25,
   "thumbnail": "thumbnail.jpg",
   "description": "A field of black-and-white geometric cells where sixteen small frames merge into four-by-four forms, split apart again, and trade motifs through custom geometric transformations. Click to change a block; press Space to pause and R to recompose."
 }

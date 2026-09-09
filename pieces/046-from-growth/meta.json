@@ -1,0 +1,11 @@
+{
+  "title": "From Growth",
+  "year": 2025,
+  "date": "2025-05-20",
+  "category": "generative",
+  "type": "interactive",
+  "wip": false,
+  "rating": 50,
+  "thumbnail": "thumbnail.png",
+  "description": "A grid of cells filling with accumulated line marks, each cell further along than the last. The lines are held inside shapes, and sometimes overflow them. An exercise in process over composition — growing, filling, containment and breaking loose."
+}

@@ -28,7 +28,8 @@ draws a tidy set of separate spirographs and loses the piece.
 
 ## Interaction
 
-- **Click or tap** — a new pattern from a new hash
+- **On arrival** — the day's iteration, the same for everyone visiting today
+- **Click or tap** — a new pattern from a new hash, leaving the day behind
 - **R** — redraw the current pattern from the start
 - **Space or Enter** — a new pattern, for keyboard use
 - `?hash=` — pin a specific iteration
@@ -45,18 +46,49 @@ removed. The four original source files — `adapted.lines.js`, `adapted.library
 webpack, npm, and the `$fxhashFeatures` export are gone.
 
 The drawing code is otherwise unchanged. fxhash's base58 hash format and its
-sfc32 generator are kept verbatim, and every random value is still drawn in the
-original order, so an original `oo…` hash passed as `?hash=` reproduces that exact
-iteration stroke for stroke. Two quirks are deliberately preserved because
-removing either would shift the random sequence and change every output: the
-system builds `systemSize + 1` curves but only ever advances `systemSize - 1` of
-them, so two are placed and never drawn; and the ground color `[66, 265, 154]`
-has always been out of range and has always clamped to 255.
+sfc32 generator are kept verbatim, and the geometry still draws its random
+values in the original order. Two quirks are deliberately preserved because
+removing either would shift that sequence and change every output: the system
+builds `systemSize + 1` curves but only ever advances `systemSize - 1` of them,
+so two are placed and never drawn; and the ground color `[66, 265, 154]` has
+always been out of range and has always clamped to 255.
 
-One thing was fixed. A palette entry carried a stray alpha value in its ground
-color, which pushed the color name out of position and titled that iteration
-"… Lines on a 0.1 Field". The name is now where it belongs. The rendered colors
-are unaffected.
+**An original `oo…` hash no longer reproduces its minted iteration**, and that is
+deliberate — see Colour below. The structure it produces is unchanged; the
+colours are not.
+
+## Colour
+
+The original chose from seventy hand-written {line, ground} pairs at random.
+Most were good. Measured in OKLab, eleven of them sat under 0.30 lightness
+separation and came out muddy — two colours of similar weight fighting each
+other rather than one reading against the other.
+
+`palette.js` replaces the lottery with a decision. It picks a relationship
+first — Complementary, Split Complementary, Triadic, Analogous, Monochrome, or
+Accented Neutral — then places ground and ink in OKLCH so the separation is
+guaranteed rather than hoped for. The floor is 0.32, above every one of those
+eleven failures. Across a year of daily iterations the minimum actually reached
+is 0.320, and the six schemes come up in roughly even measure.
+
+The hue vocabulary is measured from the original seventy, whose peaks were gold,
+blue, cyan, red, green and magenta, so the range still looks like the same
+artist picked it. Colour names are generated too, which is what keeps the titles
+working: "6720 Deep Sky Lines on a Light Amber Field".
+
+Those original pairs are gone from this folder; they remain in the
+Broken-Patterns repository and in this file's history. One of them carried a
+stray alpha in its ground colour and titled its iteration "… on a 0.1 Field" —
+that class of mistake is no longer possible.
+
+## The daily iteration
+
+The piece seeds itself from the date. Everyone visiting on a given day sees the
+same iteration, and reloading returns to it. Clicking leaves the day behind and
+explores freely; `?hash=` still pins anything specific.
+
+It also means the site never shows a minted iteration: the fxhash edition drew
+from the old palette table, which no longer exists here.
 
 The canvas is the original fixed 1920 × 1920. It scales to fit the viewport
 rather than reflowing, so the composition is the same on every screen.

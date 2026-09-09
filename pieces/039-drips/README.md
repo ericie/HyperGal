@@ -1,29 +1,29 @@
 # Drips
 
-Drips is a continuously accumulating gravity painting. Nine completed pours
-are present when the piece opens, so the surface begins with a history
-rather than a single fresh gesture. New layers then arrive automatically and
-remain in the raster field.
+Drips is a continuously accumulating gravity painting. Five completed white
+pours are present when the piece opens, giving the surface a partially filled
+history. New white ink then continues to arrive automatically from the top and
+remains in the raster field.
 
-Each pour begins with a loaded, mostly horizontal brush strike placed at a
-different height and angle. Irregular splats and satellite droplets break away
-from the gesture. Paint then releases from both the lower brush edge and the
-larger splats, separating the dry, fibrous source marks from their liquid
-response.
+Each pour begins with a loaded, nearly horizontal brush strike along the upper
+edge. Irregular splats and satellite droplets break away from the gesture.
+Paint releases from both the lower brush edge and the larger splats, separating
+the fibrous source marks from their liquid response.
 
 The descending paint is built from filled, width-changing bodies rather than
-stroked centerlines. Asymmetric edges, translucent capillary blooms, denser
-inner pigment, and swollen moving fronts make it read as liquid soaking into
-paper. Width, opacity, reach, and timing vary within each layer.
+stroked centerlines. Asymmetric edges, selective capillary blooms, dense inner
+pigment, and swollen moving fronts make it read as liquid soaking into paper.
+The streams are narrower and substantially more opaque than the earlier veils.
 
-The opening nine-pour fill completes the first pigment cycle, so the next live
-ooze immediately introduces a clearly different color. Later pigments remain
-active for ten to twelve pours—long enough to occupy most of the field—before
-changing again. Bone, ultramarine, carmine, ochre, green, and violet build up
-in successive cycles over the blue-black ground.
+A small raster coverage mask measures the accumulated footprint after every
+completed pour. White remains active until more than 75% of the mask is
+covered; only then does ultramarine begin its own empty coverage cycle. Carmine,
+ochre, green, and violet follow under the same rule. After those six foreground
+inks, a seventh ink close to the original blue-black background covers the old
+painting down. The sequence then returns to white and repeats indefinitely.
 
 Invisible horizontal ledges occupy the lower portion of the field. Many
-vertical runs stop on a ledge, spread laterally, accumulate into pale shelves,
+vertical runs stop on a ledge, spread laterally, accumulate into dense shelves,
 and occasionally overflow again toward the next ledge. Repeated layers make
 these lower shapes legible through deposited pigment rather than through a
 drawn terrain map.

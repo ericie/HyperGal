@@ -5,6 +5,7 @@
   "category": "games",
   "type": "interactive",
   "wip": false,
+  "rating": 75,
   "thumbnail": "thumbnail.jpg",
   "description": "Pac hunts every power pellet across a full-frame maze."
 }

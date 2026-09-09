@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="Brush strikes and splats release broad paper-soaked oozes; each pigment fills the field before the next color begins."
+      content="Dense white ink drips from the top until it covers three quarters of the field, then successive pigments repeat the cycle."
     />
     <title>Drips · HyperGal</title>
     <style>
@@ -36,7 +36,7 @@
       id="painting"
       tabindex="0"
       aria-describedby="instructions"
-      aria-label="Drips: brush strikes and splats release paper-soaked paint in successive color cycles."
+      aria-label="Drips: dense ink continually oozes from the top, changing color after covering three quarters of the field."
     ></canvas>
     <p class="instructions" id="instructions">
       The painting builds automatically. Click or tap to begin another pour. Press R, Space, or Enter to clear and begin again.
@@ -52,6 +52,8 @@
         const historyCtx = historyCanvas.getContext('2d');
         const activeCanvas = document.createElement('canvas');
         const activeCtx = activeCanvas.getContext('2d');
+        const coverageCanvas = document.createElement('canvas');
+        const coverageCtx = coverageCanvas.getContext('2d', { willReadFrequently: true });
         const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
         const palette = [
           [236, 233, 211],
@@ -59,7 +61,8 @@
           [204, 78, 98],
           [220, 158, 68],
           [91, 178, 150],
-          [181, 120, 207]
+          [181, 120, 207],
+          [10, 14, 23]
         ];
 
         let width = 0;
@@ -71,8 +74,7 @@
         let currentLayer = null;
         let layerCount = 0;
         let colorIndex = 0;
-        let layersInColor = 0;
-        let colorLayerTarget = 11;
+        let coverageRatio = 0;
         let layerStartedAt = 0;
         let lastPaintAt = 0;
         let running = !document.hidden;
@@ -125,21 +127,23 @@
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           historyCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
           activeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          coverageCanvas.width = clamp(Math.round(width / 8), 80, 180);
+          coverageCanvas.height = Math.max(48, Math.round(coverageCanvas.width * height / width));
         }
 
         function beginPainting() {
           random = mulberry32(seed);
           layerCount = 0;
-          colorIndex = Math.floor(random() * palette.length);
-          layersInColor = 0;
+          colorIndex = 0;
+          coverageRatio = 0;
           lastPaintAt = 0;
           ridges = makeRidges();
           currentLayer = null;
           clearContext(historyCtx, '#080b12');
           clearContext(activeCtx);
+          coverageCtx.clearRect(0, 0, coverageCanvas.width, coverageCanvas.height);
 
-          const openingLayers = reducedMotion.matches ? 22 : 9;
-          colorLayerTarget = openingLayers;
+          const openingLayers = reducedMotion.matches ? 10 : 5;
           for (let i = 0; i < openingLayers; i += 1) commitLayer(makeLayer(), 1);
 
           if (!reducedMotion.matches) {
@@ -188,7 +192,7 @@
           const mode = chooseWeighted([
             ['veil', 0.34], ['threads', 0.29], ['wash', 0.2], ['dry', 0.17]
           ]);
-          const sourceWidth = width * (0.16 + random() * 0.3);
+          const sourceWidth = width * (0.3 + random() * 0.38);
           const placement = (
             hash(seed + 313) + layerCount * 0.61803398875 + (random() - 0.5) * 0.16 + 1
           ) % 1;
@@ -196,17 +200,17 @@
           const sourceLeft = clamp(sourceCenter - sourceWidth * 0.5, 0, width - sourceWidth);
           const source = {
             x: sourceLeft + sourceWidth * 0.5,
-            y: height * (0.025 + Math.pow(random(), 1.55) * 0.48),
+            y: height * (-0.012 + random() * 0.055),
             width: sourceWidth,
-            height: height * (0.014 + random() * 0.036),
-            angle: (random() - 0.5) * 0.62
+            height: height * (0.012 + random() * 0.024),
+            angle: (random() - 0.5) * 0.16
           };
           const layer = {
             color,
             mode,
             source,
-            opacity: mode === 'wash' ? 0.15 + random() * 0.14 : 0.22 + random() * 0.25,
-            duration: 2.8 + random() * 3.2,
+            opacity: 0.62 + random() * 0.25,
+            duration: 2.3 + random() * 2.3,
             strokes: [],
             sourceMarks: [],
             splats: []
@@ -225,8 +229,8 @@
                 orientedPoint(source, center + length * 0.5, across + (random() - 0.5) * 3)
               ],
               width: 1 + Math.pow(random(), 1.8) * 12,
-              alpha: 0.08 + random() * 0.25,
-              dryness: 0.25 + random() * 0.68,
+              alpha: 0.24 + random() * 0.36,
+              dryness: 0.18 + random() * 0.52,
               seed: Math.floor(random() * 0x7fffffff)
             });
           }
@@ -241,13 +245,13 @@
               x: clamp(point.x, -20, width + 20),
               y: clamp(point.y, -20, height * 0.58),
               radius: 1.4 + Math.pow(random(), 1.8) * 12,
-              alpha: 0.18 + random() * 0.5,
+              alpha: 0.48 + random() * 0.38,
               delay: random() * 0.16,
               seed: Math.floor(random() * 0x7fffffff)
             });
           }
 
-          const strokeCount = Math.round(sourceWidth / lerp(15, 28, random()));
+          const strokeCount = Math.round(sourceWidth / lerp(8, 14, random()));
           for (let i = 0; i < strokeCount; i += 1) {
             const position = (i + random() * 0.9) / strokeCount;
             const sourcePoint = orientedPoint(
@@ -285,11 +289,11 @@
 
         function makePourStroke(layer, x, startY, index, origin) {
           const weightRoll = random();
-          const lineWidth = weightRoll < 0.34
-            ? 1.4 + random() * 2.8
-            : weightRoll < 0.82
-              ? 4 + random() * 9
-              : 13 + random() * 20;
+          const lineWidth = weightRoll < 0.48
+            ? 0.7 + random() * 1.8
+            : weightRoll < 0.92
+              ? 2.2 + random() * 3.8
+              : 6 + random() * 4.5;
           const eligibleRidges = ridges
             .map((ridge, ridgeIndex) => ({ ridge, ridgeIndex }))
             .filter(({ ridge }) => ridgeY(ridge) > startY + height * 0.045);
@@ -302,7 +306,7 @@
           const collisionY = chosen
             ? ridgeY(chosen.ridge)
             : Math.max(startY + height * 0.14, height * (0.76 + random() * 0.34));
-          const stopShort = random() < (origin === 'splat' ? 0.18 : layer.mode === 'dry' ? 0.34 : 0.14);
+          const stopShort = random() < (origin === 'splat' ? 0.14 : layer.mode === 'dry' ? 0.22 : 0.09);
           const endY = stopShort
             ? lerp(startY + height * 0.035, collisionY, 0.22 + random() * 0.58)
             : collisionY;
@@ -324,7 +328,7 @@
               kind: 'shelf',
               points: shelfPoints,
               width: lineWidth * (0.7 + random() * 2.4),
-              alpha: 0.2 + random() * 0.5,
+              alpha: 0.46 + random() * 0.38,
               delay: 0.58 + random() * 0.18,
               seed: strokeSeed + 701
             });
@@ -337,7 +341,7 @@
                 kind: 'overflow',
                 points: verticalRun(spillX, shelfPoints.at(-1).y, nextY, lineWidth * 0.72, index + 117),
                 width: Math.max(0.4, lineWidth * (0.42 + random() * 0.72)),
-                alpha: 0.18 + random() * 0.48,
+                alpha: 0.42 + random() * 0.38,
                 delay: 0.7 + random() * 0.2,
                 seed: strokeSeed + 1409
               });
@@ -349,8 +353,8 @@
             points,
             deposits,
             width: lineWidth,
-            alpha: 0.24 + random() * 0.68,
-            delay: 0.1 + random() * 0.2,
+            alpha: 0.58 + random() * 0.36,
+            delay: 0.08 + random() * 0.16,
             speed: 0.76 + random() * 0.46,
             seed: strokeSeed
           };
@@ -449,11 +453,10 @@
           const visible = partialPath(points, progress);
           if (visible.length < 2) return;
 
-          paintOozeRibbon(context, visible, width * 1.82, opacity * 0.08, color, flowSeed + 19);
-          paintOozeRibbon(context, visible, width * 1.48, opacity * 0.16, color, flowSeed + 43);
+          paintOozeRibbon(context, visible, width * 1.42, opacity * 0.18, color, flowSeed + 43);
 
-          paintOozeRibbon(context, visible, width * 1.08, opacity * 0.64, color, flowSeed + 211);
-          paintOozeRibbon(context, visible, width * 0.52, opacity * 0.24, [
+          paintOozeRibbon(context, visible, width, opacity * 0.82, color, flowSeed + 211);
+          paintOozeRibbon(context, visible, width * 0.46, opacity * 0.34, [
             Math.min(255, r + 18),
             Math.min(255, g + 18),
             Math.min(255, b + 18)
@@ -524,6 +527,7 @@
           const [r, g, b] = color;
           const sampled = resamplePath(points, clamp(width * 1.35, 14, 30));
           for (let index = 1; index < sampled.length; index += 1) {
+            if (hash(bloomSeed + index * 1297 + 2) < 0.46) continue;
             const point = sampled[index];
             const before = sampled[index - 1];
             const dx = point.x - before.x;
@@ -534,7 +538,7 @@
             const side = hash(bloomSeed + index * 1297 + 3) < 0.5 ? -1 : 1;
             const reach = width * (0.18 + hash(bloomSeed + index * 1297 + 7) * 0.48);
             const bloom = width * (0.16 + hash(bloomSeed + index * 1297 + 11) * 0.3);
-            context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity * (0.055 + hash(bloomSeed + index * 1297 + 17) * 0.075)})`;
+            context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity * (0.12 + hash(bloomSeed + index * 1297 + 17) * 0.1)})`;
             context.beginPath();
             context.ellipse(
               point.x + normalX * reach * side,
@@ -719,9 +723,8 @@
           if (visible.length < 2) return;
           const loadedWidth = width * (1.45 + hash(oozeSeed + 59) * 0.9);
 
-          paintOozeRibbon(context, visible, loadedWidth * 1.55, opacity * 0.1, color, oozeSeed + 67);
-          paintOozeRibbon(context, visible, loadedWidth * 1.28, opacity * 0.2, color, oozeSeed + 211);
-          paintOozeRibbon(context, visible, loadedWidth, opacity * 0.72, color, oozeSeed + 503);
+          paintOozeRibbon(context, visible, loadedWidth * 1.36, opacity * 0.18, color, oozeSeed + 67);
+          paintOozeRibbon(context, visible, loadedWidth, opacity * 0.82, color, oozeSeed + 503);
           paintCapillaryBlooms(context, visible, loadedWidth, opacity * 1.2, color, oozeSeed + 1877);
         }
 
@@ -828,15 +831,32 @@
           historyCtx.setTransform(1, 0, 0, 1, 0, 0);
           historyCtx.drawImage(activeCanvas, 0, 0);
           historyCtx.restore();
+
+          coverageCtx.save();
+          coverageCtx.setTransform(1, 0, 0, 1, 0, 0);
+          coverageCtx.drawImage(
+            activeCanvas,
+            0,
+            0,
+            activeCanvas.width,
+            activeCanvas.height,
+            0,
+            0,
+            coverageCanvas.width,
+            coverageCanvas.height
+          );
+          coverageCtx.restore();
+
           clearContext(activeCtx);
           layerCount += 1;
-          layersInColor += 1;
-
-          if (layersInColor >= colorLayerTarget) {
-            colorIndex = (colorIndex + 1 + Math.floor(random() * (palette.length - 1))) % palette.length;
-            layersInColor = 0;
-            colorLayerTarget = 10 + Math.floor(random() * 3);
+          coverageRatio = measureCoverage();
+          if (coverageRatio >= 0.75) {
+            canvas.dataset.transitionCoverage = coverageRatio.toFixed(3);
+            advanceColor();
           }
+          canvas.dataset.coverage = coverageRatio.toFixed(3);
+          canvas.dataset.ink = String(colorIndex);
+          canvas.dataset.layers = String(layerCount);
 
           if (layerCount % 28 === 0) {
             historyCtx.save();
@@ -844,6 +864,26 @@
             historyCtx.fillRect(0, 0, width, height);
             historyCtx.restore();
           }
+        }
+
+        function measureCoverage() {
+          const pixels = coverageCtx.getImageData(
+            0,
+            0,
+            coverageCanvas.width,
+            coverageCanvas.height
+          ).data;
+          let covered = 0;
+          for (let index = 3; index < pixels.length; index += 4) {
+            if (pixels[index] >= 52) covered += 1;
+          }
+          return covered / (pixels.length / 4);
+        }
+
+        function advanceColor() {
+          colorIndex = (colorIndex + 1) % palette.length;
+          coverageRatio = 0;
+          coverageCtx.clearRect(0, 0, coverageCanvas.width, coverageCanvas.height);
         }
 
         function draw() {

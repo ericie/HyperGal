@@ -89,6 +89,34 @@
       .opt:hover { text-decoration: underline; text-underline-offset: 2px; }
       .opt[aria-pressed="true"] { color: var(--blue); font-weight: 600; }
       .opt:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+      /* The theme picker is a real <select> dressed to sit in the sentence. */
+      .pick {
+        appearance: none;
+        -webkit-appearance: none;
+        border: 1px solid var(--ink);
+        border-radius: 2px;
+        margin: 0;
+        padding: .05em 1.5em .05em .45em;
+        /* Hug the chosen theme rather than the widest one. Browsers without
+           field-sizing just get a box wide enough for every option. */
+        field-sizing: content;
+        font: inherit;
+        font-style: normal;
+        color: var(--ink);
+        cursor: pointer;
+        background: transparent
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='%23111111'/%3E%3C/svg%3E")
+          no-repeat right .5em center / .5em auto;
+      }
+      .pick.is-set {
+        color: var(--blue);
+        border-color: var(--blue);
+        font-weight: 600;
+        background-image:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='%230000ee'/%3E%3C/svg%3E");
+      }
+      .pick:hover { text-decoration: underline; text-underline-offset: 2px; }
+      .pick:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
       .sort-dir {
         font-size: .68em;
         vertical-align: .12em;
@@ -214,7 +242,7 @@
     <header>
       <h1>HyperMedia Club</h1>
       <div class="controls">
-        <p class="ctl"><strong class="lbl">Status:</strong><span id="statuses" role="group" aria-label="Status"></span>. <strong class="lbl">Theme:</strong><span id="themes" role="group" aria-label="Theme"></span>. <strong class="lbl">View:</strong><span id="views" role="group" aria-label="View"></span>. <strong class="lbl">Sort:</strong><span id="sorts" role="group" aria-label="Sort"></span></p>
+        <p class="ctl"><strong class="lbl">Status:</strong><span id="statuses" role="group" aria-label="Status"></span>. <strong class="lbl">Theme:</strong><select id="themes" class="pick" aria-label="Theme"></select>. <strong class="lbl">View:</strong><span id="views" role="group" aria-label="View"></span>. <strong class="lbl">Sort:</strong><span id="sorts" role="group" aria-label="Sort"></span></p>
       </div>
     </header>
 
@@ -229,12 +257,14 @@
         const sortsEl = document.getElementById('sorts');
 
         const DEFAULTS = {
-          status: 'published',
+          status: 'selected',
           theme: '',
           view: 'grid',
           sort: 'date'
         };
-        const DEFAULT_DIRECTIONS = { alpha: 'asc', date: 'desc' };
+        const DEFAULT_DIRECTIONS = {
+          date: 'desc', alpha: 'asc', number: 'asc', recommended: 'desc'
+        };
         const FILTER_KEYS = ['status', 'theme', 'view', 'sort', 'dir'];
 
         let pieces = [];
@@ -244,9 +274,13 @@
         let sort = DEFAULTS.sort;
         const sortDirections = { ...DEFAULT_DIRECTIONS };
 
+        // A piece carries "wip": true while it is in progress and
+        // "rejected": true once it is cut; rejection outranks both other
+        // states, so a cut piece never shows up under Selected or WIP.
         const STATUSES = [
-          ['published', 'Published', p => !p.wip],
-          ['wip', 'WIP', p => p.wip === true],
+          ['selected', 'Selected', p => !p.wip && !p.rejected],
+          ['wip', 'WIP', p => p.wip === true && !p.rejected],
+          ['rejected', 'Rejected', p => p.rejected === true],
           ['all', 'All', () => true]
         ];
         const THEMES = [
@@ -257,7 +291,10 @@
           ['other', 'Other']
         ];
         const VIEWS = [['grid', 'Grid'], ['list', 'List']];
-        const SORTS = [['alpha', 'Alpha'], ['date', 'Date']];
+        const SORTS = [
+          ['date', 'Date'], ['alpha', 'Alpha'], ['number', 'Number'],
+          ['recommended', 'Recommended']
+        ];
         const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -286,8 +323,7 @@
           readStateFromUrl();
           buildGroup(statusesEl, STATUSES, () => status,
             v => { status = v; });
-          buildGroup(themesEl, THEMES, () => theme,
-            v => { theme = theme === v ? '' : v; });
+          buildThemeSelect();
           buildGroup(viewsEl, VIEWS, () => view, v => { view = v; });
           buildSortGroup();
           syncControls();
@@ -303,6 +339,20 @@
 
         function title(p) { return p.title || p.slug; }
 
+        // A private 1–100 score from meta.json, read but never rendered: it
+        // only ever orders the Recommended sort. Unrated pieces score 0 and
+        // fall to the bottom of it.
+        function rating(p) {
+          const value = Number(p.rating);
+          return Number.isFinite(value) ? Math.max(1, Math.min(100, value)) : 0;
+        }
+
+        // Catalog number: the digits a slug opens with, e.g. 014-… -> 14.
+        function number(p) {
+          const m = /^(\d+)/.exec(p.slug);
+          return m ? Number(m[1]) : Number.MAX_SAFE_INTEGER;
+        }
+
         function currentList() {
           const matchStatus =
             (STATUSES.find(item => item[0] === status) || STATUSES[0])[2];
@@ -312,6 +362,19 @@
           if (sort === 'alpha') {
             list.sort((a, b) => direction * title(a).localeCompare(
               title(b), undefined, { sensitivity: 'base' }));
+          } else if (sort === 'number') {
+            list.sort((a, b) => direction * (
+              number(a) - number(b) || a.slug.localeCompare(b.slug)));
+          } else if (sort === 'recommended') {
+            // Rating first, then the same Updated date the Date sort uses,
+            // then catalog number as the last word.
+            list.sort((a, b) => {
+              const [x, y] = [updatedOn(a), updatedOn(b)];
+              return direction * (
+                rating(a) - rating(b) ||
+                (x < y ? -1 : x > y ? 1 : 0) ||
+                number(a) - number(b));
+            });
           } else {
             // Updated, not published: slug (≈ creation order) breaks ties.
             list.sort((a, b) => {
@@ -409,6 +472,21 @@
           });
         }
 
+        // One theme at a time, with an explicit "All" for the unfiltered grid.
+        function buildThemeSelect() {
+          const options = [['', 'All'], ...THEMES].map(([value, label]) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = label;
+            return option;
+          });
+          themesEl.replaceChildren(...options);
+          themesEl.addEventListener('change', () => {
+            theme = validValue(THEMES, themesEl.value, DEFAULTS.theme);
+            commitState();
+          });
+        }
+
         function buildSortGroup() {
           sortsEl.replaceChildren();
           SORTS.forEach((item, i) => {
@@ -450,7 +528,8 @@
 
         function syncControls() {
           syncGroup(statusesEl, STATUSES, status);
-          syncGroup(themesEl, THEMES, theme);
+          themesEl.value = theme;
+          themesEl.classList.toggle('is-set', Boolean(theme));
           syncGroup(viewsEl, VIEWS, view);
           updateSortGroup();
         }

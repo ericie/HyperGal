@@ -71,6 +71,10 @@
         const MAX_TRAFFIC_JAM_WAIT_SECONDS = 6;
         const JAM_CLEAR_INTERVAL_SECONDS = 1.1;
         const JAM_CLEAR_LOOKAHEAD_METERS = 360;
+        const ESCAPEE_PROXIMITY_METERS = 24;
+        const HERO_LANE_COMMIT_SECONDS = 2.6;
+        const HERO_REVERSAL_WINDOW_SECONDS = 7;
+        const HERO_REVERSAL_PENALTY = 22;
         const HERO_YELLOW = '#ffd21f';
         const TRAFFIC_GRAYS = ['#545b65', '#656d78', '#777f8a', '#8a929d', '#9da4ae'];
         const FIELD_COLORS = ['#173b27', '#244d31', '#315b36', '#3d622f'];
@@ -202,6 +206,9 @@
             mergeRequestUntil: 0,
             stuckSince: 0,
             nextJamClearAt: 0,
+            previousLane: null,
+            lastLaneChangeAt: -Infinity,
+            laneCommitUntil: 0,
           };
           cameraS = hero.s;
           cars = [];
@@ -481,7 +488,7 @@
             forced = true;
             shouldSignal = requestedLane !== hero.lane;
           } else {
-            requestedLane = bestHeroPathLane();
+            requestedLane = t < hero.laneCommitUntil ? hero.lane : bestHeroPathLane(t);
             hero.pathTargetLane = requestedLane;
             const front = nearestVehicleAheadFor(hero, hero.lane, 125);
             hero.huntingOpening = requestedLane !== hero.lane || Boolean(front && front.gap < 95);
@@ -496,6 +503,7 @@
           if (
             requestedLane === hero.lane &&
             hero.stuckSince > 0 &&
+            t >= hero.laneCommitUntil &&
             t - hero.stuckSince > 1.15
           ) {
             const courtesyLane = bestCourtesyLane();
@@ -605,12 +613,13 @@
 
           if (car.exitTarget != null && exitDistance < -8) {
             if (car.lane === exitLane) {
-              const exitedAheadOfHero = car.s > hero.s;
+              const distanceAhead = car.s - hero.s;
+              const isCloseEscapee = distanceAhead > 0 && distanceAhead <= ESCAPEE_PROXIMITY_METERS;
               car.exiting = true;
               car.exitProgress = 0;
               car.signal = 0;
               car.stoppedForObstacle = false;
-              if (exitedAheadOfHero) {
+              if (isCloseEscapee) {
                 registerScore(-10, car, t, 'exit');
                 car.scoreFlash = -1;
               }
@@ -717,7 +726,13 @@
           if (!laneExists(lane)) return false;
 
           if (canMerge(vehicle, lane)) {
+            const previousLane = vehicle.lane;
             vehicle.lane = lane;
+            if (vehicle.isHero) {
+              vehicle.previousLane = previousLane;
+              vehicle.lastLaneChangeAt = t;
+              vehicle.laneCommitUntil = t + HERO_LANE_COMMIT_SECONDS;
+            }
             if (shouldSignal) {
               vehicle.signal = direction;
               vehicle.signalUntil = t + (vehicle.isHero ? 0.72 : 0.38);
@@ -784,18 +799,23 @@
           return bestLane;
         }
 
-        function bestHeroPathLane() {
+        function bestHeroPathLane(t) {
           const current = heroLaneOpportunityScore(hero.lane);
           const front = nearestVehicleAheadFor(hero, hero.lane, 190);
           const urgency = front ? clamp((170 - front.gap) / 170, 0, 1) : 0;
           const trafficBound = front && front.vehicle.speed < hero.desiredSpeed + 5;
-          const threshold = Math.max(0.75, 5.5 - urgency * 4.8 - (trafficBound ? 2.2 : 0));
+          const threshold = Math.max(4.5, 10 - urgency * 5 - (trafficBound ? 2 : 0));
           let bestLane = hero.lane;
           let bestScore = current;
 
           for (const lane of [hero.lane - 1, hero.lane + 1]) {
             if (!laneExists(lane)) continue;
-            const score = heroLaneOpportunityScore(lane);
+            const reversalAge = t - hero.lastLaneChangeAt;
+            const reversalPenalty =
+              lane === hero.previousLane && reversalAge < HERO_REVERSAL_WINDOW_SECONDS
+                ? HERO_REVERSAL_PENALTY * (1 - clamp(reversalAge / HERO_REVERSAL_WINDOW_SECONDS, 0, 1))
+                : 0;
+            const score = heroLaneOpportunityScore(lane) - reversalPenalty;
             if (score > bestScore + threshold) {
               bestScore = score;
               bestLane = lane;
@@ -1807,7 +1827,7 @@
               : 0.72 + Math.sin((1 - flashStrength) * Math.PI * 3) ** 2 * 0.28;
             ctx.save();
             ctx.globalAlpha *= clamp(flashStrength * 1.6, 0, 1) * pulse;
-            rect(x - w / 2 - 6, y - h / 2 - 6, w + 12, h + 12, flashColor);
+            strokeRect(x - w / 2 - 6, y - h / 2 - 6, w + 12, h + 12, flashColor, 4);
             ctx.restore();
           }
           rect(x - w / 2 + 4, y - h / 2 + 7, w, h, 'rgba(0, 0, 0, 0.34)');
@@ -1953,8 +1973,9 @@
           const fade = clamp((burst.until - t) / 0.3, 0, 1);
           const intro = clamp(age / 0.13, 0, 1);
           const positive = burst.amount > 0;
-          const label = formatDelta(burst.amount);
-          const size = LABEL.lead;
+          const escapee = burst.event === 'exit';
+          const label = escapee ? `ESCAPEE ${formatDelta(burst.amount)}` : formatDelta(burst.amount);
+          const size = escapee ? LABEL.body : LABEL.lead;
           const bubbleW = Math.ceil(measureLabel(label, size)) + 34;
           const bubbleH = Math.round(size + 22);
           const x = scoreBubbleX(burst, bubbleW);
@@ -2176,8 +2197,7 @@
             'THE RIG GOT YOU', 'SEMI TROUBLE', 'ROLLED RIGHT OVER', 'THAT ONE HURT',
           ],
           exit: [
-            'ESCAPED AHEAD', 'LOST TO THE EXIT', 'OFF RAMP LOSS', 'TEN POINT ESCAPE',
-            'SLIPPED AWAY', 'MISSED THE CHASE', 'GONE AT THE RAMP',
+            'ESCAPEE',
           ],
           // Milestones escalate by tier, so twenty straight cannot read the
           // same as five.

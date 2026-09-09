@@ -16,7 +16,7 @@ var cursorY = 1920;
 var fadeRate = .02;
 var showLog = false; // console output only when the page asks for it
 if (window.debugMode) showLog = true;
-var fullWindowMode = false;
+var fullWindowMode = true; // the piece fills the window rather than a locked square
 
 var maxW = 1920;
 var maxH = 1920;
@@ -37,8 +37,12 @@ function init() {
 	ctCanvas = document.getElementById("canvas");
 
 	// ctCanvas = document.getElementById("canvas");
-	HEIGHT =  window.innerHeight;
- 	WIDTH =  window.innerWidth;
+	// The page sizes the canvases to the window; everything downstream
+	// measures against those, so drawing happens in real device pixels.
+	WIDTH = ctCanvas.width;
+	HEIGHT = ctCanvas.height;
+	maxW = WIDTH;
+	maxH = HEIGHT;
 	// ctCanvas = document.getElementById("canvas");
 
 	// initCanvasSize();

@@ -23,7 +23,11 @@ from now, with zero external dependencies.
    scripts, vendored libraries, fonts — into the same folder. **No CDNs, no
    external links.**
 3. Edit `meta.json` (title, publication `date`, year, type, thumbnail filename,
-   and description).
+   and description). Three optional curatorial fields drive the gallery's
+   Status and Sort controls: `"wip": true` while a piece is in progress,
+   `"rejected": true` once it is cut (rejection outranks WIP), and
+   `"rating"`, a 1-100 score that is never displayed and only orders the
+   Recommended sort. Unrated pieces sort below every rated one.
 4. Commit the piece, then run `node scripts/build-manifest.mjs` to regenerate
    the gallery index with its latest committed update date.
 

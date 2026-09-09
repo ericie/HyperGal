@@ -5,6 +5,7 @@
   "category": "games",
   "type": "interactive",
   "wip": true,
+  "rating": 30,
   "thumbnail": "thumbnail.png",
   "description": "Twelve uniquely colored frogs begin on a monochrome lawn with moving mowers, then cross an endless grayscale course while leaving permanent, color-matched stains."
 }

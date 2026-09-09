@@ -1,3 +1,7 @@
+let inkCursor = 0;
+// These named palettes are no longer read at runtime — palette.js generates
+// from colour-theory schemes instead. They are kept because the hue
+// vocabulary the generator works from was measured out of colours like these.
 const colorPalettes = {
     miyabi: { 
         name:"Miyabi",
@@ -135,33 +139,46 @@ const colorPalettes = {
 
 let chosenPalette;
 function setColors() {
-    let paletteNames = Object.keys(colorPalettes);
-    let randomPaletteName = paletteNames[Math.floor(EeRandom() * paletteNames.length)];
-    chosenPalette = colorPalettes[randomPaletteName];
-    
-    let randomColorIndex = Math.floor(EeRandom() * chosenPalette.list.length);
-    let chosenColor = chosenPalette.list[randomColorIndex];
-    // console.log(chosenPalette,randomColorIndex,chosenColor);
+    // The original picked one ink from a named palette, then used that palette's
+    // pale tint of the SAME hue as the ground. That is why so many iterations
+    // came out as one colour washed over itself. A scheme decides the ground
+    // and a set of inks together now, with a guaranteed lightness separation.
+    const scheme = HGPalette.build(EeRandom, { inkCount: 6, minSeparation: 0.34 });
 
-    // let randomBgIndex = Math.floor(EeRandom() * chosenPalette.list.length);
-    // let chosenBg = chosenPalette.list[randomBgIndex]//chosenPalette.list[randomBgIndex];
-    
-    // // Keep generating new background color until it's different from the chosen color
-    // while (randomBgIndex === randomColorIndex) {
-    //   randomBgIndex = Math.floor(EeRandom() * chosenPalette.list.length);
-    //   chosenBg = chosenPalette.list[randomBgIndex];
-    // }
+    chosenPalette = {
+        name: scheme.scheme,
+        list: scheme.inks.map((ink) => ({ name: ink.name, color: ink.rgb })),
+        bg:   [{ name: scheme.ground.name, color: scheme.ground.rgb }]
+    };
 
-    let chosenBg = chosenPalette.bg[randomColorIndex];
-  
-    // let dynamicBg = color(255 - chosenColor.color[0], 255 - chosenColor.color[1], 255 - chosenColor.color[2]);
-  
-    // let strokeIndex = chosenColor.color;
-    strokeColor = chosenColor.color;
-    backgroundColor = chosenBg.color;
+    inkCursor = Math.floor(EeRandom() * chosenPalette.list.length);
+    strokeColor = chosenPalette.list[inkCursor].color;
+    backgroundColor = scheme.ground.rgb;
     debugColors(strokeColor, backgroundColor)
   }
-  
+
+  // Choose an ink for one cell.
+  function pickInk() {
+    return Math.floor(EeRandom() * chosenPalette.list.length);
+  }
+
+  // The colour a given cell should be painted, falling back to the first ink
+  // if the grid was built before the ink array caught up.
+  function inkAt(x, y) {
+    const row = (typeof cellInk !== 'undefined' && cellInk[x]) || null;
+    const idx = row && row[y] !== undefined ? row[y] : 0;
+    return (chosenPalette.list[idx] || chosenPalette.list[0]).color;
+  }
+
+  // Every cycle moves to the next ink. The quilt is always many-coloured now,
+  // rather than only when the stacking transition happened to be chosen.
+  function nextInk() {
+    inkCursor = (inkCursor + 1 + Math.floor(EeRandom() * (chosenPalette.list.length - 1)))
+      % chosenPalette.list.length;
+    strokeColor = chosenPalette.list[inkCursor].color;
+    return strokeColor;
+  }
+
   function debugColors(sc, bg) {
     if (window.debugMode) console.log("stroke color: ", sc, sc.color);
     if (window.debugMode) console.log("background color: ", bg.color);

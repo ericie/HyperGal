@@ -26,7 +26,9 @@ traffic may or may not signal. Traffic avoids obstacles; if a car cannot move
 away safely, it stops until a lane opens. A car facing a multi-lane closure
 selects an open lane beyond the obstacle and works toward it one lane at a
 time, signaling early and accepting tighter zipper gaps only as the barrier
-gets close. Cars do not drive through obstacles.
+gets close. Cars do not drive through obstacles. After changing lanes, the hero
+commits to its choice for 2.6 seconds and resists immediately reversing back;
+urgent obstacle avoidance can still override that commitment.
 The highway changes width as it scrolls, with wide five-lane sections
 collapsing into narrower two-lane bottlenecks and opening again.
 Alternating parcels of green farmland move behind the narrower road, making the
@@ -39,8 +41,9 @@ screen, so a diagonal ramp stays a full lane wide.
 Obstacles appear on the highway: construction, police cars, accidents, and
 road animals. The yellow car is the only car that scores: each gray car it
 passes adds one point, each car that passes it costs one point, and a semi
-truck passing it costs five. A car that takes an exit while still ahead of the
-hero costs ten points. Scores can go negative. Gray cars can take
+truck passing it costs five. A car that takes an exit within twenty-four meters
+in front of the hero is an `ESCAPEE` and costs ten points; more distant exits
+are neutral. Scores can go negative. Gray cars can take
 diagonal exit ramps and leave the highway. Click the piece to reseed the
 traffic.
 

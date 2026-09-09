@@ -90,6 +90,7 @@ function buildQuilt() {
   config.transitionType = transitionType;
 
   setColors();
+  applyGroundColour();
   calculateGrid();
   noStroke();
   strokeCap(SQUARE);
@@ -143,6 +144,17 @@ function buildQuilt() {
 }
 
 // New function to randomly set hSym and vSym
+// The canvas keeps its painted ground until a resize clears it, and cells only
+// ever cover part of it. Painting the page behind the canvas the same colour
+// means an uncovered pixel still reads as the ground rather than as the
+// stylesheet's default.
+function applyGroundColour() {
+  const css = 'rgb(' + backgroundColor[0] + ',' + backgroundColor[1] + ',' + backgroundColor[2] + ')';
+  document.body.style.backgroundColor = css;
+  const cnv = document.querySelector('canvas');
+  if (cnv) cnv.style.backgroundColor = css;
+}
+
 function setSymmetry() {
   hSym = EeRandom([true, false]);
   vSym = EeRandom([true, false]);
@@ -243,7 +255,8 @@ function draw() {
     tint(layer2Color);
     image(offscreenCanvas, 2, 5);
   }
-  tint(strokeColor[0],strokeColor[1],strokeColor[2]);
+  // No tint: the cells already carry their own colours.
+  noTint();
   image(offscreenCanvas, 0, 0);
 
 }

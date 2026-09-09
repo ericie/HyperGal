@@ -5,6 +5,7 @@
   "category": "nature",
   "type": "generative",
   "wip": true,
+  "rating": 25,
   "thumbnail": "thumbnail.png",
-  "description": "Tiny segmented grazers seek untouched moss, eating pale herringbone trails into the living surface. Their paths fork, cross, fade, and slowly grow over again."
+  "description": "Tiny resource miners move at constant speed, making broad semicircular turns into fresh parallel lanes while avoiding previously eaten paths."
 }

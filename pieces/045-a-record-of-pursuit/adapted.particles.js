@@ -31,8 +31,8 @@ var autopilot = {on:true, interval:2*1000, range:500};
 var targLoc, systemTarg;
 var lineW = 3.5;
 
-const centerX = 1920/2;
-const centerY = 1920/2;
+var centerX = 960; // recomputed by layoutTargets() once the canvas is sized
+var centerY = 960;
 
 var gridUnit = 512;
 var gridMargin = 384/2;
@@ -204,6 +204,34 @@ var targetList = {
 
 }
 
+// The sixteen targets are written at fifths of a 1920 square. Rescale those
+// positions onto the real canvas so the grid spans the window, keeping each
+// target's own velocity and radius exactly as written.
+var stageScale = 1;
+var travelScale = 1;
+
+function layoutTargets(w, h) {
+	// Radii, speeds and line widths were all tuned against a 1920 square. The
+	// grid now spans whatever shape the window is, so the tighter of the two
+	// spacings sets one scale that everything else is measured in — otherwise
+	// the marks stay 1920-sized and crowd each other in a short window.
+	stageScale = Math.min(w, h) / 1920;
+	// Crossing the frame is a different problem from sitting in a cell: in a
+	// wide window the journey is long, so the approach is paced against the
+	// larger dimension. Otherwise the swarm is still straggling in a minute later.
+	travelScale = Math.max(w, h) / 1920;
+	centerX = w / 2;
+	centerY = h / 2;
+	for (const key in targetList) {
+		const t = targetList[key];
+		if (t.basisParent === undefined) {
+			t.basisParent = { x: t.parent.x, y: t.parent.y };
+		}
+		t.parent.x = (t.basisParent.x / 1920) * w;
+		t.parent.y = (t.basisParent.y / 1920) * h;
+	}
+}
+
 var targetOrder = [
 	"Grid_1_1","Grid_1_2","Grid_1_3","Grid_1_4",
 	"Grid_2_4","Grid_3_4","Grid_4_4",
@@ -228,6 +256,9 @@ var palette_02 = {
 //////////
 // NAMED COLORS
 
+// The six hand-written palettes below are no longer read at runtime — the
+// scheme generator in palette.js replaced them. They are kept because the
+// hue vocabulary it works from was measured out of these colours.
 palette_00 = {
 	bg:[
 		{
@@ -430,220 +461,54 @@ var palettePile = [
 	palette_00, palette_01, palette_02, palette_03, palette_04, palette_05
 ]
 
-const hashTable = {
-	ootbHfbnpkBKSJohGRxBcBFKyTPTR9TvtPi7LVEMbQPQAYa5iwe : {
-		palette: 0,
-		bg: 0,
-	},
-	ooHnK4JRqymsmYQG1s5FfbUi4MqnWyRQ8meoGCbyEXsv4ioetuk : {
-		palette: 0,
-		bg: 1,
-	},
-	oofc2snWbtHGiy6eLEEyFk2diKpNwRTTpip4WSeVhhFtoqMHpKG : {
-		palette: 0,
-		bg: 2,
-	},
-	ooAuYUV84YY4wcUxPXvwwboXkxa96i7aSzRDWBJUxyZ3Y8VHnp3 : {
-		palette: 0,
-		bg: 3,
-	},
-	ooXJt4Lr8he4MxpnkUoQhqMk4WizHNRobD2JcDxtU7LyuqMudTM : {
-		palette: 0,
-		bg: 4,
-	},
-	ooMenLRaHH7D64MiN1Ywc1MsDJUtpwR4W9ww6X5FCfKpJKLU6eM : {
-		palette: 0,
-		bg: 5,
-	},
-
-
-	ooVK6eaFzb3VLVDzpPixfomvnqwHQ5wVngvzW4UQxmTAiT3YQA6 : {
-		palette: 1,
-		bg: 0,
-	},
-	ooXe62v34FhNnoraGbBmf6vdR4D8j9zkFXfAWAg8hdnbGUm88t2 : {
-		palette: 1,
-		bg: 1,
-	},
-	oogAePqxi3u5ERVFMTUjWorNMXFT6CicsdcRCgYM4oGFeFxBmRH : {
-		palette: 1,
-		bg: 2,
-	},
-	ooZhKKnnMxoAJENGnSG61EHD3wiT7diMAbSKmdAEUebCBGn8NAm : {
-		palette: 1,
-		bg: 3,
-	},
-	oo7XjMYcxBv3hUTfe9Z63d5t2i5fEwh8dcA9iA9jGgCkw7Xx1af : {
-		palette: 1,
-		bg: 4,
-	},
-	ooC3RnjuifMeCNVSb9Fu6C9JSKgkRSFvxyWtHmfSAue7GMGbMUU : {
-		palette: 1,
-		bg: 5,
-	},
-
-
-	ooXNf1g2p9uinSJ5PiCotU3cRWb6Ggb4ADFSuQUq5w5J1hctM6d : {
-		palette: 2,
-		bg: 0,
-	},
-	ooX58UkJQhpRSvhMdes3Ts9CFJYfFUHD4K7o8WcL7vSixc6p7MH : {
-		palette: 2,
-		bg: 1,
-	},
-	oomwvWYp6KyvgqsLvnpbDVLCweaVaQtaL6kC74cMvsCYYfuaB1W : {
-		palette: 2,
-		bg: 2,
-	},
-	ooZTaL5pmzk2CKh8v3vzjodAiYaxyJ4a3ScxRDnvBYWtyVYpCFR : {
-		palette: 2,
-		bg: 3,
-	},
-	ooij7DHrW7bWMDexkskAKTsLLQ3suftsKnrLKnfaUMgTSn1wpbR : {
-		palette: 2,
-		bg: 4,
-	},
-	oop3iSzx8vrH8RKotdbgN8Y53jZBpNULgzJ4br7RFpPVAxWdC7o : {
-		palette: 2,
-		bg: 5,
-	},
-
-	oo9zGEzixDy6oNai6bhRMzPgkG2UbxSUyxq29BfJr5ckdzNHPkC : {
-		palette: 3,
-		bg: 0,
-	},
-	ooAjTnSbH9ubuSSrpSBB8tJ2K1sDKgV8a46bBSqEtUFghZGQjvV : {
-		palette: 3,
-		bg: 1,
-	},
-	ooGPdLYvb3wFUULPj6MuZmR9RvykAzR2VRFQd99GeVEhKCP84Uv : {
-		palette: 3,
-		bg: 2,
-	},
-	oo4556rdptcTg4Vdx3yV3iEJG8p2iG8n2haXcdNeQyAH4GjqXUW : {
-		palette: 3,
-		bg: 3,
-	},
-	ooP99genDWLCA28mfH1E2xPpCMczvQXnmGcLKfcaL8aPLJySPMU : {
-		palette: 3,
-		bg: 4,
-	},
-	oo67oWcT56pCXETuq77yKCMzEPaFKuDDNGBTU7EKnitdvDeMui9 : {
-		palette: 3,
-		bg: 5,
-	},
-
-	oos2CCUdTKuWqJozvQETd8KdFC7ACyLFtEkj3vgPXbMitDHfz8J : {
-		palette: 4,
-		bg: 0,
-	},
-	DBtbHfbnpkBKSJohGRxBcBFKyTPTR9TvtPi7LVEMbQPQAYa5iwe : {
-		palette: 4,
-		bg: 1,
-	},
-	ooLupwk3r4XavzckwWGnKdDMujYsxf6ubPcy2zvrjp5Jt6W1VMb : {
-		palette: 4,
-		bg: 2,
-	},
-	ooUZHfSCAvjMHmmVhB9hv2x7zU9QXvGm5FerWV9qhLsnqSSMu4R : {
-		palette: 4,
-		bg: 3,
-	},
-	ooi75fKiGruJuNKX6qTtZCkhpFRhmMqgZJE6vce5QHjt6wXtnKv : {
-		palette: 4,
-		bg: 4,
-	},
-	oo6wgLjoNpdfRTWNG7qCWSF32z3C1d3nyBjks3mkwRj3Cd4Evc9 : {
-		palette: 4,
-		bg: 5,
-	},
-
-	oopPRVLAmfPzWJnyp6DFQy78Dg6yKNZ7DZeD9KjEAb4QDkgw1XW : {
-		palette: 5,
-		bg: 0,
-	},
-	ooDPT1CoYXbSuVTiS43k2eWS1BWWoYJ5LmM61LenquzSvYWKV9Y : {
-		palette: 5,
-		bg: 1,
-	},
-	oo8akMvg3E6zssqvc874qDYtkZw4MwF8jiuUtjCJNS6kfiHG2Vx : {
-		palette: 5,
-		bg: 2,
-	},
-	oox5ccoFDa5P1QXtwNjrNCSzYm8iyts5qwnV4cke1XkmMqHfN6f : {
-		palette: 5,
-		bg: 3,
-	},
-	ooPkGxMntFCriyFW4vXoX2aEa9oj2BtSYjh7FCaRw5j5G3Rj58j : {
-		palette: 5,
-		bg: 4,
-	},
-	oo7LMDCYjj2ue17mHHLbfi6WZHrKcBPQ6HN92SwN75ZYv2x2GmQ : {
-		palette: 5,
-		bg: 5,
-	},
-}
-
-var getMatchingPalette = function(){
-	if (hashTable[fxhash]){
-		var preset = hashTable[fxhash];
-		if (window.debugMode) console.log("EXISTING HASH!", hashTable[fxhash]);
-		return preset;
-	} else {
-		return false;
-	}
-}
+// The hashTable that sat here mapped thirty-six minted hashes to fixed
+// palette-and-ground pairs, and getMatchingPalette() honoured it. Those
+// palettes no longer exist, so neither could survive meaningfully. Both
+// remain in the Record-of-Pursuit repository.
 
 var pNum, preset, colorList, myBGNum, myBG, lineColors, titleParts;
 
-// Everything the hash decides, lifted into a function so a new hash can be
-// dealt in without reloading the page. The statements and their order are
-// unchanged, so the draw on fxrand() is identical to the original.
+// Everything the hash decides about colour, in a function so a new hash can be
+// dealt in without reloading the page.
+//
+// The original drew one of six hand-written palettes and one of its six grounds
+// at random, so some iterations came out as near-neighbours with nothing
+// separating line from field. A scheme now picks the relationship first and
+// places the colours in OKLCH, which guarantees they hold apart.
 function selectPalette() {
-	pNum = Math.round(fxrand() * (palettePile.length-1));
-	preset = getMatchingPalette();
-	if (preset != false){
-		pNum = preset.palette;
-	}
-	// pNum = 5;
-	colorList = palettePile[pNum].lines;
-	myBGNum = Math.round(fxrand() * (palettePile[pNum].bg.length-1));
-	if (preset != false){
-		myBGNum = preset.bg;
-	}
-	//myBGNum = 1
-	myBG = palettePile[pNum].bg[myBGNum].color;
+	const chosen = HGPalette.build(fxrand, { inkCount: 8, minSeparation: 0.34, darkGround: true });
 
-	//////
+	colorList = chosen.inks.map((ink) => 'rgb(' + ink.rgb.join(', ') + ')');
+	myBG = 'rgb(' + chosen.ground.rgb.join(', ') + ')';
 
-	lineColors = palettePile[pNum].lineColorNames;
-	if (lineColors.length > 1){
-		lineColors = lineColors[0] + " & " + lineColors[1];
-	} else {
-		lineColors = lineColors[0];
+	// Two names carry the title, as they always did.
+	const names = [];
+	for (const ink of chosen.inks) {
+		if (!names.includes(ink.name)) names.push(ink.name);
+		if (names.length === 2) break;
 	}
+	lineColors = names.length > 1 ? names[0] + ' & ' + names[1] : names[0];
 
 	titleParts = {
 		lineCount: systemSize,
 		lineColor: lineColors,
-		background: palettePile[pNum].bg[myBGNum].name,
-		title: systemSize + " "+ lineColors +" Lines Seeking on a " + palettePile[pNum].bg[myBGNum].name + " Field"
+		background: chosen.ground.name,
+		scheme: chosen.scheme,
+		title: systemSize + ' ' + lineColors + ' Lines Seeking on a ' + chosen.ground.name + ' Field'
 	};
 }
 
 selectPalette();
 
-// console.log("TITLES::", titleParts);
-
 function draw() {
 	
 	ctx.fillStyle = 'rgba(0,0,0,1)';
 	
-	ctx.clearRect(0, 0, 1920, 1920);
-	// layer04.clearRect(0, 0, 1920, 1920);
+	ctx.clearRect(0, 0, WIDTH, HEIGHT);
+	// layer04.clearRect(0, 0, WIDTH, HEIGHT);
 	// layer03.clearRect(0, 0, 1920, 1920);
 	// layer02.clearRect(0, 0, 1920, 1920);
-	layer01.clearRect(0, 0, 1920, 1920);
+	layer01.clearRect(0, 0, WIDTH, HEIGHT);
 
 	// UPDATE PARTICLE SYSTEM
 	if (system && paused != true){
@@ -680,10 +545,10 @@ function draw() {
 	
 	var scaleFactorUp = 1.002;
 	var scaleFactorDown = .999;
-	var scaleAmount = (1920 * scaleFactorUp)-1920;
+	var scaleAmount = (WIDTH * scaleFactorUp)-WIDTH;
 	var scaleHalf = scaleAmount / 2;
 	
-	var scaleAmountDown = (1920 * scaleFactorDown)-1920
+	var scaleAmountDown = (WIDTH * scaleFactorDown)-WIDTH
 	var scaleHalfDown = scaleAmountDown / 2;
 
 	// layer04.scale(1, 1);
@@ -691,12 +556,12 @@ function draw() {
 
 	var sx = 0;
 	var sy = 0;
-	var sWidth = 1920;
-	var sHeight = 1920;
+	var sWidth = WIDTH;
+	var sHeight = HEIGHT;
 	var dx = 0-scaleHalf/2;
 	var dy = 0-scaleHalf/2;
-	var dWidth = 1920 + scaleHalf;
-	var dHeight = 1920 + scaleHalf;
+	var dWidth = WIDTH + scaleHalf;
+	var dHeight = HEIGHT + scaleHalf;
 	// layer02.save();
 	// layer01.save();
 	// layer02.globalCompositionOperation = "source-over";
@@ -713,7 +578,7 @@ function draw() {
 	// layer02.fillStyle = "hsla(0,0%,0%,.10)";
 	// layer02.fillRect(0,0,1920,1920); 
 
-	layer04.clearRect(0, 0, 1920, 1920);
+	layer04.clearRect(0, 0, WIDTH, HEIGHT);
 	layer04.globalCompositionOperation = "overlay";
 	// layer03.globalCompositionOperation = "source-over";
 	
@@ -731,7 +596,7 @@ function draw() {
 	const diffuseRate = 10;
 	// layer04.globalAlpha = 0.25;
 	
-	layer04.drawImage(layer02Elem,0,			0,				1920,		1920)
+	layer04.drawImage(layer02Elem, 0, 0, WIDTH, HEIGHT)
 	// layer04.drawImage(layer02Elem,diffuseRate,			diffuseRate,				1920+diffuseRate,		1920+diffuseRate)
 	// layer04.drawImage(layer02Elem,0-diffuseRate,		0-diffuseRate,				1920-diffuseRate,		1920-diffuseRate)
 	// layer04.drawImage(layer02Elem,0-diffuseRate,		diffuseRate,				1920+diffuseRate,		1920)
@@ -766,7 +631,7 @@ function draw() {
 	
 	// Composite Layers
 	// ctx.drawImage(layer04Elem, 0, 0, 1920,1920);
-	ctx.drawImage(layer01Elem, 0, 0, 1920,1920);
+	ctx.drawImage(layer01Elem, 0, 0, WIDTH, HEIGHT);
 	// ctx.drawImage(layer02Elem, 0, 0, 1920,1920);
 }
 
@@ -831,7 +696,7 @@ ParticleSystem.prototype.moveTargets = function(){
 			targObj = targetList[t.parent];
 			hardCenter = {x:targObj.x, y:targObj.y};
 		} else if (t.parent === false){
-			hardCenter = {x:1920/4,y:1920/2};
+			hardCenter = {x:WIDTH/4,y:HEIGHT/2};
 		} else if (typeof t.parent === 'object') {
 			hardCenter = {x:t.parent.x, y:t.parent.y};
 		}
@@ -898,33 +763,33 @@ Particle.prototype.init = function(_id){
 	if (this.wType == "hairline"){}
 	switch(this.wType) {
 		case "hairline":
-			this.lineW = 4;
+			this.lineW = 4 * stageScale;
 		  	break;
 		case "thin":
-			this.lineW = 8;
+			this.lineW = 8 * stageScale;
 		  	break;
 		case "medium":
-			this.lineW = 12;
+			this.lineW = 12 * stageScale;
 			break;
 		case "thick":
-			this.lineW = 20;
+			this.lineW = 20 * stageScale;
 			break;
 		case "veryThick":
-			this.lineW = 30;
+			this.lineW = 30 * stageScale;
 			break;
 		default:
-		  this.lineW = 10;
+		  this.lineW = 10 * stageScale;
 	}
 
 	this.lineMaxL = Math.round(fxrand()*15+40);
 	this.lineL = this.lineMaxL;
-	this.targetRadius = 40;
-	this.displayRadius = 20;
+	this.targetRadius = 40 * stageScale;
+	this.displayRadius = 20 * stageScale;
 	this.maxForceReserve = fxrand()*.45+.05;
 
 	this.spiralGrow = true;
-	this.spiralChange = (fxrand()*.25)+2.75;
-	this.orbitSpin = (fxrand()*.25)+1.75;//fxrand()*1+2.5;
+	this.spiralChange = ((fxrand()*.25)+2.75) * stageScale;
+	this.orbitSpin = ((fxrand()*.25)+1.75) * stageScale;//fxrand()*1+2.5;
 	this.counterClock = false;
 	this.wanderWait = 200;
 
@@ -936,14 +801,30 @@ Particle.prototype.init = function(_id){
 	
 	this.targName = getNewTarg(this.targNum);
 	this.targObj = targetList[this.targName];
-	this.position = new Vector(this.targObj.parent.x, this.targObj.parent.y);
+	// Enter from beyond the frame at a random point on a random edge, rather
+	// than beginning life already sitting on the target. The approach machinery
+	// below is unchanged: partnerSwap keeps each line homing on its target until
+	// it arrives, then hands over to orbit, spiral or wander. All thirty-two
+	// converge on the grid together.
+	const entrySpan = Math.max(WIDTH, HEIGHT);
+	const entryMargin = entrySpan * 0.14 + fxrand() * entrySpan * 0.33;
+	const entryEdge = Math.floor(fxrand() * 4);
+	if (entryEdge === 0) {
+		this.position = new Vector(fxrand() * WIDTH, -entryMargin);           // above
+	} else if (entryEdge === 1) {
+		this.position = new Vector(WIDTH + entryMargin, fxrand() * HEIGHT);   // right
+	} else if (entryEdge === 2) {
+		this.position = new Vector(fxrand() * WIDTH, HEIGHT + entryMargin);   // below
+	} else {
+		this.position = new Vector(-entryMargin, fxrand() * HEIGHT);          // left
+	}
 	this.centerPoint = new Vector(this.targObj.x, this.targObj.y);
 	this.targetAngle = 0;
 
 	this.velocity = new Vector(0, 0);
 	this.acceleration = new Vector(0, 0);
-	this.maxSpeed = 3.5;//15;//fxrand()*10+10;
-	this.maxForce = 1.25;
+	this.maxSpeed = 3.5 * stageScale;//15;//fxrand()*10+10;
+	this.maxForce = 1.25 * stageScale;
 	this.timeSwitchMax = 800;//fxrand()*1000+100;//20 * 60;
 	this.timeSeeking = 0;
 	this.locHistory = [];
@@ -957,7 +838,7 @@ Particle.prototype.draw = function(){
 	this.timeSeeking++;
 	if (this.timeSeeking > this.timeSwitchMax){
 		this.partnerSwap = true;
-		// this.maxSpeed = 3.5; //15;//fxrand()*10+10;
+		// this.maxSpeed = 3.5 * stageScale; //15;//fxrand()*10+10;
 		// this.maxForce = 5;//1.25;
 		// this.lineL = 1;
 		if (this.id >= 16){
@@ -979,7 +860,7 @@ Particle.prototype.draw = function(){
 	}
 
 	// Arrive at partner
-	if (this.partnerSwap == true && this.position.dist(this.targObj) < 40){
+	if (this.partnerSwap == true && this.position.dist(this.targObj) < 40 * stageScale){
 		this.partnerSwap = false;
 		this.centerPoint.x = this.targObj.x;
 		this.centerPoint.y = this.targObj.y;
@@ -999,13 +880,13 @@ Particle.prototype.draw = function(){
 		if (this.lineL < this.lineMaxL){
 			this.lineL+=.05;
 		}
-		this.maxSpeed = 3.5;//15;//fxrand()*10+10;
-		this.maxForce = 1.25;
+		this.maxSpeed = 3.5 * stageScale;//15;//fxrand()*10+10;
+		this.maxForce = 1.25 * stageScale;
 		this.orbit();
 		
 	} else {
-		this.maxForce = .2;
-		this.maxSpeed = 5;
+		this.maxForce = .2 * travelScale;
+		this.maxSpeed = 5 * travelScale;
 		const halfLength = 10;//Math.ceil(this.lineL / 3);  
 				if (this.lineL > halfLength){
 			this.lineL-=2;
@@ -1040,7 +921,7 @@ Particle.prototype.orbit = function(_pType){
 	var targetRadius = this.targetRadius;
 
 	if (this.pType == "orbit"){
-		this.maxForce = .5;
+		this.maxForce = .5 * stageScale;
 		var dd = this.orbitSpin;//2.5;//t.v;
 		this.lineL = this.lineMaxL * 1.5;
 		if (this.id > 16){
@@ -1061,13 +942,13 @@ Particle.prototype.orbit = function(_pType){
 	}
 
 	if (this.pType == "spiral"){
-		this.maxForce = this.maxForceReserve;
+		this.maxForce = this.maxForceReserve * stageScale;
 		var dd = this.orbitSpin;//1.5;//t.v;
 		this.lineL = this.lineMaxL * 1.15;
 
-		var minD = 2;
+		var minD = 2 * stageScale;
 
-		var spiralChange = .01;//this.spiralChange;//.2;
+		var spiralChange = .01 * stageScale;//this.spiralChange;//.2;
 		if (this.spiralGrow == true && this.displayRadius < this.targetRadius) {
 			this.displayRadius += this.spiralChange;
 			// this.lineW += fxrand()*3-fxrand()*3;
@@ -1110,8 +991,8 @@ Particle.prototype.orbit = function(_pType){
 
 
 	if (this.pType == "wander"){
-		this.maxForce = .5;
-		var dd = 1.05;//t.v;
+		this.maxForce = .5 * stageScale;
+		var dd = 1.05 * stageScale;//t.v;
 		this.lineL = this.lineMaxL * 1.75;
 		this.displayRadius = this.targetRadius * 1.15;
 

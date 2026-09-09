@@ -5,6 +5,7 @@
   "category": "generative",
   "type": "interactive",
   "wip": false,
+  "rating": 80,
   "thumbnail": "thumbnail.png",
-  "description": "A spirograph that never lifts its pen. Five to seventeen hypotrochoids spread across the quadrants and advance one segment at a time in turn, so every stroke begins where the previous curve ended and the separate figures weave into a single translucent web."
+  "description": "A spirograph that never lifts its pen. Five to seventeen hypotrochoids spread across the quadrants and advance one segment at a time in turn, so every stroke begins where the previous curve ended and the separate figures weave into a single translucent web. A new pairing each day, built from a colour scheme rather than a lottery."
 }

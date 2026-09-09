@@ -4,6 +4,7 @@
   "date": "2026-07-15",
   "category": "generative",
   "type": "interactive",
+  "rating": 75,
   "thumbnail": "thumbnail.jpg",
   "description": "A full-window drawing of borderless Hokusai-toned walls, squares, and circles composed by adjustable gestalt forces. Boids sense each obstacle at individual distances, turn through distinct bounded lanes, and leave fine trails that slowly fan back out."
 }

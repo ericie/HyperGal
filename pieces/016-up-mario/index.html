@@ -113,16 +113,31 @@
         const STALL_SECONDS = 2.35;
         const CLOUD_PULSE_SECONDS = 0.32;
         const AUTO_LANDING_PAUSE = 0.22;
+        const LEADER_LANDING_PAUSE = 0.58;
+        const LEADER_RUN_SPEED = 212;
+        const LEADER_AIR_SPEED = 272;
         const BUDDY_STALL_SECONDS = 2.8;
         const BUDDY_JUMP_SPEED = 650;
         const BUDDY_AIR_SPEED = 325;
         const BUDDY_RUN_SPEED = 162;
-        const BUDDY_MAX_LIVE = 7;
-        const BUDDY_SPAWN_SECONDS = 3.1;
+        const MARIO_VISIBLE_TARGET = 9;
+        const MARIO_POOL_LIMIT = 14;
+        const MARIO_RESEED_SECONDS = 0.54;
+        const MARIO_ENTRY_TIMEOUT = 4.8;
+        const MARIO_CONTACT_DISTANCE = 26;
+        const SCENE_SCALE = 0.9;
         const RUNNER_EDGE_GRACE = 13;
+        /* Shelves that run past the frame, so arriving runners have somewhere
+           to walk in from instead of being flung in through the air. */
+        const EDGE_SHELF_CHANCE = 0.5;
+        const EDGE_SHELF_OVERHANG = 96;
         const CRUMBLE_TILE_SIZE = 21;
         const CRUMBLE_REGROW_SECONDS = 5.4;
         const ZONE_HEIGHT = 940;
+        /* A trapdoor shuts on whichever comes first: one body through the gap,
+           or the timer running out on an empty one. */
+        const TRAPDOOR_OPEN_SECONDS = 2.2;
+        const TRAPDOOR_SNAP_SECONDS = 0.12;
         const ZONES = ['ink', 'crumble', 'trap', 'shrink'];
 
         /* A candy-shop palette: blue-sky paper, strawberry pink, lemon,
@@ -180,6 +195,7 @@
         let cloudscapeLayout = [];
         let buddyCount = 0;
         let nextBuddySpawnAt = 0;
+        let marioEntryCount = 0;
         let keys = {
           left: false,
           right: false,
@@ -305,6 +321,7 @@
           trunkCount = 0;
           buddyCount = 0;
           nextBuddySpawnAt = 0;
+          marioEntryCount = 0;
           targetPlatformId = null;
           platforms = [];
           particles = [];
@@ -392,9 +409,11 @@
           updateControls(dt);
           updateHero(dt);
           updateMarioBuddies(dt);
+          resolveMarioShoves(dt);
+          updateTrapdoors();
           updateParticles(dt);
           updateCamera(dt);
-          spawnRisingMarios();
+          maintainMarioPopulation();
           recoverIfStalled();
           trimWorld();
           updateHud();
@@ -421,9 +440,12 @@
             desiredVx = hero.autoVx || 0;
           }
 
-          const maxSpeed = hero.grounded ? RUN_SPEED : AIR_SPEED;
+          const calmLeader = !manual && highestMario() === hero;
+          const maxSpeed = calmLeader
+            ? (hero.grounded ? LEADER_RUN_SPEED : LEADER_AIR_SPEED)
+            : (hero.grounded ? RUN_SPEED : AIR_SPEED);
           desiredVx = clamp(desiredVx, -maxSpeed, maxSpeed);
-          const accel = hero.grounded ? 18 : 8;
+          const accel = calmLeader ? (hero.grounded ? 11 : 6.2) : (hero.grounded ? 18 : 8);
           hero.vx += (desiredVx - hero.vx) * (1 - Math.exp(-accel * dt));
           hero.vx = clamp(hero.vx, -maxSpeed, maxSpeed);
           if (Math.abs(hero.vx) > 12) hero.facing = hero.vx > 0 ? 1 : -1;
@@ -459,10 +481,13 @@
 
         function planAutopilot() {
           hero.autoVx = 0;
+          const leading = highestMario() === hero;
+          const runSpeed = leading ? LEADER_RUN_SPEED : RUN_SPEED;
+          const airSpeed = leading ? LEADER_AIR_SPEED : AIR_SPEED;
 
           if (!hero.grounded) {
             if (hero.desperateUntil > simTime) {
-              hero.autoVx = hero.facing * AIR_SPEED;
+              hero.autoVx = hero.facing * airSpeed;
               return;
             }
             const target = activeAirTarget() || chooseAirLandingTarget();
@@ -471,18 +496,18 @@
             hero.noRouteSince = 0;
             const landingX = safeLandingX(target, hero.autoLandingX ?? platformCenter(target));
             hero.autoLandingX = landingX;
-            hero.autoVx = clamp((landingX - hero.x) * 4.2, -AIR_SPEED, AIR_SPEED);
+            hero.autoVx = clamp((landingX - hero.x) * (leading ? 3.05 : 4.2), -airSpeed, airSpeed);
             return;
           }
 
           const current = platformById(hero.groundId);
           if (!current) {
             targetPlatformId = null;
-            hero.autoVx = clamp((worldWidth * 0.5 - hero.x) * 2.8, -RUN_SPEED, RUN_SPEED);
+            hero.autoVx = clamp((worldWidth * 0.5 - hero.x) * 2.8, -runSpeed, runSpeed);
             return;
           }
 
-          if (simTime < hero.landedAt + AUTO_LANDING_PAUSE) {
+          if (simTime < hero.landedAt + (leading ? LEADER_LANDING_PAUSE : AUTO_LANDING_PAUSE)) {
             targetPlatformId = null;
             hero.autoVx = 0;
             return;
@@ -492,7 +517,7 @@
           targetPlatformId = route ? route.target.id : null;
           if (!route) {
             if (!hero.noRouteSince) hero.noRouteSince = simTime;
-            hero.autoVx = clamp((platformCenter(current) - hero.x) * 2.8, -RUN_SPEED, RUN_SPEED);
+            hero.autoVx = clamp((platformCenter(current) - hero.x) * 2.8, -runSpeed, runSpeed);
             return;
           }
           hero.noRouteSince = 0;
@@ -505,8 +530,8 @@
           const landingDx = route.landingX - hero.x;
           const atLaunch = Math.abs(launchDx) < Math.max(10, current.w * 0.07);
           hero.autoVx = atLaunch
-            ? clamp(landingDx * 3.6, -RUN_SPEED, RUN_SPEED)
-            : clamp(launchDx * 4.8, -RUN_SPEED, RUN_SPEED);
+            ? clamp(landingDx * (leading ? 2.8 : 3.6), -runSpeed, runSpeed)
+            : clamp(launchDx * (leading ? 3.6 : 4.8), -runSpeed, runSpeed);
 
           if (atLaunch && simTime >= hero.jumpCooldownUntil) {
             jump(route);
@@ -900,10 +925,38 @@
         function openTrapdoor(trap) {
           if (!trap || trap.trapOpenUntil > simTime) return;
           trap.openedAt = simTime;
-          trap.trapOpenUntil = simTime + 2.2;
+          trap.trapOpenUntil = simTime + TRAPDOOR_OPEN_SECONDS;
+          trap.caughtAt = 0;
           trap.pulseUntil = simTime + 0.22;
           spawnDust(platformCenter(trap), trap.y, 14, C.mid);
           releaseActorsFromPlatform(trap);
+        }
+
+        /* An open trapdoor takes one runner and no more: the first body down
+           through the gap slams it shut behind them. One that catches nobody
+           just times out. */
+        function updateTrapdoors() {
+          for (const platform of platforms) {
+            if (platform.zone !== 'trap' || platform.trapRole !== 'trapdoor') continue;
+            if (platform.caughtAt || platform.trapOpenUntil <= simTime) continue;
+            if (!trapdoorTookSomeone(platform)) continue;
+            platform.caughtAt = simTime;
+            platform.trapOpenUntil = Math.min(platform.trapOpenUntil, simTime + TRAPDOOR_SNAP_SECONDS);
+            platform.pulseUntil = simTime + 0.2;
+            spawnDust(platformCenter(platform), platform.y, 9, C.mid);
+          }
+        }
+
+        function trapdoorTookSomeone(door) {
+          const left = platformLeft(door) - 6;
+          const right = left + door.w + 12;
+          for (const runner of [hero, ...buddies]) {
+            if (runner.grounded || runner.vy > 0) continue;
+            if (runner.x < left || runner.x > right) continue;
+            /* Crossed the doorway going down during this frame. */
+            if (runner.previousY >= door.y && runner.y < door.y) return true;
+          }
+          return false;
         }
 
         function collapsePlatform(platform) {
@@ -971,7 +1024,7 @@
           if (keys.left) desired -= RUN_SPEED;
           if (keys.right) desired += RUN_SPEED;
           if (pointer.active) {
-            const worldX = pointer.x - worldLeft;
+            const worldX = inverseSceneScreenX(pointer.x);
             const dx = worldX - hero.x;
             if (Math.abs(dx) > 14) desired = clamp(dx * 3.8, -RUN_SPEED, RUN_SPEED);
           }
@@ -1071,11 +1124,7 @@
         }
 
         function updateCamera(dt) {
-          const runners = [hero, ...buddies];
-          const leader = runners.reduce(
-            (highest, runner) => runner.y > highest.y ? runner : highest,
-            runners[0]
-          );
+          const leader = highestMario();
           cameraLeaderId = leader.id;
 
           const target = leader.y - height * 0.48;
@@ -1092,6 +1141,14 @@
             lastProgressHeight = leaderHeight;
             lastProgressAt = simTime;
           }
+        }
+
+        function highestMario() {
+          const runners = [hero, ...buddies];
+          return runners.reduce(
+            (highest, runner) => runner.y > highest.y ? runner : highest,
+            runners[0]
+          );
         }
 
         function recoverIfStalled() {
@@ -1136,36 +1193,131 @@
         function seedMarioBuddies() {
           const ordered = [...platforms]
             .sort((a, b) => a.y - b.y);
-          const picks = [ordered[0], ordered[2], ordered[4], ordered[6]].filter(Boolean);
-          for (let i = 0; i < picks.length; i += 1) addMarioBuddy(picks[i], i);
+          const openingPlatforms = ordered
+            .filter((platform) => platform.y > height * 0.32 && platform.y < height * 0.82)
+            .filter((platform) => platformIsSolid(platform));
+          const picks = openingPlatforms.length ? openingPlatforms : ordered.slice(0, 4);
+          for (let i = 0; i < 8; i += 1) {
+            addMarioBuddy(picks[i % picks.length], i, true);
+          }
         }
 
-        /* New runners keep arriving from under the frame and climbing up into
-           it, so a long ascent never empties out behind the leader. */
-        function spawnRisingMarios() {
+        /* Keep a crowd in the composition without popping anyone into being.
+           Every entrant begins beyond a real viewport edge, then crosses that
+           edge under the same gravity and landing rules as the other runners. */
+        function maintainMarioPopulation() {
           if (simTime < nextBuddySpawnAt) return;
-          nextBuddySpawnAt = simTime + BUDDY_SPAWN_SECONDS * (0.7 + hash01(Math.round(simTime * 60) * 37) * 0.9);
-          if (buddies.filter((buddy) => !buddy.falling).length >= BUDDY_MAX_LIVE) return;
-          const taken = new Set(buddies.map((buddy) => buddy.platformId).filter(Boolean));
-          /* Just under the bottom edge, nearest first, so the climb into view
-             is short. */
-          const platform = platforms
-            .filter((candidate) => candidate.y < cameraY - 40 && candidate.y > cameraY - height * 0.85)
-            .filter((candidate) => platformIsSolid(candidate) && !taken.has(candidate.id))
-            .sort((a, b) => b.y - a.y)[0];
-          if (!platform) return;
-          addMarioBuddy(platform);
+
+          const visibleCount = [hero, ...buddies]
+            .filter((runner) => marioIsOnStage(runner))
+            .length;
+          const inboundCount = buddies
+            .filter((buddy) => !marioIsOnStage(buddy))
+            .filter((buddy) => buddy.entryFrom && simTime - buddy.entryStartedAt < MARIO_ENTRY_TIMEOUT)
+            .length;
+          if (visibleCount >= MARIO_VISIBLE_TARGET || inboundCount >= 6) {
+            nextBuddySpawnAt = simTime + 0.38;
+            return;
+          }
+
+          nextBuddySpawnAt = simTime + MARIO_RESEED_SECONDS *
+            (0.78 + hash01((marioEntryCount + 1) * 1877) * 0.44);
+          const entry = chooseMarioWalkIn();
+          if (!entry) {
+            nextBuddySpawnAt = simTime + 0.3;
+            return;
+          }
+
+          let buddy = buddies
+            .filter((candidate) => !marioIsOnStage(candidate, 150))
+            .filter((candidate) => !candidate.entryFrom || simTime - candidate.entryStartedAt >= MARIO_ENTRY_TIMEOUT)
+            .sort((a, b) => a.y - b.y)[0];
+
+          if (!buddy && buddies.length < MARIO_POOL_LIMIT) {
+            buddy = makeMarioBuddy(buddyCount);
+            buddies.push(buddy);
+          }
+          if (!buddy) return;
+
+          startMarioWalkIn(buddy, entry.platform, entry.dir);
+          marioEntryCount += 1;
         }
 
-        function addMarioBuddy(platform, variant = buddyCount) {
-          if (!platform || buddies.some((buddy) => buddy.platformId === platform.id)) return;
+        /* Which way a runner would have to walk to come in off this shelf, or
+           0 if the shelf does not leave the frame. */
+        function marioWalkInSide(platform) {
+          const left = platformLeft(platform);
+          const right = left + platform.w;
+          if (sceneScreenX(left) < -30) return 1;
+          if (sceneScreenX(right) > width + 30) return -1;
+          return 0;
+        }
+
+        /* Runners only ever arrive on foot, along a shelf that runs off the
+           frame. Nobody is launched in through the air. */
+        function chooseMarioWalkIn() {
+          const occupancy = new Map();
+          for (const buddy of buddies) {
+            if (!buddy.grounded || !buddy.platformId) continue;
+            occupancy.set(buddy.platformId, (occupancy.get(buddy.platformId) || 0) + 1);
+          }
+          if (hero.grounded && hero.groundId) {
+            occupancy.set(hero.groundId, (occupancy.get(hero.groundId) || 0) + 1);
+          }
+          const options = [];
+          for (const platform of platforms) {
+            if (!platformIsSolid(platform) || platform.moving) continue;
+            const sy = sceneScreenY(platform.y);
+            if (sy < height * 0.1 || sy > height * 0.97) continue;
+            const dir = marioWalkInSide(platform);
+            if (!dir) continue;
+            options.push({ platform, dir, load: occupancy.get(platform.id) || 0, sy });
+          }
+          if (!options.length) return null;
+          const lightest = Math.min(...options.map((option) => option.load));
+          const shortlist = options.filter((option) => option.load === lightest);
+          /* Prefer low shelves, so arrivals join at the back of the pack. */
+          shortlist.sort((a, b) => b.sy - a.sy);
+          const pick = Math.floor(hash01((marioEntryCount + 1) * 2371) * Math.min(3, shortlist.length));
+          return shortlist[Math.min(shortlist.length - 1, pick)];
+        }
+
+        function startMarioWalkIn(buddy, platform, dir) {
+          const left = platformLeft(platform);
+          const right = left + platform.w;
+          /* Start well clear of the frame so nobody pops into the visible
+             scene -- they have to walk the last stretch in. */
+          const offscreen = offscreenWorldX(dir > 0 ? -1 : 1) - dir * 62;
+          const x = clamp(offscreen, left + 12, right - 12);
+          buddy.platformId = platform.id;
+          buddy.localX = x - left;
+          buddy.x = x;
+          buddy.y = platform.y;
+          buddy.previousY = platform.y;
+          buddy.vx = dir * BUDDY_RUN_SPEED;
+          buddy.vy = 0;
+          buddy.spin = 0;
+          buddy.grounded = true;
+          buddy.falling = false;
+          buddy.targetId = null;
+          buddy.noRouteSince = 0;
+          buddy.facing = dir;
+          buddy.walkInDir = dir;
+          buddy.entryFrom = dir > 0 ? 'left' : 'right';
+          buddy.entryStartedAt = simTime;
+          buddy.landedAt = simTime;
+          buddy.jumpAt = simTime + 12;
+        }
+
+        function addMarioBuddy(platform, variant = buddyCount, allowOccupied = false) {
+          if (!platform || (!allowOccupied && buddies.some((buddy) => buddy.platformId === platform.id))) return;
           const edge = Math.min(28, platform.w * 0.24);
           const platformEdge = platformLeft(platform);
           const desiredX = platformEdge + edge + hash01(platform.id * 719 + variant * 31) * Math.max(1, platform.w - edge * 2);
           const x = safeLandingX(platform, desiredX);
           const localX = x - platformEdge;
-          buddies.push({
-            id: ++buddyCount,
+          const buddy = makeMarioBuddy(variant);
+          Object.assign(buddy, {
             platformId: platform.id,
             localX,
             x,
@@ -1184,6 +1336,34 @@
             phase: hash01(platform.id * 883 + variant * 67) * TAU,
             pose: variant % 3,
           });
+          buddies.push(buddy);
+        }
+
+        function makeMarioBuddy(variant = buddyCount) {
+          const id = ++buddyCount;
+          return {
+            id,
+            platformId: null,
+            localX: 0,
+            x: 0,
+            y: inverseSceneScreenY(height + 100),
+            vx: 0,
+            vy: 0,
+            spin: 0,
+            grounded: false,
+            falling: false,
+            targetId: null,
+            noRouteSince: 0,
+            previousY: inverseSceneScreenY(height + 100),
+            jumpAt: simTime,
+            facing: 1,
+            landedAt: simTime,
+            phase: hash01(id * 883 + variant * 67) * TAU,
+            pose: variant % 3,
+            entryFrom: null,
+            entryStartedAt: 0,
+            walkInDir: 0,
+          };
         }
 
         function updateMarioBuddies(dt) {
@@ -1210,7 +1390,118 @@
           }
         }
 
+        /* Grounded runners are solid. Face-to-face contact cancels their
+           inward momentum; coming up behind a runner transfers momentum and
+           can carry the front runner beyond the platform's footing. */
+        function resolveMarioShoves(dt) {
+          const runners = [hero, ...buddies];
+          for (let i = 0; i < runners.length; i += 1) {
+            for (let j = i + 1; j < runners.length; j += 1) {
+              const first = runners[i];
+              const second = runners[j];
+              if (!first.grounded || !second.grounded) continue;
+              const platformId = marioGroundId(first);
+              if (!platformId || marioGroundId(second) !== platformId) continue;
+              if (Math.abs(first.y - second.y) > 5) continue;
+
+              const left = first.x <= second.x ? first : second;
+              const right = left === first ? second : first;
+              const distance = right.x - left.x;
+              if (distance >= MARIO_CONTACT_DISTANCE) continue;
+              const penetration = MARIO_CONTACT_DISTANCE - Math.max(0, distance);
+
+              if (left.facing > 0 && right.facing < 0) {
+                if (left.vx > 0) left.vx = 0;
+                if (right.vx < 0) right.vx = 0;
+                separateGroundedMarios(left, right, penetration);
+                continue;
+              }
+
+              let pusher = null;
+              let pushed = null;
+              let direction = 0;
+              if (left.facing > 0 && right.facing > 0 && left.vx > 18) {
+                pusher = left;
+                pushed = right;
+                direction = 1;
+              } else if (left.facing < 0 && right.facing < 0 && right.vx < -18) {
+                pusher = right;
+                pushed = left;
+                direction = -1;
+              }
+
+              if (!pusher) {
+                separateGroundedMarios(left, right, penetration);
+                continue;
+              }
+
+              const pushSpeed = Math.max(96, Math.abs(pusher.vx));
+              moveGroundedMario(pushed, pushed.x + direction * (penetration + pushSpeed * dt * 0.34));
+              pushed.vx = direction * Math.max(Math.abs(pushed.vx) * 0.45, pushSpeed * 0.72);
+              moveGroundedMario(pusher, pushed.x - direction * MARIO_CONTACT_DISTANCE);
+              pusher.vx *= 0.82;
+
+              const platform = platformById(platformId);
+              if (platform && !marioHasFooting(pushed, platform)) {
+                knockMarioOffPlatform(pushed, direction, pushSpeed);
+              }
+            }
+          }
+        }
+
+        function marioGroundId(runner) {
+          return runner.id === 0 ? runner.groundId : runner.platformId;
+        }
+
+        function moveGroundedMario(runner, x) {
+          runner.x = x;
+          if (runner.id !== 0) {
+            const platform = platformById(runner.platformId);
+            if (platform) runner.localX = x - platformLeft(platform);
+          }
+        }
+
+        function separateGroundedMarios(left, right, penetration) {
+          if (penetration <= 0) return;
+          const platform = platformById(marioGroundId(left));
+          const midpoint = (left.x + right.x) * 0.5;
+          const halfContact = MARIO_CONTACT_DISTANCE * 0.5;
+          const safeMidpoint = platform
+            ? clamp(
+                midpoint,
+                platformLeft(platform) + halfContact,
+                platformLeft(platform) + platform.w - halfContact
+              )
+            : midpoint;
+          moveGroundedMario(left, safeMidpoint - halfContact);
+          moveGroundedMario(right, safeMidpoint + halfContact);
+        }
+
+        function knockMarioOffPlatform(runner, direction, speed) {
+          if (runner.id === 0) {
+            releaseHeroFromPlatform();
+            hero.vx = direction * Math.max(112, speed * 0.78);
+            hero.vy = Math.min(hero.vy, -24);
+            hero.stumbleUntil = simTime + 0.48;
+          } else {
+            dropMarioBuddy(runner, direction, Math.max(112, speed * 0.78));
+          }
+        }
+
+        /* 1 at the bottom of the frame, 0 at the top. Runners bringing up the
+           rear throw themselves upward; the ones out front can afford to pick
+           their moment. */
+        function marioAggression(runner) {
+          /* The camera pins the leader near 47% of the frame, so that is the
+             calm end; anyone trailing toward the bottom edge is the hot end. */
+          return clamp((sceneScreenY(runner.y) - height * 0.46) / (height * 0.4), 0, 1);
+        }
+
         function updateGroundedMarioBuddy(buddy, platform, dt) {
+          if (buddy.walkInDir) {
+            advanceMarioWalkIn(buddy, platform, dt);
+            return;
+          }
           if (simTime >= buddy.jumpAt) {
             launchMarioBuddy(buddy, platform);
             return;
@@ -1220,22 +1511,82 @@
           buddy.vx = clamp(buddy.vx, -BUDDY_RUN_SPEED, BUDDY_RUN_SPEED);
           buddy.localX += buddy.vx * dt;
           buddy.x = platformLeft(platform) + buddy.localX;
+          /* Pull up at the lip rather than strolling off it. Falling should be
+             a failed jump, not idle drift. */
+          const brink = marioFootingLimits(platform);
+          if (brink && buddy.x < brink.left) {
+            buddy.x = brink.left;
+            buddy.localX = buddy.x - platformLeft(platform);
+            buddy.vx = Math.abs(buddy.vx) * 0.35;
+            buddy.facing = 1;
+          } else if (brink && buddy.x > brink.right) {
+            buddy.x = brink.right;
+            buddy.localX = buddy.x - platformLeft(platform);
+            buddy.vx = -Math.abs(buddy.vx) * 0.35;
+            buddy.facing = -1;
+          }
           if (!marioHasFooting(buddy, platform)) dropMarioBuddy(buddy, Math.sign(buddy.vx), Math.abs(buddy.vx));
         }
 
+        function marioFootingLimits(platform) {
+          const left = platformLeft(platform);
+          const right = left + platform.w;
+          if (right - left < HERO_W) return null;
+          return { left: left + HERO_W * 0.34, right: right - HERO_W * 0.34 };
+        }
+
+        /* Walks in along the offscreen tail of a shelf, then hands over to the
+           ordinary climbing brain once it is properly in frame. */
+        function advanceMarioWalkIn(buddy, platform, dt) {
+          const dir = buddy.walkInDir;
+          buddy.vx = dir * BUDDY_RUN_SPEED;
+          buddy.localX += buddy.vx * dt;
+          buddy.x = platformLeft(platform) + buddy.localX;
+          buddy.facing = dir;
+          const screenX = sceneScreenX(buddy.x);
+          const brink = marioFootingLimits(platform);
+          const ranOut = brink && (dir > 0 ? buddy.x >= brink.right : buddy.x <= brink.left);
+          const arrived = screenX > width * 0.13 && screenX < width * 0.87;
+          if (arrived || ranOut || simTime - buddy.entryStartedAt > MARIO_ENTRY_TIMEOUT) {
+            if (brink) {
+              buddy.x = clamp(buddy.x, brink.left, brink.right);
+              buddy.localX = buddy.x - platformLeft(platform);
+            }
+            buddy.walkInDir = 0;
+            buddy.entryFrom = null;
+            buddy.vx *= 0.3;
+            buddy.jumpAt = simTime + marioJumpDelay(buddy);
+          }
+        }
+
+        function marioJumpDelay(buddy) {
+          const drive = marioAggression(buddy);
+          return lerp(1.55, 0.34, drive) + hash01(buddy.id * 1301 + Math.round(simTime * 7)) * lerp(1.1, 0.28, drive);
+        }
+
         function chooseMarioBuddyTarget(current, buddy, jumpSpeed = BUDDY_JUMP_SPEED) {
+          const drive = marioAggression(buddy);
           const candidates = [];
           for (const platform of platforms) {
             if (platform.id === current.id) continue;
             if (!platformIsSolid(platform)) continue;
             const route = routeToPlatform(current, platform, jumpSpeed);
             if (!route) continue;
-            const maxGap = jumpSpeed > BUDDY_JUMP_SPEED ? MAX_TARGET_GAP + 240 : 148;
+            /* Trailing runners reach for gaps the leaders will not. */
+            const maxGap = jumpSpeed > BUDDY_JUMP_SPEED
+              ? MAX_TARGET_GAP + 240
+              : lerp(112, 156, drive);
             if (route.gap < 58 || route.gap > maxGap) continue;
+            /* A landing with room to spare is worth more to a cautious one. */
+            const bounds = landingBounds(platform);
+            const room = bounds ? bounds.right - bounds.left : 0;
             const sideways = Math.abs(platformCenter(platform) - platformCenter(current));
             route.score =
-              Math.abs(route.gap - 102) * 0.42 -
-              Math.min(220, sideways) * 1.05;
+              Math.abs(route.gap - lerp(96, 118, drive)) * 0.42 -
+              Math.min(220, sideways) * lerp(0.35, 1.25, drive) -
+              route.gap * drive * 0.5 -
+              Math.min(90, room) * lerp(0.5, 0.12, drive) +
+              (hash01(buddy.id * 2017 + platform.id * 101) - 0.5) * 42;
             candidates.push(route);
           }
           candidates.sort((a, b) => a.score - b.score);
@@ -1246,7 +1597,10 @@
           const route = chooseMarioBuddyTarget(current, buddy);
           if (!route) {
             if (!buddy.noRouteSince) buddy.noRouteSince = simTime;
-            if (simTime - buddy.noRouteSince >= BUDDY_STALL_SECONDS) {
+            /* Only the ones being left behind throw themselves at nothing. */
+            const drive = marioAggression(buddy);
+            const patience = lerp(BUDDY_STALL_SECONDS * 2.6, BUDDY_STALL_SECONDS * 0.75, drive);
+            if (drive > 0.42 && simTime - buddy.noRouteSince >= patience) {
               desperateMarioBuddyJump(buddy, current);
               return;
             }
@@ -1282,6 +1636,7 @@
         }
 
         function steerMarioBuddy(buddy, dt) {
+          if (buddy.entryFrom) return;
           const target = platformById(buddy.targetId);
           if (!target) {
             buddy.targetId = null;
@@ -1289,8 +1644,10 @@
             return;
           }
           const landingX = safeLandingX(target, platformCenter(target));
-          const desired = clamp((landingX - buddy.x) * 3.4, -BUDDY_AIR_SPEED, BUDDY_AIR_SPEED);
-          buddy.vx += (desired - buddy.vx) * (1 - Math.exp(-4.2 * dt));
+          const leading = highestMario() === buddy;
+          const airSpeed = leading ? LEADER_AIR_SPEED : BUDDY_AIR_SPEED;
+          const desired = clamp((landingX - buddy.x) * (leading ? 2.8 : 3.4), -airSpeed, airSpeed);
+          buddy.vx += (desired - buddy.vx) * (1 - Math.exp(-(leading ? 3.3 : 4.2) * dt));
           if (Math.abs(buddy.vx) > 8) buddy.facing = buddy.vx < 0 ? -1 : 1;
         }
 
@@ -1313,8 +1670,10 @@
           buddy.grounded = true;
           buddy.falling = false;
           buddy.noRouteSince = 0;
+          buddy.entryFrom = null;
+          buddy.entryStartedAt = 0;
           buddy.landedAt = simTime;
-          buddy.jumpAt = simTime + 1.35 + hash01(buddy.id * 1301 + landed.id * 17) * 1.3;
+          buddy.jumpAt = simTime + marioJumpDelay(buddy);
           pulseCloud(landed);
           handlePlatformLanding(landed, buddy.x);
           spawnDust(buddy.x, buddy.y, 5, C.mint);
@@ -1325,6 +1684,8 @@
           buddy.platformId = null;
           buddy.targetId = null;
           buddy.noRouteSince = 0;
+          buddy.walkInDir = 0;
+          buddy.entryFrom = null;
           buddy.grounded = false;
           buddy.falling = true;
           buddy.vx = direction
@@ -1353,10 +1714,13 @@
 
         function trimWorld() {
           const cutoff = cameraY - height * 3;
+          const occupied = new Set([
+            hero.groundId,
+            ...buddies.filter((buddy) => buddy.grounded).map((buddy) => buddy.platformId),
+          ]);
           platforms = platforms.filter(
-            (platform) => platform.y > cutoff || platform.id === hero.groundId
+            (platform) => platform.y > cutoff || occupied.has(platform.id)
           );
-          buddies = buddies.filter((buddy) => buddy.y > cameraY - height * 1.5);
         }
 
         function addPlatform() {
@@ -1397,6 +1761,7 @@
           const zone = zoneForHeight(y);
           const moving = zone === 'ink' && y > 800 && w > 136 && rng() < 0.06;
           const platform = makePlatform(center, y, w, zone, moving);
+          if (rng() < EDGE_SHELF_CHANCE) extendPlatformOffscreen(platform);
           configurePlatformZone(platform, previous);
           platforms.push(platform);
           lastPlatform = platform;
@@ -1404,6 +1769,43 @@
           trunkCount += 1;
 
           addBranchPlatforms(previous, platform);
+        }
+
+        /* World x of a screen edge. Shelves are extended past this so they
+           genuinely leave the frame rather than stopping at the column edge. */
+        function offscreenWorldX(side) {
+          const edge = side < 0 ? 0 : width;
+          return (edge - width * 0.5) / SCENE_SCALE + width * 0.5 - worldLeft;
+        }
+
+        /* Runs a platform off the nearer side of the frame. Only ever grows it
+           outward, so a route that already reached it still does. */
+        function extendPlatformOffscreen(platform) {
+          if (platform.moving) return false;
+          const left = platformLeft(platform);
+          const right = left + platform.w;
+          const middle = (left + right) * 0.5;
+          if (middle > worldWidth * 0.32 && middle < worldWidth * 0.68) return false;
+          const side = middle < worldWidth * 0.5 ? -1 : 1;
+          const target = offscreenWorldX(side) + side * EDGE_SHELF_OVERHANG;
+          let x = platform.x;
+          let w = platform.w;
+          if (side < 0) {
+            if (target >= left) return false;
+            w += left - target;
+            x = target;
+          } else {
+            if (target <= right) return false;
+            w += target - right;
+          }
+          if (w > worldWidth * 1.15) return false;
+          if (!canPlacePlatform({ ...platform, x, w }, 'relaxed')) return false;
+          platform.x = x;
+          platform.baseX = x;
+          platform.w = w;
+          platform.baseW = w;
+          platform.edgeShelf = side < 0 ? 'left' : 'right';
+          return true;
         }
 
         function addBranchPlatforms(previous, trunk) {
@@ -1428,6 +1830,7 @@
             }
             if (!chosen) continue;
             const platform = makePlatform(chosen.center, chosen.y, chosen.w, zoneForHeight(chosen.y), false);
+            if (rng() < EDGE_SHELF_CHANCE) extendPlatformOffscreen(platform);
             configurePlatformZone(platform, base);
             platform.branch = true;
             platforms.push(platform);
@@ -1452,6 +1855,7 @@
             activatedUntil: 0,
             openedAt: 0,
             trapOpenUntil: 0,
+            caughtAt: 0,
             crumbleBricks: null,
             collapseAt: 0,
             collapsed: false,
@@ -1558,6 +1962,8 @@
               `height ${Math.floor(bestHeight)}`,
               `platforms ${platforms.length}`,
               `marios ${buddies.length + 1}`,
+              `visible ${[hero, ...buddies].filter((runner) => marioIsOnStage(runner)).length}`,
+              `entering ${buddies.filter((buddy) => buddy.entryFrom).length}`,
               `falling ${buddies.filter((buddy) => buddy.falling).length + (!hero.grounded && hero.vy < 0 ? 1 : 0)}`,
               `camera ${cameraLeaderId === 0 ? 'hero' : `mario ${cameraLeaderId}`}`,
               `target ${targetPlatformId || '-'}`,
@@ -1578,10 +1984,15 @@
 
         function render() {
           drawBackground();
+          ctx.save();
+          ctx.translate(width * 0.5, height * 0.5);
+          ctx.scale(SCENE_SCALE, SCENE_SCALE);
+          ctx.translate(-width * 0.5, -height * 0.5);
           drawPlatforms();
           drawParticles();
           drawMarioBuddies();
           drawHero();
+          ctx.restore();
         }
 
         /* -- SHAPE HELPERS -- */
@@ -2368,6 +2779,33 @@
 
         function screenY(worldY) {
           return height - hudHeight() - (worldY - cameraY);
+        }
+
+        function sceneScreenX(worldX) {
+          const rawX = worldLeft + worldX;
+          return width * 0.5 + (rawX - width * 0.5) * SCENE_SCALE;
+        }
+
+        function sceneScreenY(worldY) {
+          const rawY = screenY(worldY);
+          return height * 0.5 + (rawY - height * 0.5) * SCENE_SCALE;
+        }
+
+        function inverseSceneScreenX(screenX) {
+          const rawX = width * 0.5 + (screenX - width * 0.5) / SCENE_SCALE;
+          return rawX - worldLeft;
+        }
+
+        function inverseSceneScreenY(screenPositionY) {
+          const rawY = height * 0.5 + (screenPositionY - height * 0.5) / SCENE_SCALE;
+          return cameraY + height - hudHeight() - rawY;
+        }
+
+        function marioIsOnStage(runner, margin = 0) {
+          const sx = sceneScreenX(runner.x);
+          const sy = sceneScreenY(runner.y);
+          return sx > -26 - margin && sx < width + 26 + margin &&
+            sy > -12 - margin && sy < height + 54 + margin;
         }
 
         /* -- INPUT (unchanged) -- */

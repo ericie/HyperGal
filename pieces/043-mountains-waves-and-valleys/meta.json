@@ -5,6 +5,7 @@
   "category": "generative",
   "type": "interactive",
   "wip": false,
+  "rating": 46,
   "thumbnail": "thumbnail.png",
   "description": "Layered noise lines drifting across the field as ridgelines. Eleven controls — palette, chaos, peak height, layout, line weight and spacing — reshape it from calm waves to mountain ranges to dense interference."
 }

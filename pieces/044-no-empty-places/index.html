@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="description" content="Chalk-white currents grow through a deep blue painted field, bending into an irregular edge-to-edge labyrinth." />
+    <meta name="description" content="Chalk-white currents grow and undulate at different tempos through a deep blue painted field." />
     <title>No Empty Places · HyperGal</title>
     <style>
       :root { color-scheme: dark; --ground: #2c4b70; --focus: #f3f1e9; }
@@ -30,8 +30,9 @@
     <canvas id="painting" tabindex="0" role="img" aria-describedby="instructions"></canvas>
     <p class="instructions" id="instructions">
       Chalk-white currents grow into an organic labyrinth across a deep blue
-      field. Click, tap, press Space, or press Enter for a new painting. Press R
-      to replay the current seed.
+      field, then undulate in overlapping waves at different speeds. Click, tap,
+      press Space, or press Enter for a new painting. Press R to replay the
+      current seed.
     </p>
 
     <script>
@@ -45,6 +46,7 @@
         const BLUE = [44, 75, 112];
         const CHALK = [241, 240, 233];
         const TOTAL_STEPS = 1180;
+        const MOTION_INTERVAL = 1000 / 30;
 
         let width = 1;
         let height = 1;
@@ -147,10 +149,10 @@
           );
           if (reducedMotion.matches) {
             advance(TOTAL_STEPS);
-            render();
+            render(0, false);
           } else {
             advance(300);
-            render();
+            render(0, false);
             animateGrowth();
           }
         }
@@ -193,9 +195,24 @@
           imageCanvas.width = columns;
           imageCanvas.height = rows;
           const imageContext = imageCanvas.getContext('2d', { alpha: false });
+          const speedBands = [0.42, 0.68, 1.02, 1.46];
+          const waves = speedBands.map((baseSpeed, index) => {
+            const angle = random() * Math.PI * 2;
+            return {
+              dx: Math.cos(angle),
+              dy: Math.sin(angle),
+              frequency: 0.016 + random() * 0.022,
+              crossFrequency: 0.007 + random() * 0.012,
+              speed: baseSpeed * (0.88 + random() * 0.24) * (index % 2 ? -1 : 1),
+              amplitude: 1.4 + random() * 2,
+              phase: random() * Math.PI * 2,
+              crossPhase: random() * Math.PI * 2,
+            };
+          });
           return {
             columns, rows, u, v, nextU, nextV, imageCanvas, imageContext,
             image: imageContext.createImageData(columns, rows),
+            waves,
             feed: 0.0296,
             kill: 0.0571,
             steps: 0,
@@ -236,17 +253,56 @@
           field.steps += iterations;
         }
 
-        function render() {
+        function sample(values, x, y) {
+          const { columns, rows } = field;
+          x = (x % columns + columns) % columns;
+          y = (y % rows + rows) % rows;
+          const x0 = Math.floor(x);
+          const y0 = Math.floor(y);
+          const x1 = x0 + 1 === columns ? 0 : x0 + 1;
+          const y1 = y0 + 1 === rows ? 0 : y0 + 1;
+          const tx = x - x0;
+          const ty = y - y0;
+          const top = values[y0 * columns + x0] * (1 - tx) + values[y0 * columns + x1] * tx;
+          const bottom = values[y1 * columns + x0] * (1 - tx) + values[y1 * columns + x1] * tx;
+          return top * (1 - ty) + bottom * ty;
+        }
+
+        function displacedValue(values, x, y, seconds) {
+          let sampleX = x;
+          let sampleY = y;
+          for (const wave of field.waves) {
+            const along = x * wave.dx + y * wave.dy;
+            const across = -x * wave.dy + y * wave.dx;
+            const crossMotion = Math.sin(
+              across * wave.crossFrequency + seconds * wave.speed * 0.23 + wave.crossPhase
+            );
+            const localWeight = 0.52 + 0.48 * ((crossMotion + 1) * 0.5);
+            const bend = Math.sin(
+              along * wave.frequency + seconds * wave.speed + wave.phase + crossMotion * 1.05
+            ) * wave.amplitude * localWeight;
+            sampleX -= wave.dy * bend;
+            sampleY += wave.dx * bend;
+          }
+          return sample(values, sampleX, sampleY);
+        }
+
+        function render(seconds = 0, moving = true) {
           const data = field.image.data;
           const values = field.v;
-          for (let i = 0; i < values.length; i += 1) {
-            const white = smoothstep(0.205, 0.3, values[i]);
-            const grain = ((i * 17 + (i / field.columns | 0) * 31) % 13 - 6) * 0.24;
-            const offset = i * 4;
-            data[offset] = clamp(BLUE[0] + (CHALK[0] - BLUE[0]) * white + grain, 0, 255);
-            data[offset + 1] = clamp(BLUE[1] + (CHALK[1] - BLUE[1]) * white + grain, 0, 255);
-            data[offset + 2] = clamp(BLUE[2] + (CHALK[2] - BLUE[2]) * white + grain, 0, 255);
-            data[offset + 3] = 255;
+          const { columns, rows } = field;
+          for (let y = 0; y < rows; y += 1) {
+            for (let x = 0; x < columns; x += 1) {
+              const i = y * columns + x;
+              const value = moving ? displacedValue(values, x, y, seconds) : values[i];
+              const white = smoothstep(0.205, 0.3, value);
+              const grain = ((i * 17 + y * 31) % 13 - 6) * 0.24;
+              const offset = i * 4;
+              data[offset] = clamp(BLUE[0] + (CHALK[0] - BLUE[0]) * white + grain, 0, 255);
+              data[offset + 1] = clamp(BLUE[1] + (CHALK[1] - BLUE[1]) * white + grain, 0, 255);
+              data[offset + 2] = clamp(BLUE[2] + (CHALK[2] - BLUE[2]) * white + grain, 0, 255);
+              data[offset + 3] = 255;
+            }
           }
           field.imageContext.putImageData(field.image, 0, 0);
           ctx.save();
@@ -257,14 +313,17 @@
         }
 
         function animateGrowth() {
-          function tick() {
+          const startedAt = performance.now();
+          let lastPaint = -Infinity;
+          function tick(now) {
             const remaining = TOTAL_STEPS - field.steps;
-            if (remaining <= 0) {
-              frame = 0;
-              return;
+            if (remaining > 0) {
+              advance(Math.min(14, remaining));
             }
-            advance(Math.min(18, remaining));
-            render();
+            if (remaining > 0 || now - lastPaint >= MOTION_INTERVAL) {
+              render((now - startedAt) / 1000, true);
+              lastPaint = now;
+            }
             frame = requestAnimationFrame(tick);
           }
           frame = requestAnimationFrame(tick);

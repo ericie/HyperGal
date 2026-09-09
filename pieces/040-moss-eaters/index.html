@@ -85,6 +85,7 @@
         const trailCanvas = document.createElement('canvas');
         const trailCtx = trailCanvas.getContext('2d');
         const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+        const maturePreview = new URLSearchParams(location.search).get('preview') === 'mature';
         const TAU = Math.PI * 2;
         const CELL = 6;
         const MAX_DPR = 1.5;
@@ -106,6 +107,8 @@
         let columns = 0;
         let rows = 0;
         let food = new Float32Array(0);
+        let moss = new Float32Array(0);
+        let centerline = new Uint16Array(0);
         let worms = [];
         let random = Math.random;
         let seed = readSeed();
@@ -114,6 +117,15 @@
         let running = !document.hidden;
         let paused = false;
         let nextId = 1;
+        let pathMetrics = { entered: 0, revisited: 0, turns: 0 };
+
+        window.__mossDiagnostics = () => ({
+          ...pathMetrics,
+          overlapRate: pathMetrics.entered
+            ? pathMetrics.revisited / pathMetrics.entered
+            : 0,
+          livingWorms: worms.filter(worm => worm.alive).length
+        });
 
         resize();
         startField();
@@ -180,6 +192,8 @@
           columns = Math.ceil(width / CELL);
           rows = Math.ceil(height / CELL);
           food = new Float32Array(columns * rows);
+          moss = new Float32Array(columns * rows);
+          centerline = new Uint16Array(columns * rows);
         }
 
         function startField() {
@@ -188,11 +202,13 @@
           paused = false;
           initializeMoss();
           worms = [];
+          centerline.fill(0);
+          pathMetrics = { entered: 0, revisited: 0, turns: 0 };
           paintGround();
           clear(trailCtx);
 
           const area = width * height;
-          const openingWorms = clamp(Math.round(area / 42000), 16, 28);
+          const openingWorms = clamp(Math.round(area / 175000), 3, 6);
           for (let i = 0; i < openingWorms; i += 1) {
             const start = findRichMoss(32);
             worms.push(makeWorm(
@@ -203,42 +219,23 @@
             ));
           }
 
-          growStillLife(reducedMotion.matches ? 980 : 760);
-
-          // The oldest routes settle back into the surface instead of reading
-          // as freshly painted lines.
-          trailCtx.save();
-          trailCtx.globalCompositeOperation = 'source-over';
-          trailCtx.globalAlpha = 0.16;
-          trailCtx.fillStyle = '#596057';
-          const dust = Math.round(area / 980);
-          for (let i = 0; i < dust; i += 1) {
-            const x = random() * width;
-            const y = random() * height;
-            trailCtx.fillRect(x, y, random() * 1.6 + 0.35, random() * 1.2 + 0.25);
-          }
-          trailCtx.restore();
-
-          // Keep a smaller living edge after the opening history is made.
-          worms = worms.filter((worm, index) => index % 2 === 0).slice(0, 22);
-          while (worms.length < Math.min(12, openingWorms)) {
-            const start = findRichMoss(24);
-            worms.push(makeWorm(start.x, start.y, random() * TAU));
-          }
+          // The public piece always begins untouched. This opt-in state exists
+          // only to make a representative catalog thumbnail.
+          if (maturePreview) growStillLife(reducedMotion.matches ? 1400 : 1200);
 
           lastTime = performance.now();
           draw();
         }
 
         function paintGround() {
-          clear(groundCtx, '#73776d');
+          clear(groundCtx, '#666b61');
 
           // Large, low-contrast moss colonies establish the field.
           const colonies = Math.round(width * height / 1900);
           for (let i = 0; i < colonies; i += 1) {
             const x = random() * width;
             const y = random() * height;
-            const density = foodAt(x, y);
+            const density = mossAt(x, y);
             const radius = 7 + random() * 34;
             const points = 8 + Math.floor(random() * 8);
             groundCtx.beginPath();
@@ -251,7 +248,7 @@
               else groundCtx.lineTo(px, py);
             }
             groundCtx.closePath();
-            groundCtx.globalAlpha = (0.035 + random() * 0.12) * (0.3 + density);
+            groundCtx.globalAlpha = (0.075 + random() * 0.19) * (0.38 + density);
             groundCtx.fillStyle = mossColors[Math.floor(random() * mossColors.length)];
             groundCtx.fill();
           }
@@ -261,7 +258,7 @@
           for (let i = 0; i < grains; i += 1) {
             const x = random() * width;
             const y = random() * height;
-            const density = foodAt(x, y);
+            const density = mossAt(x, y);
             if (random() > 0.08 + density * 0.92) continue;
             const size = 0.25 + Math.pow(random(), 2) * 1.85;
             groundCtx.globalAlpha = (0.13 + random() * 0.44) * (0.36 + density * 0.82);
@@ -271,6 +268,33 @@
             } else {
               groundCtx.beginPath();
               groundCtx.arc(x, y, size, 0, TAU);
+              groundCtx.fill();
+            }
+          }
+
+          // Rich patches rise into clustered tufts; sparse patches leave the
+          // underlying stone comparatively bare.
+          const tufts = Math.round(width * height / 105);
+          for (let i = 0; i < tufts; i += 1) {
+            const x = random() * width;
+            const y = random() * height;
+            const density = mossAt(x, y);
+            if (random() > Math.pow(density, 1.55)) continue;
+            const tuftSize = 1.2 + density * (2.4 + random() * 3.8);
+            const dots = 3 + Math.floor(density * 6);
+            groundCtx.fillStyle = mossColors[Math.floor(random() * 5)];
+            groundCtx.globalAlpha = 0.13 + density * 0.28;
+            for (let dot = 0; dot < dots; dot += 1) {
+              const angle = random() * TAU;
+              const distance = random() * tuftSize;
+              groundCtx.beginPath();
+              groundCtx.arc(
+                x + Math.cos(angle) * distance,
+                y + Math.sin(angle) * distance,
+                0.35 + random() * 1.05,
+                0,
+                TAU
+              );
               groundCtx.fill();
             }
           }
@@ -295,12 +319,11 @@
               const broad = valueNoise(x / 118, y / 118, 0);
               const middle = valueNoise(x / 52, y / 52, 41);
               const fine = valueNoise(x / 23, y / 23, 97);
-              const density = clamp(
-                0.08 + Math.pow(broad * 0.58 + middle * 0.29 + fine * 0.13, 1.12) * 1.08,
-                0.08,
-                1
-              );
+              const rawDensity = broad * 0.6 + middle * 0.28 + fine * 0.12;
+              const contrasted = clamp((rawDensity - 0.25) / 0.5, 0, 1);
+              const density = 0.035 + Math.pow(contrasted, 1.42) * 0.965;
               food[gy * columns + gx] = density;
+              moss[gy * columns + gx] = density;
             }
           }
         }
@@ -337,7 +360,13 @@
             const x = 12 + random() * (width - 24);
             const y = 12 + random() * (height - 24);
             const density = foodPatch(x, y, 10);
-            if (density > best.density) best = { x, y, density };
+            let spacingPenalty = 0;
+            for (const worm of worms) {
+              const distance = Math.hypot(worm.x - x, worm.y - y);
+              if (distance < 150) spacingPenalty += (1 - distance / 150) * 0.82;
+            }
+            const score = density - spacingPenalty;
+            if (score > best.density) best = { x, y, density: score };
           }
           return best;
         }
@@ -354,20 +383,20 @@
             travelAngle: angle,
             radius,
             speed: 10 + random() * 7,
-            turn: 0,
             age: old ? random() * 12 : 0,
-            lifespan: 42 + random() * 62,
-            branchIn: 8 + random() * 17,
+            lifespan: 180 + random() * 170,
             steerIn: 0,
             targetTurn: 0,
             coverageScore: 1,
             foraging: false,
-            curvatureIn: random() * 7,
-            curvature: (random() - 0.5) * 0.12,
-            weavePhase: random() * TAU,
-            weaveSpeed: 1.65 + random() * 1.05,
-            weaveAmplitude: 0.72 + random() * 0.33,
+            turnRemaining: 0,
+            turnDirection: 1,
+            turnRadius: radius * 3.7 + 4,
+            laneRemaining: 54 + random() * 86,
+            drift: (random() - 0.5) * 0.025,
+            driftIn: 7 + random() * 12,
             stampDistance: random() * 4,
+            lastCell: -1,
             body: [],
             bodyClock: 0,
             tone: random(),
@@ -412,49 +441,53 @@
           worm.previousX = worm.x;
           worm.previousY = worm.y;
           worm.age += dt;
-          worm.branchIn -= dt;
           worm.steerIn -= dt;
-          worm.curvatureIn -= dt;
-          worm.weavePhase += worm.weaveSpeed
-            * (0.8 + Math.sin(worm.age * 0.31 + worm.id * 0.73) * 0.2)
-            * dt;
+          worm.driftIn -= dt;
 
-          if (worm.curvatureIn <= 0) {
-            worm.curvature = (random() - 0.5) * 0.12;
-            worm.curvatureIn = 5 + random() * 9;
+          if (worm.driftIn <= 0) {
+            worm.drift = (random() - 0.5) * 0.04;
+            worm.driftIn = 8 + random() * 14;
           }
 
-          if (worm.steerIn <= 0) {
-            worm.targetTurn = chooseCoverageTurn(worm);
-            worm.steerIn = 0.1 + random() * 0.13;
+          if (worm.turnRemaining <= 0 && worm.steerIn <= 0) {
+            worm.targetTurn = planCourse(worm);
+            worm.steerIn = 0.16 + random() * 0.16;
           }
 
-          let desire = worm.targetTurn + worm.curvature;
+          if (!worm.alive) return;
 
-          const edge = 28 + worm.radius * 2;
-          if (worm.x < edge) desire += angleDelta(worm.travelAngle, 0) * 1.8;
-          if (worm.x > width - edge) desire += angleDelta(worm.travelAngle, Math.PI) * 1.8;
-          if (worm.y < edge) desire += angleDelta(worm.travelAngle, Math.PI / 2) * 1.8;
-          if (worm.y > height - edge) desire += angleDelta(worm.travelAngle, -Math.PI / 2) * 1.8;
+          if (worm.turnRemaining > 0) {
+            // A U-turn is a real semicircle: fixed forward speed, fixed radius,
+            // no braking, reversal, or lateral sine displacement.
+            const angularSpeed = worm.speed / worm.turnRadius;
+            const turnStep = Math.min(worm.turnRemaining, angularSpeed * dt);
+            worm.angle += worm.turnDirection * turnStep;
+            worm.turnRemaining -= turnStep;
+            worm.foraging = false;
+          } else {
+            const maximumRate = worm.foraging
+              ? worm.speed / 46
+              : worm.speed / 118;
+            worm.angle += clamp(worm.targetTurn + worm.drift, -maximumRate, maximumRate) * dt;
+          }
 
-          worm.turn += (desire - worm.turn) * Math.min(1, dt * 4.2);
-          worm.turn *= Math.pow(0.96, dt);
-          worm.travelAngle += worm.turn * dt;
-          const feedingAmplitude = worm.weaveAmplitude * (worm.foraging ? 0.12 : 1);
-          const weave = Math.sin(worm.weavePhase) * feedingAmplitude
-            + Math.sin(worm.weavePhase * 0.47 + worm.id * 1.13) * feedingAmplitude * 0.18;
-          worm.angle = worm.travelAngle + weave;
+          worm.travelAngle = worm.angle;
+          worm.x += Math.cos(worm.angle) * worm.speed * dt;
+          worm.y += Math.sin(worm.angle) * worm.speed * dt;
 
-          const speed = worm.speed * (worm.foraging ? 1.28 : 0.82 + foodAt(worm.x, worm.y) * 0.34);
-          worm.x += Math.cos(worm.angle) * speed * dt;
-          worm.y += Math.sin(worm.angle) * speed * dt;
-          worm.x = clamp(worm.x, 5, width - 5);
-          worm.y = clamp(worm.y, 5, height - 5);
+          // Planning should keep animals inside. Clamping is only an emergency
+          // guard against a coarse preview step at the canvas boundary.
+          if (worm.x < 4 || worm.x > width - 4 || worm.y < 4 || worm.y > height - 4) {
+            worm.alive = false;
+            return;
+          }
 
           const traveled = Math.hypot(worm.x - worm.previousX, worm.y - worm.previousY);
+          if (!worm.foraging && worm.turnRemaining <= 0) worm.laneRemaining -= traveled;
           worm.stampDistance += traveled;
           worm.bodyClock += traveled;
 
+          recordCenterline(worm);
           consume(worm);
 
           if (worm.bodyClock >= worm.radius * 0.4) {
@@ -463,26 +496,9 @@
             worm.body.length = Math.min(worm.body.length, 10);
           }
 
-          if (worm.branchIn <= 0 && !worm.foraging && worms.length < maximumWorms()) {
-            const side = branchSide(worm);
-            const child = makeWorm(
-              worm.x - Math.cos(worm.angle) * worm.radius * 2,
-              worm.y - Math.sin(worm.angle) * worm.radius * 2,
-              worm.travelAngle + side * (0.62 + random() * 0.36)
-            );
-            child.speed = worm.speed * (0.9 + random() * 0.18);
-            child.radius = clamp(worm.radius * (0.82 + random() * 0.22), 2, 4.2);
-            child.curvature = -side * (0.025 + random() * 0.045);
-            worms.push(child);
-            worm.travelAngle -= side * (0.1 + random() * 0.14);
-            worm.curvature = side * (0.02 + random() * 0.04);
-            worm.branchIn = 11 + random() * 24;
-          }
-
           const localFood = foodAhead(worm, 0, 34);
           if (worm.age > worm.lifespan) worm.alive = false;
-          if (!worm.foraging && worm.age > 8 && localFood < 0.035 && random() < dt * 0.14) worm.alive = false;
-          if (!worm.foraging && worm.age > 5 && worm.coverageScore < 0.16 && random() < dt * 1.8) worm.alive = false;
+          if (!worm.foraging && worm.turnRemaining <= 0 && worm.age > 8 && localFood < 0.025 && random() < dt * 0.18) worm.alive = false;
         }
 
         function consume(worm) {
@@ -496,10 +512,12 @@
           trailCtx.save();
           trailCtx.lineCap = 'round';
           trailCtx.lineJoin = 'round';
+          const deposit = worm.foraging ? 0.22 : 0.62 + foodHere * 0.38;
+          trailCtx.globalAlpha = deposit;
 
           // A broad, broken veil of exposed stone sits beneath the individual
           // mouth marks. It keeps a feeding route from reading as a wire.
-          trailCtx.strokeStyle = 'rgba(202, 208, 203, .045)';
+          trailCtx.strokeStyle = 'rgba(202, 208, 203, .07)';
           trailCtx.lineWidth = worm.radius * (3.5 + foodHere * 0.7);
           trailCtx.beginPath();
           trailCtx.moveTo(x0, y0);
@@ -507,6 +525,8 @@
           trailCtx.stroke();
 
           // The narrow scrape at the center records the bug's exact course.
+          const trailAlpha = worm.foraging ? 0.24 : 0.72 + foodHere * 0.28;
+          trailCtx.globalAlpha = trailAlpha;
           trailCtx.strokeStyle = stoneColors[Math.floor(worm.tone * stoneColors.length) % stoneColors.length];
           trailCtx.lineWidth = worm.radius * (0.42 + foodHere * 0.26);
           trailCtx.beginPath();
@@ -528,37 +548,21 @@
             const tangentY = Math.sin(worm.angle);
             const normalX = -tangentY;
             const normalY = tangentX;
-            const ribLength = worm.radius * (2.45 + random() * 1.25) * (0.66 + foodHere * 0.48);
-            const rootX = x1 - tangentX * worm.radius * 0.22;
-            const rootY = y1 - tangentY * worm.radius * 0.22;
+            const trailRadius = worm.radius * (1.25 + foodHere * 0.7);
+            const grains = 2 + Math.floor(foodHere * 4 + random() * 2);
 
-            trailCtx.strokeStyle = stoneColors[Math.floor(random() * stoneColors.length)];
-            trailCtx.lineWidth = 0.42 + random() * 0.56;
-
-            for (const side of [-1, 1]) {
-              const tipX = x1 - tangentX * worm.radius * (0.4 + random() * 0.34)
-                + normalX * ribLength * side;
-              const tipY = y1 - tangentY * worm.radius * (0.4 + random() * 0.34)
-                + normalY * ribLength * side;
+            for (let i = 0; i < grains; i += 1) {
+              const lateral = (random() - 0.5) * trailRadius * 2;
+              const behind = random() * worm.radius * 1.7;
+              const grainX = x1 + normalX * lateral - tangentX * behind;
+              const grainY = y1 + normalY * lateral - tangentY * behind;
+              trailCtx.globalAlpha = trailAlpha * (0.28 + foodHere * 0.42 + random() * 0.2);
+              trailCtx.fillStyle = stoneColors[Math.floor(random() * stoneColors.length)];
               trailCtx.beginPath();
-              trailCtx.moveTo(rootX, rootY);
-              trailCtx.quadraticCurveTo(
-                x1 + normalX * ribLength * side * 0.56,
-                y1 + normalY * ribLength * side * 0.56,
-                tipX,
-                tipY
-              );
-              trailCtx.stroke();
-
-              if (foodHere > 0.16 && random() < 0.7) {
-                trailCtx.globalAlpha = 0.46 + random() * 0.38;
-                trailCtx.fillStyle = '#e5e9e5';
-                trailCtx.beginPath();
-                trailCtx.arc(tipX, tipY, 0.45 + random() * 0.75, 0, TAU);
-                trailCtx.fill();
-                trailCtx.globalAlpha = 1;
-              }
+              trailCtx.arc(grainX, grainY, 0.28 + random() * 0.82, 0, TAU);
+              trailCtx.fill();
             }
+            trailCtx.globalAlpha = 1;
           }
 
           trailCtx.restore();
@@ -567,8 +571,8 @@
         function maintainColony(warming) {
           worms = worms.filter(worm => worm.alive);
           const minimum = warming
-            ? clamp(Math.round(width * height / 50000), 16, 24)
-            : Math.min(14, maximumWorms());
+            ? clamp(Math.round(width * height / 175000), 3, 6)
+            : Math.min(4, maximumWorms());
           while (worms.length < minimum) {
             let richest = { x: random() * width, y: random() * height, food: -1 };
             for (let attempt = 0; attempt < 14; attempt += 1) {
@@ -681,50 +685,237 @@
           );
         }
 
-        function chooseCoverageTurn(worm) {
-          const offsets = [-1.82, -1.46, -1.12, -0.82, -0.55, -0.3, 0, 0.3, 0.55, 0.82, 1.12, 1.46, 1.82];
+        function planCourse(worm) {
+          const straight = corridorStats(worm, 0);
+          const minedBarrier = straight.capacity > 0.07 && straight.freshness < 0.46;
+          const boundaryAhead = straight.outside > 0.08;
+          const laneComplete = worm.laneRemaining <= 0;
+
+          // When a lane ends, preview the whole left and right semicircle. The
+          // animal commits only to an arc whose footprint and exit lane remain
+          // uneaten; otherwise it retires rather than crossing an old route.
+          if (minedBarrier || boundaryAhead) {
+            if (!beginClearUTurn(worm)) worm.alive = false;
+            return 0;
+          }
+
+          if (laneComplete) {
+            if (beginClearUTurn(worm)) return 0;
+            worm.laneRemaining = 28 + random() * 34;
+          }
+
+          // Thin, previously untouched moss calls for a broad, direct search.
+          // It still uses forward motion and a capped radius, never a pivot.
+          if (straight.capacity < 0.27) {
+            worm.foraging = true;
+            worm.coverageScore = straight.remaining;
+            return seekDenseMossTurn(worm);
+          }
+
+          worm.foraging = false;
+          const offsets = [-0.34, -0.17, 0, 0.17, 0.34];
           let bestOffset = 0;
           let bestScore = -Infinity;
 
           for (const offset of offsets) {
-            const angle = worm.travelAngle + offset;
-            const nearDistance = 13 + worm.radius * 1.5;
-            const middleDistance = 27 + worm.radius * 2.1;
-            const farDistance = 48 + worm.radius * 2.9;
-            const farX = worm.x + Math.cos(angle) * farDistance;
-            const farY = worm.y + Math.sin(angle) * farDistance;
-            if (farX < 7 || farX > width - 7 || farY < 7 || farY > height - 7) continue;
-
-            const near = foodPatch(
-              worm.x + Math.cos(angle) * nearDistance,
-              worm.y + Math.sin(angle) * nearDistance,
-              worm.radius * 2.15
-            );
-            const middle = foodPatch(
-              worm.x + Math.cos(angle) * middleDistance,
-              worm.y + Math.sin(angle) * middleDistance,
-              worm.radius * 2.65
-            );
-            const far = foodPatch(farX, farY, worm.radius * 3.1);
-            const continuity = Math.cos(offset) * 0.075;
-            const barrierPenalty = near < 0.22 ? 0.5 : 0;
-            const score = near * 0.56 + middle * 0.29 + far * 0.15 + continuity - barrierPenalty + random() * 0.006;
+            const sample = corridorStats(worm, offset);
+            if (sample.outside > 0.08 || sample.freshness < 0.42) continue;
+            const score = sample.remaining * 1.1
+              + sample.capacity * 0.2
+              + sample.freshness * 0.3
+              - Math.abs(offset) * 0.28
+              + random() * 0.002;
             if (score > bestScore) {
               bestScore = score;
               bestOffset = offset;
             }
           }
 
+          if (bestScore === -Infinity) {
+            if (!beginClearUTurn(worm)) worm.alive = false;
+            return 0;
+          }
+
           worm.coverageScore = bestScore;
-          return clamp(bestOffset * 1.5, -1.55, 1.55);
+          return bestOffset * 0.34;
         }
 
-        function branchSide(worm) {
-          const distance = 34 + worm.radius * 3;
-          const left = foodAhead(worm, -0.88, distance);
-          const right = foodAhead(worm, 0.88, distance);
-          if (Math.abs(left - right) < 0.025) return random() < 0.5 ? -1 : 1;
-          return left > right ? -1 : 1;
+        function corridorStats(worm, offset) {
+          const angle = worm.angle + offset;
+          const forwardX = Math.cos(angle);
+          const forwardY = Math.sin(angle);
+          const normalX = -forwardY;
+          const normalY = forwardX;
+          const distances = [
+            12 + worm.radius * 2,
+            20 + worm.radius * 2,
+            29 + worm.radius * 2,
+            40 + worm.radius * 2,
+            53 + worm.radius * 2
+          ];
+          const halfFootprint = worm.radius * 2.7;
+          const laterals = [-halfFootprint, 0, halfFootprint];
+          let remaining = 0;
+          let capacity = 0;
+          let freshness = 0;
+          let outside = 0;
+          let samples = 0;
+
+          for (const distance of distances) {
+            for (const lateral of laterals) {
+              const x = worm.x + forwardX * distance + normalX * lateral;
+              const y = worm.y + forwardY * distance + normalY * lateral;
+              samples += 1;
+              if (x < 7 || x > width - 7 || y < 7 || y > height - 7) {
+                outside += 1;
+                continue;
+              }
+              const available = foodAt(x, y);
+              const possible = mossAt(x, y);
+              const blocked = pathOccupiedNear(x, y, worm.radius * 5.4);
+              remaining += available;
+              capacity += possible;
+              freshness += blocked ? 0 : (possible > 0.045 ? available / possible : 1);
+            }
+          }
+
+          return {
+            remaining: remaining / samples,
+            capacity: capacity / samples,
+            freshness: freshness / samples,
+            outside: outside / samples
+          };
+        }
+
+        function beginClearUTurn(worm) {
+          // Two radii become the next lane's offset. This leaves a small safety
+          // margin beyond the 6.7-radius eaten footprint without wasting moss.
+          const radius = worm.radius * 3.7 + 4;
+          const left = uTurnScore(worm, -1, radius);
+          const right = uTurnScore(worm, 1, radius);
+          const best = left > right
+            ? { side: -1, score: left }
+            : { side: 1, score: right };
+
+          if (!Number.isFinite(best.score) || best.score < 0.18) return false;
+
+          worm.turnRadius = radius;
+          worm.turnDirection = best.side;
+          worm.turnRemaining = Math.PI;
+          worm.targetTurn = 0;
+          worm.steerIn = Math.PI * radius / worm.speed;
+          worm.laneRemaining = 54 + random() * 86;
+          pathMetrics.turns += 1;
+          return true;
+        }
+
+        function uTurnScore(worm, side, radius) {
+          const forwardX = Math.cos(worm.angle);
+          const forwardY = Math.sin(worm.angle);
+          const normalX = -forwardY;
+          const normalY = forwardX;
+          let score = 0;
+          let clear = 0;
+          let samples = 0;
+
+          // Sample the swept semicircle, then the beginning of the parallel
+          // exit lane. Early arc points touch the current trail by necessity;
+          // clearance tests begin once the arc has separated from it.
+          for (let i = 3; i <= 18; i += 1) {
+            const theta = i / 18 * Math.PI;
+            const x = worm.x
+              + forwardX * radius * Math.sin(theta)
+              + normalX * side * radius * (1 - Math.cos(theta));
+            const y = worm.y
+              + forwardY * radius * Math.sin(theta)
+              + normalY * side * radius * (1 - Math.cos(theta));
+            const sample = resourceSample(
+              x,
+              y,
+              worm.radius * 2.2,
+              i >= 8 ? worm.radius * 4.2 : 0
+            );
+            if (!sample) return -Infinity;
+            samples += 1;
+            score += sample.remaining * 0.86 + sample.capacity * 0.14;
+            if (sample.freshness > 0.38) clear += 1;
+          }
+
+          const exitX = worm.x + normalX * side * radius * 2;
+          const exitY = worm.y + normalY * side * radius * 2;
+          for (const distance of [16, 34, 54]) {
+            const x = exitX - forwardX * distance;
+            const y = exitY - forwardY * distance;
+            const sample = resourceSample(x, y, worm.radius * 2.4, worm.radius * 5.4);
+            if (!sample) return -Infinity;
+            samples += 1;
+            score += sample.remaining + sample.capacity * 0.18;
+            if (sample.freshness > 0.42) clear += 1;
+          }
+
+          if (clear / samples < 0.72) return -Infinity;
+          return score / samples;
+        }
+
+        function resourceSample(x, y, radius, clearance = 0) {
+          if (x < radius + 5 || x > width - radius - 5 || y < radius + 5 || y > height - radius - 5) {
+            return null;
+          }
+          if (clearance && pathOccupiedNear(x, y, clearance)) return null;
+          const remaining = foodPatch(x, y, radius);
+          const capacity = mossPatch(x, y, radius);
+          return {
+            remaining,
+            capacity,
+            freshness: capacity > 0.045 ? remaining / capacity : 1
+          };
+        }
+
+        function pathOccupiedNear(x, y, radius) {
+          const minX = clamp(Math.floor((x - radius) / CELL), 0, columns - 1);
+          const maxX = clamp(Math.floor((x + radius) / CELL), 0, columns - 1);
+          const minY = clamp(Math.floor((y - radius) / CELL), 0, rows - 1);
+          const maxY = clamp(Math.floor((y + radius) / CELL), 0, rows - 1);
+          const radiusSquared = radius * radius;
+
+          for (let gy = minY; gy <= maxY; gy += 1) {
+            for (let gx = minX; gx <= maxX; gx += 1) {
+              if (!centerline[gy * columns + gx]) continue;
+              const dx = gx * CELL + CELL * 0.5 - x;
+              const dy = gy * CELL + CELL * 0.5 - y;
+              if (dx * dx + dy * dy <= radiusSquared) return true;
+            }
+          }
+          return false;
+        }
+
+        function seekDenseMossTurn(worm) {
+          let bestOffset = 0;
+          let bestScore = -Infinity;
+          const distances = [42, 72, 112, 158];
+
+          for (let step = 0; step < 24; step += 1) {
+            const offset = -Math.PI + step / 23 * TAU;
+            const angle = worm.travelAngle + offset;
+
+            for (const distance of distances) {
+              const x = worm.x + Math.cos(angle) * distance;
+              const y = worm.y + Math.sin(angle) * distance;
+              if (x < 8 || x > width - 8 || y < 8 || y > height - 8) continue;
+              const density = foodPatch(x, y, 13 + distance * 0.045);
+              const movementCost = distance * 0.00235;
+              const reversalCost = Math.abs(offset) / Math.PI * 0.055;
+              const score = density * 1.12 - movementCost - reversalCost + random() * 0.004;
+
+              if (score > bestScore) {
+                bestScore = score;
+                bestOffset = offset;
+              }
+            }
+          }
+
+          worm.coverageScore = bestScore;
+          return clamp(bestOffset * 1.45, -1.62, 1.62);
         }
 
         function foodPatch(x, y, radius) {
@@ -738,10 +929,38 @@
           return total / samples.length;
         }
 
+        function mossPatch(x, y, radius) {
+          const samples = [
+            [0, 0], [-radius, 0], [radius, 0], [0, -radius], [0, radius],
+            [-radius * 0.7, -radius * 0.7], [radius * 0.7, -radius * 0.7],
+            [-radius * 0.7, radius * 0.7], [radius * 0.7, radius * 0.7]
+          ];
+          let total = 0;
+          for (const [dx, dy] of samples) total += mossAt(x + dx, y + dy);
+          return total / samples.length;
+        }
+
+        function recordCenterline(worm) {
+          const gx = clamp(Math.floor(worm.x / CELL), 0, columns - 1);
+          const gy = clamp(Math.floor(worm.y / CELL), 0, rows - 1);
+          const index = gy * columns + gx;
+          if (index === worm.lastCell) return;
+          worm.lastCell = index;
+          pathMetrics.entered += 1;
+          if (centerline[index] > 0) pathMetrics.revisited += 1;
+          centerline[index] += 1;
+        }
+
         function foodAt(x, y) {
           const gx = clamp(Math.floor(x / CELL), 0, columns - 1);
           const gy = clamp(Math.floor(y / CELL), 0, rows - 1);
           return food[gy * columns + gx] || 0;
+        }
+
+        function mossAt(x, y) {
+          const gx = clamp(Math.floor(x / CELL), 0, columns - 1);
+          const gy = clamp(Math.floor(y / CELL), 0, rows - 1);
+          return moss[gy * columns + gx] || 0;
         }
 
         function markEaten(x, y, radius) {
@@ -789,13 +1008,6 @@
           return Number.isFinite(value) && value !== 0
             ? value >>> 0
             : Math.floor(Math.random() * 0xffffffff) >>> 0;
-        }
-
-        function angleDelta(from, to) {
-          let delta = (to - from) % TAU;
-          if (delta > Math.PI) delta -= TAU;
-          if (delta < -Math.PI) delta += TAU;
-          return delta;
         }
 
         function clamp(value, minimum, maximum) {

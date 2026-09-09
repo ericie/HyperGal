@@ -17,14 +17,15 @@
       }
       main { height: 100vh; }
 
-      /* Every layer is the same fixed, contained square. The ground colour is
-         set on the container once the hash has picked a palette. */
+      /* Every layer fills the window. The piece is sized to the viewport rather
+         than letterboxed into a square, so the grid spans whatever shape the
+         browser is. The ground colour is set on the container once the hash has
+         picked a palette. */
       #canvas, #layer01, #layer02, #layer03, #layer04 {
-        max-width: 100%; max-height: 100%;
-        margin: auto;
         position: fixed;
-        object-fit: contain;
-        top: 0; bottom: 0; left: 0; right: 0;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        display: block;
       }
 
       /* The working layers stay hidden — except layer04, which is shown behind
@@ -32,7 +33,9 @@
          composite canvas draws the first half of the swarm sharp, layer04
          carries the second half and survives only as light. */
       #layer01, #layer02, #layer03 { display: none; }
-      #layer04 { display: block; filter: blur(20px); }
+      /* The glow. 20px at full strength swamped the drawn lines; this keeps the
+         halo without letting it take over the picture. */
+      #layer04 { display: block; filter: blur(13px) opacity(0.7); }
 
       #canvas { cursor: pointer; touch-action: manipulation; }
       #canvas:focus-visible { outline: 3px solid var(--focus); outline-offset: -6px; }
@@ -98,6 +101,7 @@
       })();
     </script>
 
+    <script src="palette.js"></script>
     <script src="adapted.vector.js"></script>
     <script src="adapted.particles.js"></script>
     <script src="adapted.library.js"></script>
@@ -121,11 +125,23 @@
         for (const id of ['layer01', 'layer02', 'layer03', 'layer04', 'canvas']) {
           const c = document.createElement('canvas');
           c.id = id;
-          c.width = 1920;
-          c.height = 1920;
           container.appendChild(c);
         }
         document.body.prepend(container);
+
+        // Back the layers at the display's pixel density, capped so a very
+        // dense screen does not ask for an unreasonable amount of canvas.
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        function sizeLayers() {
+          const w = Math.max(320, Math.round(window.innerWidth * dpr));
+          const h = Math.max(320, Math.round(window.innerHeight * dpr));
+          for (const c of container.querySelectorAll('canvas')) {
+            c.width = w;
+            c.height = h;
+          }
+          return [w, h];
+        }
+        sizeLayers();
 
         const composite = document.getElementById('canvas');
         composite.setAttribute('tabindex', '0');
@@ -133,7 +149,25 @@
 
         const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
         let timer = init();
+        layoutTargets(WIDTH, HEIGHT);
         initParticleSystem();
+
+        // Resizing re-sizes every layer, which clears them, so the grid is laid
+        // out again against the new shape and the swarm re-enters.
+        let resizeTimer = 0;
+        window.addEventListener('resize', () => {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => {
+            const [w, h] = sizeLayers();
+            WIDTH = w;
+            HEIGHT = h;
+            maxW = w;
+            maxH = h;
+            layoutTargets(w, h);
+            initParticleSystem();
+            if (reduced.matches) settle();
+          }, 180);
+        }, { passive: true });
         describe();
 
         // Reduced motion: run the pursuit forward without animating, then stop
@@ -167,6 +201,12 @@
         }
 
         function newIteration() {
+          // layer02 is never cleared during normal play — it is the accumulated
+          // record that layer04 blurs into the glow. A new iteration should not
+          // fly in over the last one's marks.
+          if (typeof layer02 !== 'undefined') layer02.clearRect(0, 0, WIDTH, HEIGHT);
+          if (typeof layer04 !== 'undefined') layer04.clearRect(0, 0, WIDTH, HEIGHT);
+
           window.reseed();
           particleCount = { type: { orbit: 0, wander: 0, spiral: 0 },
                             thickness: { hairline: 0, thin: 0, medium: 0, thick: 0 } };

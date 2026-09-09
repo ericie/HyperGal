@@ -5,6 +5,7 @@
   "category": "games",
   "type": "interactive",
   "wip": true,
+  "rating": 50,
   "thumbnail": "thumbnail.jpg",
   "description": "Space Invaders after the invaders have vanished. Four small inset cannons fire only at the opposite edge, while any armed non-shooter may volunteer to intercept. Their finite ammunition appears only as cartridge rows; the final round becomes the sole suicide nuke."
 }

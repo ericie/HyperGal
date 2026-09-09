@@ -5,6 +5,7 @@
   "category": "nature",
   "type": "interactive",
   "wip": true,
+  "rejected": true,
   "thumbnail": "thumbnail.jpg",
   "description": "Twenty colored trunk records fill a shared terrain: latitude, sun, and wind shape every tree, a broad directional fire crosses the stand, insects visit individual trunks, and two controls move the forest toward a synchronized orchard."
 }

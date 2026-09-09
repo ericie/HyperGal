@@ -23,6 +23,31 @@ and re-sewn in slow motion.
 
 Reduced-motion preferences render one completed quilt and stop.
 
+## Colour
+
+The original picked one ink from a named palette, then used that palette's pale
+tint of **the same hue** as the ground. That is why so many iterations came out
+as a single colour washed over itself, with nothing to separate quilt from
+field — and why only the stacking transition ever produced a many-coloured
+quilt, by cycling the ink between refreshes.
+
+`palette.js` decides a relationship first — Complementary, Split Complementary,
+Triadic, Analogous, Monochrome, or Accented Neutral — then places a ground and
+six inks in OKLCH with a guaranteed lightness separation of 0.34.
+
+Colour is held **per cell** rather than applied to the layer. The original
+tinted the whole offscreen quilt one colour on its way to the canvas, which is
+why a many-coloured result only emerged where a transition happened to leave
+most cells blank: change the tint and every cell changes at once, which reads as
+a blink rather than a fade. Each cell now carries its own ink index, mirrored
+along with its shape wherever the quilt is symmetrical, so the grid is
+many-coloured at any instant and a refresh only alters the cells it touches.
+Measured across frames, a refresh moves under three percent of the picture.
+
+One related fix: a resize clears the canvas, and cells only ever cover part of
+it, so uncovered pixels used to show the stylesheet's default through the gaps.
+The page behind the canvas is now painted the ground colour.
+
 ## Notes on the port
 
 Packaged for fxhash as `PatchworkGeom` in February 2023. This is that shipped

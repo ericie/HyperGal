@@ -8,42 +8,55 @@ let gridList = [];
 function preSetUpGrid(){
     gridWidth = 2 * Math.floor(EeRandom() * 25) + 4;
 }
+// A colour index per cell, alongside the shape index. Tinting the whole
+// offscreen layer one colour meant every cell changed together, which read as
+// a blink; holding the colour per cell lets one cell change at a time.
+let cellInk = [];
+
 function setUpGrid(hSymmetry, vSymmetry){   
     // hSymmetry = true;
     // vSymmetry = true;
 
     for (let i = 0; i < gridWidth; i++) {
     gridList[i] = [];
+    cellInk[i] = [];
     
         for (let j = 0; j < gridHeight; j++) {
             if(hSymmetry && i >= gridWidth/2){
                 gridList[i][j] = gridList[gridWidth-1-i][j];
+                cellInk[i][j] = cellInk[gridWidth-1-i][j];
                 gridList[i][j].flipH = true;
             }
             else if(vSymmetry && j >= gridHeight/2){
                 gridList[i][j] = gridList[i][gridHeight-1-j];
+                cellInk[i][j] = cellInk[i][gridHeight-1-j];
                 gridList[i][j].flipV = true;
             }
             else if (hSymmetry && vSymmetry) {
                 if(i > gridWidth/2 && j >= gridHeight/2) {
                     gridList[i][j] = gridList[gridWidth-1-i][gridHeight-1-j];
+                    cellInk[i][j] = cellInk[gridWidth-1-i][gridHeight-1-j];
                     gridList[i][j].flipH = true;
                     gridList[i][j].flipV = true;
                 }
                 else if(i > gridWidth/2) {
                     gridList[i][j] = gridList[gridWidth-1-i][j];
+                    cellInk[i][j] = cellInk[gridWidth-1-i][j];
                     gridList[i][j].flipH = true;
                 }
                 else if(j >= gridHeight/2) {
                     gridList[i][j] = gridList[i][gridHeight-1-j];
+                    cellInk[i][j] = cellInk[i][gridHeight-1-j];
                     gridList[i][j].flipV = true;
                 }
                 else {
                     gridList[i][j] = Math.floor(EeRandom() * newShapeList.length);
+                    cellInk[i][j] = pickInk();
                 }
             }
             else {
                 gridList[i][j] = Math.floor(EeRandom() * newShapeList.length);
+                cellInk[i][j] = pickInk();
                 // if (transitionType && transitionType != "stackingLayers" && EeRandom() < .8){
                 //     let blankCell = {name: "blank", path: [0,0,0,0,0,0,0,0]}
                 //     gridList[i][j] = 0;
@@ -71,7 +84,9 @@ let wipeDirection = "horizontal";
 
 function updateCell(cX, cY){
     let shapeNum = Math.floor(EeRandom() * newShapeList.length);
+    let inkNum = pickInk();
     gridList[cX][cY] = shapeNum;
+    cellInk[cX][cY] = inkNum;
 
     let oppX = gridWidth - cX - 1;
     let oppY = gridHeight - cY - 1;
@@ -79,6 +94,7 @@ function updateCell(cX, cY){
     if (hSym) {
         // reflect horizontal
         gridList[oppX][cY] = shapeNum;
+            cellInk[oppX][cY] = inkNum;
 
         //gridList[i][j] = gridList[gridWidth-1-i][j];
         //gridList[i][j].flipH = true;
@@ -86,10 +102,12 @@ function updateCell(cX, cY){
     if (vSym) {
         // reflect vertical
         gridList[cX][oppY] = shapeNum;
+            cellInk[cX][oppY] = inkNum;
     }
     if (hSym && vSym) {
         // reflect horizontal and vertical
         gridList[oppX][oppY] = shapeNum;
+            cellInk[oppX][oppY] = inkNum;
     }
 
 }
@@ -144,13 +162,13 @@ function updateGrid(offset, canv){
             for (let i = 0; i < gridWidth; i++) {
                 // gridList[i] = [];
                 for (let j = 0; j < gridHeight; j++) {
-                    gridList[i][j] = 0
+                    gridList[i][j] = 0;
+                    cellInk[i][j] = cellInk[i][j] || 0
                 }
             }
 
             for (let i = 0; i < randBitCount; i++) {
 
-                strokeColor = chosenPalette.list[Math.floor(EeRandom(chosenPalette.list.length))].color;
                 // setColors();
                 // Change Color
                 // Draw New Cells
@@ -257,9 +275,12 @@ let newShapeList = [
 
     // console.log(canv);
 
-    canv.strokeWeight(.1); // Set the stroke weight
-    canv.stroke(255); // Set the stroke color
-    canv.fill(255); // Set the fill color
+    // Each cell carries its own colour, so the quilt is many-coloured at any
+    // instant and a refresh changes only the cells it touches.
+    const ink = inkAt(cellX, cellY);
+    canv.strokeWeight(.1);
+    canv.stroke(ink[0], ink[1], ink[2]);
+    canv.fill(ink[0], ink[1], ink[2]);
     
     // if (flipV) canv.fill(100);
 

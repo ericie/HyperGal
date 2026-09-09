@@ -4,6 +4,7 @@
   "date": "2026-06-19",
   "category": "games",
   "type": "interactive",
+  "rating": 50,
   "thumbnail": "thumbnail.jpg",
   "description": "Breakout in reverse. An infallible paddle sends one ball on a clean arc to the nearest low column of a level Renaissance-colored wall. Each underside hit reserves one new brick, and only that completed cell creeps the aligned lattice upward. No player, no losing. Click to rebuild."
 }

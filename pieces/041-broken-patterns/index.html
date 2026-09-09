@@ -29,6 +29,7 @@
         overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
       }
     </style>
+    <script src="palette.js"></script>
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
   <body>
@@ -75,6 +76,22 @@
           };
         }
 
+        // One iteration per day, the same for everyone who visits that day.
+        // Clicking still explores freely from there; reloading returns to it.
+        function hashForToday(date) {
+          const d = date || new Date();
+          const stamp = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+          // A small deterministic generator, so the day alone fixes the hash.
+          let z = stamp >>> 0;
+          const next = () => {
+            z = (1664525 * z + 1013904223) >>> 0;
+            return z / 4294967296;
+          };
+          next(); next();
+          return 'oo' + Array(49).fill(0)
+            .map(() => ALPHABET[(next() * ALPHABET.length) | 0]).join('');
+        }
+
         function randomHash() {
           return 'oo' + Array(49).fill(0)
             .map(() => ALPHABET[(Math.random() * ALPHABET.length) | 0])
@@ -92,82 +109,13 @@
           return sfc32(...parts.slice(0, 4).map(b58dec));
         }
 
-        // Line colour is [r, g, b, alpha, name]; ground is [r, g, b, name].
-        const PALETTE = [
-          { color: [255, 255, 255, 0.1, 'White'], bg: [20, 20, 20, 'Charcoal'] },
-          { color: [0, 255, 0, 0.1, 'Bright Lime'], bg: [0, 30, 0, 'Forest Green'] },
-          { color: [255, 0, 255, 0.1, 'Magenta'], bg: [20, 0, 20, 'Dark Purple'] },
-          { color: [255, 0, 0, 0.1, 'Bright Red'], bg: [50, 0, 0, 'Dark Clay'] },
-          { color: [0, 0, 255, 0.4, 'Bright Blue'], bg: [0, 0, 10, 'Midnight'] },
-          { color: [71, 140, 137, 0.2, 'Medium Glacier'], bg: [159, 221, 237, 'Sky Blue'] },
-          { color: [255, 100, 0, 0.3, 'Hunter Orange'], bg: [252, 196, 232, 'Pink'] },
-          { color: [255, 100, 0, 0.3, 'Hunter Orange'], bg: [242, 208, 177, 'Peach'] },
-          { color: [197, 115, 216, 0.3, 'Lavendar'], bg: [38, 32, 32, 'Burnt Umber'] },
-          { color: [242, 208, 177, 0.2, 'Peach'], bg: [38, 32, 32, 'Burnt Umber'] },
-          { color: [242, 208, 177, 0.2, 'Peach'], bg: [164, 72, 125, 'Lavendar'] },
-          { color: [85, 53, 65, 0.4, 'Plum'], bg: [242, 208, 177, 'Peach'] },
-          { color: [7, 4, 25, 0.2, 'Charcoal'], bg: [253, 165, 75, 'Tangerine'] },
-          { color: [12, 65, 110, 0.3, 'Regal Blue'], bg: [6, 206, 159, 'Caribbean Green'] },
-          { color: [243, 200, 3, 0.2, 'Sunflower'], bg: [124, 49, 42, 'Copper Clay'] },
-          { color: [240, 243, 243, 0.3, 'Porcelain'], bg: [37, 136, 186, 'Cerulean'] },
-          { color: [37, 136, 186, 0.3, 'Robin Egg'], bg: [240, 243, 243, 'Cerulean'] },
-          { color: [161, 148, 116, 0.3, 'Old Gold'], bg: [240, 243, 243, 'Parchment'] },
-          { color: [240, 243, 203, 0.2, 'Sandstone'], bg: [101, 76, 67, 'Milk Chocolate'] },
-          { color: [57, 70, 15, 0.5, 'Drab Clover'], bg: [111, 213, 213, 'Robin Egg'] },
-          { color: [96, 198, 198, 0.3, 'Robin Egg'], bg: [72, 85, 30, 'Drab Clover'] },
-          { color: [159, 241, 159, 0.4, 'Pastel Green'], bg: [58, 194, 89, 'Mint'] },
-          { color: [56, 255, 144, 0.2, 'Mint'], bg: [84, 0, 134, 'Bright Lavendar'] },
-          // The 265 is original — it clamps to 255 and always has.
-          { color: [84, 0, 134, 0.2, 'Bright Lavendar'], bg: [66, 265, 154, 'Light Mint'] },
-          { color: [224, 137, 123, 0.3, 'Peach'], bg: [8, 70, 70, 'Cyprus'] },
-          { color: [45, 210, 186, 0.2, 'Turquoise'], bg: [34, 92, 94, 'Old Copper'] },
-          { color: [255, 182, 40, 0.2, 'Sunflower'], bg: [4, 158, 233, 'Bright Sky'] },
-          { color: [4, 158, 233, 0.3, 'Bright Sky'], bg: [255, 182, 40, 'Sunflower'] },
-          { color: [255, 207, 158, 0.2, 'Peach'], bg: [4, 158, 233, 'Bright Sky'] },
-          { color: [4, 158, 233, 0.3, 'Bright Sky'], bg: [255, 207, 158, 'Peach'] },
-          { color: [255, 100, 0, 0.3, 'Hunter Orange'], bg: [68, 112, 17, 'Dark Olive'] },
-          { color: [255, 41, 103, 0.3, 'Millenial Pink'], bg: [148, 15, 8, 'Brick'] },
-          { color: [148, 15, 8, 0.3, 'Brick'], bg: [255, 100, 163, 'Pink'] },
-          { color: [0, 255, 255, 0.3, 'Cyan'], bg: [0, 30, 30, 'Dark Glacier'] },
-          { color: [0, 255, 255, 0.3, 'Cyan'], bg: [0, 0, 20, 'Midnight'] },
-          { color: [255, 100, 0, 0.3, 'Hunter Orange'], bg: [0, 30, 30, 'Dark Glacier'] },
-          { color: [240, 243, 203, 0.2, 'Sandstone'], bg: [0, 0, 20, 'Midnight'] },
-          { color: [240, 243, 203, 0.2, 'Sandstone'], bg: [0, 30, 30, 'Dark Glacier'] },
-          { color: [255, 41, 103, 0.3, 'Millenial Pink'], bg: [0, 0, 20, 'Midnight'] },
-          { color: [255, 41, 103, 0.3, 'Millenial Pink'], bg: [0, 30, 30, 'Dark Glacier'] },
-          { color: [243, 200, 3, 0.2, 'Sunflower'], bg: [0, 30, 30, 'Dark Glacier'] },
-          { color: [255, 0, 255, 0.1, 'Magenta'], bg: [0, 0, 20, 'Midnight'] },
-          { color: [255, 0, 255, 0.1, 'Magenta'], bg: [0, 30, 30, 'Dark Glacier'] },
-          { color: [255, 0, 0, 0.1, 'Bright Red'], bg: [20, 0, 20, 'Dark Purple'] },
-          { color: [255, 182, 40, 0.2, 'Sunflower'], bg: [164, 72, 125, 'Lavendar'] },
-          { color: [255, 0, 0, 0.1, 'Bright Red'], bg: [0, 30, 30, 'Dark Glacier'] },
-          { color: [255, 182, 40, 0.2, 'Sunflower'], bg: [20, 0, 20, 'Dark Purple'] },
-          { color: [255, 100, 0, 0.3, 'Hunter Orange'], bg: [12, 65, 110, 'Regal Blue'] },
-          { color: [255, 0, 0, 0.1, 'Bright Red'], bg: [12, 65, 110, 'Regal Blue'] },
-          { color: [0, 255, 0, 0.2, 'Bright Lime'], bg: [12, 65, 110, 'Regal Blue'] },
-          { color: [255, 0, 0, 0.1, 'Bright Red'], bg: [0, 30, 0, 'Forest Green'] },
-          { color: [255, 100, 0, 0.3, 'Hunter Orange'], bg: [0, 30, 0, 'Forest Green'] },
-          { color: [255, 100, 0, 0.3, 'Hunter Orange'], bg: [0, 0, 240, 'Bright Blue'] },
-          { color: [255, 182, 40, 0.3, 'Sunflower'], bg: [0, 30, 0, 'Forest Green'] },
-          { color: [8, 70, 70, 0.3, 'Cyprus'], bg: [255, 207, 158, 'Peach'] },
-          { color: [255, 0, 255, 0.2, 'Magenta'], bg: [255, 207, 158, 'Peach'] },
-          { color: [0, 30, 0, 0.1, 'Forest Green'], bg: [255, 207, 158, 'Peach'] },
-          // The original had a stray alpha here, which pushed the ground name
-          // out of position and titled this iteration "…on a 0.1 Field".
-          { color: [255, 207, 158, 0.1, 'Peach'], bg: [0, 30, 0, 'Forest Green'] },
-          { color: [0, 0, 255, 0.2, 'Bright Blue'], bg: [255, 207, 158, 'Peach'] },
-          { color: [255, 207, 158, 0.2, 'Peach'], bg: [0, 0, 240, 'Bright Blue'] },
-          { color: [255, 182, 40, 0.3, 'Sunflower'], bg: [0, 0, 240, 'Bright Blue'] },
-          { color: [96, 198, 198, 0.3, 'Robin Egg'], bg: [0, 0, 240, 'Bright Blue'] },
-          { color: [240, 243, 203, 0.2, 'Sandstone'], bg: [0, 0, 240, 'Bright Blue'] },
-          { color: [240, 243, 243, 0.2, 'Porcelain'], bg: [0, 0, 240, 'Bright Blue'] },
-          { color: [240, 243, 243, 0.2, 'Porcelain'], bg: [0, 30, 0, 'Forest Green'] },
-          { color: [0, 255, 255, 0.3, 'Cyan'], bg: [148, 15, 8, 'Brick'] },
-          { color: [255, 207, 158, 0.2, 'Peach'], bg: [148, 15, 8, 'Brick'] },
-          { color: [0, 0, 255, 0.2, 'Bright Blue'], bg: [253, 165, 75, 'Tangerine'] },
-          { color: [255, 0, 0, 0.5, 'Bright Red'], bg: [253, 165, 75, 'Tangerine'] },
-          { color: [0, 30, 0, 0.3, 'Forest Green'], bg: [253, 165, 75, 'Tangerine'] }
-        ];
+        // The seventy hand-written {line, ground} pairs that used to live here
+        // are gone. palette.js generates from colour-theory schemes instead,
+        // using the hue vocabulary measured out of those pairs — eleven of them
+        // sat under 0.30 lightness separation and came out muddy. The originals
+        // are in the Broken-Patterns repo and in this file's history.
+        const INK_ALPHAS = [0.1, 0.2, 0.3, 0.4, 0.5];
+
 
         const canvas = document.querySelector('#patterns');
         const ctx = canvas.getContext('2d');
@@ -184,7 +132,7 @@
         let penX = 150;
         let penY = 150;
 
-        start(search.get('hash') || randomHash());
+        start(search.get('hash') || hashForToday());
 
         canvas.addEventListener('click', () => start(randomHash()));
         canvas.addEventListener('keydown', (event) => {
@@ -226,7 +174,14 @@
         }
 
         function buildIteration(hash) {
-          const iro = PALETTE[Math.floor(rand() * PALETTE.length)];
+          const chosen = HGPalette.build(rand, { inkCount: 1 });
+          const alpha = INK_ALPHAS[Math.floor(rand() * INK_ALPHAS.length)];
+          const iro = {
+            color: [...chosen.inks[0].rgb, alpha, chosen.inks[0].name],
+            bg: [...chosen.ground.rgb, chosen.ground.name],
+            scheme: chosen.scheme,
+            separation: chosen.separation
+          };
           const systemSize = Math.round(rand() * 12 + 5);
           const steps = Math.round(Math.PI * (rand() * 100 + 100));
           const R = steps * 0.16666;      // major ripple

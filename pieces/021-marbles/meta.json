@@ -4,6 +4,7 @@
   "date": "2026-07-31",
   "category": "generative",
   "type": "generative",
+  "rating": 60,
   "thumbnail": "thumbnail.jpg",
   "description": "Four bookmatched marble tiles cut from one procedural slab. Each seed selects a Life Checkers palette and randomized marble settings for a photographic surface whose turbulence flows through a seamless five-second loop."
 }
