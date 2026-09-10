@@ -80,7 +80,7 @@ $fx.params([
   },
   {
     id: "rowSize",
-    name: "Row Size",
+    name: "Grid Size",
     type: "select",
     options: { options: ["2", "3", "4", "5", "6", "7", "8", "9","10","11"] },
   },
@@ -315,10 +315,10 @@ const palettes = {
 // derivations themselves are unchanged and in the original order.
 let evolutionDirection, layoutMode, directionMode, lineWeightMode, containerSize;
 let paletteName, showShape, burstMode, fillAmount, paddingMode;
-let rows, cols, totalCells;
+let gridSize, rows, cols, totalCells;
 
 // === STYLES & CANVAS ===
-let cellW, cellH, palette;
+let cellW, cellH, gridOffsetX, gridOffsetY, palette;
 const drawInterval  = 1;
 const fadeInFrames  = 0;
 const fps           = 60;
@@ -346,9 +346,7 @@ function applyParams() {
   burstMode          = $fx.getParam("burstMode");
   fillAmount         = $fx.getParam("fillAmount");
   paddingMode        = $fx.getParam("paddingMode");
-  rows               = parseInt($fx.getParam("rowSize"), 10);
-  cols               = rows; // square layout
-  totalCells         = cols * rows;
+  gridSize           = parseInt($fx.getParam("rowSize"), 10);
 
   palette            = palettes[paletteName];
 
@@ -356,6 +354,32 @@ function applyParams() {
   if (paddingMode === "None")      padding = 10;
   else if (paddingMode === "Some") padding = 30;
   else if (paddingMode === "Alot") padding = 50;
+
+  // Keep every cell square at the size established by the shorter axis. The
+  // longer axis adds only complete cells. Any leftover room stays outside the
+  // centered grid so its horizontal and vertical cell spacing remain equal.
+  const canvasWidth = typeof width === "number" ? width : window.innerWidth;
+  const canvasHeight = typeof height === "number" ? height : window.innerHeight;
+  const drawWidth = Math.max(1, canvasWidth - padding * 2);
+  const drawHeight = Math.max(1, canvasHeight - padding * 2);
+  const targetCellSize = Math.min(drawWidth, drawHeight) / gridSize;
+  const wholeCellsThatFit = available => Math.max(
+    gridSize,
+    Math.floor(available / targetCellSize + 1e-9)
+  );
+
+  if (drawWidth >= drawHeight) {
+    rows = gridSize;
+    cols = wholeCellsThatFit(drawWidth);
+  } else {
+    cols = gridSize;
+    rows = wholeCellsThatFit(drawHeight);
+  }
+
+  cellW = cellH = targetCellSize;
+  gridOffsetX = (canvasWidth - cols * cellW) / 2;
+  gridOffsetY = (canvasHeight - rows * cellH) / 2;
+  totalCells = cols * rows;
 
   // === BURST LOGIC ===
   const burstMap = {
@@ -392,7 +416,8 @@ function applyParams() {
     lineWeightMode,
     containerSize,
     palette: paletteName,
-    rowSize: rows,
+    rowSize: gridSize,
+    gridDimensions: `${cols}x${rows}`,
     padding: paddingMode,
   };
 }
@@ -435,11 +460,20 @@ function randomDirectionMode() {
 
 updateFeatures();
 function setup() {
-  let cnv = createCanvas(600, 600);
+  let cnv = createCanvas(windowWidth, windowHeight);
   cnv.parent("#canvasWrapper");
-  cnv.removeAttribute("style");
   buildPiece();
   frameRate(60);
+}
+
+function windowResized() {
+  if (windowWidth === width && windowHeight === height) return;
+  resizeCanvas(windowWidth, windowHeight);
+  if (typeof window.reformPiece === "function") window.reformPiece();
+  else {
+    applyParams();
+    buildPiece();
+  }
 }
 
 // Everything downstream of the parameters and the hash. Split out of setup()
@@ -453,11 +487,6 @@ function buildPiece() {
   noiseSeed(parseInt($fx.hash.slice(0, 16), 16));
   palette = palettes[paletteName];
 
-  let drawWidth = width - padding * 2;
-  let drawHeight = height - padding * 2;
-  cellW = drawWidth / cols;
-  cellH = drawHeight / rows;
-  
   noFill();
   background(palette.bg);
   
@@ -474,8 +503,8 @@ function buildPiece() {
     const parent = index > 0 ? cells[index - 1] : null;
     // const cell = new Cell(x * cellW, y * cellH, cellW, parent, steps, isBurst);
     const cell = new Cell(
-      padding + x * cellW,
-      padding + y * cellH,
+      gridOffsetX + x * cellW,
+      gridOffsetY + y * cellH,
       cellW,
       parent,
       steps,
@@ -546,10 +575,14 @@ function generateSpiralIndices(cols, rows) {
     top++;
     for (let y = top; y <= bottom; y++) spiral.push({ x: right, y });
     right--;
-    for (let x = right; x >= left; x--) spiral.push({ x, y: bottom });
-    bottom--;
-    for (let y = bottom; y >= top; y--) spiral.push({ x: left, y });
-    left++;
+    if (top <= bottom) {
+      for (let x = right; x >= left; x--) spiral.push({ x, y: bottom });
+      bottom--;
+    }
+    if (left <= right) {
+      for (let y = bottom; y >= top; y--) spiral.push({ x: left, y });
+      left++;
+    }
   }
 
   return spiral;
@@ -1032,4 +1065,3 @@ class Cell {
     let b = (num & 255) * factor;
     return `rgb(${r}, ${g}, ${b})`;
   }
-    

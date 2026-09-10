@@ -39,9 +39,6 @@ Every newly completed cell advances the shared lattice upward by one column's
 fraction of a brick. A bounce that cannot add a genuinely empty cell does not
 move the grid. No timer or invisible boundary moves the wall.
 
-Add `?debug` to the URL for a live overlay of frame rate, ball and paddle state,
-wall hits, completed cells, front spread, missed deposits, and recoveries.
-
 ## Color
 
 The wall uses Growth Rings' Renaissance palette: chestnut, pale brown, crimson,

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="Large, wandering ink drops build shifting suminagashi rings until an enormous pale bloom clears the saturated bath into a new background color."
+      content="Layered mineral inks drift into fluid marbled currents until an enormous pale bloom clears the saturated bath into a new background color."
     />
     <title>Marbled Water · HyperGal</title>
     <style>
@@ -26,7 +26,7 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: #f3f1e9;
+        background: #d9e2e5;
       }
 
       body {
@@ -40,7 +40,7 @@
         display: block;
         width: 100%;
         height: 100%;
-        background: #f3f1e9;
+        background: #d9e2e5;
         cursor: crosshair;
         touch-action: none;
       }
@@ -307,7 +307,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Marbled Water: colored ink drops expand into wandering suminagashi rings. When the bath stays full, an enormous pale drop clears it into a new background color. Use the panel to adjust the drops or click the bath to place ink."
+      aria-label="Marbled Water: layered mineral inks expand into wandering blue-gray currents with fine iridescent veins. When the bath stays full, an enormous pale drop clears it into a new background color. Use the panel to adjust the drops or click the bath to place ink."
     ></canvas>
 
     <aside class="water-panel is-collapsed" aria-label="Marbled water controls">
@@ -345,7 +345,7 @@
             <label for="palette">Palette</label>
             <select id="palette">
               <option value="0">Ebru classic</option>
-              <option value="1" selected>Suminagashi</option>
+              <option value="1" selected>Mineral current</option>
               <option value="2">Garden pigments</option>
               <option value="3">Primary press</option>
               <option value="4">Sea glass</option>
@@ -362,7 +362,7 @@
           <div class="range-row">
             <label for="drop-size">Drop size</label>
             <output class="control-value" for="drop-size">5.8%</output>
-            <input id="drop-size" type="range" min="15" max="100" value="58" />
+            <input id="drop-size" type="range" min="15" max="100" value="42" />
           </div>
 
           <div class="range-row">
@@ -399,23 +399,23 @@
         const pageParams = new URLSearchParams(location.search);
         const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 
-        const PAPER = '#f3f1e9';
+        const PAPER = '#d9e2e5';
         const BATH_BACKGROUNDS = [
-          '#dbe8e7',
-          '#ead8ce',
-          '#dce5d4',
-          '#e3d9e8',
-          '#e8e1c6'
+          '#d4e0e3',
+          '#cbd9df',
+          '#d9dfdc',
+          '#c8d5dc',
+          '#d7dce3'
         ];
-        const POINT_COUNT = 96;
-        const INITIAL_RING_COUNT = 7;
-        const MAX_SHAPES = 180;
+        const POINT_COUNT = 144;
+        const INITIAL_RING_COUNT = 18;
+        const MAX_SHAPES = 260;
         const MAX_CANVAS_PIXELS = 2600000;
         const SUMINAGASHI_PALETTE = 1;
         const DROP_EXPANSION_SCALE = 1.8;
-        const CENTER_RUN_CHANCE = 0.3;
+        const CENTER_RUN_CHANCE = 0.08;
         const CENTER_RUN_MIN = 2;
-        const CENTER_RUN_MAX = 4;
+        const CENTER_RUN_MAX = 3;
         const MIN_DROPS_BEFORE_BACKGROUND = 30;
         const FULLNESS_THRESHOLD = 0.92;
         const FULLNESS_HOLD = 8000;
@@ -430,12 +430,17 @@
 
         const PALETTES = [
           ['#b62b59', '#d84c31', '#d4a51f', '#1c4f91', '#1c7562', '#1f1c1d'],
-          ['#171719', '#64636a', '#a3362e', '#263f72', '#c8bdb0'],
+          [
+            '#143b63', '#426d92', '#789bb5', '#b5c8d3', '#d7dfe0',
+            '#244f78', '#5c82a1', '#9eb7c8', '#0f3158', '#cfdae0',
+            '#7d6a55', '#327878', '#714956', '#356486'
+          ],
           ['#b32868', '#e05e75', '#72368c', '#32744a', '#e1ad2d', '#273d77'],
           ['#d7352a', '#e8be23', '#1d57a6', '#151515', '#f06b33'],
           ['#167a83', '#35a5ad', '#244f8c', '#e66f5e', '#c3ae58', '#34383c'],
           ['#9e3f2c', '#d18d28', '#315b42', '#59626b', '#3b2923', '#c2a86c']
         ];
+        const MINERAL_ACCENTS = new Set(['#7d6a55', '#327878', '#714956']);
 
         const controls = {
           tempo: document.getElementById('tempo'),
@@ -459,6 +464,8 @@
         let lastInkPosition = null;
         let centerRunRemaining = 0;
         let centerRunCooldown = 2;
+        let flowField = null;
+        let surfaceFlecks = [];
         let bathColor = PAPER;
         let fullSince = 0;
         let nextFullnessCheck = 0;
@@ -519,6 +526,8 @@
           nextFullnessCheck = performance.now() + FULLNESS_CHECK_INTERVAL;
           backgroundDropCooldownUntil = 0;
           random = mulberry32(seed);
+          flowField = createBathFlow();
+          surfaceFlecks = createSurfaceFlecks();
 
           seedInitialBath();
           nextDropAt = performance.now() + nextDropDelay() * 0.55;
@@ -550,13 +559,15 @@
 
         function seedInitialBath() {
           const base = Math.min(width, height) * Number(controls.dropSize.value) / 1000;
-          const openingBase = base * (usesSuminagashiSpacing() ? 1.32 : 1.16);
+          const openingBase = base * (usesSuminagashiSpacing() ? 1.48 : 1.16);
           const variation = Number(controls.sizeVariation.value) / 100;
           const marginX = Math.min(width * 0.12, openingBase * 2.4);
           const marginY = Math.min(height * 0.12, openingBase * 2.4);
           const poolCount = usesSuminagashiSpacing()
-            ? clamp(Math.round(Math.sqrt(width / Math.max(1, height)) * 4.6), 4, 7)
+            ? clamp(Math.round(Math.sqrt(width / Math.max(1, height)) * 5.2), 5, 7)
             : clamp(Math.round(Math.sqrt(width / Math.max(1, height)) * 5.3), 5, 8);
+
+          if (usesSuminagashiSpacing()) seedMineralWash();
           const pools = createInkStations(poolCount, marginX, marginY);
 
           for (const pool of pools) {
@@ -565,10 +576,10 @@
             let currentAngle = random() * TAU;
 
             for (let ring = 0; ring < INITIAL_RING_COUNT; ring++) {
-              currentAngle += (random() * 2 - 1) * 0.72;
+              currentAngle += (random() * 2 - 1) * 0.34;
               const drift = openingBase * (ring === 0
                 ? random() * 0.035
-                : 0.055 + random() * 0.22);
+                : 0.18 + random() * 0.52);
               cursorX = clamp(
                 cursorX + Math.cos(currentAngle) * drift,
                 marginX,
@@ -579,13 +590,14 @@
                 marginY,
                 height - marginY
               );
-              const sizeScale = sampleDropScale(variation * 0.78);
-              const radius = openingBase * 0.82 * sizeScale;
+              const sizeScale = clamp(sampleDropScale(variation * 0.78), 0.58, 1.38);
+              const color = nextInkColor();
+              const radius = openingBase * 0.88 * sizeScale * pigmentScale(color);
               placeSettledInk(
                 cursorX,
                 cursorY,
                 Math.max(4, radius),
-                nextInkColor(),
+                color,
                 usesSuminagashiSpacing()
               );
             }
@@ -601,6 +613,21 @@
           // The opening rings are the bath's starting material. The counter
           // tracks only ink added after the first frame.
           complexity = 0;
+        }
+
+        function seedMineralWash() {
+          const scale = Math.min(width, height);
+          const x = width * (0.4 + random() * 0.2);
+          const y = height * (0.38 + random() * 0.24);
+          const angle = random() * TAU;
+
+          placeSettledInk(x, y, scale * (0.58 + random() * 0.12), '#789bb5');
+          placeSettledInk(
+            x + Math.cos(angle) * scale * 0.13,
+            y + Math.sin(angle) * scale * 0.13,
+            scale * (0.24 + random() * 0.08),
+            '#b5c8d3'
+          );
         }
 
         function createInkStations(count, marginX, marginY) {
@@ -652,10 +679,10 @@
 
         function createSuminagashiHalo(x, y) {
           const angle = random() * TAU;
-          const offset = random() * 0.022;
+          const offset = random() * 0.038;
           const form = createDropForm();
           return {
-            scale: 1.07 + random() * 0.07,
+            scale: 1.045 + random() * 0.13,
             offsetX: Math.cos(angle) * offset,
             offsetY: Math.sin(angle) * offset,
             shape: {
@@ -670,8 +697,8 @@
           const eddies = pools.map((pool) => ({
             x: pool.x + (random() * 2 - 1) * base * 0.9,
             y: pool.y + (random() * 2 - 1) * base * 0.9,
-            radius: base * (3.4 + random() * 2.2),
-            turn: (random() < 0.5 ? -1 : 1) * (0.18 + random() * 0.16)
+            radius: base * (4.8 + random() * 3.6),
+            turn: (random() < 0.5 ? -1 : 1) * (0.28 + random() * 0.28)
           }));
 
           for (const shape of shapes) {
@@ -681,7 +708,12 @@
                 const dy = point.y - eddy.y;
                 const influence = Math.exp(-(dx * dx + dy * dy) /
                   (2 * eddy.radius * eddy.radius));
-                const angle = eddy.turn * influence;
+                const radialPull = clamp(
+                  Math.hypot(dx, dy) / Math.max(1, eddy.radius),
+                  0,
+                  1.4
+                );
+                const angle = eddy.turn * influence * (0.55 + radialPull);
                 const cosine = Math.cos(angle);
                 const sine = Math.sin(angle);
                 point.x = eddy.x + dx * cosine - dy * sine;
@@ -690,6 +722,114 @@
               constrainPoint(point);
             }
           }
+        }
+
+        function createBathFlow() {
+          const scale = Math.min(width, height);
+          const vortexCount = usesSuminagashiSpacing() ? 7 : 5;
+          const vortices = [];
+
+          for (let index = 0; index < vortexCount; index++) {
+            vortices.push({
+              x: width * (-0.08 + random() * 1.16),
+              y: height * (-0.08 + random() * 1.16),
+              radius: scale * (0.22 + random() * 0.36),
+              turn: (random() < 0.5 ? -1 : 1) * (0.16 + random() * 0.32)
+            });
+          }
+
+          return {
+            phaseX: random() * TAU,
+            phaseY: random() * TAU,
+            phaseFine: random() * TAU,
+            sweepX: scale * (0.075 + random() * 0.055),
+            sweepY: scale * (0.032 + random() * 0.04),
+            direction: random() < 0.5 ? -1 : 1,
+            vortices
+          };
+        }
+
+        function createSurfaceFlecks() {
+          const area = width * height;
+          const count = clamp(Math.round(area / 7200), 90, 260);
+          const inset = bathInset();
+          const flecks = [];
+
+          for (let index = 0; index < count; index++) {
+            flecks.push({
+              x: inset + random() * Math.max(1, width - inset * 2),
+              y: inset + random() * Math.max(1, height - inset * 2),
+              radius: 0.35 + Math.pow(random(), 2) * 1.45,
+              stretch: 0.55 + random() * 1.8,
+              rotation: random() * TAU,
+              pale: random() < 0.78,
+              alpha: 0.12 + random() * 0.28
+            });
+          }
+
+          return flecks;
+        }
+
+        function warpCoordinates(x, y, out) {
+          if (!flowField) {
+            out.x = x;
+            out.y = y;
+            return out;
+          }
+
+          const inset = bathInset();
+          const scale = Math.min(width, height);
+          const edgeDistance = Math.min(
+            x - inset,
+            width - inset - x,
+            y - inset,
+            height - inset - y
+          );
+          const edgeBlend = clamp(edgeDistance / Math.max(1, scale * 0.075), 0, 1);
+          const nx = x / Math.max(1, width);
+          const ny = y / Math.max(1, height);
+          let px = x + edgeBlend * (
+            Math.sin(ny * TAU * 0.92 + flowField.phaseX) * flowField.sweepX +
+            Math.sin(ny * TAU * 2.7 + flowField.phaseFine) * scale * 0.018 +
+            Math.sin((nx * 5.2 + ny * 2.3) * TAU - flowField.phaseY) * scale * 0.007
+          );
+          let py = y + edgeBlend * (
+            Math.sin(nx * TAU * 1.08 + flowField.phaseY) * flowField.sweepY +
+            Math.sin((nx + ny) * TAU * 1.8 - flowField.phaseFine) * scale * 0.014 +
+            Math.sin((ny * 4.7 - nx * 1.9) * TAU + flowField.phaseX) * scale * 0.006
+          ) * flowField.direction;
+
+          for (const vortex of flowField.vortices) {
+            const dx = px - vortex.x;
+            const dy = py - vortex.y;
+            const distanceSquared = dx * dx + dy * dy;
+            const radiusSquared = vortex.radius * vortex.radius;
+            const influence = Math.exp(-distanceSquared / Math.max(1, radiusSquared));
+            const angle = vortex.turn * influence * edgeBlend;
+            const cosine = Math.cos(angle);
+            const sine = Math.sin(angle);
+            px = vortex.x + dx * cosine - dy * sine;
+            py = vortex.y + dx * sine + dy * cosine;
+          }
+
+          out.x = clamp(px, inset, width - inset);
+          out.y = clamp(py, inset, height - inset);
+          return out;
+        }
+
+        function unwarpCoordinates(x, y) {
+          const model = { x, y };
+          const warped = { x, y };
+
+          // The bath mapping is smooth, so a few correction passes are enough
+          // to keep a pointer-made drop beneath the viewer's hand.
+          for (let iteration = 0; iteration < 7; iteration++) {
+            warpCoordinates(model.x, model.y, warped);
+            model.x = clamp(model.x + x - warped.x, bathInset(), width - bathInset());
+            model.y = clamp(model.y + y - warped.y, bathInset(), height - bathInset());
+          }
+
+          return model;
         }
 
         function tick(time) {
@@ -788,7 +928,15 @@
             station.y += (y - station.y) * 0.08;
           }
 
-          startDrop(x, y, radius, nextInkColor(), time, repeatsLastCenter);
+          const color = nextInkColor();
+          startDrop(
+            x,
+            y,
+            radius * pigmentScale(color),
+            color,
+            time,
+            repeatsLastCenter
+          );
         }
 
         function startDrop(x, y, radius, color, time, centeredRepeat = false) {
@@ -1084,7 +1232,30 @@
           ctx.fillRect(0, 0, width, height);
 
           for (const shape of shapes) drawShape(shape);
+          drawSurfaceFlecks();
           drawBathBorder();
+        }
+
+        function drawSurfaceFlecks() {
+          const warped = { x: 0, y: 0 };
+          ctx.save();
+          for (const fleck of surfaceFlecks) {
+            warpCoordinates(fleck.x, fleck.y, warped);
+            ctx.beginPath();
+            ctx.ellipse(
+              warped.x,
+              warped.y,
+              fleck.radius * fleck.stretch,
+              fleck.radius,
+              fleck.rotation,
+              0,
+              TAU
+            );
+            ctx.globalAlpha = fleck.alpha;
+            ctx.fillStyle = fleck.pale ? '#eef1ed' : '#173a58';
+            ctx.fill();
+          }
+          ctx.restore();
         }
 
         function drawBathBorder() {
@@ -1104,23 +1275,31 @@
         function drawShape(shape) {
           const points = shape.points;
           if (points.length < 3) return;
+          if (!shape.renderPoints || shape.renderPoints.length !== points.length * 2) {
+            shape.renderPoints = new Float32Array(points.length * 2);
+          }
+          const warped = { x: 0, y: 0 };
+          for (let index = 0; index < points.length; index++) {
+            warpCoordinates(points[index].x, points[index].y, warped);
+            shape.renderPoints[index * 2] = warped.x;
+            shape.renderPoints[index * 2 + 1] = warped.y;
+          }
 
           ctx.beginPath();
-          const lastPoint = points[points.length - 1];
-          const firstPoint = points[0];
+          const lastIndex = (points.length - 1) * 2;
           ctx.moveTo(
-            (lastPoint.x + firstPoint.x) * 0.5,
-            (lastPoint.y + firstPoint.y) * 0.5
+            (shape.renderPoints[lastIndex] + shape.renderPoints[0]) * 0.5,
+            (shape.renderPoints[lastIndex + 1] + shape.renderPoints[1]) * 0.5
           );
 
           for (let i = 0; i < points.length; i++) {
-            const point = points[i];
-            const next = points[(i + 1) % points.length];
+            const pointIndex = i * 2;
+            const nextIndex = ((i + 1) % points.length) * 2;
             ctx.quadraticCurveTo(
-              point.x,
-              point.y,
-              (point.x + next.x) * 0.5,
-              (point.y + next.y) * 0.5
+              shape.renderPoints[pointIndex],
+              shape.renderPoints[pointIndex + 1],
+              (shape.renderPoints[pointIndex] + shape.renderPoints[nextIndex]) * 0.5,
+              (shape.renderPoints[pointIndex + 1] + shape.renderPoints[nextIndex + 1]) * 0.5
             );
           }
 
@@ -1130,13 +1309,17 @@
         }
 
         function createDropForm() {
-          const looseness = usesSuminagashiSpacing() ? 1.18 : 1;
+          const looseness = usesSuminagashiSpacing() ? 1.34 : 1;
           return {
-            stretch: 0.975 + random() * 0.05,
+            stretch: usesSuminagashiSpacing()
+              ? 0.82 + random() * 0.38
+              : 0.94 + random() * 0.12,
             rotation: random() * TAU,
-            broadWobble: (0.007 + random() * 0.012) * looseness,
-            fineWobble: (0.001 + random() * 0.004) * looseness,
+            broadWobble: (0.026 + random() * 0.052) * looseness,
+            midWobble: (0.012 + random() * 0.034) * looseness,
+            fineWobble: (0.003 + random() * 0.012) * looseness,
             broadPhase: random() * TAU,
+            midPhase: random() * TAU,
             finePhase: random() * TAU
           };
         }
@@ -1189,8 +1372,9 @@
           for (let i = 0; i < pointCount; i++) {
             const angle = i / pointCount * TAU;
             const irregularity = 1 +
-              Math.sin(angle * 3 + (form.broadPhase || 0)) * (form.broadWobble || 0) +
-              Math.sin(angle * 7 + (form.finePhase || 0)) * (form.fineWobble || 0);
+              Math.sin(angle * 2 + (form.broadPhase || 0)) * (form.broadWobble || 0) +
+              Math.sin(angle * 5 + (form.midPhase || 0)) * (form.midWobble || 0) +
+              Math.sin(angle * 9 + (form.finePhase || 0)) * (form.fineWobble || 0);
             const localX = Math.cos(angle) * irregularity * stretch;
             const localY = Math.sin(angle) * irregularity / stretch;
             profile[i * 2] = localX * rotationCosine - localY * rotationSine;
@@ -1205,6 +1389,11 @@
           const color = palette[colorIndex % palette.length];
           colorIndex++;
           return color;
+        }
+
+        function pigmentScale(color) {
+          if (!usesSuminagashiSpacing() || !MINERAL_ACCENTS.has(color)) return 1;
+          return 0.28 + random() * 0.18;
         }
 
         function usesSuminagashiSpacing() {
@@ -1246,13 +1435,17 @@
           canvas.focus({ preventScroll: true });
           const rect = canvas.getBoundingClientRect();
           const inset = bathInset();
-          const x = clamp(event.clientX - rect.left, inset, width - inset);
-          const y = clamp(event.clientY - rect.top, inset, height - inset);
+          const pointerX = clamp(event.clientX - rect.left, inset, width - inset);
+          const pointerY = clamp(event.clientY - rect.top, inset, height - inset);
+          const modelPoint = unwarpCoordinates(pointerX, pointerY);
+          const x = modelPoint.x;
+          const y = modelPoint.y;
           const base = Math.min(width, height) *
             Number(controls.dropSize.value) / 1000;
           const variation = Number(controls.sizeVariation.value) / 100;
-          const radius = base * sampleDropScale(variation);
-          startDrop(x, y, Math.max(4, radius), nextInkColor(), performance.now());
+          const color = nextInkColor();
+          const radius = base * sampleDropScale(variation) * pigmentScale(color);
+          startDrop(x, y, Math.max(4, radius), color, performance.now());
           status.textContent = 'Ink dropped into the bath.';
         }
 

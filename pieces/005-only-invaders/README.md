@@ -13,15 +13,17 @@ cut across the field and erase it instead. Reaction times, intercept heights,
 aim points, lateral lunges, volley cadences, and defensive urgency all vary.
 Some saves are clean and early. Others wait until the last possible instant.
 
-Every projectile fired consumes one of forty-eight rounds from that defender's
-stockpile. The remaining ammunition is shown only as tiny cartridges along its
-edge—there is no numeric counter or score. Empty slots remain as faint outlines.
+Every ordinary projectile fired consumes one of forty-eight rounds from that
+defender's stockpile. The remaining ammunition is shown only as tiny cartridges
+along its edge—there is no numeric counter or score. Empty slots remain as faint
+outlines.
 There are no charged super bullets during ordinary play.
 
 No defender fires its final cartridge as an ordinary shot. When a cannon next
-tries to fire with one round left, it deploys that round as a suicide nuke. The
-cannon disappears at the point of detonation and a white shockwave expands
-across the field, destroying every opposing cannon as it reaches them. Their
-unused ammunition remains visible but inert after mutual destruction.
+tries to fire with one round left, that cartridge becomes an enormous pulsing
+yellow bomb, shown in the ammunition strip as a large pulsing circle. The other
+three cannons immediately abandon the surrounding fight, track the bomb, and
+fire at it together. Twelve impacts strip away its radial charge marks before
+it bursts and the ordinary crossfire resumes.
 
 Open `index.html` directly in any browser.

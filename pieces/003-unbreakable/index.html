@@ -7,17 +7,6 @@
     <style>
       html, body { margin: 0; height: 100%; background: #160f18; overflow: hidden; }
       #stage { position: fixed; inset: 0; display: block; }
-      .caption {
-        position: fixed;
-        bottom: 1rem;
-        left: 1rem;
-        color: #f9f7e5;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: .8rem;
-        letter-spacing: .05em;
-        pointer-events: none;
-        z-index: 10;
-      }
     </style>
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
@@ -27,7 +16,6 @@
       role="img"
       aria-label="Unbreakable: a reverse Breakout machine whose infallible paddle builds an even wall of Renaissance-colored bricks, one low column at a time."
     ></canvas>
-    <div class="caption">unbreakable · 2026 · reverse breakout · click to rebuild</div>
     <script>
       // unbreakable — a Breakout run in reverse.
       //
@@ -429,7 +417,6 @@
         if (ball.trail.length > 16) ball.trail.splice(0, ball.trail.length - 16);
 
         draw();
-        drawDebug();
         raf = requestAnimationFrame(tick);
       }
 
@@ -532,52 +519,6 @@
       function hexA(hex, alpha) {
         const n = parseInt(hex.slice(1), 16);
         return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
-      }
-
-      const DEBUG = location.search.includes('debug');
-      function drawDebug() {
-        if (!DEBUG) return;
-        let lo = Infinity;
-        let hi = -Infinity;
-        for (let c = 0; c < numCols; c++) {
-          lo = Math.min(lo, frontY(c));
-          hi = Math.max(hi, frontY(c));
-        }
-
-        const diagnostics = {
-          fps: frameStats.fps,
-          maxFrameMs: Number(frameStats.maxFrameMs.toFixed(2)),
-          physicsSteps: frameStats.lastSteps,
-          ball: {
-            x: Number(ball.x.toFixed(2)),
-            y: Number(ball.y.toFixed(2)),
-            vx: Number(ball.vx.toFixed(2)),
-            vy: Number(ball.vy.toFixed(2)),
-            phase: ball.phase,
-            targetCol: ball.targetCol,
-          },
-          paddle: {
-            x: Number(ball.paddle.x.toFixed(2)),
-            targetX: Number(ball.paddle.targetX.toFixed(2)),
-          },
-          bricks: bricks.length,
-          spread: Number((hi - lo).toFixed(2)),
-          pending: pendingDeposit ? 1 : 0,
-          ...impactStats,
-        };
-        window.__unbreakableDebug = diagnostics;
-        canvas.dataset.debug = JSON.stringify(diagnostics);
-
-        ctx.fillStyle = SCENE.paper;
-        ctx.font = '13px ui-monospace, monospace';
-        const lines = [
-          `fps=${diagnostics.fps} maxFrame=${diagnostics.maxFrameMs}ms steps=${diagnostics.physicsSteps}`,
-          `ball x=${diagnostics.ball.x} y=${diagnostics.ball.y} vx=${diagnostics.ball.vx} vy=${diagnostics.ball.vy} ${diagnostics.ball.phase}`,
-          `paddle x=${diagnostics.paddle.x} target=${diagnostics.paddle.targetX} column=${diagnostics.ball.targetCol}`,
-          `bricks=${diagnostics.bricks} spread=${diagnostics.spread} pending=${diagnostics.pending}`,
-          `hits=${diagnostics.hits} cells=${diagnostics.cells} misses=${diagnostics.misses} recoveries=${diagnostics.recoveries}`,
-        ];
-        lines.forEach((line, i) => ctx.fillText(line, 12, 24 + i * 18));
       }
 
       addEventListener('resize', reset);

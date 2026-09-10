@@ -7,25 +7,11 @@
     <style>
       html, body { margin: 0; height: 100%; background: #061016; overflow: hidden; }
       canvas { display: block; width: 100%; height: 100%; }
-      .caption {
-        position: fixed;
-        left: 50%;
-        bottom: 1rem;
-        transform: translateX(-50%);
-        color: rgba(229, 246, 255, .62);
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: .8rem;
-        letter-spacing: .04em;
-        text-align: center;
-        pointer-events: none;
-        text-shadow: 0 1px 0 #000;
-      }
     </style>
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
   <body>
     <canvas id="stage"></canvas>
-    <div class="caption">Only Centipede · 2026 · click to reseed</div>
     <script>
       const canvas = document.getElementById('stage');
       const ctx = canvas.getContext('2d');
@@ -38,7 +24,6 @@
         top: '#ff6b9d',
         bottom: '#7cf7c8',
         bullet: '#ffe66d',
-        text: 'rgba(229,246,255,.86)',
       };
       const CENT_COLORS = ['#38ff5d', '#ff4fd8', '#ffc400', '#22c8ff', '#ff5a3d', '#aaff00', '#b66cff', '#ffffff', '#ff8a00', '#00ffd8'];
       const MUSH_COLORS = ['#36d49f', '#31b8ff', '#ff9f5a', '#b889ff'];
@@ -922,7 +907,6 @@
         drawDefender(defenders.bottom);
         drawBullets();
         drawSparks();
-        drawHud();
         ctx.restore();
         drawScreenFlash();
       }
@@ -1141,19 +1125,6 @@
           ctx.fillRect(s.x - s.r / 2, s.y - s.r / 2, s.r, s.r);
         }
         ctx.restore();
-      }
-
-      function drawHud() {
-        ctx.font = '700 13px ui-monospace, SFMono-Regular, Menlo, monospace';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = COLORS.top;
-        ctx.fillText(`TOP ${String(defenders.top.hits).padStart(3, '0')}`, 18, 26);
-        ctx.fillStyle = COLORS.bottom;
-        ctx.fillText(`BOTTOM ${String(defenders.bottom.hits).padStart(3, '0')}`, 18, H - 26);
-        ctx.fillStyle = COLORS.text;
-        ctx.textAlign = 'right';
-        ctx.fillText(`SEGS ${String(activeSegmentCount()).padStart(2, '0')}`, W - 18, 26);
-        ctx.textAlign = 'left';
       }
 
       function drawScreenFlash() {

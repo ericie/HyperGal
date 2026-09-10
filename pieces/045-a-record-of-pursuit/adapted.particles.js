@@ -36,6 +36,9 @@ var centerY = 960;
 
 var gridUnit = 512;
 var gridMargin = 384/2;
+var baseGridSize = 4;
+var gridCols = baseGridSize;
+var gridRows = baseGridSize;
 
 var targetList = {
 	Grid_1_1: {
@@ -204,9 +207,9 @@ var targetList = {
 
 }
 
-// The sixteen targets are written at fifths of a 1920 square. Rescale those
-// positions onto the real canvas so the grid spans the window, keeping each
-// target's own velocity and radius exactly as written.
+// The original sixteen targets were written at fifths of a 1920 square. Keep
+// that four-target density on the shorter axis, then add targets on the longer
+// axis so portrait, landscape and wide screens all have the same visual rhythm.
 var stageScale = 1;
 var travelScale = 1;
 
@@ -222,30 +225,64 @@ function layoutTargets(w, h) {
 	travelScale = Math.max(w, h) / 1920;
 	centerX = w / 2;
 	centerY = h / 2;
-	// The grid itself stays square and centred. The canvas fills the window so
-	// the lines can enter from the real edges, but stretching the grid to the
-	// window's aspect pulls the composition out of shape.
-	const span = Math.min(w, h);
-	const originX = (w - span) / 2;
-	const originY = (h - span) / 2;
 
-	for (const key in targetList) {
-		const t = targetList[key];
-		if (t.basisParent === undefined) {
-			t.basisParent = { x: t.parent.x, y: t.parent.y };
+	const baseSpacing = Math.min(w, h) / (baseGridSize + 1);
+	gridCols = Math.max(baseGridSize, Math.round(w / baseSpacing) - 1);
+	gridRows = Math.max(baseGridSize, Math.round(h / baseSpacing) - 1);
+
+	targetList = {};
+	for (let row = 0; row < gridRows; row++) {
+		for (let col = 0; col < gridCols; col++) {
+			const name = `Grid_${row + 1}_${col + 1}`;
+			const x = ((col + 1) * w) / (gridCols + 1);
+			const y = ((row + 1) * h) / (gridRows + 1);
+			targetList[name] = {
+				name,
+				parent: { x, y },
+				x,
+				y,
+				r: 10,
+				v: 0.2 + ((row + col) % 5) * 0.1,
+				a: 0,
+				orbitR: 50
+			};
 		}
-		t.parent.x = originX + (t.basisParent.x / 1920) * span;
-		t.parent.y = originY + (t.basisParent.y / 1920) * span;
+	}
+
+	targetOrder = spiralTargetOrder(gridCols, gridRows);
+	systemSize = targetOrder.length * 2;
+	if (titleParts) {
+		titleParts.lineCount = systemSize;
+		titleParts.title = systemSize + ' ' + lineColors + ' Lines Seeking on a ' + titleParts.background + ' Field';
 	}
 }
 
-var targetOrder = [
-	"Grid_1_1","Grid_1_2","Grid_1_3","Grid_1_4",
-	"Grid_2_4","Grid_3_4","Grid_4_4",
-	"Grid_4_3","Grid_4_2","Grid_4_1",
-	"Grid_3_1","Grid_2_1","Grid_3_2","Grid_3_3",
-	"Grid_2_3","Grid_2_2"	
-]
+function spiralTargetOrder(cols, rows) {
+	const order = [];
+	let left = 0;
+	let right = cols - 1;
+	let top = 0;
+	let bottom = rows - 1;
+	const name = (row, col) => `Grid_${row + 1}_${col + 1}`;
+
+	while (left <= right && top <= bottom) {
+		for (let col = left; col <= right; col++) order.push(name(top, col));
+		top++;
+		for (let row = top; row <= bottom; row++) order.push(name(row, right));
+		right--;
+		if (top <= bottom) {
+			for (let col = right; col >= left; col--) order.push(name(bottom, col));
+			bottom--;
+		}
+		if (left <= right) {
+			for (let row = bottom; row >= top; row--) order.push(name(row, left));
+			left++;
+		}
+	}
+	return order;
+}
+
+var targetOrder = [];
 
 var palette_01 = {
 	bg:'rgb(0, 40, 12)',
@@ -643,6 +680,10 @@ function draw() {
 }
 
 function initParticleSystem(){
+	particleCount = {
+		type: { orbit: 0, wander: 0, spiral: 0 },
+		thickness: { hairline: 0, thin: 0, medium: 0, thick: 0 }
+	};
 	system = new ParticleSystem();
 	system.init(systemSize);
 	// document.getElementById("canvas").style.setProperty('background-color',  myBG);
@@ -800,19 +841,16 @@ Particle.prototype.init = function(_id){
 	this.counterClock = false;
 	this.wanderWait = 200;
 
-	this.targNum = this.id;
-
-	if (this.id >= 16){
-		this.targNum = this.id-16;
-	}
+	const targetCount = targetOrder.length;
+	this.targNum = this.id % targetCount;
 	
 	this.targName = getNewTarg(this.targNum);
 	this.targObj = targetList[this.targName];
 	// Enter from beyond the frame at a random point on a random edge, rather
 	// than beginning life already sitting on the target. The approach machinery
 	// below is unchanged: partnerSwap keeps each line homing on its target until
-	// it arrives, then hands over to orbit, spiral or wander. All thirty-two
-	// converge on the grid together.
+	// it arrives, then hands over to orbit, spiral or wander. The whole swarm
+	// converges on the responsive grid together.
 	const entrySpan = Math.max(WIDTH, HEIGHT);
 	const entryMargin = entrySpan * 0.14 + fxrand() * entrySpan * 0.33;
 	const entryEdge = Math.floor(fxrand() * 4);
@@ -848,7 +886,7 @@ Particle.prototype.draw = function(){
 		// this.maxSpeed = 3.5 * stageScale; //15;//fxrand()*10+10;
 		// this.maxForce = 5;//1.25;
 		// this.lineL = 1;
-		if (this.id >= 16){
+		if (this.id >= targetOrder.length){
 			this.targNum--;
 		} else {
 			this.targNum++;
@@ -931,7 +969,7 @@ Particle.prototype.orbit = function(_pType){
 		this.maxForce = .5 * stageScale;
 		var dd = this.orbitSpin;//2.5;//t.v;
 		this.lineL = this.lineMaxL * 1.5;
-		if (this.id > 16){
+		if (this.id >= targetOrder.length){
 			dd *= -1;
 			targetRadius *= 1.3;
 		}
@@ -1003,7 +1041,7 @@ Particle.prototype.orbit = function(_pType){
 		this.lineL = this.lineMaxL * 1.75;
 		this.displayRadius = this.targetRadius * 1.15;
 
-		if (this.id > 16){
+		if (this.id >= targetOrder.length){
 			dd *= -1;
 			this.displayRadius = this.targetRadius * 1.4;
 		}
@@ -1147,4 +1185,3 @@ function controlSystemSize(_num){
 	systemSize = _num;
 	initParticleSystem();
 }
-

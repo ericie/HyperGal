@@ -22,33 +22,11 @@
         background: #03030a;
         image-rendering: pixelated;
       }
-
-      .caption {
-        position: fixed;
-        left: 50%;
-        bottom: 0.95rem;
-        transform: translateX(-50%);
-        color: rgba(238, 246, 255, 0.62);
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 0.78rem;
-        letter-spacing: 0.04em;
-        text-align: center;
-        pointer-events: none;
-        text-shadow: 0 1px 0 #000;
-        white-space: nowrap;
-      }
-
-      @media (max-width: 560px) {
-        .caption {
-          display: none;
-        }
-      }
     </style>
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
   <body>
     <canvas id="stage"></canvas>
-    <div class="caption">Mutual Command - 2026 - click to reseed</div>
     <script>
       const canvas = document.getElementById('stage');
       const screen = canvas.getContext('2d', { alpha: false });
@@ -62,18 +40,61 @@
         bg: '#03030a',
         bg2: '#080816',
         stars: '#5e7cff',
-        top: '#ff4a76',
-        topCity: '#ff8b3d',
-        topSoft: 'rgba(255, 74, 118, .26)',
-        bottom: '#41f6c0',
-        bottomCity: '#28b7ff',
-        bottomSoft: 'rgba(65, 246, 192, .24)',
-        missileTop: '#ffdd5d',
-        missileBottom: '#8bfff0',
         impact: '#fff2a2',
         smoke: '#9a5bff',
         black: '#03030a',
       };
+
+      const PLAYER_PALETTES = [
+        {
+          color: '#ff4a76',
+          cityColor: '#ff8b3d',
+          softColor: 'rgba(255, 74, 118, .26)',
+          missileColor: '#ffdd5d',
+          detailColor: '#401018',
+          trailColor: 'rgba(255, 108, 75, .78)',
+        },
+        {
+          color: '#41f6c0',
+          cityColor: '#28b7ff',
+          softColor: 'rgba(65, 246, 192, .24)',
+          missileColor: '#8bfff0',
+          detailColor: '#061b22',
+          trailColor: 'rgba(93, 255, 235, .72)',
+        },
+        {
+          color: '#ffd84d',
+          cityColor: '#ff713d',
+          softColor: 'rgba(255, 216, 77, .25)',
+          missileColor: '#fff2a2',
+          detailColor: '#2b1600',
+          trailColor: 'rgba(255, 195, 75, .76)',
+        },
+        {
+          color: '#a879ff',
+          cityColor: '#ef69ff',
+          softColor: 'rgba(168, 121, 255, .25)',
+          missileColor: '#f4b8ff',
+          detailColor: '#1c0831',
+          trailColor: 'rgba(204, 125, 255, .76)',
+        },
+        {
+          color: '#bdf052',
+          cityColor: '#66d96f',
+          softColor: 'rgba(189, 240, 82, .24)',
+          missileColor: '#efff91',
+          detailColor: '#102500',
+          trailColor: 'rgba(174, 245, 91, .74)',
+        },
+        {
+          color: '#ff765e',
+          cityColor: '#ffc35c',
+          softColor: 'rgba(255, 118, 94, .25)',
+          missileColor: '#fff0a8',
+          detailColor: '#301006',
+          trailColor: 'rgba(255, 147, 87, .76)',
+        },
+      ];
 
       const GLYPHS = {
         '0': ['111', '101', '101', '101', '101', '101', '111'],
@@ -86,14 +107,6 @@
         '7': ['111', '001', '001', '010', '010', '010', '010'],
         '8': ['111', '101', '101', '111', '101', '101', '111'],
         '9': ['111', '101', '101', '111', '001', '001', '111'],
-        N: ['1001', '1101', '1011', '1001', '1001', '1001', '1001'],
-        O: ['111', '101', '101', '101', '101', '101', '111'],
-        R: ['1110', '1001', '1001', '1110', '1010', '1001', '1001'],
-        T: ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
-        H: ['1001', '1001', '1001', '1111', '1001', '1001', '1001'],
-        S: ['111', '100', '100', '111', '001', '001', '111'],
-        U: ['101', '101', '101', '101', '101', '101', '111'],
-        ' ': ['0', '0', '0', '0', '0', '0', '0'],
       };
 
       let W = 384;
@@ -179,14 +192,13 @@
       }
 
       function makeSide(key) {
+        const paletteIndex = key === 'top' ? 0 : 1;
+        const palette = PLAYER_PALETTES[paletteIndex];
         const side = {
           key,
-          label: key === 'top' ? 'NORTH' : 'SOUTH',
           dir: key === 'top' ? 1 : -1,
-          color: key === 'top' ? COLORS.top : COLORS.bottom,
-          cityColor: key === 'top' ? COLORS.topCity : COLORS.bottomCity,
-          softColor: key === 'top' ? COLORS.topSoft : COLORS.bottomSoft,
-          missileColor: key === 'top' ? COLORS.missileTop : COLORS.missileBottom,
+          paletteIndex,
+          ...palette,
           groundY: key === 'top' ? Math.max(29, Math.round(H * 0.115)) : H - Math.max(29, Math.round(H * 0.115)),
           score: 1000,
           displayScore: 1000,
@@ -309,6 +321,7 @@
 
         side.replaceTimer += dt;
         if (!side.slideBuilt && side.replaceTimer > 0.58) {
+          applyNextPalette(side);
           buildRow(side);
           side.score = 1000;
           side.displayScore = 1000;
@@ -327,6 +340,16 @@
             side.invuln = 0.65;
           }
         }
+      }
+
+      function applyNextPalette(side) {
+        const opponentPaletteIndex = sides[OPPOSITE[side.key]]?.paletteIndex;
+        const candidates = PLAYER_PALETTES
+          .map((palette, index) => ({ palette, index }))
+          .filter(({ index }) => index !== side.paletteIndex && index !== opponentPaletteIndex);
+        const next = pick(candidates);
+        side.paletteIndex = next.index;
+        Object.assign(side, next.palette);
       }
 
       function updateLaunchQueue() {
@@ -690,10 +713,9 @@
         drawInterceptors();
         drawBlasts();
         drawDebris();
+        drawHud();
         ctx.restore();
 
-        drawHud();
-        drawScanlines();
         if (whiteFlash > 0) {
           ctx.fillStyle = `rgba(255,255,255,${whiteFlash * 0.28})`;
           ctx.fillRect(0, 0, W, H);
@@ -719,13 +741,6 @@
           ctx.fillStyle = `rgba(116,146,255,${twinkle})`;
           ctx.fillRect(Math.round(star.x), Math.round(star.y), 1, 1);
         }
-
-        ctx.fillStyle = 'rgba(130, 180, 255, .11)';
-        const mid = Math.round(H / 2);
-        for (let x = 0; x < W; x += 8) ctx.fillRect(x, mid, 3, 1);
-
-        ctx.fillStyle = 'rgba(70, 90, 180, .07)';
-        for (let x = 0; x < W; x += 16) ctx.fillRect(x, 0, 1, H);
       }
 
       function drawRows() {
@@ -735,12 +750,9 @@
 
       function drawSide(side) {
         const y = Math.round(side.groundY);
-        ctx.fillStyle = side.softColor;
-        ctx.fillRect(Math.round(side.offsetX), y - (side.dir < 0 ? 1 : 0), W, 2);
+        const groundHeight = side.key === 'top' ? y : H - y;
         ctx.fillStyle = side.color;
-        for (let x = Math.round(side.offsetX); x < W + 10; x += 12) {
-          ctx.fillRect(x, y - (side.dir < 0 ? 2 : 0), 7, 1);
-        }
+        ctx.fillRect(0, side.key === 'top' ? 0 : y, W, groundHeight);
 
         for (const structure of side.structures) {
           if (structure.type === 'battery') drawBattery(side, structure);
@@ -765,7 +777,7 @@
           ctx.fillRect(x, y, Math.round(block.w), h);
 
           if (health > 0.45) {
-            ctx.fillStyle = side.key === 'top' ? '#401018' : '#061b22';
+            ctx.fillStyle = side.detailColor;
             const wy0 = side.dir > 0 ? y + 3 : y + 2;
             for (let wy = wy0; wy < y + h - 2; wy += 5) {
               for (let wx = x + 2; wx < x + block.w - 1; wx += 5) {
@@ -821,7 +833,7 @@
           const sy = Math.round(missile.sy);
           const x = Math.round(missile.x);
           const y = Math.round(missile.y);
-          ctx.strokeStyle = missile.side === 'top' ? 'rgba(255, 108, 75, .78)' : 'rgba(93, 255, 235, .72)';
+          ctx.strokeStyle = sides[missile.side].trailColor;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(sx, sy);
@@ -838,7 +850,7 @@
           const sy = Math.round(shot.sy);
           const x = Math.round(shot.x);
           const y = Math.round(shot.y);
-          ctx.strokeStyle = shot.side === 'top' ? 'rgba(255, 74, 118, .78)' : 'rgba(65, 246, 192, .76)';
+          ctx.strokeStyle = sides[shot.side].trailColor;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(sx, sy);
@@ -901,26 +913,20 @@
       }
 
       function drawHud() {
-        const scale = W < 300 ? 1 : 2;
+        const scale = 2;
         const topScore = String(Math.max(0, Math.round(sides.top.displayScore))).padStart(4, '0');
         const bottomScore = String(Math.max(0, Math.round(sides.bottom.displayScore))).padStart(4, '0');
-        drawPixelText('NORTH ' + topScore, 7, 5, scale, sides.top.color);
-        drawPixelText('SOUTH ' + bottomScore, 7, H - 7 * scale - 5, scale, sides.bottom.color);
-
-        drawScoreBar(7, 7 + 9 * scale, sides.top, scale);
-        drawScoreBar(7, H - 10 * scale - 8, sides.bottom, scale);
+        drawCenteredPixelText(topScore, Math.round(sides.top.groundY / 2), scale, COLORS.black);
+        drawCenteredPixelText(bottomScore, Math.round((sides.bottom.groundY + H) / 2), scale, COLORS.black);
       }
 
-      function drawScoreBar(x, y, side, scale) {
-        const w = W < 300 ? 58 : 92;
-        const h = scale;
-        ctx.fillStyle = 'rgba(255,255,255,.16)';
-        ctx.fillRect(x, y, w, h);
-        ctx.fillStyle = side.color;
-        ctx.fillRect(x, y, Math.round(w * clamp(side.displayScore / 1000, 0, 1)), h);
-      }
-
-      function drawPixelText(text, x, y, scale, color) {
+      function drawCenteredPixelText(text, centerY, scale, color) {
+        const glyphWidth = 3 * scale;
+        const gap = scale;
+        const textWidth = text.length * glyphWidth + (text.length - 1) * gap;
+        const textHeight = 7 * scale;
+        const x = Math.round((W - textWidth) / 2);
+        const y = Math.round(centerY - textHeight / 2);
         ctx.fillStyle = color;
         let cursor = x;
         for (const ch of text) {
@@ -935,13 +941,6 @@
           }
           cursor += (width + 1) * scale;
         }
-      }
-
-      function drawScanlines() {
-        ctx.fillStyle = 'rgba(0,0,0,.22)';
-        for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1);
-        ctx.fillStyle = 'rgba(255,255,255,.025)';
-        for (let y = 1; y < H; y += 6) ctx.fillRect(0, y, W, 1);
       }
 
       window.addEventListener('resize', resize);

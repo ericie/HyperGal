@@ -55,11 +55,22 @@ ever reaches zero, and hunters die of both starvation and old age.
 
 ## Tuning & interaction
 
-- **Click** — reseed with a fresh soil tint and bloom palette (and a clean canvas).
+- **Tap or click** — reseed with a fresh soil tint and bloom palette (and a clean canvas).
+- **Enter / Space** — reseed when the canvas is keyboard-focused.
 - **`g` / `G`**, **`p` / `P`** — lower/raise plant growth and propagation live.
 - URL: `?growth=`, `?prop=` set the plant rates; `?warm=120` fast-forwards the
   simulation ~120 s before the first frame, so it opens already alive instead of
   from a sparse cold start; `?debug` shows population, coverage, death counts, fps.
+
+## Mobile profile
+
+On touch-sized screens the piece automatically uses a population proportional to
+the available field, caps its canvas resolution at 1.5×, and paints at 30 fps.
+That keeps the same ecological behavior and visual language without forcing a
+desktop-sized herd, five 3× full-screen canvas buffers, and 60 composites per
+second through a phone. Browser-chrome height changes no longer reseed the piece;
+real viewport changes such as rotation still do. Safe-area insets keep the caption
+clear of notches and home indicators.
 
 ## Archival rule
 

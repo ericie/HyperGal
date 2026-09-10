@@ -260,7 +260,7 @@
 
           const columns = width < 640 ? 4 : clamp(5, Math.round(width / 220), 8);
           const rows = clamp(6, Math.round(height / 130), 8);
-          const edgeInset = width < 640 ? 18 : 28;
+          const edgeInset = width < 640 ? 10 : 28;
           const spacingX = (width - edgeInset * 2) / (columns - 1);
           const top = Math.max(52, height * .065);
           const bottom = Math.max(52, height * .075);
@@ -271,8 +271,13 @@
           for (let row = 0; row < rows; row++) {
             const odd = row % 2 === 1;
             const count = odd ? columns - 1 : columns;
+            const spansMobileEdges = odd && width < 640;
+            const rowSpacingX = spansMobileEdges
+              ? (width - edgeInset * 2) / (count - 1)
+              : spacingX;
             for (let column = 0; column < count; column++) {
-              const x = edgeInset + spacingX * (column + (odd ? .5 : 0));
+              const offset = odd && !spansMobileEdges ? .5 : 0;
+              const x = edgeInset + rowSpacingX * (column + offset);
               const y = top + row * spacingY;
               const peg = makePeg(x, y, pegRadius);
               pegs.push(peg);

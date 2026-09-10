@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="Thirty-two lines chase sixteen targets across a grid, orbiting, spiralling and wandering after them. Half the swarm draws sharp; the other half survives only as the glow it leaves behind."
+      content="A responsive swarm of lines chases an evenly spaced field of targets, orbiting, spiralling and wandering after them. Half the swarm draws sharp; the other half survives only as the glow it leaves behind."
     />
     <title>A Record of Pursuit · HyperGal</title>
     <style>
@@ -15,7 +15,7 @@
         background: #000; color: #fff;
         overflow: hidden;
       }
-      main { height: 100vh; }
+      main { height: 100vh; height: 100dvh; }
 
       /* Every layer fills the window. The piece is sized to the viewport rather
          than letterboxed into a square, so the grid spans whatever shape the
@@ -165,6 +165,7 @@
             maxH = h;
             layoutTargets(w, h);
             initParticleSystem();
+            describe();
             if (reduced.matches) settle();
           }, 180);
         }, { passive: true });
@@ -183,10 +184,15 @@
         function describe() {
           composite.setAttribute(
             'aria-label',
-            'A Record of Pursuit: ' + titleParts.title + '.'
+            'A Record of Pursuit: ' + systemSize + ' ' + titleParts.lineColor +
+            ' lines chase ' + targetOrder.length + ' targets across a grid with ' +
+            gridCols + ' columns and ' + gridRows + ' rows on a ' +
+            titleParts.background + ' field.'
           );
           window.$fxhashFeatures = {
             'Iteration Title': titleParts.title,
+            'Grid': gridCols + 'x' + gridRows,
+            'Targets': targetOrder.length,
             'Background Color': titleParts.background,
             'Line Colors': titleParts.lineColor,
             'Orbiting Lines': particleCount.type.orbit,

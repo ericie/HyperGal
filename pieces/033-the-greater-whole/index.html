@@ -114,6 +114,7 @@
           clamp(18px, 3.2vw, 52px)
           max(48px, calc(env(safe-area-inset-bottom) + 28px));
         place-items: center;
+        touch-action: none;
       }
 
       .quote-shell {
@@ -158,7 +159,7 @@
         color: inherit;
         cursor: crosshair;
         outline: none;
-        touch-action: manipulation;
+        touch-action: none;
         transform-origin: 50% 62%;
         transition: color 110ms linear;
       }
@@ -480,6 +481,7 @@
           [144, 153, 26],
           [11, 107, 0]
         ];
+        const main = document.querySelector('main');
         const quote = document.querySelector('#quote');
         const shell = document.querySelector('.quote-shell');
         const canvas = document.querySelector('#field');
@@ -493,6 +495,7 @@
         const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
         const finePointer = window.matchMedia('(pointer: fine)');
         const events = [];
+        const glyphActivators = new WeakMap();
         const debugStart = performance.now();
         let width = 0;
         let height = 0;
@@ -500,6 +503,8 @@
         let serial = 0;
         let frame = 0;
         let knifeColorTimer = 0;
+        let dragPointerId = null;
+        let lastDragPoint = null;
 
         if (DEBUG) {
           document.body.classList.add('is-debug');
@@ -515,7 +520,10 @@
         });
 
         window.addEventListener('resize', resize, { passive: true });
-        window.addEventListener('pointermove', moveKnife, { passive: true });
+        main.addEventListener('pointerdown', beginKnifeDrag, { passive: false });
+        window.addEventListener('pointermove', moveKnife, { passive: false });
+        window.addEventListener('pointerup', endKnifeDrag, { passive: true });
+        window.addEventListener('pointercancel', endKnifeDrag, { passive: true });
         window.addEventListener('pointerout', (event) => {
           if (!event.relatedTarget) knifeCursor.classList.remove('is-visible');
         }, { passive: true });
@@ -546,6 +554,7 @@
                 trigger(button, character);
                 deleteCharacter(button, character);
               };
+              glyphActivators.set(button, activate);
 
               button.addEventListener('pointerenter', (event) => {
                 if (event.pointerType !== 'touch') activate();
@@ -648,10 +657,69 @@
           return punctuation[character] || `character ${character}`;
         }
 
+        function isDragPointer(event) {
+          return event.pointerType === 'touch' || event.pointerType === 'pen';
+        }
+
+        function positionKnife(x, y) {
+          knifeCursor.style.transform = `translate3d(${x - 9}px, ${y - 68}px, 0)`;
+          knifeCursor.classList.add('is-visible');
+        }
+
+        function activateGlyphAtPoint(x, y) {
+          const glyph = document.elementFromPoint(x, y)?.closest('.glyph');
+          if (!glyph || glyph.disabled || glyph.classList.contains('is-deleted')) return;
+          glyphActivators.get(glyph)?.();
+        }
+
+        function activateGlyphsAlongPath(from, to) {
+          if (!from) {
+            activateGlyphAtPoint(to.x, to.y);
+            return;
+          }
+          const distance = Math.hypot(to.x - from.x, to.y - from.y);
+          const steps = Math.max(1, Math.ceil(distance / 8));
+          for (let step = 1; step <= steps; step++) {
+            const progress = step / steps;
+            activateGlyphAtPoint(
+              from.x + (to.x - from.x) * progress,
+              from.y + (to.y - from.y) * progress
+            );
+          }
+        }
+
+        function beginKnifeDrag(event) {
+          if (DEBUG || !isDragPointer(event) || !event.isPrimary) return;
+          event.preventDefault();
+          dragPointerId = event.pointerId;
+          lastDragPoint = { x: event.clientX, y: event.clientY };
+          main.setPointerCapture?.(event.pointerId);
+          positionKnife(event.clientX, event.clientY);
+          activateGlyphAtPoint(event.clientX, event.clientY);
+        }
+
         function moveKnife(event) {
-          if (DEBUG || !finePointer.matches || event.pointerType === 'touch') return;
+          if (DEBUG) return;
+          if (isDragPointer(event)) {
+            if (event.pointerId !== dragPointerId) return;
+            event.preventDefault();
+            const point = { x: event.clientX, y: event.clientY };
+            activateGlyphsAlongPath(lastDragPoint, point);
+            lastDragPoint = point;
+            positionKnife(point.x, point.y);
+            return;
+          }
+          if (!finePointer.matches) return;
           knifeCursor.style.transform = `translate3d(${event.clientX - 9}px, ${event.clientY - 68}px, 0)`;
           knifeCursor.classList.add('is-visible');
+        }
+
+        function endKnifeDrag(event) {
+          if (!isDragPointer(event) || event.pointerId !== dragPointerId) return;
+          if (main.hasPointerCapture?.(event.pointerId)) main.releasePointerCapture(event.pointerId);
+          dragPointerId = null;
+          lastDragPoint = null;
+          knifeCursor.classList.remove('is-visible');
         }
 
         function setKnifeColor(color) {

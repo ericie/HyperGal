@@ -24,7 +24,7 @@ starts closed, so the piece opens unobscured.
 | Line Complexity | 8 – 110 points |
 | Line Weight | Faint · Very Light · Light · Regular · Medium · Heavy |
 | Line Space | Close · Normal · Loose |
-| Layout Mode | Even · Erratic · Top · Bottom · Center |
+| Layout Mode | Even · Erratic · Center |
 | Peak Height | Very Low · Low · Medium · High |
 | Valleys On | on / off |
 | Wave Offset | 0.0001 – 0.2 |

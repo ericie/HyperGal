@@ -216,18 +216,6 @@ function initLines(){
     case 'Erratic':
       // Random spacing - handled during line generation
       break;
-    case 'Top':
-      // Fill from top to 3/4 of the height
-      startY = 0-(height * 0.2);
-      endY = height * .75;
-      spacing = (endY-startY) / maxLines;
-      break;
-    case 'Bottom':
-      // Start from the bottom and fill up to 3/4 of the height
-      startY = height * 0.25;
-      endY = height * 1.2;
-      spacing = (endY-startY) / maxLines;
-      break;
     case 'Center':
       // Center within 3/4 of the height
       let totalHeight = height * 0.65;
@@ -491,4 +479,3 @@ function createPalettesFromCSSArray() {
     createPaletteFromCSS(paletteName);
   });
 }
-

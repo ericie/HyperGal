@@ -47,7 +47,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 50,
       "thumbnail": "thumbnail.jpg",
-      "description": "Space Invaders after the invaders have vanished. Four small inset cannons fire only at the opposite edge, while any armed non-shooter may volunteer to intercept. Their finite ammunition appears only as cartridge rows; the final round becomes the sole suicide nuke.",
+      "description": "Space Invaders after the invaders have vanished. Four small inset cannons fire only at the opposite edge, while any armed non-shooter may volunteer to intercept. The final round appears as a large pulsing bomb; once fired, the other three cannons need twelve hits to destroy it.",
       "updated": "2026-09-09"
     },
     {
@@ -273,7 +273,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
-      "description": "Large colored ink drops and open-water halos build wandering suminagashi rings, including brief runs of exact-center blooms, inside a bounded floating bath.",
+      "description": "Layered mineral inks and open-water halos stretch through a shared current field, building blue-gray marbled ribbons with fine, muted iridescent veins.",
       "updated": "2026-09-09"
     },
     {

@@ -25,13 +25,21 @@ closed, so the piece opens unobscured.
 | Burst Mode | None · Last · A Few · Several |
 | Fill Amount | Light · Medium · Full |
 | Color Palette | 25 palettes |
-| Row Size | 2 – 11 |
+| Grid Size | 2 – 11 cells along the shorter screen axis |
 | Padding | None · Some · Alot |
 
 **Randomise** rerolls every parameter without changing the hash. **New hash**
 draws a fresh iteration, which is also what clicking the artwork does. Every
 parameter can be set from the URL too — `?layoutMode=Diamond&rowSize=8` — by
 name or index.
+
+The canvas and grid follow the viewport. **Grid Size** sets the number of cells
+on the shorter axis; portrait screens add rows and landscape screens add
+columns, but only when another complete cell fits. Cells and their shapes stay
+square with identical spacing in both directions. Any remainder becomes extra
+outer padding on the longer axis, so no edge row or column is ever cropped or
+distorted. Both linear and spiral growth visit each cell exactly once, so every
+generated row is complete.
 
 ## Interaction
 

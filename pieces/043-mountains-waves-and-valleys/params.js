@@ -125,8 +125,8 @@ $fx.params([
     id: "layout_mode",
     name: "Layout Mode",
     type: "select",
-    options: { options: ["Even", "Erratic", "Top", "Bottom", "Center"] },
-    default: randchoice(["Even", "Erratic", "Top", "Bottom", "Center"]),
+    options: { options: ["Even", "Erratic", "Center"] },
+    default: randchoice(["Even", "Erratic", "Center"]),
   },
   {
     id: "peak_height",

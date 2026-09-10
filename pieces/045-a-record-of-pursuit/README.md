@@ -1,7 +1,8 @@
 # A Record of Pursuit
 
-Sixteen targets sit on a four-by-four grid — square, and centred in the window. Thirty-two lines enter from beyond
-the frame — each from a random point on a random edge — and converge on it. As
+Targets sit on an evenly spaced grid that follows the window: four along the
+shorter axis, with more added along the longer axis. Two lines per target enter
+from beyond the frame — each from a random point on a random edge — and converge on it. As
 each one arrives it takes up its own manner of waiting: some orbiting, some
 spiralling in and out, some wandering. Every so often a line gives up on its
 target and sets off after the next one. What you see is not the
@@ -34,8 +35,8 @@ Record-of-Pursuit repository.
 
 ## The glow
 
-The swarm is split across two canvases. The first sixteen lines are composited
-sharp; the second sixteen are drawn to a layer that is never composited at all —
+The swarm is split across two canvases. The first half is composited sharp; the
+second half is drawn to a layer that is never composited at all —
 it sits behind the picture under a thirteen-pixel blur at seven-tenths opacity,
 so those lines exist only as light. The original used twenty pixels at full
 strength, which swamped the drawn half; this keeps the halo without letting it
@@ -64,9 +65,11 @@ on the record made by then.
 The original drew into a fixed 1920 square and let the browser letterbox it, so
 the lines entered from the edge of that square rather than the edge of the
 window — they appeared to pop into existence in mid-air. The piece now sizes
-its five layers to the viewport at the display's pixel density. The grid itself
-stays square and centred: stretching it to the window's aspect pulled the
-composition out of shape, so only the field around it grows.
+its five layers to the viewport at the display's pixel density. The target grid
+keeps the original four-by-four density on the shorter axis and adds rows or
+columns on the longer one. Target positions are distributed from equal outer
+margins, so their horizontal and vertical spacing stays nearly equal without
+stretching the composition.
 
 Everything measured in pixels had been tuned against the 1920 square, so it all
 hangs off one scale now: the tighter of the two grid spacings sets the orbit
@@ -74,8 +77,9 @@ radii, line weights and spiral steps, since a mark has to fit its cell in the
 narrow direction. The approach is paced separately, against the *longer*
 dimension — crossing a wide window is a different problem from sitting in a
 cell, and pacing the journey by the short side left the swarm straggling in
-long after it should have arrived. A resize re-lays the grid and the swarm
-enters again.
+long after it should have arrived. The swarm always contains two lines per
+target, so the field grows with the screen. A resize re-lays the grid and the
+swarm enters again.
 
 ## Notes on the port
 

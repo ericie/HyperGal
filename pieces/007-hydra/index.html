@@ -7,25 +7,11 @@
     <style>
       html, body { margin: 0; height: 100%; background: #06091d; overflow: hidden; }
       #stage { position: fixed; inset: 0; display: block; }
-      .caption {
-        position: fixed;
-        bottom: 1rem;
-        left: 1rem;
-        color: #8bd9ff;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: .8rem;
-        letter-spacing: .12em;
-        text-transform: uppercase;
-        pointer-events: none;
-        z-index: 10;
-        text-shadow: 0 0 9px rgba(39, 164, 255, .7), 0 0 22px rgba(98, 54, 175, .55);
-      }
     </style>
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
   <body>
     <canvas id="stage"></canvas>
-    <div class="caption">hydra · 2026 · twenty contenders, one mouse · click to reseed</div>
     <script>
       // hydra — autonomous traditional Snake, rendered as a flooded cavern mural.
       //
@@ -93,12 +79,12 @@
       const VICTORY_REDUCED_DURATION = 0.7;
       const GOLDEN_HEIR_RATIO = 0.1;
       const GOLDEN_HEIR_MIN = 2;
+      const GOLDEN_HEIR_SIZE_ADVANTAGE = 2;
 
       // Mega Man underground: near-black navy, tile indigo, electric cobalt,
       // water cyan, mineral violet and the small amber energy pickup.
       const C_BG = '#06091d';
       const C_MOUSE = '#ffd35a';
-      const C_BORDER = '#3267c8';
       const C_CLOT = '6,9,29';
       const C_HATCH = '112,130,154';
       const C_HATCH_LIGHT = '164,177,194';
@@ -168,7 +154,7 @@
           const remainder = totalLength - headLength;
           const fragments = Math.min(START_SNAKES - 1, remainder);
           const largestFragment = fragments ? Math.ceil(remainder / fragments) : 0;
-          if (headLength > largestFragment) break;
+          if (headLength >= largestFragment * GOLDEN_HEIR_SIZE_ADVANTAGE) break;
           headLength++;
         }
         return headLength;
@@ -1437,15 +1423,6 @@
         ctx.setLineDash([]);
       }
 
-      function drawBorder() {
-        ctx.shadowColor = GLOW;
-        ctx.shadowBlur = 8;
-        ctx.strokeStyle = C_BORDER;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(OX + 1, OY + 1, GW * CELL - 2, GH * CELL - 2);
-        ctx.shadowBlur = 0;
-      }
-
       function render() {
         // almost-black cavern ground
         ctx.shadowBlur = 0;
@@ -1500,7 +1477,6 @@
         vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)');
         ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
 
-        drawBorder();
       }
 
       // ---- loop -----------------------------------------------------------

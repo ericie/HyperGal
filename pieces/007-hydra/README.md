@@ -61,11 +61,12 @@ The final survivor freezes for a short victory beat while its future head
 section blinks six times between its original palette and a warm, luminous
 gold. At the end of the beat, the whole winning body cleaves into the next
 field. Roughly the leading tenth becomes the permanently golden heir—always
-strictly longer than every individual offspring—while every remaining segment
-is distributed across as many smaller contiguous snakes as the twenty-snake
-field allows. No outside contenders enter. One-segment offspring carry enough
-latent growth to establish a short body as they move. Reduced-motion mode
-replaces the blink with an immediate golden head and a short static pause.
+at least twice as long as every individual offspring when the new field is
+formed—while every remaining segment is distributed across as many smaller
+contiguous snakes as the twenty-snake field allows. No outside contenders
+enter. One-segment offspring carry enough latent growth to establish a short
+body as they move. Reduced-motion mode replaces the blink with an immediate
+golden head and a short static pause.
 On death, a bright sparking front travels down the body. Each segment crossfades
 directly from living pigment into dry, desaturated cross-hatching as the front
 passes it, but the full sweep now finishes in 0.28–0.72 seconds with a wider

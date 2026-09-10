@@ -4,12 +4,17 @@ An interactive typographic piece about the way many small, independent forms
 are read as a single statement. Every letter and punctuation mark in the
 sentence is a control. Crossing one with the knife cursor cuts it from the
 statement and releases a composition made only from that character. Its place
-remains fixed so the sentence erodes without reflowing. Touch contact and
-keyboard activation provide equivalents where rollover is not available.
+remains fixed so the sentence erodes without reflowing. On touch screens, a
+finger drag carries the knife across the sentence and cuts every character in
+its path. Keyboard activation provides an equivalent where rollover is not
+available.
 
 On fine-pointer devices, the native cursor becomes a compact knife whose blade
 switches to the exact color assigned to the newly triggered animation, then
 fades back to white after the cut.
+
+On touch and pen devices, the same knife sits just above the contact point while
+dragging, keeping both the tool and the text visible beneath the hand.
 
 ## Motion
 
