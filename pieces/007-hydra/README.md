@@ -1,4 +1,4 @@
-# hydra
+# Snake Pit
 
 An autonomous game of traditional Snake, glowing like a flooded 8-bit cavern.
 

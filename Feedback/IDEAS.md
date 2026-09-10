@@ -3,7 +3,7 @@
 Extensions of the existing body of work. The riff grammar across the current
 eleven pieces:
 
-- **Remove the player** → the system plays itself to equilibrium (*hydra*,
+- **Remove the player** → the system plays itself to equilibrium (*Snake Pit*,
   *Vectrex Asteroids*)
 - **Remove the protagonist, keep the antagonists** → *Only Invaders*,
   *Only Centipede*
@@ -13,7 +13,7 @@ eleven pieces:
   *Only Invaders*
 - **No win, no lose, floored-and-capped** → it runs forever
 - **Death leaves a painting** → stains, bone memory, sediment
-  (*hunt prey paint*, *hydra*)
+  (*hunt prey paint*, *Snake Pit*)
 
 ## Leading ideas
 

@@ -88,7 +88,7 @@ Chain splitting, segment promotion, and mushroom degradation demonstrate fine sy
 
 Reframe it around pesticide resistance and ecological blowback. Every successful hit could increase the resistance or speed of the next generation, while mushrooms become accumulated toxic residue that obstructs both attacker and defender. The defense should eventually make the field less habitable than the infestation did. That causal reversal would justify the appropriation.
 
-### 007 — hydra
+### 007 — Snake Pit
 
 **Current status:** Visually distinctive competitive ecology with latent political potential.
 

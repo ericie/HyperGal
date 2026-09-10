@@ -65,7 +65,7 @@ window.HYPERGAL_MANIFEST = {
     },
     {
       "slug": "007-hydra",
-      "title": "hydra",
+      "title": "Snake Pit",
       "year": 2026,
       "date": "2026-06-25",
       "category": "games",
@@ -73,7 +73,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
       "description": "Twenty autonomous snakes hunt one mouse in an 8-bit underground Mega Man palette. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Continuous rounded bodies cross a cavern-dark field; death travels from head to tail, replacing each fading segment with abstract cross-hatching in place. Click to reseed.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-11"
     },
     {
       "slug": "008-vectrex-asteroids",
@@ -97,7 +97,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
       "description": "A two-sided Missile Command riff. A north row and south row of pixel towns and batteries launch paired attacks while their defenses try to erase incoming missiles at roughly the same rate. Each side starts at 1000 points and loses score as cities, batteries, and ground are destroyed; when a side reaches zero, the ruined row is cleared and a fresh set of towns slides in from the side.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-11"
     },
     {
       "slug": "010-obstacles-and-how-to-avoid-them",
