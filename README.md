@@ -14,7 +14,8 @@ from now, with zero external dependencies.
 - `manifest.js` — generated list of pieces, loaded by `index.html` as a plain
   script tag so the gallery works on `file://` (no server required).
 - `scripts/build-manifest.mjs` — Node script (stdlib only) that scans
-  `pieces/`, reads each piece's latest Git commit date, and writes `manifest.js`.
+  `pieces/`, works out when each piece's code last changed, and writes
+  `manifest.js`.
 
 ## Adding a piece
 
@@ -29,7 +30,23 @@ from now, with zero external dependencies.
    `"rating"`, a 1-100 score that is never displayed and only orders the
    Recommended sort. Unrated pieces sort below every rated one.
 4. Commit the piece, then run `node scripts/build-manifest.mjs` to regenerate
-   the gallery index with its latest committed update date.
+   the gallery index.
+
+## The "Updated" date
+
+A piece shows **Updated** only when its code changed after publication. The
+date comes from Git, but not from any commit that merely touched the folder:
+
+- `thumbnail.*`, `README.md` and `meta.json` never count.
+- A commit whose message contains `[chore]` never counts — use it for
+  mechanical edits like dropping a tracking snippet into every piece.
+- Past commits that should have been chores are listed by hash in
+  `CHORE_COMMITS` at the top of `scripts/build-manifest.mjs`.
+- If a piece's history is too tangled for the rules, set `"updated"` in its
+  `meta.json` (`YYYY-MM-DD`); that value wins outright.
+
+The Date sort still keys on this date, and a piece with no qualifying commit
+yet sorts as if updated today so fresh work surfaces first.
 
 ## Viewing
 

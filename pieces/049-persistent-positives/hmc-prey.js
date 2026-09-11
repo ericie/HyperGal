@@ -1,5 +1,5 @@
 function PreySystem(t) {
-  this.params = t, this.canvas = this.params.myLayer, this.background = this.params.bg, this.foreground = this.params.fg, this.bgShapeMix = this.params.bgShapeMix, this.wordShapeMix = this.params.wordShapeMix, this.buffer = this.params.buffer, this.bufferElem = this.params.bufferElem, this.layerObj = this.params.layerObj, this.systemSize = 400, this.growthType = this.params.growthType, this.wordTargList = [], this.introMode = !0, this.wordTargetMin = 2200, this.shapeTypes = ["circle", "rectangle", "triangle"], this.eraserMode = !1
+  this.params = t, this.canvas = this.params.myLayer, this.background = this.params.bg, this.foreground = this.params.fg, this.bgShapeMix = this.params.bgShapeMix, this.wordShapeMix = this.params.wordShapeMix, this.buffer = this.params.buffer, this.bufferElem = this.params.bufferElem, this.layerObj = this.params.layerObj, this.systemSize = Math.round(400 * stage.w * stage.h / (1920 * 1920)), this.growthType = this.params.growthType, this.wordTargList = [], this.introMode = !0, this.wordTargetMin = 2200, this.shapeTypes = ["circle", "rectangle", "triangle"], this.eraserMode = !1
 }
 
 function Prey(t) {

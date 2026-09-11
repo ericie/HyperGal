@@ -16,8 +16,9 @@
         overflow: hidden;
       }
 
-      /* The piece is a fixed 1920×1920 square letterboxed into the window
-         over a mintcream ground — as it shipped. Two canvases are visible,
+      /* The stage is drawn at the window's aspect ratio, so the canvases
+         fill it edge to edge. `cover` only matters in the moment between a
+         resize and the redraw that follows it. Two canvases are visible,
          stacked: the grid of ring slices, then the overlay drawn on top. */
       #hmcMain {
         position: absolute;
@@ -29,7 +30,7 @@
         overflow: auto;
         width: 100%;
         height: 100%;
-        object-fit: contain;
+        object-fit: cover;
         top: 0; bottom: 0; left: 0; right: 0;
       }
       /* Working layers: the buffer, the composite the saver reads, and the
@@ -87,9 +88,10 @@
         window.fxhash = search.get('hash') || newHash();
         window.fxrand = seedFrom(window.fxhash) || seedFrom((window.fxhash = newHash()));
         window.newHash = newHash;
-        window.reseed = () => {
-          window.fxhash = newHash();
-          window.fxrand = seedFrom(window.fxhash);
+        // Rewind to a given hash, or deal a new one.
+        window.reseed = (hash = newHash()) => {
+          window.fxhash = hash;
+          window.fxrand = seedFrom(hash);
         };
 
         // The platform's preview trigger has nothing to talk to any more.
@@ -115,21 +117,32 @@
 
     <script>
       // Stands in for the webpack entry: builds the container and the four
-      // 1920×1920 canvases the sketch expects, then draws once. There is no
-      // frame loop — the piece is a still.
+      // canvases the sketch expects, then draws once. There is no frame
+      // loop — the piece is a still.
+      //
+      // The build shipped a fixed 1920×1920 stage. Here the stage takes the
+      // window's aspect ratio instead, keeping the same number of pixels as
+      // that square (a square window still gets exactly 1920×1920), so the
+      // picture fills the window without letterboxing, cropping, or
+      // stretching. The sketch reads the stage from the canvas size.
       (() => {
         'use strict';
 
-        const stage = { w: 1920, h: 1920 };
+        const AREA = 1920 * 1920;
+        const stageFor = (vw, vh) => {
+          const aspect = Math.max(0.2, Math.min(5, vw / vh));
+          return { w: Math.round(Math.sqrt(AREA * aspect)), h: Math.round(Math.sqrt(AREA / aspect)) };
+        };
+        let stage = stageFor(innerWidth, innerHeight);
+
         const container = document.createElement('main');
         container.id = 'hmcMain';
-
+        const canvases = [];
         for (const id of ['hmcBuffer', 'hmcBackground', 'hmcComp', 'hmcForeground']) {
           const c = document.createElement('canvas');
           c.id = id;
-          c.width = stage.w;
-          c.height = stage.h;
           container.appendChild(c);
+          canvases.push(c);
         }
         document.body.prepend(container);
 
@@ -143,34 +156,54 @@
         // the constructor here and put it back before each new iteration.
         const BgGrid = bgGrid;
 
-        window.$fxhashFeatures = {};
-        init(stage, container);
-        describe();
+        render();
 
         function describe() {
           const f = window.$fxhashFeatures;
+          const p = window.systemParams;
           overlay.setAttribute(
             'aria-label',
-            'Growth Rings: a ' + f.gridSize + ' by ' + f.gridSize +
+            'Growth Rings: a ' + p.gridCols + ' by ' + p.gridRows +
             ' grid of ring slices in the ' + f.pallet + ' palette, with a ' +
             String(f.foreground).replace(/_/g, ' ') + ' overlay.'
           );
-          if (window.debugMode) console.log(window.fxhash, f);
+          if (window.debugMode) console.log(window.fxhash, stage.w + 'x' + stage.h, f);
         }
 
-        function newIteration() {
-          // init() appends ten fresh library canvases and paints every layer
-          // without clearing first, so start from an empty room.
+        // Draws the current hash onto a fresh stage. init() appends ten
+        // library canvases and paints every layer without clearing first, so
+        // start from an empty room: resizing a canvas also clears it.
+        function render() {
           library.replaceChildren();
-          for (const c of container.querySelectorAll('canvas')) {
-            c.getContext('2d').clearRect(0, 0, stage.w, stage.h);
+          for (const c of canvases) {
+            c.width = stage.w;
+            c.height = stage.h;
           }
-          window.reseed();
           window.$fxhashFeatures = {};
           bgGrid = BgGrid;
           init(stage, container);
           describe();
         }
+
+        function newIteration() {
+          window.reseed();
+          render();
+        }
+
+        // A window that changes shape gets the same hash drawn again at the
+        // new shape. Small changes (a browser bar coming and going) are left
+        // to `object-fit: cover`.
+        let resizeTimer = 0;
+        addEventListener('resize', () => {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => {
+            const next = stageFor(innerWidth, innerHeight);
+            if (Math.abs(next.w - stage.w) / stage.w < 0.01 && Math.abs(next.h - stage.h) / stage.h < 0.01) return;
+            stage = next;
+            window.reseed(window.fxhash);
+            render();
+          }, 200);
+        });
 
         function savePicture() {
           // hmcForeground is the composite the shipped saver read: grid then

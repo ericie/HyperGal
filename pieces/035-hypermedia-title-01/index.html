@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#e8ebea" />
     <meta
       name="description"
-      content="Ten colorful geometric letters land on a center-pivoting teeter-totter, sprout legs, and slide or walk off as the platform tips under their own weight."
+      content="A conveyor feeds ten geometric letters into a small Rube Goldberg machine where impacts tip a teeter-totter, walkers topple dominoes, and spinners trade momentum."
     />
     <title>Hypermedia Title 01 · HyperGal</title>
     <style>
@@ -68,6 +68,47 @@
         pointer-events: none;
       }
 
+      .conveyor {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 18px;
+        border: 3px solid var(--ink);
+        border-radius: 999px;
+        pointer-events: none;
+        transform-origin: 0 0;
+      }
+
+      .conveyor-roller {
+        position: absolute;
+        top: 50%;
+        width: 12px;
+        height: 12px;
+        margin-top: -6px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: var(--field);
+      }
+
+      .conveyor-roller::after {
+        position: absolute;
+        top: 50%;
+        left: 1px;
+        width: 6px;
+        height: 2px;
+        margin-top: -1px;
+        background: var(--ink);
+        content: '';
+      }
+
+      .conveyor-roller--left { left: 1px; }
+      .conveyor-roller--right { right: 1px; }
+      .conveyor-roller { animation: conveyor-turn 900ms linear infinite; }
+
+      @keyframes conveyor-turn {
+        to { transform: rotate(360deg); }
+      }
+
       .falling-letter {
         position: absolute;
         top: 0;
@@ -102,20 +143,51 @@
         stroke: none;
       }
 
-      .platform-field {
+      .spinner-field {
         position: absolute;
         inset: 0;
         overflow: hidden;
         pointer-events: none;
       }
 
-      .platform {
+      .spinner {
         position: absolute;
         top: 0;
         left: 0;
         height: 3px;
         background: var(--ink);
         transform-origin: 50% 50%;
+        will-change: transform;
+      }
+
+      .spinner::after {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 8px;
+        height: 8px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: var(--field);
+        content: '';
+        transform: translate(-50%, -50%);
+      }
+
+      .domino-field {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .domino {
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: block;
+        background: var(--ink);
+        transform-origin: 50% 100%;
+        will-change: transform;
       }
 
       body.debug-mode {
@@ -312,6 +384,7 @@
 
       @media (prefers-reduced-motion: reduce) {
         .glyph .construction { transition: none; }
+        .conveyor-roller { animation: none; }
       }
     </style>
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
@@ -321,14 +394,27 @@
       id="stage"
       class="stage"
       tabindex="0"
-      aria-label="The geometric letters in HYPERMEDIA fall onto a center-pivoting teeter-totter, settle, sprout legs, and patrol it. As the platform tips, walkers slide or step off its ends, bounce down staggered platforms, and leave the frame; once the top platform is bare the word falls again. Click, tap, or press Enter to drop it now."
+      aria-label="A conveyor feeds the geometric letters in HYPERMEDIA onto a center-pivoting teeter-totter. The letters land, sprout legs, walk into two banks of dominoes, and set nearby spinners turning before leaving the frame. Once the machine is empty, it starts again. Click, tap, or press Enter to restart it now."
     >
       <h1 class="sr-only">Hypermedia</h1>
+      <div id="conveyor" class="conveyor" aria-hidden="true">
+        <span class="conveyor-roller conveyor-roller--left"></span>
+        <span class="conveyor-roller conveyor-roller--right"></span>
+      </div>
       <div id="letter-field" class="letter-field" aria-hidden="true"></div>
-      <div id="platform-field" class="platform-field" aria-hidden="true">
-        <span class="platform"></span>
-        <span class="platform"></span>
-        <span class="platform"></span>
+      <div class="spinner-field" aria-hidden="true">
+        <span class="spinner"></span>
+        <span class="spinner"></span>
+      </div>
+      <div class="domino-field" aria-hidden="true">
+        <span class="domino"></span>
+        <span class="domino"></span>
+        <span class="domino"></span>
+        <span class="domino"></span>
+        <span class="domino"></span>
+        <span class="domino"></span>
+        <span class="domino"></span>
+        <span class="domino"></span>
       </div>
       <svg class="rule" aria-hidden="true">
         <path id="rule-path" class="rule-line" d="" />
@@ -359,8 +445,10 @@
         const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === 'true';
         const stage = document.getElementById('stage');
         const catalog = document.getElementById('catalog');
+        const conveyor = document.getElementById('conveyor');
         const letterField = document.getElementById('letter-field');
-        const platforms = [...document.querySelectorAll('.platform')];
+        const spinners = [...document.querySelectorAll('.spinner')];
+        const dominoes = [...document.querySelectorAll('.domino')];
         const rulePath = document.getElementById('rule-path');
         const fulcrumPath = document.getElementById('fulcrum-path');
         const grid = document.querySelector('.grid');
@@ -739,6 +827,12 @@
 
         function startPhysics() {
           const WORD = [...'HYPERMEDIA'];
+          // Drop from the longest lever arms toward the fulcrum: left edge,
+          // right edge, then the next pair inward.
+          const dropRank = index =>
+            index < WORD.length * 0.5
+              ? index * 2
+              : (WORD.length - 1 - index) * 2 + 1;
           // Odds that a walker reaching an end keeps going instead of turning.
           // A thinning line wanders off sooner: the fewer walkers are left, the
           // less often one turns back.
@@ -748,7 +842,7 @@
           const PATROL_GRACE = 2600;
           const stepOffChance = walking =>
             STEP_OFF_CHANCE * (1 + (WORD.length - walking) * 0.9);
-          const TEETER_MAX_ANGLE = (13 * Math.PI) / 180;
+          const TEETER_MAX_ANGLE = (30 * Math.PI) / 180;
           // The plank is a balance, not a metronome. The walkers' combined
           // leverage about the fulcrum sets the angle it wants to hold, and it
           // swings toward that angle with the weight of a real beam: a letter
@@ -756,10 +850,19 @@
           const TEETER_LEVERAGE = 3.4;
           const TEETER_STIFFNESS = 6.5;
           const TEETER_DAMPING = 0.955;
-          const TEETER_RAMP = 1400;
-          // Zero until the word is up and walking; the plank is locked level
-          // while the letters are still falling and growing legs.
-          let teeterStartedAt = 0;
+          // A landing transfers some of the letter's momentum into the beam.
+          // The cap keeps a hard hit lively without letting one glyph fling the
+          // whole word off-screen before the spring can answer.
+          const TEETER_IMPACT_TRANSFER = 0.04;
+          const TEETER_IMPACT_MIN_SPEED = 42;
+          const TEETER_MAX_VELOCITY = 0.9;
+          const TEETER_MASS = 3.2;
+          const SPINNER_MASS = 1.8;
+          const SPINNER_DRAG = 0.997;
+          const SPINNER_MAX_VELOCITY = 6;
+          const BAR_COLLISION_RADIUS = 6;
+          const DOMINOES_PER_BANK = 4;
+          const MAX_FEED_AND_SETTLE_TIME = 14000;
           let teeterVelocity = 0;
           const LEG_ANCHORS = {
             A: [24, 76],
@@ -795,7 +898,9 @@
             ledgeRight: 0,
             ledgeCenter: 0,
             teeterAngle: 0,
-            slabs: [],
+            conveyor: null,
+            spinners: [],
+            dominos: [],
             size: 0,
           };
           let bodies = [];
@@ -820,6 +925,7 @@
             world.height = stage.clientHeight || innerHeight;
             world.inset = Math.max(14, world.width * 0.035);
             world.groundY = Math.round(world.height * (world.height < 520 ? 0.5 : 0.52));
+            world.teeterAngle = 0;
 
             const span = world.width - world.inset * 2;
             world.ledge = Math.round(clamp(span * (world.width < 520 ? 0.86 : 0.72), 180, 900));
@@ -837,30 +943,274 @@
             if (world.height < 480) world.size = Math.min(world.size, 58);
             world.size = Math.min(world.size, world.ledge / (WORD.length * 1.25));
 
-            const platformGap = clamp((world.height - world.groundY) / 3.4, 28, 120);
-            const platformLayout = [
-              { x: 0.08, y: 1, width: 0.28, angle: -7 },
-              { x: 0.49, y: 1.88, width: 0.32, angle: 5 },
-              { x: 0.15, y: 2.76, width: 0.23, angle: -4 },
-            ];
-            world.slabs = platforms.map((platform, index) => {
-              const layout = platformLayout[index];
-              const width = clamp(world.width * layout.width, 92, 390);
-              const x = clamp(world.width * layout.x, world.inset, world.width - world.inset - width);
-              const y = world.groundY + platformGap * layout.y;
-              platform.style.width = `${width}px`;
-              platform.style.transform =
-                `translate3d(${x}px, ${y}px, 0) rotate(${layout.angle}deg)`;
+            const lowerHeight = Math.max(world.height - world.groundY, 1);
+            world.conveyor = {
+              left: world.inset + world.size * 0.2,
+              right: world.ledgeCenter - world.ledge * 0.08,
+              y: clamp(
+                world.height * 0.16,
+                world.size * 0.9,
+                world.groundY - world.size * 1.8
+              ),
+              speed: clamp(world.width * 0.14, 72, 150),
+            };
+            conveyor.style.width = `${world.conveyor.right - world.conveyor.left}px`;
+            conveyor.style.transform =
+              `translate3d(${world.conveyor.left}px, ${world.conveyor.y}px, 0)`;
 
-              const radians = (layout.angle * Math.PI) / 180;
+            const spinnerWidth = clamp(world.ledge * 0.24, 72, 190);
+            world.spinners = spinners.map((node, index) => {
+              const side = index ? 1 : -1;
+              const angle = side * 0.2;
+              const spinner = {
+                node,
+                x: world.ledgeCenter + side * world.ledge * 0.42,
+                y: world.groundY + lowerHeight * 0.22,
+                half: spinnerWidth * 0.5,
+                angle,
+                angularVelocity: 0,
+                inertia: (SPINNER_MASS * spinnerWidth * spinnerWidth) / 12,
+                cos: Math.cos(angle),
+                sin: Math.sin(angle),
+                touchingTeeter: false,
+              };
+              node.style.width = `${spinnerWidth}px`;
+              renderSpinner(spinner);
+              return spinner;
+            });
+
+            const dominoWidth = clamp(world.size * 0.14, 7, 11);
+            const dominoHeight = clamp(world.size * 0.54, 24, 38);
+            const dominoSpacing = dominoWidth * 1.9;
+            world.dominos = dominoes.map((node, index) => {
+              const bank = Math.floor(index / DOMINOES_PER_BANK);
+              const order = index % DOMINOES_PER_BANK;
+              const direction = bank ? 1 : -1;
+              const innerDistance =
+                world.ledge * 0.5 -
+                world.size * 0.85 -
+                dominoSpacing * (DOMINOES_PER_BANK - 1);
+              node.style.width = `${dominoWidth}px`;
+              node.style.height = `${dominoHeight}px`;
               return {
-                x: x + width * 0.5,
-                y: y + 1.5,
-                half: width * 0.5,
-                cos: Math.cos(radians),
-                sin: Math.sin(radians),
+                node,
+                bank,
+                order,
+                direction,
+                localX: direction * (innerDistance + order * dominoSpacing),
+                width: dominoWidth,
+                height: dominoHeight,
+                angle: 0,
+                angularVelocity: 0,
+                active: false,
+                fallen: false,
+                passedOn: false,
+                transferred: false,
+                baseX: 0,
+                baseY: 0,
               };
             });
+            renderDominos();
+          }
+
+          function renderDominos() {
+            const cos = Math.cos(world.teeterAngle);
+            const sin = Math.sin(world.teeterAngle);
+            for (const domino of world.dominos) {
+              domino.baseX = world.ledgeCenter + domino.localX * cos;
+              domino.baseY = world.groundY + domino.localX * sin;
+              domino.node.style.transform =
+                `translate3d(${domino.baseX - domino.width * 0.5}px, ` +
+                `${domino.baseY - domino.height}px, 0) ` +
+                `rotate(${world.teeterAngle + domino.angle}rad)`;
+            }
+          }
+
+          function tipDomino(domino, shove = 0) {
+            if (!domino || domino.active || domino.fallen || motion.matches) return;
+            domino.active = true;
+            domino.angularVelocity =
+              domino.direction * (1.35 + clamp(Math.abs(shove) / 180, 0, 1.25));
+          }
+
+          function updateDominos(step) {
+            for (const domino of world.dominos) {
+              if (!domino.active || domino.fallen) continue;
+              const fall = Math.abs(domino.angle);
+              domino.angularVelocity +=
+                domino.direction * (3.2 + Math.sin(fall) * 8.5) * step;
+              domino.angle += domino.angularVelocity * step;
+
+              if (!domino.passedOn && Math.abs(domino.angle) > 0.48) {
+                domino.passedOn = true;
+                const next = world.dominos[
+                  domino.bank * DOMINOES_PER_BANK + domino.order + 1
+                ];
+                if (domino.order < DOMINOES_PER_BANK - 1) {
+                  tipDomino(next, domino.angularVelocity * domino.height);
+                }
+              }
+
+              if (
+                domino.order === DOMINOES_PER_BANK - 1 &&
+                !domino.transferred &&
+                Math.abs(domino.angle) > 0.82
+              ) {
+                domino.transferred = true;
+                const spinner = world.spinners[domino.bank];
+                spinner.angularVelocity = clamp(
+                  spinner.angularVelocity + domino.direction * 4.2,
+                  -SPINNER_MAX_VELOCITY,
+                  SPINNER_MAX_VELOCITY
+                );
+              }
+
+              if (Math.abs(domino.angle) >= Math.PI * 0.48) {
+                domino.angle = domino.direction * Math.PI * 0.48;
+                domino.angularVelocity = 0;
+                domino.fallen = true;
+              }
+            }
+            renderDominos();
+          }
+
+          function renderSpinner(spinner) {
+            spinner.node.style.transform =
+              `translate3d(${spinner.x - spinner.half}px, ${spinner.y - 1.5}px, 0) ` +
+              `rotate(${spinner.angle}rad)`;
+          }
+
+          function updateSpinners(step) {
+            for (const spinner of world.spinners) {
+              if (motion.matches) spinner.angularVelocity = 0;
+              else {
+                spinner.angle = (spinner.angle + spinner.angularVelocity * step) % (Math.PI * 2);
+                spinner.angularVelocity *= Math.pow(SPINNER_DRAG, step * 60);
+              }
+              spinner.cos = Math.cos(spinner.angle);
+              spinner.sin = Math.sin(spinner.angle);
+              renderSpinner(spinner);
+            }
+          }
+
+          function endpointContact(spinner, spinnerEnd) {
+            const spinnerAlong = spinnerEnd * spinner.half;
+            const pointX = spinner.x + spinnerAlong * spinner.cos;
+            const pointY = spinner.y + spinnerAlong * spinner.sin;
+            const dx = pointX - world.ledgeCenter;
+            const dy = pointY - world.groundY;
+            const teeterAlong = clamp(
+              dx * Math.cos(world.teeterAngle) + dy * Math.sin(world.teeterAngle),
+              -world.ledge * 0.5,
+              world.ledge * 0.5
+            );
+            const closestX = world.ledgeCenter + teeterAlong * Math.cos(world.teeterAngle);
+            const closestY = world.groundY + teeterAlong * Math.sin(world.teeterAngle);
+            return {
+              distance: Math.hypot(pointX - closestX, pointY - closestY),
+              dx: pointX - closestX,
+              dy: pointY - closestY,
+              spinnerAlong,
+              teeterAlong,
+            };
+          }
+
+          function teeterEndpointContact(spinner, teeterEnd) {
+            const teeterAlong = teeterEnd * world.ledge * 0.5;
+            const pointX = world.ledgeCenter + teeterAlong * Math.cos(world.teeterAngle);
+            const pointY = world.groundY + teeterAlong * Math.sin(world.teeterAngle);
+            const dx = pointX - spinner.x;
+            const dy = pointY - spinner.y;
+            const spinnerAlong = clamp(
+              dx * spinner.cos + dy * spinner.sin,
+              -spinner.half,
+              spinner.half
+            );
+            const closestX = spinner.x + spinnerAlong * spinner.cos;
+            const closestY = spinner.y + spinnerAlong * spinner.sin;
+            return {
+              distance: Math.hypot(pointX - closestX, pointY - closestY),
+              // Keep every normal pointing from the teeter toward the spinner.
+              dx: closestX - pointX,
+              dy: closestY - pointY,
+              spinnerAlong,
+              teeterAlong,
+            };
+          }
+
+          function resolveTeeterSpinnerCollisions() {
+            if (motion.matches) return;
+
+            const teeterCos = Math.cos(world.teeterAngle);
+            const teeterSin = Math.sin(world.teeterAngle);
+            const teeterInertia = (TEETER_MASS * world.ledge * world.ledge) / 12;
+
+            for (const spinner of world.spinners) {
+              const contacts = [
+                endpointContact(spinner, -1),
+                endpointContact(spinner, 1),
+                teeterEndpointContact(spinner, -1),
+                teeterEndpointContact(spinner, 1),
+              ];
+              const contact = contacts.reduce(
+                (closest, candidate) =>
+                  !closest || candidate.distance < closest.distance ? candidate : closest,
+                null
+              );
+
+              if (!contact || contact.distance > BAR_COLLISION_RADIUS) {
+                spinner.touchingTeeter = false;
+                continue;
+              }
+              if (spinner.touchingTeeter) continue;
+
+              let nx = contact.dx / Math.max(contact.distance, 0.001);
+              let ny = contact.dy / Math.max(contact.distance, 0.001);
+              if (contact.distance < 0.001) {
+                nx = -teeterSin;
+                ny = teeterCos;
+                const towardSpinner =
+                  (spinner.x - world.ledgeCenter) * nx +
+                  (spinner.y - world.groundY) * ny;
+                if (towardSpinner < 0) {
+                  nx *= -1;
+                  ny *= -1;
+                }
+              }
+
+              const teeterVx = -teeterVelocity * contact.teeterAlong * teeterSin;
+              const teeterVy = teeterVelocity * contact.teeterAlong * teeterCos;
+              const spinnerVx =
+                -spinner.angularVelocity * contact.spinnerAlong * spinner.sin;
+              const spinnerVy =
+                spinner.angularVelocity * contact.spinnerAlong * spinner.cos;
+              const relativeNormal =
+                (spinnerVx - teeterVx) * nx + (spinnerVy - teeterVy) * ny;
+              if (relativeNormal >= -4) continue;
+              spinner.touchingTeeter = true;
+
+              const teeterArm =
+                contact.teeterAlong * (teeterCos * ny - teeterSin * nx);
+              const spinnerArm =
+                contact.spinnerAlong * (spinner.cos * ny - spinner.sin * nx);
+              const inverseAngularMass =
+                (teeterArm * teeterArm) / teeterInertia +
+                (spinnerArm * spinnerArm) / spinner.inertia;
+              if (inverseAngularMass < 0.000001) continue;
+              const impulse =
+                (-1.16 * relativeNormal) / inverseAngularMass;
+
+              teeterVelocity = clamp(
+                teeterVelocity - (impulse * teeterArm) / teeterInertia,
+                -TEETER_MAX_VELOCITY,
+                TEETER_MAX_VELOCITY
+              );
+              spinner.angularVelocity = clamp(
+                spinner.angularVelocity + (impulse * spinnerArm) / spinner.inertia,
+                -SPINNER_MAX_VELOCITY,
+                SPINNER_MAX_VELOCITY
+              );
+            }
           }
 
           function groundAt(x) {
@@ -904,6 +1254,9 @@
             let carried = 0;
             for (const body of bodies) {
               if (body.gone || body.dropping || !body.active) continue;
+              // An airborne letter has momentum, but no weight on the plank
+              // until the instant it makes contact.
+              if (phase === 'falling' && !body.grounded) continue;
               // A letter already past the end presses on nothing.
               if (!Number.isFinite(groundAt(body.x))) continue;
               const centre =
@@ -916,17 +1269,31 @@
             return carried ? load / carried : 0;
           }
 
-          function updateTeeter(step, now) {
-            if (motion.matches || !teeterStartedAt) {
+          function applyTeeterImpact(body, normalSpeed) {
+            if (motion.matches || normalSpeed < TEETER_IMPACT_MIN_SPEED) return;
+
+            const half = world.ledge * 0.5;
+            const centre =
+              body.x +
+              (Math.cos(body.angle) * body.balance - Math.sin(body.angle) * body.rise) *
+                body.size;
+            const arm = clamp((centre - world.ledgeCenter) / half, -1, 1);
+            const momentum = (body.mass * normalSpeed) / Math.max(body.size, 1);
+            teeterVelocity = clamp(
+              teeterVelocity + arm * momentum * TEETER_IMPACT_TRANSFER,
+              -TEETER_MAX_VELOCITY,
+              TEETER_MAX_VELOCITY
+            );
+          }
+
+          function updateTeeter(step) {
+            if (motion.matches) {
               teeterVelocity = 0;
               applyTeeter(0);
               return;
             }
-            // Ease the beam free over the first stride or two so the word does
-            // not get pitched off the instant it finds its feet.
-            const ramp = clamp((now - teeterStartedAt) / TEETER_RAMP, 0, 1);
             const target =
-              clamp(teeterBalance() * TEETER_LEVERAGE * ramp, -1, 1) * TEETER_MAX_ANGLE;
+              clamp(teeterBalance() * TEETER_LEVERAGE, -1, 1) * TEETER_MAX_ANGLE;
             teeterVelocity += (target - world.teeterAngle) * TEETER_STIFFNESS * step;
             teeterVelocity *= Math.pow(TEETER_DAMPING, step * 60);
             applyTeeter(clamp(
@@ -1039,6 +1406,7 @@
               body.size = size;
               body.radius = body.size * 0.36;
               body.active = true;
+              body.onConveyor = false;
               body.angle = 0;
               body.x = world.ledgeLeft + spacing * (index + 0.5);
               body.y = groundAt(body.x) - body.size * 0.62;
@@ -1061,10 +1429,12 @@
             letterField.replaceChildren();
             measureWorld();
 
-            const spacing = (world.ledge - world.size * 2) / WORD.length;
             const start = performance.now() + 120;
+            const feedInterval = Math.max(
+              360,
+              (world.size * 0.9 * 1000) / world.conveyor.speed
+            );
             emptyAt = 0;
-            teeterStartedAt = 0;
             teeterVelocity = 0;
             applyTeeter(0);
             fallStartedAt = start;
@@ -1086,16 +1456,16 @@
                 rise: weighed.rise,
                 // How well this one keeps its footing on this drop.
                 grip: 0.42 + Math.random() * 0.58,
-                x:
-                  world.ledgeLeft + world.size + spacing * (index + 0.5) +
-                  (Math.sin(index * 2.3) * 0.05 + toss() * 0.1) * size,
-                y: -size * (0.58 + (index % 3) * 0.09),
-                vx: (Math.sin(index * 1.73) * 0.22 + toss() * 0.3) * size,
+                x: world.conveyor.left - size * 0.55,
+                y: world.conveyor.y - size * 0.4,
+                vx: 0,
                 vy: 0,
-                angle: ((index % 3) - 1) * 0.055,
-                angularVelocity: Math.cos(index * 1.37) * 0.22 + toss() * 0.3,
-                bornAt: start + index * 145,
-                bounce: 0.27 + (index % 4) * 0.015,
+                angle: 0,
+                angularVelocity: 0,
+                bornAt: start + dropRank(index) * feedInterval,
+                // Low restitution gives each landing a readable thud instead
+                // of sending the glyph back into a long series of hops.
+                bounce: 0.16 + (index % 4) * 0.01,
                 runDirection: index % 2 ? 1 : -1,
                 runSpeed: size * (0.55 + (index % 4) * 0.09),
                 slideVx: 0,
@@ -1105,6 +1475,7 @@
                 standAngle: 0,
                 footY: 0,
                 active: false,
+                onConveyor: true,
                 grounded: false,
                 stepping: 0,
                 dropping: false,
@@ -1143,8 +1514,12 @@
             if (!Number.isFinite(top)) return;
             if (body.y - top >= extent * 0.9 || body.y + extent <= top) return;
 
+            const normalSpeed =
+              body.vy * Math.cos(world.teeterAngle) -
+              body.vx * Math.sin(world.teeterAngle);
             body.y = top - extent;
             body.grounded = true;
+            applyTeeterImpact(body, normalSpeed);
             if (body.vy > 34) {
               body.vy = -body.vy * body.bounce * (1.25 - body.mass * 0.25);
               body.angularVelocity += (body.vx / body.size) * 0.035;
@@ -1190,17 +1565,20 @@
             body.angularVelocity += direction * topple * 6 * step;
           }
 
-          function resolveSlabs(body) {
+          function resolveSpinners(body) {
             if (body.droppedAt && performance.now() - body.droppedAt > 3000) return;
             const radius = bodyExtent(body);
-            for (const slab of world.slabs) {
+            for (const spinner of world.spinners) {
               const along = clamp(
-                (body.x - slab.x) * slab.cos + (body.y - slab.y) * slab.sin,
-                -slab.half,
-                slab.half
+                (body.x - spinner.x) * spinner.cos +
+                  (body.y - spinner.y) * spinner.sin,
+                -spinner.half,
+                spinner.half
               );
-              const ox = body.x - (slab.x + along * slab.cos);
-              const oy = body.y - (slab.y + along * slab.sin);
+              const contactX = spinner.x + along * spinner.cos;
+              const contactY = spinner.y + along * spinner.sin;
+              const ox = body.x - contactX;
+              const oy = body.y - contactY;
               const distance = Math.hypot(ox, oy) || 0.001;
               if (distance >= radius) continue;
 
@@ -1209,15 +1587,30 @@
               body.x += nx * (radius - distance);
               body.y += ny * (radius - distance);
 
-              const normalSpeed = body.vx * nx + body.vy * ny;
+              const surfaceVx = -spinner.angularVelocity * along * spinner.sin;
+              const surfaceVy = spinner.angularVelocity * along * spinner.cos;
+              const relativeX = body.vx - surfaceVx;
+              const relativeY = body.vy - surfaceVy;
+              const normalSpeed = relativeX * nx + relativeY * ny;
               if (normalSpeed >= 0) continue;
-              const restitution = body.bounce + 0.24;
-              body.vx -= (1 + restitution) * normalSpeed * nx;
-              body.vy -= (1 + restitution) * normalSpeed * ny;
+
+              const restitution = body.bounce + 0.14;
+              const rotationalArm =
+                along * (spinner.cos * ny - spinner.sin * nx);
+              const impulse =
+                (-(1 + restitution) * normalSpeed) /
+                (1 / body.mass + (rotationalArm * rotationalArm) / spinner.inertia);
+              body.vx += (impulse / body.mass) * nx;
+              body.vy += (impulse / body.mass) * ny;
+              spinner.angularVelocity = clamp(
+                spinner.angularVelocity - (impulse * rotationalArm) / spinner.inertia,
+                -SPINNER_MAX_VELOCITY,
+                SPINNER_MAX_VELOCITY
+              );
 
               const tx = -ny;
               const ty = nx;
-              const tangentSpeed = body.vx * tx + body.vy * ty;
+              const tangentSpeed = relativeX * tx + relativeY * ty;
               body.vx -= tangentSpeed * 0.07 * tx;
               body.vy -= tangentSpeed * 0.07 * ty;
               body.angularVelocity += (tangentSpeed / body.size) * 0.3;
@@ -1225,6 +1618,7 @@
           }
 
           function resolvePair(a, b) {
+            if (a.onConveyor || b.onConveyor) return;
             const dx = b.x - a.x;
             const dy = b.y - a.y;
             const minimum = a.radius + b.radius;
@@ -1271,16 +1665,35 @@
 
           function simulate(step) {
             const gravity = clamp(world.height * 1.35, 760, 1400);
+            updateSpinners(step);
+            resolveTeeterSpinnerCollisions();
 
             for (const body of bodies) {
               if (!body.active) continue;
+              body.grounded = false;
+
+              if (body.onConveyor) {
+                body.x += world.conveyor.speed * step;
+                body.y = world.conveyor.y - bodyExtent(body);
+                body.vx = world.conveyor.speed;
+                body.vy = 0;
+                body.angle *= Math.pow(0.7, step * 60);
+                body.angularVelocity = 0;
+                if (body.x < world.conveyor.right) continue;
+
+                body.onConveyor = false;
+                body.x = world.conveyor.right;
+                body.vx = world.conveyor.speed * (0.42 + body.grip * 0.12);
+                body.vy = world.size * 0.18;
+                body.angularVelocity = toss() * 0.45;
+              }
+
               body.vy = Math.min(body.vy + gravity * step, world.height * 1.25);
               body.x += body.vx * step;
               body.y += body.vy * step;
               body.angle += body.angularVelocity * step;
               body.vx *= 0.999;
               body.angularVelocity *= 0.998;
-              body.grounded = false;
               resolveBounds(body);
               resolveGround(body);
               if (body.grounded) {
@@ -1288,7 +1701,7 @@
                 const slack = 1.5 - body.grip;
                 body.vx += gravity * Math.sin(world.teeterAngle) * 0.32 * slack * step;
               }
-              resolveSlabs(body);
+              resolveSpinners(body);
               tipOverEdge(body, step);
             }
 
@@ -1350,7 +1763,6 @@
             if (progress >= 1) {
               phase = 'running';
               phaseStarted = now;
-              teeterStartedAt = now;
             }
           }
 
@@ -1369,6 +1781,34 @@
             const top = groundAt(body.x);
             if (Number.isFinite(top) && top - body.footY < body.size * 0.7) return;
             startDropping(body, body.x < world.ledgeLeft ? -1 : 1);
+          }
+
+          function bumpDominos(body) {
+            const travel = body.runDirection * body.runSpeed + body.slideVx;
+            if (Math.abs(travel) < 1) return;
+
+            let closest = null;
+            let closestDistance = Infinity;
+            for (const domino of world.dominos) {
+              if (domino.active || domino.fallen) continue;
+              const toward = (domino.baseX - body.x) * travel;
+              if (toward < 0) continue;
+              const distance = Math.abs(domino.baseX - body.x);
+              if (
+                distance < body.radius + domino.width * 0.65 &&
+                Math.abs(domino.baseY - body.footY) < body.size * 0.24 &&
+                distance < closestDistance
+              ) {
+                closest = domino;
+                closestDistance = distance;
+              }
+            }
+
+            if (!closest) return;
+            tipDomino(closest, travel * body.mass);
+            const direction = Math.sign(travel);
+            body.slideVx -= direction * body.runSpeed * 0.46;
+            body.x -= direction * closest.width * 0.35;
           }
 
           function separateRunners() {
@@ -1412,7 +1852,7 @@
                 body.angle += body.angularVelocity * step;
                 body.grounded = false;
                 resolveGround(body);
-                resolveSlabs(body);
+                resolveSpinners(body);
                 setGait(body, gait);
                 if (body.grounded && body.vy <= 0) {
                   // Caught by the stroke again: back on its feet.
@@ -1486,6 +1926,7 @@
               }
               body.y = body.footY - body.size * 0.62 - Math.abs(Math.sin(gait * 2)) * body.size * 0.022;
               body.angle = Math.sin(gait) * 0.035 * body.runDirection + world.teeterAngle * 0.78;
+              bumpDominos(body);
               setLegGrowth(body, 1);
               setGait(body, gait);
             }
@@ -1498,8 +1939,18 @@
             if (!lastTime) lastTime = now;
             const elapsed = Math.min((now - lastTime) / 1000, 0.034);
             lastTime = now;
+            const physicsSteps = 3;
 
-            updateTeeter(elapsed, now);
+            // Once the walkers are up, advance both rotating systems in small
+            // steps so fast bar-to-bar contacts cannot slip between frames.
+            if (phase !== 'falling') {
+              for (let step = 0; step < physicsSteps; step++) {
+                updateSpinners(elapsed / physicsSteps);
+                updateTeeter(elapsed / physicsSteps);
+                resolveTeeterSpinnerCollisions();
+                updateDominos(elapsed / physicsSteps);
+              }
+            }
 
             if (phase === 'falling') {
               for (const body of bodies) {
@@ -1509,8 +1960,13 @@
                 }
               }
 
-              const substeps = 3;
-              for (let step = 0; step < substeps; step++) simulate(elapsed / substeps);
+              // Resolve each letter contact before moving the beam so landing
+              // momentum changes its angle within the same rendered frame.
+              for (let step = 0; step < physicsSteps; step++) {
+                simulate(elapsed / physicsSteps);
+                updateTeeter(elapsed / physicsSteps);
+                updateDominos(elapsed / physicsSteps);
+              }
 
               let totalMotion = 0;
               let standing = 0;
@@ -1534,7 +1990,11 @@
               if (!pending && totalMotion < standing * 4.5) settledFrames += 1;
               else settledFrames = 0;
 
-              if (standing && !pending && (settledFrames > 60 || now - fallStartedAt > 9000)) {
+              if (
+                standing &&
+                !pending &&
+                (settledFrames > 60 || now - fallStartedAt > MAX_FEED_AND_SETTLE_TIME)
+              ) {
                 beginSprouting(now);
               }
             } else if (phase === 'sprouting') {

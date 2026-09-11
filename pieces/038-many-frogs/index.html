@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="description" content="Twelve autonomous frogs cross an endless course of traffic, logs, alligators, and permanent colorful stains." />
+    <meta name="description" content="Autonomous frogs cross a wide endless course of cars, bicycles, trains, rivers, mowers, watercolor bloodstains, and multiplying flies." />
     <link rel="icon" href="data:," />
     <title>Many Frogs · HyperGal</title>
     <style>
@@ -28,7 +28,7 @@
         'use strict';
 
         const FROG_COUNT = 12;
-        const COLS = 17;
+        const COLS = 21;
         const HOP_TIME = 0.18;
         const OPENING_HOLD = 0.68;
         const RETURN_PAUSE = 1.15;
@@ -36,6 +36,9 @@
         const HAZARD_COLLISION_Y = 0.58;
         const FROG_HIT_RADIUS = 0.24;
         const FROG_CLEARANCE = 0.52;
+        const FLY_HIT_RADIUS = 0.38;
+        const BIKE_HIT_RADIUS = 0.16;
+        const GATOR_HEAD_FRACTION = 0.82;
         const ROUTE_DEPTH = 3;
         const ROUTE_BEAM_WIDTH = 7;
         const TAU = Math.PI * 2;
@@ -53,6 +56,17 @@
           road: 'oklch(0.16 0 0)',
           roadEdge: 'oklch(0.36 0 0)',
           roadMark: 'oklch(0.7 0 0)',
+          bikeLane: 'oklch(0.22 0.025 155)',
+          bikeEdge: 'oklch(0.42 0.035 155)',
+          bikeMark: 'oklch(0.72 0.035 155)',
+          bikeFrame: 'oklch(0.62 0.065 150)',
+          bikeRider: 'oklch(0.15 0.012 155)',
+          railBed: 'oklch(0.13 0 0)',
+          railTie: 'oklch(0.29 0 0)',
+          railSteel: 'oklch(0.58 0 0)',
+          railSignal: 'oklch(0.57 0.15 24)',
+          train: 'oklch(0.46 0 0)',
+          trainLight: 'oklch(0.76 0 0)',
           water: 'oklch(0.29 0 0)',
           waterLine: 'oklch(0.53 0 0)',
           log: 'oklch(0.33 0 0)',
@@ -64,17 +78,28 @@
           rockLight: 'oklch(0.52 0 0)',
           mower: 'oklch(0.66 0 0)',
           mowerLight: 'oklch(0.84 0 0)',
+          flyWing: 'oklch(0.86 0.025 85)',
+          flyBody: 'oklch(0.13 0.02 70)',
           ink: 'oklch(0.97 0 0)',
           tire: 'oklch(0.07 0 0)'
         };
 
-        const frogColors = [
-          'oklch(0.68 0.24 25)', 'oklch(0.75 0.2 55)',
-          'oklch(0.84 0.18 92)', 'oklch(0.78 0.21 125)',
-          'oklch(0.7 0.22 150)', 'oklch(0.72 0.18 178)',
-          'oklch(0.76 0.17 205)', 'oklch(0.67 0.22 245)',
-          'oklch(0.65 0.24 275)', 'oklch(0.69 0.24 305)',
-          'oklch(0.7 0.25 335)', 'oklch(0.75 0.21 5)'
+        // A narrow natural-pigment palette: madder and oxide carry the field,
+        // with quieter plum notes. Each frog stays identifiable without reading
+        // as one stop in a literal rainbow.
+        const frogPigments = [
+          { frog: 'oklch(0.62 0.16 23)', wash: 'oklch(0.58 0.15 20)', rim: 'oklch(0.37 0.12 18)' },
+          { frog: 'oklch(0.52 0.09 72)', wash: 'oklch(0.49 0.09 68)', rim: 'oklch(0.31 0.07 60)' },
+          { frog: 'oklch(0.58 0.13 345)', wash: 'oklch(0.54 0.13 347)', rim: 'oklch(0.33 0.10 350)' },
+          { frog: 'oklch(0.66 0.14 33)', wash: 'oklch(0.61 0.13 30)', rim: 'oklch(0.39 0.11 26)' },
+          { frog: 'oklch(0.47 0.10 305)', wash: 'oklch(0.45 0.10 308)', rim: 'oklch(0.28 0.08 312)' },
+          { frog: 'oklch(0.65 0.12 48)', wash: 'oklch(0.60 0.12 45)', rim: 'oklch(0.38 0.10 40)' },
+          { frog: 'oklch(0.62 0.10 355)', wash: 'oklch(0.58 0.10 357)', rim: 'oklch(0.37 0.08 2)' },
+          { frog: 'oklch(0.50 0.13 8)',  wash: 'oklch(0.47 0.12 8)',  rim: 'oklch(0.29 0.09 5)' },
+          { frog: 'oklch(0.68 0.09 77)', wash: 'oklch(0.62 0.09 72)', rim: 'oklch(0.40 0.07 64)' },
+          { frog: 'oklch(0.52 0.12 325)', wash: 'oklch(0.49 0.11 328)', rim: 'oklch(0.30 0.09 332)' },
+          { frog: 'oklch(0.58 0.10 60)', wash: 'oklch(0.54 0.10 56)', rim: 'oklch(0.34 0.08 50)' },
+          { frog: 'oklch(0.55 0.14 18)', wash: 'oklch(0.52 0.13 16)', rim: 'oklch(0.32 0.10 14)' }
         ];
 
         const moveOptions = [
@@ -88,7 +113,7 @@
         let width = 0;
         let height = 0;
         let dpr = 1;
-        let tile = 48;
+        let tile = 40;
         let boardLeft = 0;
         let visibleRows = 12;
         let cameraY = 0;
@@ -100,6 +125,8 @@
         let waitingFrogs = [];
         let particles = [];
         let bloodStains = [];
+        let collectedFlies = new Set();
+        let nextFrogId = FROG_COUNT;
         let elapsed = 0;
         let lastTime = performance.now();
         let gameOverAt = -1;
@@ -124,6 +151,8 @@
         function startRound() {
           round += 1;
           roundSeed = nextRoundSeed || hashString(`many-frogs-${round}-${Math.floor(Date.now() / 1000)}`);
+          nextFrogId = FROG_COUNT;
+          collectedFlies.clear();
           cameraY = 0;
           targetCameraY = 0;
           gameOverAt = -1;
@@ -139,30 +168,36 @@
 
         function createFrogs(seed, waiting) {
           return Array.from({ length: FROG_COUNT }, (_, index) => {
-            const spread = 3.1 + index * (10.8 / (FROG_COUNT - 1));
-            return {
-              id: index,
-              x: spread,
-              y: 0,
-              fromX: spread,
-              fromY: 0,
-              toX: spread,
-              toY: 0,
-              hop: 1,
-              alive: true,
-              facing: 'up',
-              deathAt: -1,
-              deathKind: '',
-              deathPhase: '',
-              color: frogColors[index],
-              decision: 0,
-              waitStreak: 0,
-              nextMoveAt: waiting ? Infinity : elapsed + OPENING_HOLD + index * 0.03 + hash(seed + index * 613) * 0.08,
-              boldness: hash(seed + index * 1709),
-              patience: hash(seed + index * 2347),
-              lateralPreference: hash(seed + index * 4517) < 0.5 ? -1 : 1
-            };
+            const margin = COLS * 0.18;
+            const spread = margin + index * ((COLS - margin * 2) / (FROG_COUNT - 1));
+            return createFrog(index, spread, 0, frogPigments[index], seed, waiting);
           });
+        }
+
+        function createFrog(id, x, y, pigment, seed, waiting = false) {
+          return {
+            id,
+            x,
+            y,
+            fromX: x,
+            fromY: y,
+            toX: x,
+            toY: y,
+            hop: 1,
+            alive: true,
+            facing: 'up',
+            deathAt: -1,
+            deathKind: '',
+            deathPhase: '',
+            color: pigment.frog,
+            pigment,
+            decision: 0,
+            waitStreak: 0,
+            nextMoveAt: waiting ? Infinity : elapsed + OPENING_HOLD + id * 0.03 + hash(seed + id * 613) * 0.08,
+            boldness: hash(seed + id * 1709),
+            patience: hash(seed + id * 2347),
+            lateralPreference: hash(seed + id * 4517) < 0.5 ? -1 : 1
+          };
         }
 
         function loop(now) {
@@ -221,6 +256,12 @@
             } else if (lane.type === 'road' && hitsVehicleAt(lane, frog.x, elapsed)) {
               killFrog(frog, 'traffic');
               return;
+            } else if (lane.type === 'bike' && hitsBikeAt(lane, frog.x, elapsed)) {
+              killFrog(frog, 'bike');
+              return;
+            } else if (lane.type === 'rail' && hitsTrainAt(lane, frog.x, elapsed)) {
+              killFrog(frog, 'train');
+              return;
             } else if (lane.type === 'grass' && lane.mower && hitsMowerAt(lane, frog.x, elapsed)) {
               killFrog(frog, 'mower');
               return;
@@ -228,6 +269,12 @@
 
             if (elapsed >= frog.nextMoveAt) chooseMove(frog);
           });
+
+          // Work from a snapshot because collecting a fly appends three frogs.
+          frogs.slice().forEach((frog) => {
+            if (frog.alive) collectFlyAt(frog);
+          });
+          updateBloodStains(dt);
 
           const alive = frogs.filter((frog) => frog.alive);
           if (gameOverAt >= 0) {
@@ -281,7 +328,9 @@
             if (x < 0.25 || x > COLS - 0.25) return;
 
             const lane = getLane(Math.round(y));
-            const dwell = lane.type === 'road' ? 0.15 : lane.type === 'river' ? 0.2 : lane.mower ? 0.18 : 0.05;
+            const dwell = lane.type === 'road'
+              ? 0.15
+              : lane.type === 'bike' ? 0.12 : lane.type === 'rail' ? 0.09 : lane.type === 'river' ? 0.2 : lane.mower ? 0.18 : 0.05;
             const danger = moveDanger(frog, choice, x, y, arrival, dwell);
             const riskWeight = lerp(2.3, 1.55, frog.boldness);
             let score = choice.base - danger * riskWeight;
@@ -299,7 +348,9 @@
             if (currentLane.type !== 'grass' && choice.dy > 0) score += 2.2;
             if (choice.dy > 0 && danger < 40) score += Math.min(7, frog.waitStreak * 0.45);
 
-            const thinkDelay = lane.mower ? 0.08 : lane.type === 'grass' ? 0.28 : 0.075;
+            const thinkDelay = lane.mower
+              ? 0.08
+              : lane.type === 'grass' ? 0.28 : lane.type === 'rail' ? 0.045 : lane.type === 'bike' ? 0.06 : 0.075;
             const carriedX = lane.type === 'river' ? x + lane.speed * thinkDelay : x;
             const escapeAt = arrival + thinkDelay + HOP_TIME;
             const escapeMoves = [[0, 1], [-1, 0], [1, 0], [0, -1]];
@@ -310,7 +361,9 @@
               const nextY = Math.max(-1, y + nextDy);
               if (nextX < 0.25 || nextX > COLS - 0.25) return;
               const nextLane = getLane(Math.round(nextY));
-              const nextDwell = nextLane.type === 'road' ? 0.13 : nextLane.type === 'river' ? 0.18 : nextLane.mower ? 0.16 : 0.04;
+              const nextDwell = nextLane.type === 'road'
+                ? 0.13
+                : nextLane.type === 'bike' ? 0.1 : nextLane.type === 'rail' ? 0.08 : nextLane.type === 'river' ? 0.18 : nextLane.mower ? 0.16 : 0.04;
               escapeDanger = Math.min(
                 escapeDanger,
                 laneDanger(nextLane, nextX, escapeAt, nextDwell)
@@ -423,7 +476,9 @@
           const targetLane = getLane(Math.round(targetY));
           const reaction = targetLane.mower
             ? 0.08
-            : targetLane.type === 'grass' ? 0.2 : targetLane.type === 'road' ? 0.045 : 0.055;
+            : targetLane.type === 'grass'
+              ? 0.2
+              : targetLane.type === 'rail' ? 0.035 : targetLane.type === 'bike' ? 0.05 : targetLane.type === 'road' ? 0.045 : 0.055;
           const danger = laneDanger(targetLane, targetX, arrival, reaction);
           if (danger >= 100) return null;
 
@@ -544,6 +599,42 @@
             return futureX < 0.3 || futureX > COLS - 0.3 ? 65 : 0.15;
           }
 
+          if (lane.type === 'rail') {
+            let clearance = Infinity;
+            const steps = Math.max(2, Math.ceil(duration / 0.02));
+            for (let step = 0; step <= steps; step += 1) {
+              const sampleTime = atTime + duration * (step / steps);
+              if (hitsTrainAt(lane, x, sampleTime)) return 100;
+              trainObjectsAt(lane, sampleTime).forEach((train) => {
+                const distance = x < train.x
+                  ? train.x - x
+                  : x > train.x + train.length
+                    ? x - train.x - train.length
+                    : 0;
+                clearance = Math.min(clearance, distance);
+              });
+            }
+            return clearance < 1.8 ? (1.8 - clearance) * 18 : 0;
+          }
+
+          if (lane.type === 'bike') {
+            let clearance = Infinity;
+            const steps = Math.max(1, Math.ceil(duration / 0.035));
+            for (let step = 0; step <= steps; step += 1) {
+              const sampleTime = atTime + duration * (step / steps);
+              if (hitsBikeAt(lane, x, sampleTime)) return 100;
+              bikeObjectsAt(lane, sampleTime).forEach((bike) => {
+                const distance = x < bike.x
+                  ? bike.x - x
+                  : x > bike.x + bike.length
+                    ? x - bike.x - bike.length
+                    : 0;
+                clearance = Math.min(clearance, distance);
+              });
+            }
+            return clearance < 0.55 ? (0.55 - clearance) * 9 : 0;
+          }
+
           let clearance = Infinity;
           const steps = Math.max(1, Math.ceil(duration / 0.035));
           for (let step = 0; step <= steps; step += 1) {
@@ -647,9 +738,21 @@
             killFrog(frog, 'traffic');
             return;
           }
+          if (lane.type === 'bike' && hitsBikeAt(lane, frog.x, elapsed)) {
+            killFrog(frog, 'bike');
+            return;
+          }
+          if (lane.type === 'rail' && hitsTrainAt(lane, frog.x, elapsed)) {
+            killFrog(frog, 'train');
+            return;
+          }
 
-          const urgency = lane.mower ? 0.045 : lane.type === 'grass' ? 0.24 : lane.type === 'road' ? 0.035 : 0.05;
-          const variation = lane.mower ? 0.07 : lane.type === 'grass' ? 0.3 : lane.type === 'road' ? 0.045 : 0.07;
+          const urgency = lane.mower
+            ? 0.045
+            : lane.type === 'grass' ? 0.24 : lane.type === 'rail' ? 0.022 : lane.type === 'bike' ? 0.04 : lane.type === 'road' ? 0.035 : 0.05;
+          const variation = lane.mower
+            ? 0.07
+            : lane.type === 'grass' ? 0.3 : lane.type === 'rail' ? 0.025 : lane.type === 'bike' ? 0.05 : lane.type === 'road' ? 0.045 : 0.07;
           frog.nextMoveAt = elapsed + urgency + brainRandom(frog, 117) * variation;
         }
 
@@ -689,20 +792,164 @@
 
         function addBloodStain(frog, kind) {
           const seed = hashString(`${round}-${frog.id}-${Math.round(elapsed * 1000)}-${kind}`);
-          const droplets = Array.from({ length: 4 + Math.floor(hash(seed + 41) * 5) }, (_, index) => ({
+          const surface = stainSurfaceAt(frog, kind);
+          const layerCount = reducedMotion.matches ? 14 : 22;
+          const edgePoints = Array.from({ length: 24 }, (_, index) => {
+            const angle = index / 24 * TAU;
+            const radius = 0.74 + hash(seed + index * 397) * 0.34;
+            return { angle, radius };
+          });
+          const layers = Array.from({ length: layerCount }, (_, layerIndex) => {
+            const spread = 0.42 + 0.58 * (layerIndex / Math.max(1, layerCount - 1));
+            return {
+              alpha: 0.055 + hash(seed + layerIndex * 1291) * 0.025,
+              points: edgePoints.map((point, pointIndex) => {
+                const wobble = (hash(seed + layerIndex * 2137 + pointIndex * 4591) - 0.5) * 0.12;
+                const radius = (point.radius + wobble) * spread;
+                return {
+                  x: Math.cos(point.angle) * radius * 0.39,
+                  y: Math.sin(point.angle) * radius * 0.23
+                };
+              })
+            };
+          });
+          const droplets = Array.from({ length: 7 + Math.floor(hash(seed + 41) * 7) }, (_, index) => ({
             angle: hash(seed + index * 97) * TAU,
-            distance: 0.16 + hash(seed + index * 211) * 0.48,
-            size: 0.035 + hash(seed + index * 397) * 0.07
+            distance: 0.28 + hash(seed + index * 211) * 0.52,
+            size: 0.018 + hash(seed + index * 397) * 0.052,
+            bloomAt: 0.34 + hash(seed + index * 571) * 0.54
           }));
+          const stipple = Array.from({ length: 18 }, (_, index) => {
+            const angle = hash(seed + index * 661) * TAU;
+            const distance = Math.sqrt(hash(seed + index * 881)) * 0.34;
+            return {
+              x: Math.cos(angle) * distance,
+              y: Math.sin(angle) * distance * 0.58,
+              size: 0.006 + hash(seed + index * 1069) * 0.013
+            };
+          });
+          const scaffold = Array.from({ length: 6 }, (_, index) => {
+            const angle = hash(seed + index * 1217) * TAU;
+            const inner = 0.10 + hash(seed + index * 1451) * 0.12;
+            const outer = 0.38 + hash(seed + index * 1693) * 0.28;
+            const bend = (hash(seed + index * 1877) - 0.5) * 0.22;
+            return [
+              { x: Math.cos(angle) * inner, y: Math.sin(angle) * inner * 0.62 },
+              { x: Math.cos(angle) * outer, y: Math.sin(angle) * inner * 0.62 + bend },
+              { x: Math.cos(angle) * outer, y: Math.sin(angle) * outer * 0.62 }
+            ];
+          });
           bloodStains.push({
             x: frog.x,
             y: frog.y,
             frogId: frog.id,
-            color: frog.color,
-            rotation: hash(seed + 17) * TAU,
-            scale: 0.72 + hash(seed + 29) * 0.55,
-            droplets
+            born: elapsed,
+            pigment: frog.pigment,
+            surfaceType: surface.type,
+            surfaceRow: surface.row,
+            opacity: 1,
+            waterAge: 0,
+            stretchX: 1,
+            stretchY: 1,
+            roadStretch: 1,
+            vehicleSmears: [],
+            smearedBy: new Set(),
+            rotation: surface.type === 'river'
+              ? (hash(seed + 17) - 0.5) * 0.16
+              : hash(seed + 17) * TAU,
+            scale: 0.82 + hash(seed + 29) * 0.48,
+            layers,
+            droplets,
+            stipple,
+            scaffold
           });
+        }
+
+        function stainSurfaceAt(frog, kind) {
+          const expectedType = kind === 'traffic'
+            ? 'road'
+            : kind === 'bike'
+              ? 'bike'
+            : kind === 'train'
+              ? 'rail'
+            : kind === 'splash' || kind === 'gator'
+              ? 'river'
+              : kind === 'mower' ? 'grass' : null;
+          const nearestRow = Math.round(frog.y);
+          if (!expectedType) {
+            return { type: getLane(nearestRow).type, row: nearestRow };
+          }
+
+          let bestRow = nearestRow;
+          let bestDistance = Infinity;
+          for (let row = Math.floor(frog.y) - 1; row <= Math.ceil(frog.y) + 1; row += 1) {
+            if (getLane(row).type !== expectedType) continue;
+            const distance = Math.abs(frog.y - row);
+            if (distance < bestDistance) {
+              bestDistance = distance;
+              bestRow = row;
+            }
+          }
+          return { type: expectedType, row: bestRow };
+        }
+
+        function updateBloodStains(dt) {
+          bloodStains.forEach((stain) => {
+            if (stain.surfaceType === 'river') {
+              const lane = getLane(stain.surfaceRow);
+              stain.waterAge += dt;
+              stain.x += lane.speed * dt * 0.68;
+              stain.stretchX = 1 + Math.min(2.5, stain.waterAge * 0.14);
+              stain.stretchY = 1 + Math.min(0.28, stain.waterAge * 0.018);
+              stain.rotation *= Math.pow(0.08, dt);
+              stain.opacity = Math.exp(-stain.waterAge / 13);
+              return;
+            }
+
+            if (stain.surfaceType !== 'road') return;
+            const lane = getLane(stain.surfaceRow);
+            if (lane.type !== 'road' || stain.smearedBy.size >= 5) return;
+            laneObjectsAt(lane, elapsed).forEach((vehicle) => {
+              if (stain.smearedBy.size >= 5) return;
+              const contactMargin = 0.3 * stain.roadStretch;
+              const touching = stain.x >= vehicle.x - contactMargin &&
+                stain.x <= vehicle.x + vehicle.length + contactMargin;
+              if (touching) addVehicleSmear(stain, lane, vehicle);
+            });
+          });
+
+          bloodStains = bloodStains.filter((stain) =>
+            stain.surfaceType !== 'river' ||
+            (stain.opacity > 0.025 && stain.x > -4 && stain.x < COLS + 4)
+          );
+        }
+
+        function addVehicleSmear(stain, lane, vehicle) {
+          const vehicleKey = `${lane.row}:${vehicle.id}`;
+          if (stain.smearedBy.has(vehicleKey)) return;
+          stain.smearedBy.add(vehicleKey);
+          stain.roadStretch = Math.min(2.45, stain.roadStretch + 0.28);
+          stain.rotation *= 0.52;
+
+          const direction = Math.sign(lane.speed) || 1;
+          const passIndex = stain.smearedBy.size - 1;
+          const seed = hashString(`${stain.frogId}-${vehicleKey}-${passIndex}`);
+          const length = 0.55 + hash(seed + 43) * 0.8 + passIndex * 0.12;
+          for (let track = 0; track < 3; track += 1) {
+            stain.vehicleSmears.push({
+              born: elapsed,
+              direction,
+              length: length * (0.82 + hash(seed + track * 317) * 0.24),
+              offsetY: (track - 1) * 0.1 + (hash(seed + track * 617) - 0.5) * 0.045,
+              width: track === 1 ? 0.075 : 0.032 + hash(seed + track * 911) * 0.018,
+              alpha: track === 1 ? 0.18 : 0.32,
+              gaps: [
+                0.2 + hash(seed + track * 1217) * 0.08,
+                0.48 + hash(seed + track * 1451) * 0.1
+              ],
+              wobble: (hash(seed + track * 1693) - 0.5) * 0.055
+            });
+          }
         }
 
         function getLane(row) {
@@ -720,24 +967,41 @@
           }
           const type = terrainTypeAt(row);
           if (type === 'grass') {
-            return { type: 'grass', row, variant: hash(row * 31 + COURSE_SEED), mower: false };
+            const mower = hash(row * 4519 + COURSE_SEED * 7) < 0.18;
+            return {
+              type: 'grass',
+              row,
+              variant: hash(row * 31 + COURSE_SEED),
+              mower,
+              mowerLength: 1.08 + hash(row * 1877 + COURSE_SEED * 11) * 0.48,
+              mowerSpeed: 0.54 + hash(row * 3571 + COURSE_SEED * 13) * 0.58,
+              mowerOffset: hash(row * 3301 + COURSE_SEED * 17) * COLS * 1.8
+            };
           }
 
           const direction = hash(row * 1181 + COURSE_SEED * 3) < 0.5 ? -1 : 1;
           const climb = Math.max(0, row) * 0.008;
-          const speedBase = type === 'road' ? 1.45 : 0.72;
-          const speedRange = type === 'road' ? 1.45 : 0.72;
+          const speedBase = type === 'rail' ? 4.8 : type === 'road' ? 1.45 : type === 'bike' ? 0.88 : 0.72;
+          const speedRange = type === 'rail' ? 1.8 : type === 'road' ? 1.45 : type === 'bike' ? 0.72 : 0.72;
           return {
             type,
             row,
             direction,
             speed: direction * (speedBase + Math.min(0.9, climb) + hash(row * 3571 + COURSE_SEED) * speedRange),
-            length: type === 'road'
-              ? 1.05 + hash(row * 1877 + COURSE_SEED) * 1.15
-              : 2.25 + hash(row * 2213 + COURSE_SEED) * 2.1,
-            spacing: type === 'road'
-              ? 3.6 + hash(row * 1297 + COURSE_SEED) * 2.25
-              : 4.8 + hash(row * 1213 + COURSE_SEED) * 2.5,
+            length: type === 'rail'
+              ? 8 + hash(row * 1877 + COURSE_SEED) * 3.5
+              : type === 'road'
+                ? 1.05 + hash(row * 1877 + COURSE_SEED) * 1.15
+                : type === 'bike'
+                  ? 0.62 + hash(row * 1877 + COURSE_SEED) * 0.22
+                : 2.25 + hash(row * 2213 + COURSE_SEED) * 2.1,
+            spacing: type === 'rail'
+              ? 30 + hash(row * 1297 + COURSE_SEED) * 9
+              : type === 'road'
+                ? 5.2 + hash(row * 1297 + COURSE_SEED) * 3.0
+                : type === 'bike'
+                  ? 5.7 + hash(row * 1297 + COURSE_SEED) * 2.9
+                : 4.8 + hash(row * 1213 + COURSE_SEED) * 2.5,
             offset: hash(row * 3301 + COURSE_SEED) * 20
           };
         }
@@ -747,11 +1011,14 @@
           while (terrainGeneratedThrough < row) {
             const isHazardBand = terrainSegmentIndex % 2 === 0;
             const segmentSeed = COURSE_SEED + terrainSegmentIndex * 104729;
-            const type = isHazardBand
-              ? (hash(segmentSeed + 811) < 0.58 ? 'road' : 'river')
-              : 'grass';
+            const hazardRoll = hash(segmentSeed + 811);
+            const type = !isHazardBand
+              ? 'grass'
+              : terrainSegmentIndex === 0
+                ? 'rail'
+                : hazardRoll < 0.38 ? 'road' : hazardRoll < 0.56 ? 'bike' : hazardRoll < 0.84 ? 'river' : 'rail';
             const length = isHazardBand
-              ? 1 + Math.floor(hash(segmentSeed + 1877) * 3)
+              ? (type === 'rail' || type === 'bike' ? 1 : 1 + Math.floor(hash(segmentSeed + 1877) * 3))
               : 2 + Math.floor(hash(segmentSeed + 3571) * 3);
             for (let index = 0; index < length; index += 1) {
               terrainGeneratedThrough += 1;
@@ -780,6 +1047,28 @@
           }));
         }
 
+        function trainObjectsAt(lane, atTime) {
+          return laneObjectsAt(lane, atTime);
+        }
+
+        function bikeObjectsAt(lane, atTime) {
+          return laneObjectsAt(lane, atTime);
+        }
+
+        function hitsBikeAt(lane, frogX, atTime) {
+          return bikeObjectsAt(lane, atTime).some((bike) =>
+            frogX > bike.x - BIKE_HIT_RADIUS &&
+            frogX < bike.x + bike.length + BIKE_HIT_RADIUS
+          );
+        }
+
+        function hitsTrainAt(lane, frogX, atTime) {
+          return trainObjectsAt(lane, atTime).some((train) =>
+            frogX > train.x - FROG_HIT_RADIUS &&
+            frogX < train.x + train.length + FROG_HIT_RADIUS
+          );
+        }
+
         function supportingRiverObjectAt(lane, frogX, atTime) {
           return riverObjectsAt(lane, atTime).find((object) => {
             if (object.kind === 'log') {
@@ -788,21 +1077,123 @@
             }
 
             const headBoundary = lane.direction > 0
-              ? object.x + object.length * 0.72
-              : object.x + object.length * 0.28;
+              ? object.x + object.length * GATOR_HEAD_FRACTION
+              : object.x + object.length * (1 - GATOR_HEAD_FRACTION);
             return lane.direction > 0
-              ? frogX > object.x + FROG_HIT_RADIUS && frogX < headBoundary - FROG_HIT_RADIUS
-              : frogX > headBoundary + FROG_HIT_RADIUS && frogX < object.x + object.length - FROG_HIT_RADIUS;
+              ? frogX > object.x + FROG_HIT_RADIUS && frogX < headBoundary
+              : frogX > headBoundary && frogX < object.x + object.length - FROG_HIT_RADIUS;
           });
         }
 
         function alligatorHeadAt(lane, frogX, atTime) {
-          return riverObjectsAt(lane, atTime).find((gator) => gator.kind === 'alligator' &&
-            (lane.direction > 0
-              ? frogX > gator.x + gator.length * 0.72 - FROG_HIT_RADIUS &&
-                frogX < gator.x + gator.length + FROG_HIT_RADIUS
-              : frogX > gator.x - FROG_HIT_RADIUS &&
-                frogX < gator.x + gator.length * 0.28 + FROG_HIT_RADIUS));
+          return riverObjectsAt(lane, atTime).some((gator) => {
+            if (gator.kind !== 'alligator') return false;
+            const headBoundary = lane.direction > 0
+              ? gator.x + gator.length * GATOR_HEAD_FRACTION
+              : gator.x + gator.length * (1 - GATOR_HEAD_FRACTION);
+            return lane.direction > 0
+              ? frogX >= headBoundary && frogX <= gator.x + gator.length
+              : frogX >= gator.x && frogX <= headBoundary;
+          });
+        }
+
+        function flyObjectsAt(row, atTime) {
+          const lane = getLane(row);
+          if (row < 1 || lane.type !== 'grass' || lane.mower) return [];
+          const seed = COURSE_SEED + row * 92821;
+          const count = row === 1 || row === 5
+            ? 1
+            : hash(seed + 17) < 0.26 ? 1 : 0;
+          const flies = [];
+          for (let index = 0; index < count; index += 1) {
+            const id = `${row}:${index}`;
+            if (collectedFlies.has(id)) continue;
+            let anchorX = 0.8 + hash(seed + index * 1877) * (COLS - 1.6);
+            for (let attempt = 0; attempt < 5 && blockedByGrassObstacle(row, anchorX); attempt += 1) {
+              anchorX = 0.8 + mod(anchorX + 2.73, COLS - 1.6);
+            }
+            const phase = hash(seed + index * 2671) * TAU;
+            flies.push({
+              id,
+              row,
+              seed,
+              x: anchorX + Math.sin(atTime * 3.1 + phase) * 0.12,
+              y: row + Math.cos(atTime * 3.7 + phase) * 0.08
+            });
+          }
+          return flies;
+        }
+
+        function collectFlyAt(frog) {
+          const firstRow = Math.max(1, Math.floor(frog.y - FLY_HIT_RADIUS));
+          const lastRow = Math.ceil(frog.y + FLY_HIT_RADIUS);
+          for (let row = firstRow; row <= lastRow; row += 1) {
+            const fly = flyObjectsAt(row, elapsed).find((item) => {
+              const dx = frog.x - item.x;
+              const dy = frog.y - item.y;
+              return dx * dx + dy * dy <= FLY_HIT_RADIUS * FLY_HIT_RADIUS;
+            });
+            if (!fly) continue;
+            collectedFlies.add(fly.id);
+            spawnFrogBrood(frog, fly);
+            return;
+          }
+        }
+
+        function spawnFrogBrood(parent, fly) {
+          const columnOffsets = Array.from({ length: (COLS - 1) * 2 + 1 }, (_, index) => {
+            if (index === 0) return 0;
+            const offsetIndex = index - 1;
+            const distance = Math.floor(offsetIndex / 2) + 1;
+            return offsetIndex % 2 === 0 ? -distance : distance;
+          });
+          const rowOffsets = Array.from({ length: 17 }, (_, index) => {
+            if (index === 0) return 0;
+            const offsetIndex = index - 1;
+            const distance = Math.floor(offsetIndex / 2) + 1;
+            return offsetIndex % 2 === 0 ? -distance : distance;
+          });
+          const candidates = [];
+          rowOffsets.forEach((rowOffset) => {
+            const y = fly.row + rowOffset;
+            const lane = getLane(y);
+            if (lane.type !== 'grass' || lane.mower) return;
+            columnOffsets.forEach((offset) => candidates.push({ x: parent.x + offset, y }));
+          });
+
+          let born = 0;
+          for (const candidate of candidates) {
+            if (born >= 3) break;
+            const { x, y } = candidate;
+            if (x < 0.25 || x > COLS - 0.25) continue;
+            if (blockedByGrassObstacle(y, x)) continue;
+            if (frogs.some((frog) => frog.alive && frogsTooClose(x, y, frog.x, frog.y))) continue;
+
+            const id = nextFrogId++;
+            const seed = hashString(`${round}-${fly.id}-${parent.id}-${id}`);
+            const child = createFrog(id, x, y, parent.pigment, seed);
+            child.facing = parent.facing;
+            child.nextMoveAt = elapsed + 0.2 + born * 0.08 + hash(seed + 31) * 0.08;
+            frogs.push(child);
+            born += 1;
+          }
+
+          if (!reducedMotion.matches) {
+            for (let index = 0; index < 12; index += 1) {
+              const angle = index / 12 * TAU + hash(fly.seed + index * 191) * 0.4;
+              const speed = 0.35 + hash(fly.seed + index * 313) * 0.7;
+              particles.push({
+                x: fly.x,
+                y: fly.y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                born: elapsed,
+                life: 0.45 + hash(fly.seed + index * 487) * 0.35,
+                color: parent.color,
+                size: 0.018 + hash(fly.seed + index * 619) * 0.026
+              });
+            }
+          }
         }
 
         function mowerObjectAt(lane, atTime) {
@@ -825,7 +1216,7 @@
         }
 
         function grassObstacles(row) {
-          if (row < 6) return [];
+          if (row < 6 || getLane(row).mower) return [];
           const count = hash(COURSE_SEED + row * 421) < 0.58 ? 1 : 2;
           const obstacles = [];
           for (let index = 0; index < count; index += 1) {
@@ -859,6 +1250,8 @@
             const lane = getLane(row);
             if (lane.type === 'grass' && lane.mower && hitsMowerAt(lane, frogX, atTime)) return 'mower';
             if (lane.type === 'road' && hitsVehicleAt(lane, frogX, atTime)) return 'traffic';
+            if (lane.type === 'bike' && hitsBikeAt(lane, frogX, atTime)) return 'bike';
+            if (lane.type === 'rail' && hitsTrainAt(lane, frogX, atTime)) return 'train';
             if (lane.type === 'river' && alligatorHeadAt(lane, frogX, atTime)) return 'gator';
             if (lane.type === 'river' && !supportingRiverObjectAt(lane, frogX, atTime)) return 'splash';
           }
@@ -880,6 +1273,7 @@
           ctx.rect(boardLeft, 0, COLS * tile, height);
           ctx.clip();
           rows.forEach(drawLaneObjects);
+          drawFlies(rows);
           ctx.restore();
 
           drawBoardEdges();
@@ -896,11 +1290,17 @@
 
           ctx.fillStyle = lane.type === 'grass'
             ? (lane.variant > 0.5 ? palette.grassA : palette.grassB)
-            : lane.type === 'road' ? palette.road : palette.water;
+            : lane.type === 'road'
+              ? palette.road
+              : lane.type === 'bike'
+                ? palette.bikeLane
+                : lane.type === 'rail' ? palette.railBed : palette.water;
           ctx.fillRect(boardLeft, top, COLS * tile, h);
 
           if (lane.type === 'grass') drawGrass(row, top);
           else if (lane.type === 'road') drawRoadSurface(top);
+          else if (lane.type === 'bike') drawBikeSurface(lane, top);
+          else if (lane.type === 'rail') drawRailSurface(lane, top);
           else drawRiverSurface(lane, top);
         }
 
@@ -913,6 +1313,8 @@
             if (lane.mower) drawMower(lane, top);
           }
           else if (lane.type === 'road') drawVehicles(lane, top);
+          else if (lane.type === 'bike') drawBikes(lane, top);
+          else if (lane.type === 'rail') drawTrains(lane, top);
           else drawRiverObjects(lane, top);
         }
 
@@ -1003,6 +1405,36 @@
           ctx.restore();
         }
 
+        function drawFlies(rows) {
+          rows.forEach((row) => {
+            flyObjectsAt(row, elapsed).forEach((fly) => {
+              const x = worldToScreenX(fly.x);
+              const y = worldToScreenY(fly.y);
+              const flap = 0.55 + Math.sin(elapsed * 22 + fly.seed) * 0.22;
+              ctx.save();
+              ctx.translate(x, y);
+              ctx.rotate(Math.sin(elapsed * 4.3 + fly.seed) * 0.18);
+              ctx.fillStyle = palette.flyWing;
+              ctx.globalAlpha = 0.72;
+              ctx.beginPath();
+              ctx.ellipse(-tile * 0.075, -tile * 0.035, tile * 0.085, tile * 0.035 * flap, -0.45, 0, TAU);
+              ctx.ellipse(tile * 0.075, -tile * 0.035, tile * 0.085, tile * 0.035 * flap, 0.45, 0, TAU);
+              ctx.fill();
+              ctx.globalAlpha = 1;
+              ctx.fillStyle = palette.flyBody;
+              ctx.beginPath();
+              ctx.ellipse(0, 0, tile * 0.045, tile * 0.075, 0, 0, TAU);
+              ctx.fill();
+              ctx.fillStyle = palette.ink;
+              ctx.beginPath();
+              ctx.arc(-tile * 0.021, -tile * 0.055, Math.max(1, tile * 0.014), 0, TAU);
+              ctx.arc(tile * 0.021, -tile * 0.055, Math.max(1, tile * 0.014), 0, TAU);
+              ctx.fill();
+              ctx.restore();
+            });
+          });
+        }
+
         function drawRoadSurface(top) {
           ctx.fillStyle = palette.roadEdge;
           ctx.fillRect(boardLeft, top, COLS * tile, Math.max(2, tile * 0.055));
@@ -1013,6 +1445,75 @@
           for (let x = boardLeft + tile * 0.3; x < boardLeft + COLS * tile; x += tile * 1.15) {
             ctx.fillRect(x, top + tile * 0.485, tile * 0.55, Math.max(1, tile * 0.03));
           }
+          ctx.globalAlpha = 1;
+        }
+
+        function drawBikeSurface(lane, top) {
+          const edge = Math.max(1, tile * 0.035);
+          ctx.fillStyle = palette.bikeEdge;
+          ctx.globalAlpha = 0.7;
+          ctx.fillRect(boardLeft, top, COLS * tile, edge);
+          ctx.fillRect(boardLeft, top + tile - edge, COLS * tile, edge);
+
+          ctx.fillStyle = palette.bikeMark;
+          ctx.globalAlpha = 0.44;
+          for (let x = boardLeft + tile * 0.25; x < boardLeft + COLS * tile; x += tile * 1.35) {
+            ctx.fillRect(x, top + tile * 0.49, tile * 0.62, Math.max(1, tile * 0.025));
+          }
+
+          ctx.strokeStyle = palette.bikeMark;
+          ctx.lineWidth = Math.max(1, tile * 0.035);
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          for (let x = boardLeft + tile * 2.1; x < boardLeft + COLS * tile; x += tile * 4.2) {
+            const direction = lane.direction > 0 ? 1 : -1;
+            ctx.beginPath();
+            ctx.moveTo(x - direction * tile * 0.18, top + tile * 0.33);
+            ctx.lineTo(x + direction * tile * 0.13, top + tile * 0.5);
+            ctx.lineTo(x - direction * tile * 0.18, top + tile * 0.67);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        function drawRailSurface(lane, top) {
+          ctx.fillStyle = palette.railTie;
+          ctx.globalAlpha = 0.82;
+          for (let x = boardLeft - tile * 0.2; x < boardLeft + COLS * tile; x += tile * 0.48) {
+            ctx.fillRect(x, top + tile * 0.12, tile * 0.13, tile * 0.76);
+          }
+
+          ctx.strokeStyle = palette.railSteel;
+          ctx.lineWidth = Math.max(2, tile * 0.065);
+          ctx.beginPath();
+          ctx.moveTo(boardLeft, top + tile * 0.28);
+          ctx.lineTo(boardLeft + COLS * tile, top + tile * 0.28);
+          ctx.moveTo(boardLeft, top + tile * 0.72);
+          ctx.lineTo(boardLeft + COLS * tile, top + tile * 0.72);
+          ctx.stroke();
+
+          ctx.strokeStyle = palette.ink;
+          ctx.globalAlpha = 0.28;
+          ctx.lineWidth = Math.max(1, tile * 0.018);
+          ctx.beginPath();
+          ctx.moveTo(boardLeft, top + tile * 0.255);
+          ctx.lineTo(boardLeft + COLS * tile, top + tile * 0.255);
+          ctx.moveTo(boardLeft, top + tile * 0.695);
+          ctx.lineTo(boardLeft + COLS * tile, top + tile * 0.695);
+          ctx.stroke();
+
+          const trainNear = trainObjectsAt(lane, elapsed).some((train) =>
+            train.x < COLS + 7 && train.x + train.length > -7
+          );
+          const signalAlpha = trainNear
+            ? reducedMotion.matches ? 0.92 : 0.45 + (Math.sin(elapsed * 13) > 0 ? 0.47 : 0)
+            : 0.16;
+          ctx.fillStyle = palette.railSignal;
+          ctx.globalAlpha = signalAlpha;
+          ctx.beginPath();
+          ctx.arc(boardLeft + tile * 0.28, top + tile * 0.5, tile * 0.085, 0, TAU);
+          ctx.arc(boardLeft + (COLS - 0.28) * tile, top + tile * 0.5, tile * 0.085, 0, TAU);
+          ctx.fill();
           ctx.globalAlpha = 1;
         }
 
@@ -1042,6 +1543,146 @@
           ctx.fillStyle = palette.tire;
           ctx.fillRect(x + w * 0.12, y + h * 0.82, Math.max(5, w * 0.18), h * 0.22);
           ctx.fillRect(x + w * 0.7, y + h * 0.82, Math.max(5, w * 0.18), h * 0.22);
+        }
+
+        function drawBikes(lane, top) {
+          bikeObjectsAt(lane, elapsed).forEach((bike) => drawBike(lane, bike, top));
+        }
+
+        function drawBike(lane, bike, top) {
+          const x = boardLeft + bike.x * tile;
+          const w = bike.length * tile;
+          if (x > boardLeft + COLS * tile || x + w < boardLeft) return;
+          const rearX = w * 0.18;
+          const frontX = w * 0.82;
+          const hubY = top + tile * 0.68;
+          const crankX = w * 0.48;
+          const crankY = top + tile * 0.55;
+          const seatX = w * 0.38;
+          const seatY = top + tile * 0.38;
+
+          ctx.save();
+          if (lane.direction < 0) {
+            ctx.translate(x + w, 0);
+            ctx.scale(-1, 1);
+          } else {
+            ctx.translate(x, 0);
+          }
+
+          ctx.strokeStyle = 'oklch(0.04 0 0 / 0.3)';
+          ctx.lineWidth = Math.max(2, tile * 0.055);
+          ctx.beginPath();
+          ctx.moveTo(rearX, hubY + tile * 0.08);
+          ctx.lineTo(frontX, hubY + tile * 0.08);
+          ctx.stroke();
+
+          ctx.strokeStyle = palette.bikeMark;
+          ctx.lineWidth = Math.max(1.5, tile * 0.045);
+          ctx.beginPath();
+          ctx.arc(rearX, hubY, tile * 0.13, 0, TAU);
+          ctx.arc(frontX, hubY, tile * 0.13, 0, TAU);
+          ctx.stroke();
+
+          ctx.strokeStyle = palette.bikeFrame;
+          ctx.lineWidth = Math.max(1.5, tile * 0.052);
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          ctx.moveTo(rearX, hubY);
+          ctx.lineTo(seatX, seatY);
+          ctx.lineTo(crankX, crankY);
+          ctx.lineTo(rearX, hubY);
+          ctx.moveTo(crankX, crankY);
+          ctx.lineTo(frontX, hubY);
+          ctx.lineTo(w * 0.69, top + tile * 0.34);
+          ctx.lineTo(frontX, hubY);
+          ctx.stroke();
+
+          ctx.strokeStyle = palette.bikeRider;
+          ctx.lineWidth = Math.max(2, tile * 0.065);
+          ctx.beginPath();
+          ctx.moveTo(w * 0.49, top + tile * 0.27);
+          ctx.lineTo(w * 0.58, top + tile * 0.43);
+          ctx.lineTo(w * 0.69, top + tile * 0.34);
+          ctx.moveTo(w * 0.56, top + tile * 0.42);
+          ctx.lineTo(crankX, crankY);
+          ctx.lineTo(seatX, seatY);
+          ctx.stroke();
+          ctx.fillStyle = palette.bikeRider;
+          ctx.beginPath();
+          ctx.arc(w * 0.46, top + tile * 0.2, tile * 0.075, 0, TAU);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        function drawTrains(lane, top) {
+          trainObjectsAt(lane, elapsed).forEach((train) => drawTrain(lane, train, top));
+        }
+
+        function drawTrain(lane, train, top) {
+          const x = boardLeft + train.x * tile;
+          const w = train.length * tile;
+          if (x > boardLeft + COLS * tile || x + w < boardLeft) return;
+          const y = top + tile * 0.13;
+          const h = tile * 0.74;
+          const engineWidth = Math.min(w * 0.3, tile * 2.35);
+          const freightEnd = w - engineWidth - tile * 0.12;
+          ctx.save();
+          if (lane.direction < 0) {
+            ctx.translate(x + w, 0);
+            ctx.scale(-1, 1);
+          } else {
+            ctx.translate(x, 0);
+          }
+
+          ctx.fillStyle = 'oklch(0.03 0 0 / 0.34)';
+          ctx.fillRect(0, y + h * 0.77, w, h * 0.25);
+
+          let carIndex = 0;
+          for (let carX = 0; carX < freightEnd - tile * 0.4; carX += tile * 2.25) {
+            const carWidth = Math.min(tile * 2.08, freightEnd - carX);
+            ctx.fillStyle = hash(train.id * 3571 + carIndex * 977 + lane.row) < 0.5
+              ? palette.train
+              : 'oklch(0.53 0 0)';
+            roundedRect(carX, y + h * 0.08, carWidth, h * 0.68, tile * 0.045);
+            ctx.fill();
+            ctx.strokeStyle = palette.trainLight;
+            ctx.globalAlpha = 0.48;
+            ctx.lineWidth = Math.max(1, tile * 0.025);
+            ctx.strokeRect(carX + tile * 0.16, y + h * 0.22, carWidth - tile * 0.32, h * 0.34);
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = palette.tire;
+            ctx.beginPath();
+            ctx.arc(carX + carWidth * 0.22, y + h * 0.82, tile * 0.105, 0, TAU);
+            ctx.arc(carX + carWidth * 0.78, y + h * 0.82, tile * 0.105, 0, TAU);
+            ctx.fill();
+            carIndex += 1;
+          }
+
+          const engineX = w - engineWidth;
+          ctx.fillStyle = palette.train;
+          ctx.beginPath();
+          ctx.moveTo(engineX, y + h * 0.08);
+          ctx.lineTo(w - tile * 0.34, y + h * 0.08);
+          ctx.lineTo(w, y + h * 0.38);
+          ctx.lineTo(w, y + h * 0.76);
+          ctx.lineTo(engineX, y + h * 0.76);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = palette.trainLight;
+          roundedRect(engineX + tile * 0.24, y + h * 0.19, tile * 0.72, h * 0.29, tile * 0.035);
+          ctx.fill();
+          ctx.fillStyle = palette.ink;
+          ctx.globalAlpha = 0.82;
+          roundedRect(w - tile * 0.47, y + h * 0.37, tile * 0.25, h * 0.16, tile * 0.025);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = palette.tire;
+          ctx.beginPath();
+          ctx.arc(engineX + engineWidth * 0.28, y + h * 0.82, tile * 0.12, 0, TAU);
+          ctx.arc(engineX + engineWidth * 0.78, y + h * 0.82, tile * 0.12, 0, TAU);
+          ctx.fill();
+          ctx.restore();
         }
 
         function drawRiverSurface(lane, top) {
@@ -1138,29 +1779,131 @@
             const x = worldToScreenX(stain.x);
             const y = worldToScreenY(stain.y);
             if (y < -tile || y > height + tile) return;
+            const opacity = stain.opacity;
+            const progress = reducedMotion.matches
+              ? 1
+              : easeOutQuart(clamp((elapsed - stain.born) / 1.65, 0, 1));
+            const visibleLayers = Math.max(1, Math.ceil(stain.layers.length * progress));
+
+            if (stain.vehicleSmears.length) drawVehicleSmears(stain, x, y, progress);
+
             ctx.save();
             ctx.translate(x, y);
+            if (stain.surfaceType === 'river') {
+              const blur = Math.min(tile * 0.14, stain.waterAge * tile * 0.012);
+              ctx.filter = `blur(${blur.toFixed(2)}px)`;
+            }
             ctx.rotate(stain.rotation);
-            ctx.scale(stain.scale, stain.scale);
-            ctx.fillStyle = stain.color;
-            ctx.globalAlpha = 0.82;
-            ctx.beginPath();
-            ctx.ellipse(0, 0, tile * 0.27, tile * 0.13, 0, 0, TAU);
-            ctx.ellipse(tile * 0.12, -tile * 0.06, tile * 0.16, tile * 0.1, 0.4, 0, TAU);
-            ctx.ellipse(-tile * 0.15, tile * 0.05, tile * 0.13, tile * 0.09, -0.35, 0, TAU);
-            ctx.fill();
+            ctx.scale(
+              stain.scale * stain.stretchX * stain.roadStretch,
+              stain.scale * stain.stretchY
+            );
+
+            // Stacked, slightly mismatched washes let pigment collect in the
+            // centre and feather at the edge, echoing Hunt Prey Paint's blooms.
+            for (let index = 0; index < visibleLayers; index += 1) {
+              const layer = stain.layers[index];
+              const layerProgress = clamp(progress * stain.layers.length - index, 0, 1);
+              ctx.globalAlpha = layer.alpha * layerProgress * opacity;
+              ctx.fillStyle = index % 6 === 0 ? stain.pigment.frog : stain.pigment.wash;
+              ctx.beginPath();
+              ctx.moveTo(layer.points[0].x * tile, layer.points[0].y * tile);
+              for (let point = 1; point < layer.points.length; point += 1) {
+                ctx.lineTo(layer.points[point].x * tile, layer.points[point].y * tile);
+              }
+              ctx.closePath();
+              ctx.fill();
+            }
+
+            ctx.strokeStyle = stain.pigment.rim;
+            ctx.lineCap = 'square';
+            ctx.lineJoin = 'miter';
+            ctx.globalAlpha = 0.18 * progress * opacity;
+            ctx.lineWidth = Math.max(0.75, tile * 0.018);
+            stain.scaffold.forEach((line) => {
+              ctx.beginPath();
+              ctx.moveTo(line[0].x * tile, line[0].y * tile);
+              ctx.lineTo(line[1].x * tile, line[1].y * tile);
+              ctx.lineTo(line[2].x * tile, line[2].y * tile);
+              ctx.stroke();
+            });
+
+            if (progress > 0.72) {
+              const edge = stain.layers[stain.layers.length - 1].points;
+              ctx.globalAlpha = (progress - 0.72) / 0.28 * 0.42 * opacity;
+              ctx.lineWidth = Math.max(0.8, tile * 0.022);
+              ctx.beginPath();
+              ctx.moveTo(edge[0].x * tile, edge[0].y * tile);
+              for (let point = 1; point < edge.length; point += 1) {
+                ctx.lineTo(edge[point].x * tile, edge[point].y * tile);
+              }
+              ctx.closePath();
+              ctx.stroke();
+            }
+
+            ctx.fillStyle = stain.pigment.rim;
+            ctx.globalAlpha = Math.max(0, progress - 0.38) * 0.34 * opacity;
+            stain.stipple.forEach((dot) => {
+              ctx.fillRect(
+                (dot.x - dot.size * 0.5) * tile,
+                (dot.y - dot.size * 0.5) * tile,
+                Math.max(1, dot.size * tile),
+                Math.max(1, dot.size * tile)
+              );
+            });
+
+            ctx.fillStyle = stain.pigment.wash;
             stain.droplets.forEach((drop) => {
+              if (progress < drop.bloomAt) return;
+              const dropProgress = easeOutQuart(clamp((progress - drop.bloomAt) / 0.22, 0, 1));
+              ctx.globalAlpha = 0.48 * dropProgress * opacity;
               ctx.beginPath();
               ctx.arc(
                 Math.cos(drop.angle) * drop.distance * tile,
-                Math.sin(drop.angle) * drop.distance * tile,
-                drop.size * tile, 0, TAU
+                Math.sin(drop.angle) * drop.distance * tile * 0.72,
+                drop.size * tile * dropProgress, 0, TAU
               );
               ctx.fill();
             });
             ctx.restore();
           });
           ctx.globalAlpha = 1;
+        }
+
+        function drawVehicleSmears(stain, x, y, stainProgress) {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.strokeStyle = stain.pigment.wash;
+          ctx.lineCap = 'butt';
+          stain.vehicleSmears.forEach((smear) => {
+            const reveal = reducedMotion.matches
+              ? 1
+              : easeOutQuart(clamp((elapsed - smear.born) / 0.16, 0, 1));
+            const ranges = [
+              [0, smear.gaps[0]],
+              [smear.gaps[0] + 0.07, smear.gaps[1]],
+              [smear.gaps[1] + 0.08, 1]
+            ];
+            ctx.globalAlpha = smear.alpha * stainProgress * reveal;
+            ctx.lineWidth = Math.max(1, smear.width * tile);
+            ranges.forEach(([from, to], segmentIndex) => {
+              const visibleTo = Math.min(to, reveal);
+              if (visibleTo <= from) return;
+              const fromX = smear.direction * smear.length * from * tile;
+              const toX = smear.direction * smear.length * visibleTo * tile;
+              const offsetY = smear.offsetY * tile;
+              ctx.beginPath();
+              ctx.moveTo(fromX, offsetY);
+              ctx.quadraticCurveTo(
+                (fromX + toX) * 0.5,
+                offsetY + smear.wobble * tile * (segmentIndex % 2 ? -1 : 1),
+                toX,
+                offsetY + smear.wobble * tile * 0.35
+              );
+              ctx.stroke();
+            });
+          });
+          ctx.restore();
         }
 
         function drawBoardEdges() {
@@ -1260,7 +2003,7 @@
           canvas.style.height = `${height}px`;
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-          tile = clamp(Math.min(48, width / COLS), 18, 48);
+          tile = clamp(Math.min(40, width / COLS), 14, 40);
           boardLeft = (width - COLS * tile) / 2;
           visibleRows = height / tile;
         }
@@ -1313,6 +2056,8 @@
             topFrogY: frogs.filter((frog) => frog.alive).reduce((top, frog) => Math.max(top, frog.y), -1),
             gameOver: gameOverAt >= 0,
             waiting: waitingFrogs.length,
+            totalFrogs: frogs.length,
+            fliesCollected: collectedFlies.size,
             bloodStains: bloodStains.length,
             frogs: frogs.map((frog) => ({
               id: frog.id,

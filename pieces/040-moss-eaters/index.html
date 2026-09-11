@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta
       name="description"
-      content="One tiny grazer mines an efficient pale path through dark, noise-grown clouds of moss."
+      content="A small colony of grazers mows dark, noise-grown clouds of moss in tightly packed lanes, prospecting between patches."
     />
     <title>Moss Eaters · HyperGal</title>
     <style>
@@ -66,10 +66,10 @@
       id="field"
       tabindex="0"
       aria-describedby="instructions"
-      aria-label="Moss Eaters. One small caterpillar-like grazer mines a pale, non-overlapping path through dark pixel clouds of moss."
+      aria-label="Moss Eaters. A small colony of caterpillar-like grazers mows dark pixel clouds of moss in tightly packed lanes, prospecting between patches."
     ></canvas>
     <p class="instructions" id="instructions">
-      The grazer feeds automatically. Click or tap to relocate it. Press R or Enter for a new field. Press Space to pause or resume.
+      The grazers feed automatically. Click or tap to move the nearest one there. Press R or Enter for a new field. Press Space to pause or resume.
     </p>
     <p class="instructions" id="status" aria-live="polite"></p>
 
@@ -87,19 +87,19 @@
         const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
         const maturePreview = new URLSearchParams(location.search).get('preview') === 'mature';
         const TAU = Math.PI * 2;
-        const CELL = 6;
+        const CELL = 3;
         const MAX_DPR = 1.5;
+        // Exposed stone still carries a trace of growth; a full carpet is 1.
+        const BARE = 0.03;
+        // Moss thinner than this is not worth laying a lane through. The grazer
+        // still eats whatever it happens to walk over while prospecting.
+        const LANE_FOOD = 0.5;
 
         const mossColors = [
           '#252c26', '#2d352d', '#343c32', '#3b4338',
           '#202820', '#444a3d', '#30382f', '#1d251f'
         ];
-        const stoneColors = [
-          'rgba(202, 208, 205, .64)',
-          'rgba(218, 222, 219, .56)',
-          'rgba(185, 193, 188, .66)',
-          'rgba(228, 231, 227, .48)'
-        ];
+        const stoneColors = ['#c6ccc8', '#d3d7d4', '#b9c1bc', '#dfe2de'];
 
         let width = 0;
         let height = 0;
@@ -110,21 +110,26 @@
         let moss = new Float32Array(0);
         let centerline = new Uint16Array(0);
         let worms = [];
+        // Every sweep ever started on this field. A grazer arriving beside
+        // lanes already laid, by itself or by another, joins that sweep.
+        let sweeps = [];
         let random = Math.random;
         let seed = readSeed();
         let lastTime = 0;
         let frameRequest = 0;
         let running = !document.hidden;
         let paused = false;
-        let nextId = 1;
-        let pathMetrics = { entered: 0, revisited: 0, turns: 0 };
+        let pathMetrics = { entered: 0, revisited: 0, turns: 0, lanes: 0, prospects: 0 };
 
         window.__mossDiagnostics = () => ({
           ...pathMetrics,
           overlapRate: pathMetrics.entered
             ? pathMetrics.revisited / pathMetrics.entered
             : 0,
-          livingWorms: worms.filter(worm => worm.alive).length
+          bugs: worms.length,
+          modes: worms.map(worm => worm.mode),
+          sweeps: sweeps.length,
+          eatenFraction: eatenFraction()
         });
 
         resize();
@@ -151,11 +156,11 @@
           placeGrazer(x, y);
 
           if (reducedMotion.matches) {
-            growStillLife(150);
+            growStillLife(400);
             draw();
           }
 
-          announce('The grazer moved to a new patch.');
+          announce('A grazer moved to a new patch.');
         });
 
         canvas.addEventListener('keydown', (event) => {
@@ -198,21 +203,27 @@
 
         function startField() {
           random = mulberry32(seed);
-          nextId = 1;
           paused = false;
           initializeMoss();
           worms = [];
+          sweeps = [];
           centerline.fill(0);
-          pathMetrics = { entered: 0, revisited: 0, turns: 0 };
+          pathMetrics = { entered: 0, revisited: 0, turns: 0, lanes: 0, prospects: 0 };
           paintGround();
           clear(trailCtx);
 
-          const start = findRichMoss(32);
-          worms.push(makeWorm(start.x, start.y, random() * TAU));
+          // A small colony, sized to the field, each placed in its own rich
+          // patch.
+          const colony = clamp(Math.round(width * height / 150000), 3, 9);
+          for (let i = 0; i < colony; i += 1) {
+            const start = findRichMoss(32);
+            worms.push(makeWorm(start.x, start.y, random() * TAU));
+          }
 
-          // The public piece always begins untouched. This opt-in state exists
-          // only to make a representative catalog thumbnail.
-          if (maturePreview) growStillLife(reducedMotion.matches ? 1400 : 1200);
+          // The field opens with a short history already laid, so the first
+          // lanes and hairpins are there to read from the start. The private
+          // preview runs much longer for the catalog thumbnail.
+          growStillLife(maturePreview ? 1500 : 700);
 
           lastTime = performance.now();
           draw();
@@ -224,15 +235,17 @@
           // Each noise cell becomes a small cloud of dark square pixels. Dense
           // cells receive more, larger, and more opaque pixels; sparse cells
           // remain mostly exposed stone rather than becoming a smooth wash.
+          const perCell = CELL * CELL / 36;
           for (let gy = 0; gy < rows; gy += 1) {
             for (let gx = 0; gx < columns; gx += 1) {
               const density = moss[gy * columns + gx];
-              const pixels = Math.floor(density * 5 + random() * density * 5);
+              const expected = (Math.pow(density, 1.3) * 13 + random() * density * 5) * perCell;
+              const pixels = Math.floor(expected) + (random() < expected % 1 ? 1 : 0);
               for (let i = 0; i < pixels; i += 1) {
                 const x = Math.round(gx * CELL + random() * CELL);
                 const y = Math.round(gy * CELL + random() * CELL);
-                const size = 0.45 + random() * (0.7 + density * 1.55);
-                groundCtx.globalAlpha = 0.26 + density * 0.5 + random() * 0.18;
+                const size = 0.45 + random() * (0.7 + density * 1.8);
+                groundCtx.globalAlpha = 0.28 + density * 0.55 + random() * 0.15;
                 groundCtx.fillStyle = mossColors[Math.floor(random() * mossColors.length)];
                 groundCtx.fillRect(x, y, size, size * (0.55 + random() * 0.8));
               }
@@ -241,7 +254,7 @@
 
           // Rich regions carry compact satellite clusters, giving the cloud
           // ragged local edges without introducing soft blobs or polygons.
-          const clusters = Math.round(width * height / 82);
+          const clusters = Math.round(width * height / 70);
           for (let i = 0; i < clusters; i += 1) {
             const x = random() * width;
             const y = random() * height;
@@ -280,8 +293,8 @@
               const middle = valueNoise(x / 52, y / 52, 41);
               const fine = valueNoise(x / 23, y / 23, 97);
               const rawDensity = broad * 0.6 + middle * 0.28 + fine * 0.12;
-              const contrasted = clamp((rawDensity - 0.23) / 0.46, 0, 1);
-              const density = 0.035 + Math.pow(contrasted, 1.08) * 0.965;
+              const contrasted = clamp((rawDensity - 0.17) / 0.44, 0, 1);
+              const density = BARE + contrasted * (1 - BARE);
               food[gy * columns + gx] = density;
               moss[gy * columns + gx] = density;
             }
@@ -323,7 +336,7 @@
             let spacingPenalty = 0;
             for (const worm of worms) {
               const distance = Math.hypot(worm.x - x, worm.y - y);
-              if (distance < 150) spacingPenalty += (1 - distance / 150) * 0.82;
+              if (distance < 180) spacingPenalty += (1 - distance / 180) * 0.9;
             }
             const score = density - spacingPenalty;
             if (score > best.density) best = { x, y, density: score };
@@ -332,37 +345,50 @@
         }
 
         function makeWorm(x, y, angle) {
-          const radius = 2.15 + random() * 1.95;
+          const radius = 2.5 + random() * 1.7;
+          // The mouth clears a swath about four body radii wide. Lanes are laid
+          // slightly closer than one swath so adjacent passes overlap a little
+          // and no ribbon of moss survives between them.
+          const bite = radius * 1.9 + 0.6;
           const worm = {
-            id: nextId++,
             x,
             y,
             previousX: x,
             previousY: y,
             angle,
-            travelAngle: angle,
             radius,
-            speed: 10 + random() * 7,
-            steerIn: 0,
-            targetTurn: 0,
-            coverageScore: 1,
-            foraging: false,
+            bite,
+            turnRadius: bite * 0.92,
+            speed: 18 + random() * 10,
+            mode: 'prospecting',
+            // A sweep is a frame for laying lanes: an axis, the lateral
+            // offsets of every lane laid in it, and one gentle wobble that all
+            // of those lanes share so the spacing between neighbours never
+            // changes. It persists through prospecting so a return to the
+            // same patch extends the same tiling.
+            sweep: null,
+            laneRecord: null,
+            laneAngle: angle,
+            laneDir: 1,
+            laneOffset: 0,
+            laneFood: 0,
+            laneLength: 0,
+            laneLimit: 0,
+            mineHoldoff: 0,
             turnRemaining: 0,
             turnDirection: 1,
-            turnRadius: radius * 3.35 + 0.75,
-            laneRemaining: 40 + random() * 70,
-            brownianTurn: 0,
-            brownianIn: random() * 0.7,
-            avoidanceTurn: 0,
-            avoidanceIn: 0,
-            drift: (random() - 0.5) * 0.025,
-            driftIn: 7 + random() * 12,
-            stampDistance: random() * 4,
+            targetAngle: angle,
+            targetWeight: 0,
+            scanIn: 0,
+            tumbleTurn: 0,
+            tumbleIn: random() * 0.6,
+            stampDistance: 0,
+            stampX: x,
+            stampY: y,
             lastCell: -1,
             body: [],
             bodyClock: 0,
-            tone: random(),
-            alive: true
+            tone: random()
           };
 
           for (let i = 0; i < 9; i += 1) {
@@ -377,9 +403,7 @@
 
         function growStillLife(steps) {
           for (let step = 0; step < steps; step += 1) {
-            const countAtStart = worms.length;
-            for (let i = 0; i < countAtStart; i += 1) updateWorm(worms[i], 0.12, true);
-            maintainColony();
+            for (const worm of worms) updateWorm(worm, 0.1);
           }
         }
 
@@ -388,8 +412,7 @@
           lastTime = now;
 
           if (running && !paused && !reducedMotion.matches && dt > 0) {
-            for (const worm of worms) updateWorm(worm, dt, false);
-            maintainColony();
+            for (const worm of worms) updateWorm(worm, dt);
             softenOldTrails(dt);
             draw();
           }
@@ -397,166 +420,631 @@
           frameRequest = requestAnimationFrame(loop);
         }
 
-        function updateWorm(worm, dt, warming) {
-          if (!worm.alive) return;
-
+        function updateWorm(worm, dt) {
           worm.previousX = worm.x;
           worm.previousY = worm.y;
-          worm.steerIn -= dt;
-          worm.driftIn -= dt;
-          worm.brownianIn -= dt;
-          worm.avoidanceIn -= dt;
 
-          if (worm.driftIn <= 0) {
-            worm.drift = (random() - 0.5) * 0.04;
-            worm.driftIn = 8 + random() * 14;
+          // Two modes only. Mining lays straight, tightly packed lanes through
+          // a patch and hairpins between them. Prospecting searches for the
+          // next patch. Decisions are made before the move so sensors see the
+          // grazer's real position.
+          if (worm.turnRemaining <= 0) {
+            if (worm.mode === 'mining') mineLane(worm, dt);
+            else prospect(worm, dt);
           }
 
-          if (worm.turnRemaining <= 0 && worm.steerIn <= 0) {
-            worm.targetTurn = planCourse(worm);
-            worm.steerIn = 0.16 + random() * 0.16;
-          }
-
-          if (!worm.alive) return;
+          const step = worm.speed * dt;
+          let heading = worm.angle;
 
           if (worm.turnRemaining > 0) {
-            // A U-turn is a real semicircle: fixed forward speed, fixed radius,
-            // no braking, reversal, or lateral sine displacement.
-            const angularSpeed = worm.speed / worm.turnRadius;
-            const turnStep = Math.min(worm.turnRemaining, angularSpeed * dt);
+            // A U-turn is a real semicircle at fixed forward speed and fixed
+            // radius: no braking, reversing, or sideways slide. Moving along
+            // the half-step heading keeps the integrated arc round.
+            const turnStep = Math.min(worm.turnRemaining, step / worm.turnRadius);
+            heading = worm.angle + worm.turnDirection * turnStep * 0.5;
             worm.angle += worm.turnDirection * turnStep;
             worm.turnRemaining -= turnStep;
-            worm.foraging = false;
+            if (worm.turnRemaining <= 1e-9) {
+              worm.turnRemaining = 0;
+              worm.angle = laneTangent(worm, sweepCoords(worm).s);
+            }
+          } else if (worm.mode === 'mining') {
+            heading = steerAlongLane(worm, dt);
           } else {
-            const maximumRate = worm.foraging
-              ? worm.speed / 20
-              : worm.speed / 118;
-            worm.angle += clamp(worm.targetTurn + worm.drift, -maximumRate, maximumRate) * dt;
+            heading = steerProspecting(worm, dt);
           }
 
-          worm.travelAngle = worm.angle;
-          worm.x += Math.cos(worm.angle) * worm.speed * dt;
-          worm.y += Math.sin(worm.angle) * worm.speed * dt;
+          worm.x += Math.cos(heading) * step;
+          worm.y += Math.sin(heading) * step;
 
-          // Planning turns them before the edge. This clamp is a non-lethal
+          // Sensing turns the grazer before the edge. This clamp is a non-lethal
           // fallback for unusually coarse frames; the insect is redirected
           // inward and continues at the same speed on the following frame.
-          if (worm.x < 4 || worm.x > width - 4 || worm.y < 4 || worm.y > height - 4) {
+          if (!inside(worm.x, worm.y, 4)) {
             worm.x = clamp(worm.x, 4, width - 4);
             worm.y = clamp(worm.y, 4, height - 4);
             worm.angle = Math.atan2(height * 0.5 - worm.y, width * 0.5 - worm.x);
-            worm.travelAngle = worm.angle;
-            worm.foraging = true;
-            worm.steerIn = 0;
+            worm.turnRemaining = 0;
+            beginProspecting(worm);
           }
 
           const traveled = Math.hypot(worm.x - worm.previousX, worm.y - worm.previousY);
-          if (!worm.foraging && worm.turnRemaining <= 0) worm.laneRemaining -= traveled;
           worm.stampDistance += traveled;
           worm.bodyClock += traveled;
+          if (worm.mode === 'prospecting') worm.mineHoldoff = Math.max(0, worm.mineHoldoff - traveled);
 
           recordCenterline(worm);
-          consume(worm);
+          consume(worm, traveled);
 
           if (worm.bodyClock >= worm.radius * 0.4) {
             worm.bodyClock = 0;
             worm.body.unshift({ x: worm.x, y: worm.y });
             worm.body.length = Math.min(worm.body.length, 10);
           }
-
         }
 
-        function consume(worm) {
-          const x0 = worm.previousX;
-          const y0 = worm.previousY;
-          const x1 = worm.x;
-          const y1 = worm.y;
-          const foodHere = foodAt(x1, y1);
-          markEaten(x1, y1, worm.radius * 3.35);
+        // ---- Mining -------------------------------------------------------
 
+        function mineLane(worm, dt) {
+          extendLane(worm);
+          const ahead = laneAhead(worm);
+          // The lane is judged against what it has been yielding: a lane that
+          // has run through thick carpet ends where growth thins well below
+          // that, not only where it drops to the absolute floor. So the mined
+          // region takes the shape of the rich patch rather than running on
+          // through medium speckle to the far side of the field.
+          const blend = 1 - Math.exp(-worm.speed * dt / (worm.bite * 6));
+          worm.laneFood += (ahead.near - worm.laneFood) * blend;
+          // Thresholds are staggered: a lane starts only in thick carpet
+          // (see prospect), continues down to a lower floor, and turns into
+          // an exit lane that clears a floor in between, so a lane never
+          // flickers on and off at a patch edge.
+          const floor = Math.max(LANE_FOOD * 0.7, worm.laneFood * 0.6);
+          const farFloor = Math.max(LANE_FOOD, worm.laneFood * 0.8);
+          // A lane may bridge a naturally bare gap toward rich moss beyond,
+          // but never runs across ground it has already mined.
+          const bridge = ahead.far >= farFloor && ahead.eaten < 0.12;
+          const laneContinues = !ahead.outside && (ahead.near >= floor || bridge);
+
+          // Even a rich lane is eventually broken. Each lane draws its own
+          // soft limit; past it the chance of turning rises with every step,
+          // and at twice the limit the turn is certain. This keeps mined
+          // patches compact instead of striping the whole field.
+          const step = worm.speed * dt;
+          worm.laneLength += step;
+          const over = worm.laneLength - worm.laneLimit;
+          const tired = over > worm.laneLimit
+            || (over > 0 && random() < over / worm.laneLimit * step * 0.1);
+
+          if (laneContinues && !tired) return;
+
+          // The lane is spent. Preview both semicircular turns and take the
+          // side whose parallel lane still holds moss. Each turn draws its
+          // own radius, never wider than the swath, so lane spacing varies
+          // a little without ever opening a gap.
+          const radius = worm.bite * (0.8 + random() * 0.16);
+          const left = exitLaneFood(worm, -1, radius);
+          const right = exitLaneFood(worm, 1, radius);
+          const side = left === right
+            ? (random() < 0.5 ? -1 : 1)
+            : (left > right ? -1 : 1);
+
+          if (Math.max(left, right) >= LANE_FOOD * 0.8) {
+            commitUTurn(worm, side, radius);
+            return;
+          }
+
+          // A tired lane with nowhere to turn keeps going on a fresh limit
+          // rather than abandoning moss that is still ahead.
+          if (laneContinues) {
+            worm.laneLength = 0;
+            worm.laneLimit = drawLaneLimit();
+            return;
+          }
+
+          // Neither side holds moss: the patch is finished.
+          beginProspecting(worm);
+        }
+
+        function drawLaneLimit() {
+          return 50 + random() * 130;
+        }
+
+        // A fresh sweep: axis along the current heading, origin here, one
+        // lane at offset zero. Three gentle sine terms, long to short, with
+        // slopes kept modest so neighbouring lanes never pinch; zeroed at the
+        // origin so the first lane leaves the entry point without a jog.
+        function startSweep(worm) {
+          const sweep = {
+            x: worm.x,
+            y: worm.y,
+            angle: worm.angle,
+            lanes: [],
+            wobbleLen: [220 + random() * 120, 90 + random() * 50, 40 + random() * 20],
+            wobbleAmp: [3.5 + random() * 2.5, 1.5 + random(), 0.5 + random() * 0.4],
+            wobblePhase: [random() * TAU, random() * TAU, random() * TAU],
+            wobbleBase: 0
+          };
+          worm.sweep = sweep;
+          sweeps.push(sweep);
+          sweep.wobbleBase = wobbleAt(worm, 0);
+          worm.laneDir = 1;
+          worm.laneOffset = 0;
+        }
+
+        // Arriving beside lanes already laid, by itself or by another grazer,
+        // a grazer joins that sweep: it keeps the sweep's axis and wobble and
+        // takes the nearest free slot, so later passes extend the same tiling
+        // instead of crossing it at a new angle. Lanes are segments, so a
+        // slot is taken only where an existing lane actually reaches; the far
+        // end of a patch is open ground, and a lane may carry straight on
+        // from where an earlier one stopped.
+        function rejoinSweep(worm) {
+          const W = worm.bite;
+          const reach = W * 2;
+          let sweep = null;
+          let anchor = null;
+          let anchorDistance = Infinity;
+
+          for (const candidate of sweeps) {
+            const { s, lateral } = frameCoords(candidate, worm.x, worm.y);
+            for (const lane of candidate.lanes) {
+              const across = Math.abs(lane.offset - lateral);
+              const along = Math.max(0, lane.sMin - s, s - lane.sMax);
+              if (across > (lane.bite + W) * 2.6 || along > W * 6) continue;
+              const distance = across + along;
+              if (distance < anchorDistance) {
+                anchorDistance = distance;
+                anchor = lane;
+                sweep = candidate;
+              }
+            }
+          }
+          if (!sweep) return 'none';
+
+          worm.sweep = sweep;
+          const { s, lateral } = sweepCoords(worm);
+          const adjacent = (anchor.bite + W) * 0.88;
+          const candidates = [anchor.offset, anchor.offset + adjacent, anchor.offset - adjacent]
+            .sort((a, b) => Math.abs(a - lateral) - Math.abs(b - lateral));
+          const preferred = Math.cos(worm.angle - sweep.angle) >= 0 ? 1 : -1;
+
+          for (const slot of candidates) {
+            if (Math.abs(slot - lateral) > adjacent * 1.6) continue;
+            const taken = sweep.lanes.some(lane => Math.abs(lane.offset - slot) < (lane.bite + W) * 0.66
+              && lane.sMax > s - reach && lane.sMin < s + reach);
+            if (taken) continue;
+
+            // Take the slot only if its lane holds moss in some direction,
+            // preferring the direction the grazer is already heading.
+            worm.laneOffset = slot;
+            for (const laneDir of [preferred, -preferred]) {
+              worm.laneDir = laneDir;
+              const ahead = laneAhead(worm);
+              if (!ahead.outside && ahead.near >= LANE_FOOD) return 'joined';
+            }
+          }
+          return 'poor';
+        }
+
+        // The sweep's shared lateral wobble at distance s along its axis.
+        function wobbleAt(worm, s) {
+          const sweep = worm.sweep;
+          let offset = -sweep.wobbleBase;
+          for (let i = 0; i < 3; i += 1) {
+            offset += sweep.wobbleAmp[i] * Math.sin(TAU * s / sweep.wobbleLen[i] + sweep.wobblePhase[i]);
+          }
+          return offset;
+        }
+
+        function wobbleSlope(worm, s) {
+          const sweep = worm.sweep;
+          let slope = 0;
+          for (let i = 0; i < 3; i += 1) {
+            slope += sweep.wobbleAmp[i] * TAU / sweep.wobbleLen[i]
+              * Math.cos(TAU * s / sweep.wobbleLen[i] + sweep.wobblePhase[i]);
+          }
+          return slope;
+        }
+
+        // Heading of the current lane's curve at s, in the lane's direction.
+        function laneTangent(worm, s) {
+          return wrapAngle(worm.laneAngle + Math.atan(wobbleSlope(worm, s)));
+        }
+
+        // The grazer's position in the sweep frame: s along the axis,
+        // lateral across it.
+        function sweepCoords(worm) {
+          return frameCoords(worm.sweep, worm.x, worm.y);
+        }
+
+        function frameCoords(sweep, x, y) {
+          const forwardX = Math.cos(sweep.angle);
+          const forwardY = Math.sin(sweep.angle);
+          const dx = x - sweep.x;
+          const dy = y - sweep.y;
+          return { s: dx * forwardX + dy * forwardY, lateral: -dx * forwardY + dy * forwardX };
+        }
+
+        // World position of the sweep-frame point (s, lateral), with the
+        // shared wobble applied.
+        function sweepPoint(worm, s, lateral) {
+          const forwardX = Math.cos(worm.sweep.angle);
+          const forwardY = Math.sin(worm.sweep.angle);
+          const offset = lateral + wobbleAt(worm, s);
+          return {
+            x: worm.sweep.x + forwardX * s - forwardY * offset,
+            y: worm.sweep.y + forwardY * s + forwardX * offset
+          };
+        }
+
+        function laneAhead(worm) {
+          const W = worm.bite;
+          const forwardX = Math.cos(worm.angle);
+          const forwardY = Math.sin(worm.angle);
+          const normalX = -forwardY;
+          const normalY = forwardX;
+          const margin = W + 2;
+          const mining = worm.mode === 'mining';
+          const s = mining ? sweepCoords(worm).s : 0;
+          let near = 0;
+          let nearGrown = 0;
+          let far = 0;
+          let outside = false;
+
+          // While mining, samples follow the wobbled lane itself rather than
+          // the momentary heading, so a bend never reads the neighbouring
+          // lane by mistake. Prospecting simply looks straight ahead.
+          const at = (distance, lateral) => mining
+            ? sweepPoint(worm, s + worm.laneDir * distance * W, worm.laneOffset + lateral * W)
+            : {
+              x: worm.x + forwardX * distance * W + normalX * lateral * W,
+              y: worm.y + forwardY * distance * W + normalY * lateral * W
+            };
+
+          // Samples begin beyond the mouth's own reach so the lane is judged
+          // by moss the grazer has not yet touched. The far band lets a lane
+          // cross a short bare gap when rich moss continues beyond it.
+          for (const lateral of [-0.55, 0, 0.55]) {
+            for (const distance of [1.3, 2, 2.8]) {
+              const { x, y } = at(distance, lateral);
+              if (!inside(x, y, margin)) {
+                outside = true;
+                continue;
+              }
+              near += foodAt(x, y);
+              nearGrown += mossAt(x, y);
+            }
+            for (const distance of [3.8, 5.2, 6.6]) {
+              const { x, y } = at(distance, lateral);
+              if (!inside(x, y, margin)) continue;
+              far += foodAt(x, y);
+            }
+          }
+
+          // How much of the near band was moss that has already been eaten.
+          return { near: near / 9, far: far / 9, eaten: (nearGrown - near) / 9, outside };
+        }
+
+        function exitLaneFood(worm, side, R) {
+          const W = worm.bite;
+          const forwardX = Math.cos(worm.angle);
+          const forwardY = Math.sin(worm.angle);
+          const normalX = -forwardY;
+          const normalY = forwardX;
+          const margin = W + 2;
+
+          // The whole swept semicircle must fit inside the field.
+          for (let i = 1; i <= 4; i += 1) {
+            const theta = i / 4 * Math.PI;
+            const x = worm.x
+              + forwardX * R * Math.sin(theta)
+              + normalX * side * R * (1 - Math.cos(theta));
+            const y = worm.y
+              + forwardY * R * Math.sin(theta)
+              + normalY * side * R * (1 - Math.cos(theta));
+            if (!inside(x, y, margin)) return -1;
+          }
+
+          // Then read the parallel exit lane, running back the way we came,
+          // following the sweep's shared wobble.
+          const { s } = sweepCoords(worm);
+          const exitOffset = worm.laneOffset + side * worm.laneDir * R * 2;
+          const distances = [0.5, 1.5, 3, 5];
+          const weights = [1, 1, 0.7, 0.5];
+          let total = 0;
+          let weightSum = 0;
+
+          for (let i = 0; i < distances.length; i += 1) {
+            for (const lateral of [-0.4, 0, 0.4]) {
+              const { x, y } = sweepPoint(
+                worm,
+                s - worm.laneDir * distances[i] * W,
+                exitOffset + lateral * W
+              );
+              if (!inside(x, y, margin)) {
+                if (i < 2) return -1;
+                continue;
+              }
+              total += foodAt(x, y) * weights[i];
+              weightSum += weights[i];
+            }
+          }
+
+          return weightSum ? total / weightSum : -1;
+        }
+
+        // Each lane is a segment of its sweep: a lateral offset, the swath it
+        // clears, and its extent along the axis. The record is opened when
+        // the lane starts and grows as the grazer advances, so another grazer
+        // sees the lane being laid and never claims the same slot.
+        function openLane(worm) {
+          const { s } = sweepCoords(worm);
+          worm.laneRecord = {
+            offset: worm.laneOffset,
+            bite: worm.bite,
+            sMin: s - worm.bite,
+            sMax: s + worm.bite
+          };
+          worm.sweep.lanes.push(worm.laneRecord);
+        }
+
+        function extendLane(worm) {
+          const { s } = sweepCoords(worm);
+          worm.laneRecord.sMin = Math.min(worm.laneRecord.sMin, s - worm.bite);
+          worm.laneRecord.sMax = Math.max(worm.laneRecord.sMax, s + worm.bite);
+        }
+
+        function closeLane(worm) {
+          if (!worm.laneRecord) return;
+          extendLane(worm);
+          worm.laneRecord = null;
+        }
+
+        function commitUTurn(worm, side, radius) {
+          closeLane(worm);
+          worm.turnRadius = radius;
+          worm.turnDirection = side;
+          worm.turnRemaining = Math.PI;
+          // The exit lane is exactly one turn diameter over, heading back.
+          worm.laneOffset += side * worm.laneDir * radius * 2;
+          worm.laneDir = -worm.laneDir;
+          worm.laneAngle = wrapAngle(worm.sweep.angle + (worm.laneDir === 1 ? 0 : Math.PI));
+          openLane(worm);
+          worm.laneLength = 0;
+          worm.laneLimit = drawLaneLimit();
+          pathMetrics.turns += 1;
+        }
+
+        function steerAlongLane(worm, dt) {
+          const { s, lateral } = sweepCoords(worm);
+          const offset = lateral - (worm.laneOffset + wobbleAt(worm, s));
+          // Aim at the lane's centerline a few bite-widths ahead. This keeps
+          // every lane on its curve and parallel to its neighbours regardless
+          // of frame timing.
+          const desired = laneTangent(worm, s) - worm.laneDir * Math.atan2(offset, worm.bite * 3);
+          const maximumRate = worm.speed / (worm.turnRadius * 1.5);
+          const turn = clamp(wrapAngle(desired - worm.angle) * 6, -maximumRate, maximumRate);
+          worm.angle = wrapAngle(worm.angle + turn * dt);
+          return worm.angle;
+        }
+
+        function beginMining(worm, laneFood) {
+          worm.mode = 'mining';
+          const joined = rejoinSweep(worm);
+          if (joined === 'poor') {
+            worm.mode = 'prospecting';
+            return false;
+          }
+          if (joined === 'none') startSweep(worm);
+          worm.laneAngle = wrapAngle(worm.sweep.angle + (worm.laneDir === 1 ? 0 : Math.PI));
+          openLane(worm);
+          worm.laneFood = laneFood;
+          worm.laneLength = 0;
+          worm.laneLimit = drawLaneLimit();
+          worm.turnRemaining = 0;
+          pathMetrics.lanes += 1;
+          return true;
+        }
+
+        // ---- Prospecting --------------------------------------------------
+
+        function beginProspecting(worm) {
+          closeLane(worm);
+          worm.mode = 'prospecting';
+          worm.mineHoldoff = worm.bite * 3;
+          worm.scanIn = 0;
+          worm.targetWeight = 0;
+          pathMetrics.prospects += 1;
+        }
+
+        function prospect(worm, dt) {
+          const ahead = laneAhead(worm);
+          // A lane starts only where thick carpet runs well ahead; a small
+          // pocket is eaten in passing rather than mined. If the nearby sweep
+          // has no workable slot here, wait a few bite-widths before asking
+          // again rather than churning out lane stubs.
+          const carpetAhead = !ahead.outside && ahead.near >= LANE_FOOD * 1.2 && ahead.far >= LANE_FOOD;
+          if (carpetAhead && worm.mineHoldoff <= 0) {
+            if (beginMining(worm, ahead.near)) return;
+            worm.mineHoldoff = worm.bite * 3;
+          }
+
+          worm.scanIn -= dt;
+          if (worm.scanIn <= 0) {
+            worm.scanIn = 0.3 + random() * 0.3;
+            scanForMoss(worm);
+          }
+        }
+
+        function scanForMoss(worm) {
+          // A short-range sense of remaining moss in every direction. Nearby
+          // growth outweighs distant growth, and the current bearing keeps a
+          // small bonus so the search does not dither between rival patches.
+          const directions = 16;
+          const ranges = [18, 36, 60, 90, 130];
+          let bestAngle = worm.angle;
+          let bestScore = 0;
+
+          for (let k = 0; k < directions; k += 1) {
+            const angle = worm.angle + k / directions * TAU;
+            const forwardX = Math.cos(angle);
+            const forwardY = Math.sin(angle);
+            let score = 0;
+
+            for (const distance of ranges) {
+              const x = worm.x + forwardX * distance;
+              const y = worm.y + forwardY * distance;
+              if (!inside(x, y, worm.bite + 4)) {
+                if (distance <= 30) score = 0;
+                break;
+              }
+              // Thin growth is everywhere and never worth a detour; only
+              // carpet thick enough to lane through pulls the search, rich
+              // carpet pulls hardest, and a large patch further off outweighs
+              // a scrap close by.
+              const richness = Math.max(0, foodPatch(x, y, worm.bite * 0.8) - LANE_FOOD);
+              score += Math.pow(richness, 1.5) / (1 + distance / 80);
+            }
+
+            let persistence = 1 + 0.1 * Math.cos(angle - worm.angle);
+            if (worm.targetWeight > 0) persistence += 0.2 * Math.cos(angle - worm.targetAngle);
+            score *= persistence;
+
+            if (score > bestScore) {
+              bestScore = score;
+              bestAngle = angle;
+            }
+          }
+
+          // Below this there is nothing worth steering toward, only the
+          // trace on bare stone; the grazer keeps to its random walk.
+          if (bestScore < 0.05) {
+            worm.targetWeight = 0;
+            return;
+          }
+          worm.targetAngle = wrapAngle(bestAngle);
+          worm.targetWeight = bestScore;
+        }
+
+        function steerProspecting(worm, dt) {
+          worm.tumbleIn -= dt;
+          if (worm.tumbleIn <= 0) {
+            // Summed uniform samples approximate rotational Brownian noise
+            // without an artificial left-right oscillation.
+            const noise = random() + random() + random() - 1.5;
+            worm.tumbleTurn = noise * worm.speed / 12;
+            worm.tumbleIn = 0.35 + random() * 0.8;
+          }
+
+          // A faint scent only nudges the random walk; a strong one leads it.
+          const pull = clamp(worm.targetWeight / 0.5, 0, 1);
+          let turn = worm.tumbleTurn * (1 - pull * 0.5);
+          if (worm.targetWeight > 0) {
+            turn += wrapAngle(worm.targetAngle - worm.angle) * (0.6 + pull * 2);
+          }
+
+          // The field edge repels the search well before the hard clamp.
+          const margin = 36;
+          let pushX = 0;
+          let pushY = 0;
+          if (worm.x < margin) pushX += 1 - worm.x / margin;
+          if (worm.x > width - margin) pushX -= 1 - (width - worm.x) / margin;
+          if (worm.y < margin) pushY += 1 - worm.y / margin;
+          if (worm.y > height - margin) pushY -= 1 - (height - worm.y) / margin;
+          if (pushX || pushY) {
+            const away = Math.atan2(pushY, pushX);
+            const strength = Math.min(1, Math.hypot(pushX, pushY) * 2);
+            turn += wrapAngle(away - worm.angle) * 3 * strength;
+          }
+
+          const maximumRate = worm.speed / 16;
+          worm.angle = wrapAngle(worm.angle + clamp(turn, -maximumRate, maximumRate) * dt);
+          return worm.angle;
+        }
+
+        // ---- Eating and the trail -----------------------------------------
+
+        function consume(worm, traveled) {
+          const density = mossAt(worm.x, worm.y);
+          // The grazer mows the full swath wherever it goes: a prospecting
+          // route through thin growth is eaten just like a lane.
+          markEaten(worm.x, worm.y, worm.bite);
+
+          // The trail is laid by distance, not by frame, so a coarse step and
+          // a smooth one leave the same exposure behind.
+          const spacing = worm.bite * 0.3;
+          while (worm.stampDistance >= spacing) {
+            worm.stampDistance -= spacing;
+            const back = traveled > 0 ? Math.min(traveled, worm.stampDistance) / traveled : 0;
+            stampTrail(
+              worm,
+              worm.x - (worm.x - worm.previousX) * back,
+              worm.y - (worm.y - worm.previousY) * back,
+              density
+            );
+          }
+        }
+
+        function stampTrail(worm, x, y, density) {
+          const W = worm.bite;
           trailCtx.save();
           trailCtx.lineCap = 'round';
-          trailCtx.lineJoin = 'round';
-          const deposit = worm.foraging ? 0.22 : 0.62 + foodHere * 0.38;
-          trailCtx.globalAlpha = deposit;
 
-          // A broad, broken veil of exposed stone sits beneath the individual
-          // mouth marks. It keeps a feeding route from reading as a wire.
-          trailCtx.strokeStyle = 'rgba(202, 208, 203, .07)';
-          trailCtx.lineWidth = worm.radius * (3.5 + foodHere * 0.7);
+          // A broad, broken veil of exposed stone. Each stamp lifts a little
+          // more moss, so the swath's core reads clean and its edges ragged.
+          trailCtx.globalAlpha = 0.02 + density * 0.32;
+          trailCtx.fillStyle = stoneColors[Math.floor(random() * stoneColors.length)];
           trailCtx.beginPath();
-          trailCtx.moveTo(x0, y0);
-          trailCtx.lineTo(x1, y1);
-          trailCtx.stroke();
+          trailCtx.arc(
+            x + (random() - 0.5) * W * 0.2,
+            y + (random() - 0.5) * W * 0.2,
+            W * (0.86 + random() * 0.16),
+            0,
+            TAU
+          );
+          trailCtx.fill();
+
+          // Mouth marks: pale grains scattered across the swath.
+          const grains = 1 + Math.floor(density * 4 + random() * 2);
+          for (let i = 0; i < grains; i += 1) {
+            const reach = W * 0.95 * Math.sqrt(random());
+            const theta = random() * TAU;
+            trailCtx.globalAlpha = (0.18 + density * 0.5) * (0.5 + random() * 0.5);
+            trailCtx.fillStyle = stoneColors[Math.floor(random() * stoneColors.length)];
+            trailCtx.beginPath();
+            trailCtx.arc(x + Math.cos(theta) * reach, y + Math.sin(theta) * reach, 0.3 + random() * 0.85, 0, TAU);
+            trailCtx.fill();
+          }
 
           // The narrow scrape at the center records the bug's exact course.
-          const trailAlpha = worm.foraging ? 0.24 : 0.72 + foodHere * 0.28;
-          trailCtx.globalAlpha = trailAlpha;
+          trailCtx.globalAlpha = 0.2 + density * 0.6;
           trailCtx.strokeStyle = stoneColors[Math.floor(worm.tone * stoneColors.length) % stoneColors.length];
-          trailCtx.lineWidth = worm.radius * (0.42 + foodHere * 0.26);
+          trailCtx.lineWidth = worm.radius * 0.5;
           trailCtx.beginPath();
-          trailCtx.moveTo(x0, y0);
-          trailCtx.lineTo(x1, y1);
+          trailCtx.moveTo(worm.stampX, worm.stampY);
+          trailCtx.lineTo(x, y);
           trailCtx.stroke();
 
-          trailCtx.strokeStyle = 'rgba(232, 236, 232, .34)';
-          trailCtx.lineWidth = 0.42 + worm.radius * 0.06;
-          trailCtx.beginPath();
-          trailCtx.moveTo(x0, y0);
-          trailCtx.lineTo(x1, y1);
+          trailCtx.globalAlpha = 0.08 + density * 0.3;
+          trailCtx.strokeStyle = '#eef1eb';
+          trailCtx.lineWidth = 0.5 + worm.radius * 0.06;
           trailCtx.stroke();
-
-          const spacing = 1.25 + worm.radius * 0.2;
-          if (worm.stampDistance >= spacing) {
-            worm.stampDistance %= spacing;
-            const tangentX = Math.cos(worm.angle);
-            const tangentY = Math.sin(worm.angle);
-            const normalX = -tangentY;
-            const normalY = tangentX;
-            const trailRadius = worm.radius * (1.25 + foodHere * 0.7);
-            const grains = 2 + Math.floor(foodHere * 4 + random() * 2);
-
-            for (let i = 0; i < grains; i += 1) {
-              const lateral = (random() - 0.5) * trailRadius * 2;
-              const behind = random() * worm.radius * 1.7;
-              const grainX = x1 + normalX * lateral - tangentX * behind;
-              const grainY = y1 + normalY * lateral - tangentY * behind;
-              trailCtx.globalAlpha = trailAlpha * (0.28 + foodHere * 0.42 + random() * 0.2);
-              trailCtx.fillStyle = stoneColors[Math.floor(random() * stoneColors.length)];
-              trailCtx.beginPath();
-              trailCtx.arc(grainX, grainY, 0.28 + random() * 0.82, 0, TAU);
-              trailCtx.fill();
-            }
-            trailCtx.globalAlpha = 1;
-          }
 
           trailCtx.restore();
-        }
-
-        function maintainColony() {
-          worms = worms.filter(worm => worm.alive);
-          worms.length = Math.min(worms.length, 1);
-          while (worms.length < 1) {
-            let richest = { x: random() * width, y: random() * height, food: -1 };
-            for (let attempt = 0; attempt < 14; attempt += 1) {
-              const candidate = {
-                x: 12 + random() * (width - 24),
-                y: 12 + random() * (height - 24)
-              };
-              const candidateFood = foodAt(candidate.x, candidate.y);
-              if (candidateFood > richest.food) richest = { ...candidate, food: candidateFood };
-            }
-            worms.push(makeWorm(richest.x, richest.y, random() * TAU));
-          }
+          worm.stampX = x;
+          worm.stampY = y;
         }
 
         function placeGrazer(x, y) {
-          const angle = random() * TAU;
-          worms = [makeWorm(
-            clamp(x, 5, width - 5),
-            clamp(y, 5, height - 5),
-            angle
-          )];
+          let nearest = 0;
+          for (let i = 1; i < worms.length; i += 1) {
+            if (Math.hypot(worms[i].x - x, worms[i].y - y)
+              < Math.hypot(worms[nearest].x - x, worms[nearest].y - y)) nearest = i;
+          }
+          const moved = makeWorm(clamp(x, 5, width - 5), clamp(y, 5, height - 5), random() * TAU);
+          closeLane(worms[nearest]);
+          worms[nearest] = moved;
         }
 
         function softenOldTrails(dt) {
@@ -576,7 +1064,7 @@
           const gx = clamp(Math.floor(x / CELL), 0, columns - 1);
           const gy = clamp(Math.floor(y / CELL), 0, rows - 1);
           const index = gy * columns + gx;
-          food[index] = Math.min(1, food[index] + 0.006);
+          food[index] = Math.min(moss[index], food[index] + 0.006);
         }
 
         function draw() {
@@ -589,7 +1077,7 @@
         function drawWorms() {
           ctx.save();
           for (const worm of worms) {
-            if (!worm.alive || worm.body.length < 2) continue;
+            if (worm.body.length < 2) continue;
 
             for (let i = worm.body.length - 1; i >= 0; i -= 1) {
               const point = worm.body[i];
@@ -636,283 +1124,10 @@
           ctx.restore();
         }
 
-        function planCourse(worm) {
-          const straight = corridorStats(worm, 0);
-          const minedBarrier = straight.blocked > 0.04
-            || (straight.capacity > 0.07 && straight.freshness < 0.46);
-          const boundaryAhead = straight.outside > 0.08;
-          const laneComplete = worm.laneRemaining <= 0;
+        // ---- Field queries ------------------------------------------------
 
-          // At an edge, prefer a fully clear turn and fall back to the tighter
-          // in-bounds arc. The animal is never removed from the simulation.
-          if (boundaryAhead) {
-            if (!beginClearUTurn(worm)) beginBoundaryUTurn(worm);
-            return 0;
-          }
-
-          // An eaten lane ahead triggers the same clear-turn preview. If both
-          // semicircles are occupied, use local Brownian avoidance until a gap
-          // opens rather than crossing deliberately or killing the insect.
-          if (minedBarrier) {
-            if (beginClearUTurn(worm)) return 0;
-            worm.foraging = true;
-            return avoidPathTurn(worm);
-          }
-
-          if (laneComplete) {
-            if (beginClearUTurn(worm)) return 0;
-            worm.laneRemaining = 28 + random() * 34;
-          }
-
-          // Thin moss produces rotational Brownian motion: constant translation
-          // with locally changing angular velocity, not long-range targeting.
-          if (straight.capacity < 0.32) {
-            worm.foraging = true;
-            worm.coverageScore = straight.remaining;
-            return brownianWanderTurn(worm);
-          }
-
-          worm.foraging = false;
-          const offsets = [-0.34, -0.17, 0, 0.17, 0.34];
-          let bestOffset = 0;
-          let bestScore = -Infinity;
-
-          for (const offset of offsets) {
-            const sample = corridorStats(worm, offset);
-            if (sample.outside > 0.08 || sample.freshness < 0.42) continue;
-            const score = sample.remaining * 1.1
-              + sample.capacity * 0.2
-              + sample.freshness * 0.3
-              - Math.abs(offset) * 0.28
-              + random() * 0.002;
-            if (score > bestScore) {
-              bestScore = score;
-              bestOffset = offset;
-            }
-          }
-
-          if (bestScore === -Infinity) {
-            if (beginClearUTurn(worm)) return 0;
-            worm.foraging = true;
-            return avoidPathTurn(worm);
-          }
-
-          worm.coverageScore = bestScore;
-          return bestOffset * 0.34;
-        }
-
-        function corridorStats(worm, offset) {
-          const angle = worm.angle + offset;
-          const forwardX = Math.cos(angle);
-          const forwardY = Math.sin(angle);
-          const normalX = -forwardY;
-          const normalY = forwardX;
-          const distances = [
-            8 + worm.radius * 1.6,
-            14 + worm.radius * 1.6,
-            21 + worm.radius * 1.6,
-            29 + worm.radius * 1.6,
-            37 + worm.radius * 1.6
-          ];
-          const halfFootprint = worm.radius * 2.7;
-          const laterals = [-halfFootprint, 0, halfFootprint];
-          let remaining = 0;
-          let capacity = 0;
-          let freshness = 0;
-          let blocked = 0;
-          let outside = 0;
-          let samples = 0;
-
-          for (const distance of distances) {
-            for (const lateral of laterals) {
-              const x = worm.x + forwardX * distance + normalX * lateral;
-              const y = worm.y + forwardY * distance + normalY * lateral;
-              samples += 1;
-              if (x < 7 || x > width - 7 || y < 7 || y > height - 7) {
-                outside += 1;
-                continue;
-              }
-              const available = foodAt(x, y);
-              const possible = mossAt(x, y);
-              const occupied = pathOccupiedNear(x, y, worm.radius * 3.2);
-              remaining += available;
-              capacity += possible;
-              if (occupied) blocked += 1;
-              freshness += occupied ? 0 : (possible > 0.045 ? available / possible : 1);
-            }
-          }
-
-          return {
-            remaining: remaining / samples,
-            capacity: capacity / samples,
-            freshness: freshness / samples,
-            blocked: blocked / samples,
-            outside: outside / samples
-          };
-        }
-
-        function beginClearUTurn(worm) {
-          // Two radii become the next lane's offset: almost exactly one eaten
-          // footprint, with a sub-pixel safety margin between adjacent lanes.
-          const radius = worm.radius * 3.35 + 0.75;
-          const left = uTurnScore(worm, -1, radius);
-          const right = uTurnScore(worm, 1, radius);
-          const best = left > right
-            ? { side: -1, score: left }
-            : { side: 1, score: right };
-
-          if (!Number.isFinite(best.score) || best.score < 0.18) return false;
-
-          commitUTurn(worm, best.side, radius);
-          return true;
-        }
-
-        function beginBoundaryUTurn(worm) {
-          const radius = worm.radius * 3.35 + 0.75;
-          const left = boundaryArcScore(worm, -1, radius);
-          const right = boundaryArcScore(worm, 1, radius);
-          const side = left === right
-            ? (random() < 0.5 ? -1 : 1)
-            : (left > right ? -1 : 1);
-          commitUTurn(worm, side, radius);
-        }
-
-        function boundaryArcScore(worm, side, radius) {
-          const forwardX = Math.cos(worm.angle);
-          const forwardY = Math.sin(worm.angle);
-          const normalX = -forwardY;
-          const normalY = forwardX;
-          let nearestEdge = Infinity;
-
-          for (let i = 1; i <= 16; i += 1) {
-            const theta = i / 16 * Math.PI;
-            const x = worm.x
-              + forwardX * radius * Math.sin(theta)
-              + normalX * side * radius * (1 - Math.cos(theta));
-            const y = worm.y
-              + forwardY * radius * Math.sin(theta)
-              + normalY * side * radius * (1 - Math.cos(theta));
-            nearestEdge = Math.min(nearestEdge, x - 4, width - 4 - x, y - 4, height - 4 - y);
-          }
-          return nearestEdge;
-        }
-
-        function commitUTurn(worm, side, radius) {
-          worm.turnRadius = radius;
-          worm.turnDirection = side;
-          worm.turnRemaining = Math.PI;
-          worm.targetTurn = 0;
-          worm.steerIn = Math.PI * radius / worm.speed;
-          worm.laneRemaining = 40 + random() * 70;
-          worm.foraging = false;
-          pathMetrics.turns += 1;
-        }
-
-        function uTurnScore(worm, side, radius) {
-          const forwardX = Math.cos(worm.angle);
-          const forwardY = Math.sin(worm.angle);
-          const normalX = -forwardY;
-          const normalY = forwardX;
-          let score = 0;
-          let clear = 0;
-          let samples = 0;
-
-          // Sample the swept semicircle, then the beginning of the parallel
-          // exit lane. Early arc points touch the current trail by necessity;
-          // clearance tests begin once the arc has separated from it.
-          for (let i = 3; i <= 18; i += 1) {
-            const theta = i / 18 * Math.PI;
-            const x = worm.x
-              + forwardX * radius * Math.sin(theta)
-              + normalX * side * radius * (1 - Math.cos(theta));
-            const y = worm.y
-              + forwardY * radius * Math.sin(theta)
-              + normalY * side * radius * (1 - Math.cos(theta));
-            const sample = resourceSample(
-              x,
-              y,
-              worm.radius * 2.2,
-              i >= 8 ? worm.radius * 4.2 : 0
-            );
-            if (!sample) return -Infinity;
-            samples += 1;
-            score += sample.remaining * 0.86 + sample.capacity * 0.14;
-            if (sample.freshness > 0.38) clear += 1;
-          }
-
-          const exitX = worm.x + normalX * side * radius * 2;
-          const exitY = worm.y + normalY * side * radius * 2;
-          for (const distance of [12, 24, 38]) {
-            const x = exitX - forwardX * distance;
-            const y = exitY - forwardY * distance;
-            const sample = resourceSample(x, y, worm.radius * 2.4, worm.radius * 5.4);
-            if (!sample) return -Infinity;
-            samples += 1;
-            score += sample.remaining + sample.capacity * 0.18;
-            if (sample.freshness > 0.42) clear += 1;
-          }
-
-          if (clear / samples < 0.72) return -Infinity;
-          return score / samples;
-        }
-
-        function resourceSample(x, y, radius, clearance = 0) {
-          if (x < radius + 5 || x > width - radius - 5 || y < radius + 5 || y > height - radius - 5) {
-            return null;
-          }
-          if (clearance && pathOccupiedNear(x, y, clearance)) return null;
-          const remaining = foodPatch(x, y, radius);
-          const capacity = mossPatch(x, y, radius);
-          return {
-            remaining,
-            capacity,
-            freshness: capacity > 0.045 ? remaining / capacity : 1
-          };
-        }
-
-        function pathOccupiedNear(x, y, radius) {
-          const minX = clamp(Math.floor((x - radius) / CELL), 0, columns - 1);
-          const maxX = clamp(Math.floor((x + radius) / CELL), 0, columns - 1);
-          const minY = clamp(Math.floor((y - radius) / CELL), 0, rows - 1);
-          const maxY = clamp(Math.floor((y + radius) / CELL), 0, rows - 1);
-          const radiusSquared = radius * radius;
-
-          for (let gy = minY; gy <= maxY; gy += 1) {
-            for (let gx = minX; gx <= maxX; gx += 1) {
-              if (!centerline[gy * columns + gx]) continue;
-              const dx = gx * CELL + CELL * 0.5 - x;
-              const dy = gy * CELL + CELL * 0.5 - y;
-              if (dx * dx + dy * dy <= radiusSquared) return true;
-            }
-          }
-          return false;
-        }
-
-        function brownianWanderTurn(worm) {
-          if (worm.brownianIn <= 0) {
-            // Summed uniform samples approximate rotational Brownian noise while
-            // avoiding an artificial left-right oscillation.
-            const noise = random() + random() + random() - 1.5;
-            worm.brownianTurn = noise * worm.speed / 8.5;
-            worm.brownianIn = 0.32 + random() * 0.78;
-          }
-
-          return worm.brownianTurn;
-        }
-
-        function avoidPathTurn(worm) {
-          if (worm.avoidanceIn <= 0) {
-            const left = corridorStats(worm, -0.68);
-            const right = corridorStats(worm, 0.68);
-            const leftScore = left.freshness + left.capacity * 0.3 - left.blocked * 2;
-            const rightScore = right.freshness + right.capacity * 0.3 - right.blocked * 2;
-            const side = leftScore === rightScore
-              ? (random() < 0.5 ? -1 : 1)
-              : (leftScore > rightScore ? -1 : 1);
-            worm.avoidanceTurn = side * worm.speed / 17;
-            worm.avoidanceIn = 1.25 + random() * 0.75;
-          }
-          return worm.avoidanceTurn;
+        function inside(x, y, margin) {
+          return x >= margin && x <= width - margin && y >= margin && y <= height - margin;
         }
 
         function foodPatch(x, y, radius) {
@@ -923,17 +1138,6 @@
           ];
           let total = 0;
           for (const [dx, dy] of samples) total += foodAt(x + dx, y + dy);
-          return total / samples.length;
-        }
-
-        function mossPatch(x, y, radius) {
-          const samples = [
-            [0, 0], [-radius, 0], [radius, 0], [0, -radius], [0, radius],
-            [-radius * 0.7, -radius * 0.7], [radius * 0.7, -radius * 0.7],
-            [-radius * 0.7, radius * 0.7], [radius * 0.7, radius * 0.7]
-          ];
-          let total = 0;
-          for (const [dx, dy] of samples) total += mossAt(x + dx, y + dy);
           return total / samples.length;
         }
 
@@ -974,11 +1178,26 @@
               const distanceSquared = dx * dx + dy * dy;
               if (distanceSquared > radiusSquared) continue;
               const index = gy * columns + gx;
-              const bite = 0.52 + (1 - distanceSquared / radiusSquared) * 0.48;
+              // One pass strips nearly everything; a thin fringe survives at
+              // the very edge of the swath, and the next lane's overlap takes it.
+              const bite = 0.85 + (1 - distanceSquared / radiusSquared) * 0.15;
               food[index] = Math.max(0, food[index] - bite);
             }
           }
         }
+
+        function eatenFraction() {
+          let total = 0;
+          let eaten = 0;
+          for (let i = 0; i < moss.length; i += 1) {
+            if (moss[i] < LANE_FOOD) continue;
+            total += moss[i];
+            eaten += moss[i] - food[i];
+          }
+          return total ? eaten / total : 0;
+        }
+
+        // ---- Utilities ----------------------------------------------------
 
         function announce(message) {
           status.textContent = '';
@@ -1005,6 +1224,10 @@
 
         function clamp(value, minimum, maximum) {
           return Math.max(minimum, Math.min(maximum, value));
+        }
+
+        function wrapAngle(angle) {
+          return ((angle + Math.PI) % TAU + TAU) % TAU - Math.PI;
         }
 
         function mulberry32(value) {

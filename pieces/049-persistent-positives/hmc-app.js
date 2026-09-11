@@ -68,7 +68,7 @@ function init(e) {
     i = document.createElement("canvas"),
     l = i.getContext("2d"),
     o = "layer_0";
-  i.setAttribute("id", o), i.setAttribute("height", stage.w), i.setAttribute("width", stage.h), s.appendChild(i);
+  i.setAttribute("id", o), i.setAttribute("height", stage.h), i.setAttribute("width", stage.w), s.appendChild(i);
   let u = {
     id: o,
     elem: i,

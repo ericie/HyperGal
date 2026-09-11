@@ -72,7 +72,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
-      "description": "Twenty autonomous snakes hunt one mouse in an 8-bit underground Mega Man palette. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Continuous rounded bodies cross a cavern-dark field; death travels from head to tail, replacing each fading segment with abstract cross-hatching in place. Click to reseed.",
+      "description": "Autonomous snakes hunt one mouse on a field that remembers its dead — eight to start, up to twenty as the winner's body is divided. Flat integer cells with a hard offset shadow, one of eight palettes per round, one swatch per snake. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Death travels from head to tail, and every segment it passes is painted into the memory beneath the living. Click to reseed.",
       "updated": "2026-09-10"
     },
     {
@@ -273,7 +273,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
-      "description": "Layered mineral inks and open-water halos stretch through a shared current field, building blue-gray marbled ribbons with fine, muted iridescent veins.",
+      "description": "A continuous field of mineral pigment folds into broad blue marbled rivers, with cloudy granulation and a concentrated basin of muted iridescent veins.",
       "updated": "2026-09-10"
     },
     {
@@ -580,7 +580,8 @@ window.HYPERGAL_MANIFEST = {
       "wip": false,
       "rating": 60,
       "thumbnail": "thumbnail.jpg",
-      "description": "Dozens of particles got together and decided to draw. They drew nothing but flowers. Fifty to eighty lines fly to drifting targets, then scribble shadowed loops around them onto a square field that is never wiped, until the field fills with blossoms. Six layouts, eight palettes, and a few lines in every swarm that erase instead of paint. Click to reseed; S saves the picture."
+      "description": "Dozens of particles got together and decided to draw. They drew nothing but flowers. Fifty to eighty lines fly to drifting targets, then scribble shadowed loops around them onto a square field that is never wiped, until the field fills with blossoms. Six layouts, eight palettes, and a few lines in every swarm that erase instead of paint. Click to reseed; S saves the picture.",
+      "updated": "2026-09-11"
     },
     {
       "slug": "048-growth-rings-2022",
@@ -592,7 +593,8 @@ window.HYPERGAL_MANIFEST = {
       "wip": false,
       "rating": 55,
       "thumbnail": "thumbnail.jpg",
-      "description": "A still. Ten tree-ring cross-sections are grown from a seed, then a grid of three to twenty-two cells is filled with slices cut from near their centres, so every cell carries a fragment of curve. Over the grid sits one of nine overlays — a whole cross-section, a spread of three, a passage, a void, four voids, two joined discs, or a diagonal passage — in one of sixteen palettes. Click to reseed; S saves the picture."
+      "description": "A still. Ten tree-ring cross-sections are grown from a seed, then a grid of three to twenty-two cells is filled with slices cut from near their centres, so every cell carries a fragment of curve. Over the grid sits one of nine overlays — a whole cross-section, a spread of three, a passage, a void, four voids, two joined discs, or a diagonal passage — in one of sixteen palettes. Click to reseed; S saves the picture.",
+      "updated": "2026-09-11"
     },
     {
       "slug": "049-persistent-positives",
@@ -604,7 +606,8 @@ window.HYPERGAL_MANIFEST = {
       "wip": false,
       "rating": 60,
       "thumbnail": "thumbnail.jpg",
-      "description": "Communication and progress are a cycle of building, entropy and repair. A simple positive four-letter word — HOPE, LOVE, GIVE, MAKE, GROW or LIVE — struggles for legibility under a barrage of four hundred textured shapes that grow, die and pile up. Some of them seek the word until it surfaces; then they stop being replaced, the field grows over it, and it returns in a new layout. Fifteen palettes, eleven layouts, Space Mono. Click to reseed; S saves the picture."
+      "description": "Communication and progress are a cycle of building, entropy and repair. A simple positive four-letter word — HOPE, LOVE, GIVE, MAKE, GROW or LIVE — struggles for legibility under a barrage of four hundred textured shapes that grow, die and pile up. Some of them seek the word until it surfaces; then they stop being replaced, the field grows over it, and it returns in a new layout. Fifteen palettes, eleven layouts, Space Mono. Click to reseed; S saves the picture.",
+      "updated": "2026-09-11"
     }
   ]
 };

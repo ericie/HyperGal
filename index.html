@@ -139,9 +139,30 @@
       }
 
       .thumb {
+        position: relative;
         aspect-ratio: 1;
         overflow: hidden;
         background: #f0f0f0;
+      }
+      /* W.I.P. badge: a white disc over the image so it reads on any art. */
+      .badge {
+        position: absolute;
+        top: .6rem;
+        right: .6rem;
+        width: 2.9rem;
+        height: 2.9rem;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: #fff;
+        border: 1px solid var(--ink);
+        font-family: var(--sans);
+        font-style: normal;
+        font-size: .6rem;
+        font-weight: 700;
+        letter-spacing: .06em;
+        color: var(--ink);
+        pointer-events: none;
       }
       .thumb img {
         display: block;
@@ -172,6 +193,21 @@
       }
       .cap .dates { margin-top: .18rem; font-size: .88em; }
       .date-label { color: #767676; }
+      /* Small bordered tag on the date line, e.g. W.I.P. */
+      .tag {
+        align-self: center;
+        padding: 0 .38em;
+        border: 1px solid #8a8a8a;
+        border-radius: 2px;
+        font-family: var(--sans);
+        font-style: normal;
+        font-size: .66em;
+        font-weight: 600;
+        letter-spacing: .08em;
+        line-height: 1.55;
+        color: #555;
+        white-space: nowrap;
+      }
 
       .work:hover .cap .t { text-decoration-thickness: 2px; }
       .work:focus-visible { outline: none; }
@@ -308,6 +344,12 @@
         ].join('-');
         function updatedOn(p) { return p.updated || TODAY; }
 
+        // Only a real code change after publication earns an Updated line.
+        // The today fallback above is for sorting only and never shows.
+        function updatedSince(p) {
+          return p.updated && p.date && p.updated > p.date ? p.updated : '';
+        }
+
         const script = document.createElement('script');
         script.src = `./manifest.js?v=${Date.now()}`;
         script.onload = boot;
@@ -404,9 +446,10 @@
           const a = link(p, 'work');
           const thumb = el('div', 'thumb');
           if (p.thumbnail) thumb.append(thumbImg(p));
+          if (p.wip) thumb.append(el('span', 'badge', 'W.I.P.'));
           const cap = el('div', 'cap');
           cap.append(el('span', 't', title(p)));
-          cap.append(dateMeta(p));
+          cap.append(dateMeta(p, false));
           a.append(thumb, cap);
           return a;
         }
@@ -414,14 +457,18 @@
         function listRow(p) {
           const a = link(p, 'row');
           a.append(el('span', 't', title(p)));
-          a.append(dateMeta(p));
+          a.append(dateMeta(p, true));
           return a;
         }
 
-        function dateMeta(p) {
+        // The grid carries W.I.P. as a badge on the image; the list, which has
+        // no image, keeps it as an inline tag on the date line.
+        function dateMeta(p, inlineTag) {
           const dates = el('span', 'dates');
           dates.append(dateItem('Published', p.date || (p.year ? String(p.year) : '')));
-          if (p.wip) dates.append(el('span', '', 'In progress'));
+          const updated = updatedSince(p);
+          if (updated) dates.append(dateItem('Updated', updated));
+          if (p.wip && inlineTag) dates.append(el('span', 'tag', 'W.I.P.'));
           return dates;
         }
 
@@ -440,7 +487,8 @@
           a.href = `./pieces/${p.slug}/index.html`;
           a.setAttribute('aria-label',
             `${title(p)}${p.date ? ', published ' + fmtDate(p.date) : ''}` +
-            `${p.wip ? ', in progress' : ''}`);
+            `${updatedSince(p) ? ', updated ' + fmtDate(updatedSince(p)) : ''}` +
+            `${p.wip ? ', work in progress' : ''}`);
           return a;
         }
 

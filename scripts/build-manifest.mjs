@@ -14,16 +14,57 @@ const root = join(here, '..');
 const piecesDir = join(root, 'pieces');
 const execFileAsync = promisify(execFile);
 
-async function lastCommitDate(path) {
+// "Updated" means the piece itself changed in some significant way, not that
+// its folder was touched. Thumbnails, READMEs and meta.json never count. A
+// commit counts only if it changed more than SIGNIFICANT_LINES lines of the
+// piece's code — a one-line tweak or a tracking snippet stays invisible — and
+// never if its message carries [chore] or its hash is listed below. Pieces
+// whose real history is tangled can pin "updated" by hand in meta.json
+// instead; that value wins outright.
+const SIGNIFICANT_LINES = 3;
+const CHORE_MARKER = '[chore]';
+const CHORE_COMMITS = [
+  '6ebaf89', // Use custom-domain analytics across all pages
+];
+const NOT_CODE = ['thumbnail.*', 'README.md', 'meta.json'];
+
+async function lastCodeChangeDate(dir) {
   try {
+    // --numstat follows each commit header with one "added<TAB>deleted<TAB>path"
+    // line per file, so the size of a commit's footprint in this piece can
+    // be read straight off the log without a diff per commit.
     const { stdout } = await execFileAsync(
       'git',
-      ['log', '-1', '--format=%cs', '--', path],
+      [
+        'log', '--format=@%H%x09%cs%x09%s', '--numstat', '--',
+        dir, ...NOT_CODE.map(name => `:!${dir}/${name}`),
+      ],
       { cwd: root }
     );
-    return stdout.trim();
+    let commit = null;
+    const commits = [];
+    for (const line of stdout.split('\n')) {
+      if (line.startsWith('@')) {
+        const [hash, date, subject] = line.slice(1).split('\t');
+        commit = { hash, date, subject, lines: 0 };
+        commits.push(commit);
+      } else if (commit && line.trim()) {
+        // Binary files report "-"; they change no lines. A rewritten line
+        // is one added and one deleted, so take the larger side per file
+        // to count lines touched rather than double it.
+        const [added, deleted] = line.split('\t');
+        commit.lines += Math.max(Number(added) || 0, Number(deleted) || 0);
+      }
+    }
+    for (const { hash, date, subject, lines } of commits) {
+      if (lines <= SIGNIFICANT_LINES) continue;
+      if (subject.includes(CHORE_MARKER)) continue;
+      if (CHORE_COMMITS.some(prefix => hash.startsWith(prefix))) continue;
+      return date;
+    }
+    return '';
   } catch (err) {
-    console.warn(`Could not read Git history for ${path}: ${err.message}`);
+    console.warn(`Could not read Git history for ${dir}: ${err.message}`);
     return '';
   }
 }
@@ -38,7 +79,7 @@ for (const entry of entries) {
   const metaPath = join(piecesDir, entry.name, 'meta.json');
   try {
     const meta = JSON.parse(await readFile(metaPath, 'utf8'));
-    const updated = await lastCommitDate(`pieces/${entry.name}`);
+    const updated = meta.updated || await lastCodeChangeDate(`pieces/${entry.name}`);
     pieces.push({ slug: entry.name, ...meta, ...(updated && { updated }) });
   } catch (err) {
     console.warn(`Skipping ${entry.name}: ${err.message}`);

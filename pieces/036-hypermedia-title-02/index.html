@@ -152,11 +152,15 @@
         let width = 0;
         let height = 0;
         let pegs = [];
+        let pegRows = [];
         let topRowPegs = [];
         let topAimCursor = 0;
         let disks = [];
         let lastFrame = performance.now();
         let resizeFrame = 0;
+        let introActive = !reduced;
+        let introElapsed = 0;
+        const introHold = 1250;
 
         function clamp(minimum, value, maximum) {
           return Math.max(minimum, Math.min(value, maximum));
@@ -219,33 +223,64 @@
           const color = colors[index];
           element.style.setProperty('--disk-color', color);
           board.append(element);
-          const entry = chooseEntry(radius);
 
           return {
             element,
             index,
             color,
             radius,
-            angle: randomBetween(-Math.PI, Math.PI),
-            angularVelocity: randomBetween(-.025, .025),
-            targetPeg: entry.target,
-            x: entry.x,
-            y: -radius - index * height * .075,
-            vx: randomBetween(-.25, .25),
+            angle: 0,
+            angularVelocity: 0,
+            targetPeg: null,
+            x: 0,
+            y: 0,
+            vx: 0,
             vy: 0
           };
         }
 
-        function placeReducedMotionDisks() {
-          const columns = width < 640 ? 3 : 5;
-          const rows = Math.ceil(disks.length / columns);
-          disks.forEach((disk, index) => {
-            const column = index % columns;
-            const row = Math.floor(index / columns);
-            const itemsInRow = Math.min(columns, disks.length - row * columns);
-            disk.x = width * ((column + 1) / (itemsInRow + 1));
-            disk.y = height * ((row + 1) / (rows + 1));
-            disk.element.style.transform = `translate3d(${disk.x - disk.radius}px, ${disk.y - disk.radius}px, 0) rotate(0rad)`;
+        function placeTitleDisks() {
+          let diskIndex = 0;
+
+          for (let band = 0; band < pegRows.length - 1 && diskIndex < disks.length; band++) {
+            const upperRow = pegRows[band];
+            const lowerRow = pegRows[band + 1];
+            const slotRow = upperRow.length >= lowerRow.length ? upperRow : lowerRow;
+            const minimumSlotWidth = disks[0].radius * 2 + slotRow[0].radius * 2 + 2;
+            const slots = [];
+            for (let index = 0; index < slotRow.length - 1; index++) {
+              const leftPeg = slotRow[index];
+              const rightPeg = slotRow[index + 1];
+              if (rightPeg.x - leftPeg.x < minimumSlotWidth) continue;
+              slots.push((leftPeg.x + rightPeg.x) * .5);
+            }
+            const count = Math.min(5, slots.length, disks.length - diskIndex);
+            const extraSlots = slots.length - count;
+            const slotStart = band % 2 ? Math.ceil(extraSlots * .5) : Math.floor(extraSlots * .5);
+            const selectedSlots = slots.slice(slotStart, slotStart + count);
+            const y = (upperRow[0].y + lowerRow[0].y) * .5;
+
+            for (let slot = 0; slot < count; slot++) {
+              const disk = disks[diskIndex];
+              disk.x = selectedSlots[slot];
+              disk.y = y;
+              disk.angle = diskIndex % 2 ? .045 : -.045;
+              disk.angularVelocity = 0;
+              disk.targetPeg = null;
+              disk.vx = 0;
+              disk.vy = 0;
+              disk.element.style.transform = `translate3d(${disk.x - disk.radius}px, ${disk.y - disk.radius}px, 0) rotate(${disk.angle}rad)`;
+              diskIndex++;
+            }
+          }
+        }
+
+        function releaseTitle() {
+          introActive = false;
+          disks.forEach(disk => {
+            disk.vx = randomBetween(-.12, .12);
+            disk.vy = .35;
+            disk.angularVelocity = randomBetween(-.012, .012);
           });
         }
 
@@ -254,40 +289,56 @@
           height = stage.clientHeight;
           board.replaceChildren();
           pegs = [];
+          pegRows = [];
           topRowPegs = [];
           topAimCursor = 0;
           disks = [];
+          introActive = !reduced;
+          introElapsed = 0;
 
-          const columns = width < 640 ? 4 : clamp(5, Math.round(width / 220), 8);
           const rows = clamp(6, Math.round(height / 130), 8);
-          const edgeInset = width < 640 ? 10 : 28;
-          const spacingX = (width - edgeInset * 2) / (columns - 1);
           const top = Math.max(52, height * .065);
           const bottom = Math.max(52, height * .075);
           const spacingY = (height - top - bottom) / (rows - 1);
-          const pegRadius = clamp(3.5, spacingX * .035, 6);
-          const diskRadius = clamp(28, Math.min(spacingX * .37, spacingY * .39), 64);
+          const diskRadius = clamp(14, Math.min(width * .125, spacingY * .5 - 7), 68);
+          const diskDiameter = diskRadius * 2;
+          const edgeInset = diskDiameter * .44;
+          const minimumSpacingX = diskDiameter * 1.36;
+          let columns = clamp(3, Math.floor((width - edgeInset * 2) / minimumSpacingX) + 1, 8);
+          let spacingX = (width - edgeInset * 2) / (columns - 1);
+          let pegRadius = clamp(3.5, spacingX * .035, 6);
+
+          while (
+            columns > 3 &&
+            Math.hypot(spacingX * .5, spacingY) < diskDiameter + pegRadius * 2 + 2
+          ) {
+            columns--;
+            spacingX = (width - edgeInset * 2) / (columns - 1);
+            pegRadius = clamp(3.5, spacingX * .035, 6);
+          }
 
           for (let row = 0; row < rows; row++) {
             const odd = row % 2 === 1;
             const count = odd ? columns - 1 : columns;
-            const spansMobileEdges = odd && width < 640;
-            const rowSpacingX = spansMobileEdges
-              ? (width - edgeInset * 2) / (count - 1)
-              : spacingX;
+            const rowPegs = [];
+            const y = top + row * spacingY;
+
             for (let column = 0; column < count; column++) {
-              const offset = odd && !spansMobileEdges ? .5 : 0;
-              const x = edgeInset + rowSpacingX * (column + offset);
-              const y = top + row * spacingY;
+              const offset = odd ? .5 : 0;
+              const x = edgeInset + spacingX * (column + offset);
               const peg = makePeg(x, y, pegRadius);
               pegs.push(peg);
+              rowPegs.push(peg);
               if (row === 0) topRowPegs.push(peg);
             }
+
+            pegRows.push(rowPegs);
           }
 
           disks = characters.map((character, index) => makeDisk(character, index, diskRadius));
+          placeTitleDisks();
           lastFrame = performance.now();
-          if (reduced) placeReducedMotionDisks();
+          status.textContent = reduced ? 'Static HYPERMEDIA title' : 'Animation playing';
         }
 
         function collideWithPegs(disk) {
@@ -386,10 +437,21 @@
         }
 
         function tick(now) {
+          const frameElapsed = Math.min(50, Math.max(0, now - lastFrame));
           const delta = Math.min(2.2, (now - lastFrame) / 16.667);
           lastFrame = now;
 
           if (!paused && !reduced) {
+            if (introActive) {
+              introElapsed += frameElapsed;
+              if (introElapsed >= introHold) releaseTitle();
+            }
+
+            if (introActive) {
+              requestAnimationFrame(tick);
+              return;
+            }
+
             for (const disk of disks) {
               disk.vy = Math.min(disk.vy + .31 * delta, 7);
               disk.vx *= .999;

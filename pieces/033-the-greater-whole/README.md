@@ -2,12 +2,17 @@
 
 An interactive typographic piece about the way many small, independent forms
 are read as a single statement. Every letter and punctuation mark in the
-sentence is a control. Crossing one with the knife cursor cuts it from the
+sentence first types into its fixed position in a new random order. Only once
+the complete statement is visible does the knife appear and make every letter
+a control. Crossing one with the knife cursor cuts it from the
 statement and releases a composition made only from that character. Its place
 remains fixed so the sentence erodes without reflowing. On touch screens, a
 finger drag carries the knife across the sentence and cuts every character in
 its path. Keyboard activation provides an equivalent where rollover is not
 available.
+
+Slashing the final remaining character automatically starts a fresh random-order
+retyping of the complete statement, turning total erasure back into a whole.
 
 On fine-pointer devices, the native cursor becomes a compact knife whose blade
 switches to the exact color assigned to the newly triggered animation, then
@@ -45,7 +50,8 @@ and exits interpolate through the ground color, avoiding alpha stacking while
 the black statement remains readable above them.
 
 The piece honors reduced-motion preferences by presenting each composition as
-a changing 2.5-second still rather than moving its glyphs across the field.
+a changing 2.5-second still rather than moving its glyphs across the field, and
+by showing each random-order retyping immediately instead of staggering it.
 
 ## Type and archive
 

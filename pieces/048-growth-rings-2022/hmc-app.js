@@ -13,7 +13,10 @@ function init(e, t) {
   comp = document.getElementById("hmcComp").getContext("2d"), compElem = document.getElementById("hmcComp"), stage.w = compElem.width, stage.h = compElem.height, buffer = document.getElementById("hmcBuffer").getContext("2d"), bufferElem = document.getElementById("hmcBuffer"), bg = document.getElementById("hmcBackground").getContext("2d"), bgElem = document.getElementById("hmcBackground"), fg = document.getElementById("hmcForeground").getContext("2d"), fgElem = document.getElementById("hmcForeground");
   const a = Math.round(fxrand() * (palletList.length - 1)),
     r = palletList[a],
-    s = Math.floor(20 * fxrand()) + 3;
+    s = Math.floor(20 * fxrand()) + 3,
+    u = Math.min(stage.w, stage.h),
+    gc = Math.round(s * stage.w / u),
+    gr = Math.round(s * stage.h / u);
   this.layoutTypes = ["Center", "Center", "Center", "Center", "Center", "Spread", "Passage", "Void", "Joined", "Four_Voids", "Diagonal_Passage_1", "Diagonal_Passage_2"];
   const o = Math.floor(fxrand() * layoutTypes.length);
   let m = this.layoutTypes[o];
@@ -39,11 +42,13 @@ function init(e, t) {
     seperate: !0,
     layout: m,
     gridSize: s,
+    gridCols: gc,
+    gridRows: gr,
     gridRealMax: 23,
     gridMin: 3
   }, (growthCircle = new GrowthCircle(this.systemParams)).init(), growthCircle.draw(), (bgGrid = new bgGrid).init({
-    cols: s,
-    rows: s,
+    cols: gc,
+    rows: gr,
     stage,
     canvas: comp,
     canvasElem: compElem,
@@ -56,7 +61,7 @@ function init(e, t) {
     let t = document.createElement("canvas"),
       a = t.getContext("2d"),
       r = "layerSlice_" + e;
-    t.setAttribute("id", r), t.setAttribute("height", stage.w), t.setAttribute("width", stage.h), i.appendChild(t);
+    t.setAttribute("id", r), t.setAttribute("height", stage.h), t.setAttribute("width", stage.w), i.appendChild(t);
     let s = {
       id: r,
       elem: t,

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="Layered mineral inks drift into fluid marbled currents until an enormous pale bloom clears the saturated bath into a new background color."
+      content="A continuous field of mineral pigment folds into blue marbled rivers, with cloudy granulation and a concentrated basin of muted iridescent veins."
     />
     <title>Marbled Water · HyperGal</title>
     <style>
@@ -31,7 +31,7 @@
 
       body {
         min-width: 320px;
-        font-family: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+        font-family: "Helvetica Neue", Helvetica, system-ui, sans-serif;
       }
 
       canvas {
@@ -62,7 +62,7 @@
         border: 1px solid var(--panel-ink);
         border-radius: 2px;
         background: var(--panel);
-        box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.58);
+        box-shadow: 0 3px 8px rgba(15, 35, 49, 0.28);
         color: var(--panel-ink);
         font-size: 12px;
         line-height: 1.2;
@@ -126,7 +126,36 @@
         width: 29px;
         height: 29px;
         padding: 0;
-        font: 700 17px/1 Arial, sans-serif;
+        font: inherit;
+        font-size: 17px;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .panel-button svg {
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.7;
+      }
+
+      .panel-button[data-action="collapse"]::before,
+      .panel-button[data-action="collapse"]::after {
+        position: absolute;
+        width: 11px;
+        height: 1px;
+        background: currentColor;
+        content: "";
+        transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      .panel-button[data-action="collapse"] { position: relative; }
+      .panel-button[data-action="collapse"]::after { transform: rotate(90deg); }
+      .panel-button[data-action="collapse"][aria-expanded="true"]::after {
+        transform: rotate(90deg) scaleX(0);
       }
 
       .panel-button[data-action="reseed"] {
@@ -152,7 +181,7 @@
       }
 
       .water-panel.is-dragging .panel-header { cursor: grabbing; }
-      .water-panel.is-collapsed { width: 184px; }
+      .water-panel.is-collapsed { width: 206px; }
       .water-panel.is-collapsed .panel-header { border-bottom: 0; }
       .water-panel.is-collapsed .panel-controls,
       .water-panel.is-collapsed .panel-note,
@@ -177,6 +206,7 @@
         align-items: center;
         gap: 8px;
         min-height: 35px;
+        padding-block: 4px;
         border-bottom: 1px solid var(--panel-rule);
       }
 
@@ -191,7 +221,7 @@
         border-radius: 1px;
         background: var(--panel);
         color: var(--panel-ink);
-        font: 10px/1.1 "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+        font: 11px/1.1 "Helvetica Neue", Helvetica, system-ui, sans-serif;
         cursor: pointer;
       }
 
@@ -207,7 +237,7 @@
       .control-value {
         color: var(--panel-muted);
         font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-        font-size: 10px;
+        font-size: 11px;
         font-variant-numeric: tabular-nums;
         text-align: right;
       }
@@ -299,6 +329,13 @@
         .range-row { min-height: 34px; }
         .panel-note { display: none; }
       }
+
+      @media (prefers-reduced-motion: reduce) {
+        .panel-button[data-action="collapse"]::before,
+        .panel-button[data-action="collapse"]::after {
+          transition: none;
+        }
+      }
     </style>
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
@@ -307,14 +344,14 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Marbled Water: layered mineral inks expand into wandering blue-gray currents with fine iridescent veins. When the bath stays full, an enormous pale drop clears it into a new background color. Use the panel to adjust the drops or click the bath to place ink."
+      aria-label="Marbled Water: a continuous field of blue-gray mineral pigment folds into broad rivers with cloudy granulation and fine iridescent veins. Use the panel to adjust the currents or click the bath to create an eddy."
     ></canvas>
 
     <aside class="water-panel is-collapsed" aria-label="Marbled water controls">
       <div class="panel-header">
         <div class="panel-heading">
           <h1>Marbled Water</h1>
-          <p id="bath-number">BATH 0000 · DROPS 000</p>
+          <p id="bath-number">BATH 0000 · EDDIES 000</p>
         </div>
         <div class="panel-actions">
           <button
@@ -326,7 +363,7 @@
             aria-expanded="false"
             aria-label="Expand marbling controls"
             title="Expand controls"
-          >+</button>
+          ></button>
           <button
             class="panel-button"
             id="reseed"
@@ -334,7 +371,12 @@
             type="button"
             aria-label="Start a new bath"
             title="Start a new bath"
-          >↻</button>
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M15.7 6.3V2.8m0 3.5h-3.5" />
+              <path d="M15.2 5.2a7 7 0 1 0 1.5 7.4" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -354,14 +396,14 @@
           </div>
 
           <div class="range-row">
-            <label for="tempo">Drop tempo</label>
+            <label for="tempo">Eddy tempo</label>
             <output class="control-value" for="tempo">84/min</output>
             <input id="tempo" type="range" min="24" max="150" value="84" />
           </div>
 
           <div class="range-row">
-            <label for="drop-size">Drop size</label>
-            <output class="control-value" for="drop-size">5.8%</output>
+            <label for="drop-size">Eddy size</label>
+            <output class="control-value" for="drop-size">4.2%</output>
             <input id="drop-size" type="range" min="15" max="100" value="42" />
           </div>
 
@@ -372,7 +414,7 @@
           </div>
 
           <div class="range-row">
-            <label for="repulsion">Repulsion</label>
+            <label for="repulsion">Current force</label>
             <output class="control-value" for="repulsion">100%</output>
             <input id="repulsion" type="range" min="50" max="160" value="100" />
           </div>
@@ -380,1284 +422,11 @@
         </section>
       </div>
 
-      <p class="panel-note">CLICK TO DROP · SPACE PAUSE · R NEW BATH</p>
+      <p class="panel-note">CLICK TO STIR · SPACE PAUSE · R NEW BATH</p>
     </aside>
 
     <p id="status" class="status" aria-live="polite"></p>
 
-    <script>
-      (() => {
-        const canvas = document.getElementById('stage');
-        const ctx = canvas.getContext('2d', { alpha: false });
-        const panel = document.querySelector('.water-panel');
-        const panelHeader = panel.querySelector('.panel-header');
-        const collapseButton = document.getElementById('collapse-panel');
-        const reseedButton = document.getElementById('reseed');
-        const bathNumber = document.getElementById('bath-number');
-        const status = document.getElementById('status');
-        const paletteSelect = document.getElementById('palette');
-        const pageParams = new URLSearchParams(location.search);
-        const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
-
-        const PAPER = '#d9e2e5';
-        const BATH_BACKGROUNDS = [
-          '#d4e0e3',
-          '#cbd9df',
-          '#d9dfdc',
-          '#c8d5dc',
-          '#d7dce3'
-        ];
-        const POINT_COUNT = 144;
-        const INITIAL_RING_COUNT = 18;
-        const MAX_SHAPES = 260;
-        const MAX_CANVAS_PIXELS = 2600000;
-        const SUMINAGASHI_PALETTE = 1;
-        const DROP_EXPANSION_SCALE = 1.8;
-        const CENTER_RUN_CHANCE = 0.08;
-        const CENTER_RUN_MIN = 2;
-        const CENTER_RUN_MAX = 3;
-        const MIN_DROPS_BEFORE_BACKGROUND = 30;
-        const FULLNESS_THRESHOLD = 0.92;
-        const FULLNESS_HOLD = 8000;
-        const FULLNESS_CHECK_INTERVAL = 900;
-        const TAU = Math.PI * 2;
-
-        const coverageCanvas = document.createElement('canvas');
-        const coverageContext = coverageCanvas.getContext('2d', {
-          alpha: false,
-          willReadFrequently: true
-        });
-
-        const PALETTES = [
-          ['#b62b59', '#d84c31', '#d4a51f', '#1c4f91', '#1c7562', '#1f1c1d'],
-          [
-            '#143b63', '#426d92', '#789bb5', '#b5c8d3', '#d7dfe0',
-            '#244f78', '#5c82a1', '#9eb7c8', '#0f3158', '#cfdae0',
-            '#7d6a55', '#327878', '#714956', '#356486'
-          ],
-          ['#b32868', '#e05e75', '#72368c', '#32744a', '#e1ad2d', '#273d77'],
-          ['#d7352a', '#e8be23', '#1d57a6', '#151515', '#f06b33'],
-          ['#167a83', '#35a5ad', '#244f8c', '#e66f5e', '#c3ae58', '#34383c'],
-          ['#9e3f2c', '#d18d28', '#315b42', '#59626b', '#3b2923', '#c2a86c']
-        ];
-        const MINERAL_ACCENTS = new Set(['#7d6a55', '#327878', '#714956']);
-
-        const controls = {
-          tempo: document.getElementById('tempo'),
-          dropSize: document.getElementById('drop-size'),
-          sizeVariation: document.getElementById('size-variation'),
-          repulsion: document.getElementById('repulsion')
-        };
-
-        let width = 1;
-        let height = 1;
-        let dpr = 1;
-        let bathInsetValue = 8;
-        let bathRight = 1;
-        let bathBottom = 1;
-        let shapes = [];
-        let activeDrop = null;
-        let nextDropAt = 0;
-        let complexity = 0;
-        let colorIndex = 0;
-        let inkStations = [];
-        let lastInkPosition = null;
-        let centerRunRemaining = 0;
-        let centerRunCooldown = 2;
-        let flowField = null;
-        let surfaceFlecks = [];
-        let bathColor = PAPER;
-        let fullSince = 0;
-        let nextFullnessCheck = 0;
-        let backgroundDropCooldownUntil = 0;
-        let paused = motionPreference.matches;
-        let seed = seedFromLocation();
-        let random = mulberry32(seed);
-        let panelDrag = null;
-        let resizeTimer = 0;
-        let hiddenAt = 0;
-
-        if (pageParams.get('panel') === '0') {
-          document.body.classList.add('no-panel');
-        }
-
-        bindControls();
-        bindPanel();
-        updatePanel();
-        resetBath();
-        requestAnimationFrame(tick);
-
-        addEventListener('resize', onResize, { passive: true });
-        addEventListener('keydown', onKeyDown);
-        document.addEventListener('visibilitychange', onVisibilityChange);
-        canvas.addEventListener('pointerdown', onBathPointer);
-        reseedButton.addEventListener('click', reseed);
-        motionPreference.addEventListener('change', onMotionPreference);
-
-        function resetBath() {
-          if (resizeTimer) {
-            clearTimeout(resizeTimer);
-            resizeTimer = 0;
-          }
-          width = Math.max(1, innerWidth);
-          height = Math.max(1, innerHeight);
-          const pixelRatio = devicePixelRatio || 1;
-          const pixelBudgetRatio = Math.sqrt(MAX_CANVAS_PIXELS / (width * height));
-          dpr = Math.min(2, pixelRatio, Math.max(1, pixelBudgetRatio));
-          bathInsetValue = clamp(Math.min(width, height) * 0.018, 8, 18);
-          bathRight = width - bathInsetValue;
-          bathBottom = height - bathInsetValue;
-          canvas.width = Math.round(width * dpr);
-          canvas.height = Math.round(height * dpr);
-          canvas.style.width = `${width}px`;
-          canvas.style.height = `${height}px`;
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-          shapes = [];
-          activeDrop = null;
-          complexity = 0;
-          colorIndex = 0;
-          inkStations = [];
-          lastInkPosition = null;
-          centerRunRemaining = 0;
-          centerRunCooldown = 2;
-          bathColor = PAPER;
-          fullSince = 0;
-          nextFullnessCheck = performance.now() + FULLNESS_CHECK_INTERVAL;
-          backgroundDropCooldownUntil = 0;
-          random = mulberry32(seed);
-          flowField = createBathFlow();
-          surfaceFlecks = createSurfaceFlecks();
-
-          seedInitialBath();
-          nextDropAt = performance.now() + nextDropDelay() * 0.55;
-          updateBathNumber();
-          render();
-        }
-
-        function onResize() {
-          if (resizeTimer) clearTimeout(resizeTimer);
-          resizeTimer = setTimeout(resetBath, 120);
-        }
-
-        function onVisibilityChange() {
-          const time = performance.now();
-          if (document.hidden) {
-            hiddenAt = time;
-            return;
-          }
-          if (!hiddenAt) return;
-
-          const hiddenDuration = time - hiddenAt;
-          if (activeDrop) activeDrop.start += hiddenDuration;
-          nextDropAt += hiddenDuration;
-          nextFullnessCheck += hiddenDuration;
-          backgroundDropCooldownUntil += hiddenDuration;
-          if (fullSince) fullSince += hiddenDuration;
-          hiddenAt = 0;
-        }
-
-        function seedInitialBath() {
-          const base = Math.min(width, height) * Number(controls.dropSize.value) / 1000;
-          const openingBase = base * (usesSuminagashiSpacing() ? 1.48 : 1.16);
-          const variation = Number(controls.sizeVariation.value) / 100;
-          const marginX = Math.min(width * 0.12, openingBase * 2.4);
-          const marginY = Math.min(height * 0.12, openingBase * 2.4);
-          const poolCount = usesSuminagashiSpacing()
-            ? clamp(Math.round(Math.sqrt(width / Math.max(1, height)) * 5.2), 5, 7)
-            : clamp(Math.round(Math.sqrt(width / Math.max(1, height)) * 5.3), 5, 8);
-
-          if (usesSuminagashiSpacing()) seedMineralWash();
-          const pools = createInkStations(poolCount, marginX, marginY);
-
-          for (const pool of pools) {
-            let cursorX = pool.x;
-            let cursorY = pool.y;
-            let currentAngle = random() * TAU;
-
-            for (let ring = 0; ring < INITIAL_RING_COUNT; ring++) {
-              currentAngle += (random() * 2 - 1) * 0.34;
-              const drift = openingBase * (ring === 0
-                ? random() * 0.035
-                : 0.18 + random() * 0.52);
-              cursorX = clamp(
-                cursorX + Math.cos(currentAngle) * drift,
-                marginX,
-                width - marginX
-              );
-              cursorY = clamp(
-                cursorY + Math.sin(currentAngle) * drift,
-                marginY,
-                height - marginY
-              );
-              const sizeScale = clamp(sampleDropScale(variation * 0.78), 0.58, 1.38);
-              const color = nextInkColor();
-              const radius = openingBase * 0.88 * sizeScale * pigmentScale(color);
-              placeSettledInk(
-                cursorX,
-                cursorY,
-                Math.max(4, radius),
-                color,
-                usesSuminagashiSpacing()
-              );
-            }
-            colorIndex++;
-          }
-
-          settleInitialField(pools, openingBase);
-          inkStations = pools.map((pool) => ({
-            x: pool.x,
-            y: pool.y
-          }));
-
-          // The opening rings are the bath's starting material. The counter
-          // tracks only ink added after the first frame.
-          complexity = 0;
-        }
-
-        function seedMineralWash() {
-          const scale = Math.min(width, height);
-          const x = width * (0.4 + random() * 0.2);
-          const y = height * (0.38 + random() * 0.24);
-          const angle = random() * TAU;
-
-          placeSettledInk(x, y, scale * (0.58 + random() * 0.12), '#789bb5');
-          placeSettledInk(
-            x + Math.cos(angle) * scale * 0.13,
-            y + Math.sin(angle) * scale * 0.13,
-            scale * (0.24 + random() * 0.08),
-            '#b5c8d3'
-          );
-        }
-
-        function createInkStations(count, marginX, marginY) {
-          const stations = [];
-          const minDistance = Math.min(width, height) * 0.19;
-
-          for (let index = 0; index < count; index++) {
-            let candidate = null;
-            for (let attempt = 0; attempt < 24; attempt++) {
-              const next = {
-                x: marginX + random() * Math.max(1, width - marginX * 2),
-                y: marginY + random() * Math.max(1, height - marginY * 2)
-              };
-              candidate = next;
-              if (stations.every((station) =>
-                Math.hypot(next.x - station.x, next.y - station.y) >= minDistance
-              )) break;
-            }
-            stations.push(candidate);
-          }
-
-          return stations;
-        }
-
-        function placeSettledInk(
-          x,
-          y,
-          radius,
-          color,
-          withHalo = false
-        ) {
-          const form = createDropForm();
-          const shape = {
-            color,
-            form,
-            points: circlePoints(x, y, 0.01, form)
-          };
-          const halo = withHalo ? createSuminagashiHalo(x, y) : null;
-          if (halo) shapes.push(halo.shape);
-          shapes.push(shape);
-          applyDropExpansion({
-            shape,
-            halo,
-            x,
-            y,
-            currentRadius: 0.01
-          }, radius);
-        }
-
-        function createSuminagashiHalo(x, y) {
-          const angle = random() * TAU;
-          const offset = random() * 0.038;
-          const form = createDropForm();
-          return {
-            scale: 1.045 + random() * 0.13,
-            offsetX: Math.cos(angle) * offset,
-            offsetY: Math.sin(angle) * offset,
-            shape: {
-              color: bathColor,
-              form,
-              points: circlePoints(x, y, 0.01, form)
-            }
-          };
-        }
-
-        function settleInitialField(pools, base) {
-          const eddies = pools.map((pool) => ({
-            x: pool.x + (random() * 2 - 1) * base * 0.9,
-            y: pool.y + (random() * 2 - 1) * base * 0.9,
-            radius: base * (4.8 + random() * 3.6),
-            turn: (random() < 0.5 ? -1 : 1) * (0.28 + random() * 0.28)
-          }));
-
-          for (const shape of shapes) {
-            for (const point of shape.points) {
-              for (const eddy of eddies) {
-                const dx = point.x - eddy.x;
-                const dy = point.y - eddy.y;
-                const influence = Math.exp(-(dx * dx + dy * dy) /
-                  (2 * eddy.radius * eddy.radius));
-                const radialPull = clamp(
-                  Math.hypot(dx, dy) / Math.max(1, eddy.radius),
-                  0,
-                  1.4
-                );
-                const angle = eddy.turn * influence * (0.55 + radialPull);
-                const cosine = Math.cos(angle);
-                const sine = Math.sin(angle);
-                point.x = eddy.x + dx * cosine - dy * sine;
-                point.y = eddy.y + dx * sine + dy * cosine;
-              }
-              constrainPoint(point);
-            }
-          }
-        }
-
-        function createBathFlow() {
-          const scale = Math.min(width, height);
-          const vortexCount = usesSuminagashiSpacing() ? 7 : 5;
-          const vortices = [];
-
-          for (let index = 0; index < vortexCount; index++) {
-            vortices.push({
-              x: width * (-0.08 + random() * 1.16),
-              y: height * (-0.08 + random() * 1.16),
-              radius: scale * (0.22 + random() * 0.36),
-              turn: (random() < 0.5 ? -1 : 1) * (0.16 + random() * 0.32)
-            });
-          }
-
-          return {
-            phaseX: random() * TAU,
-            phaseY: random() * TAU,
-            phaseFine: random() * TAU,
-            sweepX: scale * (0.075 + random() * 0.055),
-            sweepY: scale * (0.032 + random() * 0.04),
-            direction: random() < 0.5 ? -1 : 1,
-            vortices
-          };
-        }
-
-        function createSurfaceFlecks() {
-          const area = width * height;
-          const count = clamp(Math.round(area / 7200), 90, 260);
-          const inset = bathInset();
-          const flecks = [];
-
-          for (let index = 0; index < count; index++) {
-            flecks.push({
-              x: inset + random() * Math.max(1, width - inset * 2),
-              y: inset + random() * Math.max(1, height - inset * 2),
-              radius: 0.35 + Math.pow(random(), 2) * 1.45,
-              stretch: 0.55 + random() * 1.8,
-              rotation: random() * TAU,
-              pale: random() < 0.78,
-              alpha: 0.12 + random() * 0.28
-            });
-          }
-
-          return flecks;
-        }
-
-        function warpCoordinates(x, y, out) {
-          if (!flowField) {
-            out.x = x;
-            out.y = y;
-            return out;
-          }
-
-          const inset = bathInset();
-          const scale = Math.min(width, height);
-          const edgeDistance = Math.min(
-            x - inset,
-            width - inset - x,
-            y - inset,
-            height - inset - y
-          );
-          const edgeBlend = clamp(edgeDistance / Math.max(1, scale * 0.075), 0, 1);
-          const nx = x / Math.max(1, width);
-          const ny = y / Math.max(1, height);
-          let px = x + edgeBlend * (
-            Math.sin(ny * TAU * 0.92 + flowField.phaseX) * flowField.sweepX +
-            Math.sin(ny * TAU * 2.7 + flowField.phaseFine) * scale * 0.018 +
-            Math.sin((nx * 5.2 + ny * 2.3) * TAU - flowField.phaseY) * scale * 0.007
-          );
-          let py = y + edgeBlend * (
-            Math.sin(nx * TAU * 1.08 + flowField.phaseY) * flowField.sweepY +
-            Math.sin((nx + ny) * TAU * 1.8 - flowField.phaseFine) * scale * 0.014 +
-            Math.sin((ny * 4.7 - nx * 1.9) * TAU + flowField.phaseX) * scale * 0.006
-          ) * flowField.direction;
-
-          for (const vortex of flowField.vortices) {
-            const dx = px - vortex.x;
-            const dy = py - vortex.y;
-            const distanceSquared = dx * dx + dy * dy;
-            const radiusSquared = vortex.radius * vortex.radius;
-            const influence = Math.exp(-distanceSquared / Math.max(1, radiusSquared));
-            const angle = vortex.turn * influence * edgeBlend;
-            const cosine = Math.cos(angle);
-            const sine = Math.sin(angle);
-            px = vortex.x + dx * cosine - dy * sine;
-            py = vortex.y + dx * sine + dy * cosine;
-          }
-
-          out.x = clamp(px, inset, width - inset);
-          out.y = clamp(py, inset, height - inset);
-          return out;
-        }
-
-        function unwarpCoordinates(x, y) {
-          const model = { x, y };
-          const warped = { x, y };
-
-          // The bath mapping is smooth, so a few correction passes are enough
-          // to keep a pointer-made drop beneath the viewer's hand.
-          for (let iteration = 0; iteration < 7; iteration++) {
-            warpCoordinates(model.x, model.y, warped);
-            model.x = clamp(model.x + x - warped.x, bathInset(), width - bathInset());
-            model.y = clamp(model.y + y - warped.y, bathInset(), height - bathInset());
-          }
-
-          return model;
-        }
-
-        function tick(time) {
-          let needsRender = false;
-
-          if (!paused) {
-            if (activeDrop) {
-              updateDrop(time);
-              needsRender = true;
-            }
-            if (time >= nextFullnessCheck && !activeDrop) {
-              nextFullnessCheck = time + FULLNESS_CHECK_INTERVAL;
-              needsRender = updateBathFullness(time) || needsRender;
-            }
-
-            if (!activeDrop && time >= nextDropAt) {
-              placeAutomaticInk(time);
-              needsRender = true;
-            }
-          }
-
-          if (needsRender) render();
-          requestAnimationFrame(tick);
-        }
-
-        function placeAutomaticInk(time) {
-          const base = Math.min(width, height) * Number(controls.dropSize.value) / 1000;
-          const variation = Number(controls.sizeVariation.value) / 100;
-          const inset = bathInset();
-          const margin = Math.max(inset + base * 1.4, Math.min(width, height) * 0.07);
-
-          if (!inkStations.length) {
-            inkStations = createInkStations(5, margin, margin);
-          }
-
-          const stationIndex = Math.floor(random() * inkStations.length);
-          const station = inkStations[stationIndex];
-          if (
-            !centerRunRemaining &&
-            !centerRunCooldown &&
-            lastInkPosition &&
-            random() < CENTER_RUN_CHANCE
-          ) {
-            centerRunRemaining = CENTER_RUN_MIN + Math.floor(
-              random() * (CENTER_RUN_MAX - CENTER_RUN_MIN + 1)
-            );
-          }
-
-          const repeatsLastCenter = centerRunRemaining > 0 && Boolean(lastInkPosition);
-          let startsNewFamily = false;
-          let placement = 0;
-          let x;
-          let y;
-
-          if (repeatsLastCenter) {
-            x = lastInkPosition.x;
-            y = lastInkPosition.y;
-            centerRunRemaining--;
-            if (!centerRunRemaining) {
-              centerRunCooldown = 2 + Math.floor(random() * 3);
-            }
-          } else {
-            if (centerRunCooldown > 0) centerRunCooldown--;
-            startsNewFamily = random() < 0.16;
-            if (startsNewFamily) {
-              station.x = margin + random() * Math.max(1, width - margin * 2);
-              station.y = margin + random() * Math.max(1, height - margin * 2);
-            }
-
-            const angle = random() * TAU;
-            placement = random();
-            const offset = placement < 0.12
-              ? 0
-              : placement < 0.78
-                ? base * (0.08 + random() * 0.68)
-                : base * (0.82 + random() * 1.75);
-            x = clamp(
-              station.x + Math.cos(angle) * offset,
-              margin,
-              width - margin
-            );
-            y = clamp(
-              station.y + Math.sin(angle) * offset,
-              margin,
-              height - margin
-            );
-          }
-
-          const sizeScale = repeatsLastCenter
-            ? clamp(sampleDropScale(variation * 0.65), 0.65, 1.45)
-            : sampleDropScale(variation);
-          const radius = Math.max(3.5, base * sizeScale);
-
-          if (!startsNewFamily && placement > 0.24) {
-            station.x += (x - station.x) * 0.08;
-            station.y += (y - station.y) * 0.08;
-          }
-
-          const color = nextInkColor();
-          startDrop(
-            x,
-            y,
-            radius * pigmentScale(color),
-            color,
-            time,
-            repeatsLastCenter
-          );
-        }
-
-        function startDrop(x, y, radius, color, time, centeredRepeat = false) {
-          completeActiveDrop();
-          const interval = dropInterval();
-          const baseRadius = Math.min(width, height) *
-            Number(controls.dropSize.value) / 1000;
-          const bloomScale = clamp(radius / Math.max(1, baseRadius), 0.16, 4.2);
-          const targetRadius = radius * DROP_EXPANSION_SCALE;
-          const form = createDropForm();
-          const shape = {
-            color,
-            form,
-            points: circlePoints(x, y, 0.01, form)
-          };
-          const impactDuration = 110 + random() * 100;
-          const cadenceScale = centeredRepeat ? 0.78 : 1;
-          const expansionDuration = clamp(
-            interval * (0.65 + bloomScale * 0.22 + random() * 0.12) *
-              cadenceScale,
-            centeredRepeat ? 420 : 520,
-            centeredRepeat ? 1050 : 1600
-          );
-          const impactRadius = clamp(radius * 0.16, 2.5, 6);
-          const halo = usesSuminagashiSpacing()
-            ? createSuminagashiHalo(x, y)
-            : null;
-
-          if (halo) shapes.push(halo.shape);
-          shapes.push(shape);
-          activeDrop = {
-            shape,
-            halo,
-            x,
-            y,
-            targetRadius,
-            impactRadius,
-            currentRadius: 0.01,
-            start: time,
-            impactDuration,
-            expansionDuration,
-            duration: impactDuration + expansionDuration
-          };
-
-          lastInkPosition = { x, y };
-          nextDropAt = time + nextDropDelay() *
-            (centerRunRemaining ? 0.58 : 1);
-          complexity++;
-          updateBathNumber();
-
-          if (motionPreference.matches) {
-            completeActiveDrop();
-            render();
-          }
-          pruneShapes();
-        }
-
-        function updateDrop(time) {
-          const drop = activeDrop;
-          if (!drop) return;
-          const elapsed = time - drop.start;
-          let radius;
-
-          if (elapsed < drop.impactDuration) {
-            const landing = easeOutCubic(elapsed / drop.impactDuration);
-            radius = drop.impactRadius * landing;
-          } else {
-            const expansion = clamp(
-              (elapsed - drop.impactDuration) / drop.expansionDuration,
-              0,
-              1
-            );
-            const easedArea = easeInOutSine(expansion);
-            const impactArea = drop.impactRadius * drop.impactRadius;
-            const targetArea = drop.targetRadius * drop.targetRadius;
-            radius = Math.sqrt(impactArea + (targetArea - impactArea) * easedArea);
-          }
-
-          applyDropExpansion(drop, radius);
-          if (elapsed >= drop.duration) {
-            activeDrop = null;
-            finishDrop(drop, time);
-          }
-        }
-
-        function completeActiveDrop() {
-          if (!activeDrop) return;
-          const drop = activeDrop;
-          applyDropExpansion(drop, drop.targetRadius);
-          activeDrop = null;
-          finishDrop(drop, performance.now());
-        }
-
-        function finishDrop(drop, time) {
-          if (drop.backgroundDrop) {
-            finishBackgroundDrop(drop, time);
-          }
-        }
-
-        function updateBathFullness(time) {
-          if (
-            complexity < MIN_DROPS_BEFORE_BACKGROUND ||
-            time < backgroundDropCooldownUntil ||
-            (activeDrop && activeDrop.backgroundDrop)
-          ) {
-            fullSince = 0;
-            return false;
-          }
-
-          const coverage = measureBathCoverage();
-          if (coverage < FULLNESS_THRESHOLD) {
-            fullSince = 0;
-            return false;
-          }
-
-          if (!fullSince) fullSince = time;
-          if (
-            time - fullSince >= FULLNESS_HOLD &&
-            !activeDrop
-          ) {
-            startBackgroundDrop(time);
-            return true;
-          }
-          return false;
-        }
-
-        function measureBathCoverage() {
-          const sampleWidth = 96;
-          const sampleHeight = clamp(
-            Math.round(sampleWidth * height / Math.max(1, width)),
-            48,
-            112
-          );
-          if (
-            coverageCanvas.width !== sampleWidth ||
-            coverageCanvas.height !== sampleHeight
-          ) {
-            coverageCanvas.width = sampleWidth;
-            coverageCanvas.height = sampleHeight;
-            coverageContext.imageSmoothingEnabled = true;
-            coverageContext.imageSmoothingQuality = 'low';
-          }
-
-          coverageContext.drawImage(
-            canvas,
-            0,
-            0,
-            canvas.width,
-            canvas.height,
-            0,
-            0,
-            sampleWidth,
-            sampleHeight
-          );
-          const pixels = coverageContext.getImageData(
-            0,
-            0,
-            sampleWidth,
-            sampleHeight
-          ).data;
-          const background = hexToRgb(bathColor);
-          let covered = 0;
-          let sampled = 0;
-
-          for (let y = 1; y < sampleHeight - 1; y++) {
-            for (let x = 1; x < sampleWidth - 1; x++) {
-              const index = (y * sampleWidth + x) * 4;
-              const difference =
-                Math.abs(pixels[index] - background.r) +
-                Math.abs(pixels[index + 1] - background.g) +
-                Math.abs(pixels[index + 2] - background.b);
-              if (difference > 32) covered++;
-              sampled++;
-            }
-          }
-
-          return sampled ? covered / sampled : 0;
-        }
-
-        function startBackgroundDrop(time) {
-          completeActiveDrop();
-          const inset = bathInset();
-          const x = width * (0.44 + random() * 0.12);
-          const y = height * (0.44 + random() * 0.12);
-          const farthestCorner = Math.max(
-            Math.hypot(x - inset, y - inset),
-            Math.hypot(width - inset - x, y - inset),
-            Math.hypot(x - inset, height - inset - y),
-            Math.hypot(width - inset - x, height - inset - y)
-          );
-          const targetRadius = farthestCorner + Math.min(width, height) * 0.18;
-          const nextColor = nextBathBackground();
-          const form = {
-            stretch: 1,
-            rotation: 0,
-            broadWobble: 0.003,
-            fineWobble: 0,
-            broadPhase: random() * TAU,
-            finePhase: 0
-          };
-          const shape = {
-            color: nextColor,
-            backgroundDrop: true,
-            form,
-            points: circlePoints(x, y, 0.01, form)
-          };
-          const impactDuration = 180;
-          const expansionDuration = 3800 + random() * 900;
-
-          shapes.push(shape);
-          activeDrop = {
-            shape,
-            x,
-            y,
-            targetRadius,
-            impactRadius: clamp(Math.min(width, height) * 0.026, 9, 20),
-            currentRadius: 0.01,
-            start: time,
-            impactDuration,
-            expansionDuration,
-            duration: impactDuration + expansionDuration,
-            backgroundDrop: true
-          };
-
-          fullSince = 0;
-          nextDropAt = time + activeDrop.duration + 900;
-          status.textContent = 'The saturated bath is opening into a new ground.';
-
-          if (motionPreference.matches) {
-            completeActiveDrop();
-            render();
-          }
-        }
-
-        function finishBackgroundDrop(drop, time) {
-          bathColor = drop.shape.color;
-          shapes = [];
-          inkStations = [];
-          lastInkPosition = null;
-          centerRunRemaining = 0;
-          centerRunCooldown = 2;
-          complexity = 0;
-          fullSince = 0;
-          backgroundDropCooldownUntil = time + 12000;
-          nextFullnessCheck = time + FULLNESS_CHECK_INTERVAL;
-          nextDropAt = time + 900;
-          updateBathNumber();
-          status.textContent = 'A new bath ground is ready for ink.';
-        }
-
-        function nextBathBackground() {
-          const available = BATH_BACKGROUNDS.filter((color) => color !== bathColor);
-          return available[Math.floor(random() * available.length)];
-        }
-
-        function applyDropExpansion(drop, radius) {
-          const areaScale = drop.halo ? drop.halo.scale * drop.halo.scale : 1;
-          const previousArea = drop.currentRadius * drop.currentRadius * areaScale;
-          const nextArea = radius * radius * areaScale;
-          const deltaArea = Math.max(0, nextArea - previousArea) *
-            Number(controls.repulsion.value) / 100;
-
-          if (deltaArea > 0) {
-            for (const shape of shapes) {
-              if (shape === drop.shape || shape === drop.halo?.shape) continue;
-              for (const point of shape.points) {
-                const dx = point.x - drop.x;
-                const dy = point.y - drop.y;
-                const distanceSquared = Math.max(0.6, dx * dx + dy * dy);
-                const factor = Math.sqrt(1 + deltaArea / distanceSquared);
-                point.x = drop.x + dx * factor;
-                point.y = drop.y + dy * factor;
-                constrainPoint(point);
-              }
-            }
-          }
-
-          drop.currentRadius = radius;
-          if (drop.halo) {
-            setCirclePoints(
-              drop.halo.shape.points,
-              drop.x + radius * drop.halo.offsetX,
-              drop.y + radius * drop.halo.offsetY,
-              radius * drop.halo.scale,
-              drop.halo.shape.form
-            );
-          }
-          setCirclePoints(drop.shape.points, drop.x, drop.y, radius, drop.shape.form);
-        }
-
-        function render() {
-          ctx.fillStyle = bathColor;
-          ctx.fillRect(0, 0, width, height);
-
-          for (const shape of shapes) drawShape(shape);
-          drawSurfaceFlecks();
-          drawBathBorder();
-        }
-
-        function drawSurfaceFlecks() {
-          const warped = { x: 0, y: 0 };
-          ctx.save();
-          for (const fleck of surfaceFlecks) {
-            warpCoordinates(fleck.x, fleck.y, warped);
-            ctx.beginPath();
-            ctx.ellipse(
-              warped.x,
-              warped.y,
-              fleck.radius * fleck.stretch,
-              fleck.radius,
-              fleck.rotation,
-              0,
-              TAU
-            );
-            ctx.globalAlpha = fleck.alpha;
-            ctx.fillStyle = fleck.pale ? '#eef1ed' : '#173a58';
-            ctx.fill();
-          }
-          ctx.restore();
-        }
-
-        function drawBathBorder() {
-          const inset = bathInset();
-          ctx.save();
-          ctx.strokeStyle = 'rgba(23, 25, 24, 0.76)';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(
-            inset,
-            inset,
-            Math.max(0, width - inset * 2),
-            Math.max(0, height - inset * 2)
-          );
-          ctx.restore();
-        }
-
-        function drawShape(shape) {
-          const points = shape.points;
-          if (points.length < 3) return;
-          if (!shape.renderPoints || shape.renderPoints.length !== points.length * 2) {
-            shape.renderPoints = new Float32Array(points.length * 2);
-          }
-          const warped = { x: 0, y: 0 };
-          for (let index = 0; index < points.length; index++) {
-            warpCoordinates(points[index].x, points[index].y, warped);
-            shape.renderPoints[index * 2] = warped.x;
-            shape.renderPoints[index * 2 + 1] = warped.y;
-          }
-
-          ctx.beginPath();
-          const lastIndex = (points.length - 1) * 2;
-          ctx.moveTo(
-            (shape.renderPoints[lastIndex] + shape.renderPoints[0]) * 0.5,
-            (shape.renderPoints[lastIndex + 1] + shape.renderPoints[1]) * 0.5
-          );
-
-          for (let i = 0; i < points.length; i++) {
-            const pointIndex = i * 2;
-            const nextIndex = ((i + 1) % points.length) * 2;
-            ctx.quadraticCurveTo(
-              shape.renderPoints[pointIndex],
-              shape.renderPoints[pointIndex + 1],
-              (shape.renderPoints[pointIndex] + shape.renderPoints[nextIndex]) * 0.5,
-              (shape.renderPoints[pointIndex + 1] + shape.renderPoints[nextIndex + 1]) * 0.5
-            );
-          }
-
-          ctx.closePath();
-          ctx.fillStyle = shape.color;
-          ctx.fill();
-        }
-
-        function createDropForm() {
-          const looseness = usesSuminagashiSpacing() ? 1.34 : 1;
-          return {
-            stretch: usesSuminagashiSpacing()
-              ? 0.82 + random() * 0.38
-              : 0.94 + random() * 0.12,
-            rotation: random() * TAU,
-            broadWobble: (0.026 + random() * 0.052) * looseness,
-            midWobble: (0.012 + random() * 0.034) * looseness,
-            fineWobble: (0.003 + random() * 0.012) * looseness,
-            broadPhase: random() * TAU,
-            midPhase: random() * TAU,
-            finePhase: random() * TAU
-          };
-        }
-
-        function sampleDropScale(variation) {
-          const separation = Math.pow(clamp(variation, 0, 1), 0.42);
-          const family = random();
-          let sampledScale;
-
-          if (family < 0.14) {
-            sampledScale = 0.16 + random() * 0.18;
-          } else if (family < 0.4) {
-            sampledScale = 0.42 + random() * 0.32;
-          } else if (family < 0.86) {
-            sampledScale = 0.78 + random() * 0.57;
-          } else {
-            // Large blooms remain occasional punctuation rather than the norm.
-            sampledScale = 1.65 + random() * 1.75;
-          }
-
-          return 1 + (sampledScale - 1) * separation;
-        }
-
-        function circlePoints(cx, cy, radius, form) {
-          const points = new Array(POINT_COUNT);
-          for (let i = 0; i < POINT_COUNT; i++) points[i] = { x: cx, y: cy };
-          setCirclePoints(points, cx, cy, radius, form);
-          return points;
-        }
-
-        function setCirclePoints(points, cx, cy, radius, form) {
-          const profile = dropProfile(form, points.length);
-
-          for (let i = 0; i < points.length; i++) {
-            points[i].x = cx + profile[i * 2] * radius;
-            points[i].y = cy + profile[i * 2 + 1] * radius;
-            constrainPoint(points[i]);
-          }
-        }
-
-        function dropProfile(form, pointCount) {
-          if (form.profile && form.profile.length === pointCount * 2) {
-            return form.profile;
-          }
-
-          const profile = new Float32Array(pointCount * 2);
-          const stretch = form.stretch || 1;
-          const rotationCosine = Math.cos(form.rotation || 0);
-          const rotationSine = Math.sin(form.rotation || 0);
-          for (let i = 0; i < pointCount; i++) {
-            const angle = i / pointCount * TAU;
-            const irregularity = 1 +
-              Math.sin(angle * 2 + (form.broadPhase || 0)) * (form.broadWobble || 0) +
-              Math.sin(angle * 5 + (form.midPhase || 0)) * (form.midWobble || 0) +
-              Math.sin(angle * 9 + (form.finePhase || 0)) * (form.fineWobble || 0);
-            const localX = Math.cos(angle) * irregularity * stretch;
-            const localY = Math.sin(angle) * irregularity / stretch;
-            profile[i * 2] = localX * rotationCosine - localY * rotationSine;
-            profile[i * 2 + 1] = localX * rotationSine + localY * rotationCosine;
-          }
-          form.profile = profile;
-          return profile;
-        }
-
-        function nextInkColor() {
-          const palette = PALETTES[Number(paletteSelect.value)] || PALETTES[0];
-          const color = palette[colorIndex % palette.length];
-          colorIndex++;
-          return color;
-        }
-
-        function pigmentScale(color) {
-          if (!usesSuminagashiSpacing() || !MINERAL_ACCENTS.has(color)) return 1;
-          return 0.28 + random() * 0.18;
-        }
-
-        function usesSuminagashiSpacing() {
-          return Number(paletteSelect.value) === SUMINAGASHI_PALETTE;
-        }
-
-        function dropInterval() {
-          return 60000 / Number(controls.tempo.value);
-        }
-
-        function nextDropDelay() {
-          const interval = dropInterval();
-          const jitter = 0.46 + random() * 0.92;
-          const occasionalPause = random() < 0.12 ? 1.35 + random() * 0.7 : 1;
-          return interval * jitter * occasionalPause;
-        }
-
-        function bathInset() {
-          return bathInsetValue;
-        }
-
-        function constrainPoint(point) {
-          point.x = point.x < bathInsetValue
-            ? bathInsetValue
-            : point.x > bathRight ? bathRight : point.x;
-          point.y = point.y < bathInsetValue
-            ? bathInsetValue
-            : point.y > bathBottom ? bathBottom : point.y;
-          return point;
-        }
-
-        function pruneShapes() {
-          if (shapes.length > MAX_SHAPES) {
-            shapes.splice(0, shapes.length - MAX_SHAPES);
-          }
-        }
-
-        function onBathPointer(event) {
-          canvas.focus({ preventScroll: true });
-          const rect = canvas.getBoundingClientRect();
-          const inset = bathInset();
-          const pointerX = clamp(event.clientX - rect.left, inset, width - inset);
-          const pointerY = clamp(event.clientY - rect.top, inset, height - inset);
-          const modelPoint = unwarpCoordinates(pointerX, pointerY);
-          const x = modelPoint.x;
-          const y = modelPoint.y;
-          const base = Math.min(width, height) *
-            Number(controls.dropSize.value) / 1000;
-          const variation = Number(controls.sizeVariation.value) / 100;
-          const color = nextInkColor();
-          const radius = base * sampleDropScale(variation) * pigmentScale(color);
-          startDrop(x, y, Math.max(4, radius), color, performance.now());
-          status.textContent = 'Ink dropped into the bath.';
-        }
-
-        function bindControls() {
-          Object.values(controls).forEach((control) => {
-            control.addEventListener('input', updatePanel);
-          });
-          paletteSelect.addEventListener('change', updatePanel);
-        }
-
-        function updatePanel() {
-          updateRange(controls.tempo, `${controls.tempo.value}/min`);
-          updateRange(controls.dropSize, `${(Number(controls.dropSize.value) / 10).toFixed(1)}%`);
-          updateRange(controls.sizeVariation, `${controls.sizeVariation.value}%`);
-          updateRange(controls.repulsion, `${controls.repulsion.value}%`);
-          updateBathNumber();
-        }
-
-        function updateBathNumber() {
-          bathNumber.textContent =
-            `BATH ${String(seed % 10000).padStart(4, '0')}` +
-            ` · DROPS ${String(complexity).padStart(3, '0')}`;
-        }
-
-        function updateRange(input, text) {
-          const row = input.closest('.range-row');
-          const min = Number(input.min);
-          const max = Number(input.max);
-          const progress = ((Number(input.value) - min) / (max - min)) * 100;
-          row.style.setProperty('--progress', `${progress}%`);
-          const output = row.querySelector('output');
-          output.value = text;
-          output.textContent = text;
-        }
-
-        function bindPanel() {
-          collapseButton.addEventListener('click', () => {
-            const collapsed = panel.classList.toggle('is-collapsed');
-            collapseButton.textContent = collapsed ? '+' : '−';
-            collapseButton.setAttribute('aria-expanded', String(!collapsed));
-            collapseButton.setAttribute(
-              'aria-label',
-              collapsed ? 'Expand marbling controls' : 'Collapse marbling controls'
-            );
-            collapseButton.title = collapsed ? 'Expand controls' : 'Collapse controls';
-            clampPanel();
-          });
-
-          panelHeader.addEventListener('pointerdown', (event) => {
-            if (event.target.closest('button')) return;
-            const rect = panel.getBoundingClientRect();
-            panelDrag = {
-              pointerId: event.pointerId,
-              startX: event.clientX,
-              startY: event.clientY,
-              left: rect.left,
-              top: rect.top,
-              width: rect.width,
-              height: rect.height,
-              nextLeft: rect.left,
-              nextTop: rect.top
-            };
-            panel.classList.add('is-dragging');
-            panelHeader.setPointerCapture(event.pointerId);
-            event.preventDefault();
-          });
-
-          panelHeader.addEventListener('pointermove', (event) => {
-            if (!panelDrag || event.pointerId !== panelDrag.pointerId) return;
-            movePanelDuringDrag(event.clientX, event.clientY);
-          });
-
-          panelHeader.addEventListener('pointerup', endPanelDrag);
-          panelHeader.addEventListener('pointercancel', endPanelDrag);
-        }
-
-        function endPanelDrag(event) {
-          if (!panelDrag || event.pointerId !== panelDrag.pointerId) return;
-          panel.style.left = `${Math.round(panelDrag.nextLeft)}px`;
-          panel.style.top = `${Math.round(panelDrag.nextTop)}px`;
-          panel.style.transform = '';
-          panel.classList.remove('is-dragging');
-          if (panelHeader.hasPointerCapture(event.pointerId)) {
-            panelHeader.releasePointerCapture(event.pointerId);
-          }
-          panelDrag = null;
-        }
-
-        function movePanelDuringDrag(clientX, clientY) {
-          const margin = 8;
-          const maxLeft = Math.max(margin, innerWidth - panelDrag.width - margin);
-          const maxTop = Math.max(margin, innerHeight - panelDrag.height - margin);
-          const left = clamp(
-            panelDrag.left + clientX - panelDrag.startX,
-            margin,
-            maxLeft
-          );
-          const top = clamp(
-            panelDrag.top + clientY - panelDrag.startY,
-            margin,
-            maxTop
-          );
-          panelDrag.nextLeft = left;
-          panelDrag.nextTop = top;
-          panel.style.transform =
-            `translate3d(${left - panelDrag.left}px, ${top - panelDrag.top}px, 0)`;
-        }
-
-        function movePanel(left, top) {
-          const rect = panel.getBoundingClientRect();
-          const margin = 8;
-          const maxLeft = Math.max(margin, innerWidth - rect.width - margin);
-          const maxTop = Math.max(margin, innerHeight - rect.height - margin);
-          panel.style.left = `${Math.round(clamp(left, margin, maxLeft))}px`;
-          panel.style.top = `${Math.round(clamp(top, margin, maxTop))}px`;
-        }
-
-        function clampPanel() {
-          if (!panel.style.left && !panel.style.top) return;
-          const rect = panel.getBoundingClientRect();
-          movePanel(rect.left, rect.top);
-        }
-
-        function reseed() {
-          const value = Math.floor(Math.random() * 0x7fffffff).toString(36);
-          seed = hashString(value);
-          try {
-            const url = new URL(location.href);
-            url.searchParams.set('seed', value);
-            history.replaceState(null, '', url);
-          } catch (error) {
-            // The bath still resets when history is unavailable on file://.
-          }
-          resetBath();
-          status.textContent = `New bath ${String(seed % 10000).padStart(4, '0')}`;
-        }
-
-        function onKeyDown(event) {
-          if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
-          const tag = event.target.tagName;
-          if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-
-          if (event.key.toLowerCase() === 'r') {
-            event.preventDefault();
-            reseed();
-          } else if (event.key === ' ') {
-            event.preventDefault();
-            if (!paused) {
-              completeActiveDrop();
-              render();
-            }
-            paused = !paused;
-            nextDropAt = performance.now() + nextDropDelay() * 0.3;
-            status.textContent = paused ? 'Bath paused.' : 'Bath flowing.';
-          }
-        }
-
-        function onMotionPreference(event) {
-          paused = event.matches;
-          if (paused) {
-            completeActiveDrop();
-            render();
-          }
-          status.textContent = paused
-            ? 'Bath paused for reduced motion.'
-            : 'Bath flowing.';
-        }
-
-        function seedFromLocation() {
-          const value = pageParams.get('seed');
-          return value ? hashString(value) : Math.floor(Math.random() * 0x7fffffff);
-        }
-
-        function hashString(value) {
-          let hash = 2166136261;
-          for (let i = 0; i < value.length; i++) {
-            hash ^= value.charCodeAt(i);
-            hash = Math.imul(hash, 16777619);
-          }
-          return hash >>> 0;
-        }
-
-        function hexToRgb(value) {
-          const number = parseInt(value.replace('#', ''), 16);
-          return {
-            r: number >> 16 & 255,
-            g: number >> 8 & 255,
-            b: number & 255
-          };
-        }
-
-        function mulberry32(value) {
-          return () => {
-            let t = (value += 0x6d2b79f5);
-            t = Math.imul(t ^ (t >>> 15), t | 1);
-            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-          };
-        }
-
-        function easeOutCubic(value) {
-          return 1 - Math.pow(1 - value, 3);
-        }
-
-        function easeInOutSine(value) {
-          return (1 - Math.cos(Math.PI * value)) * 0.5;
-        }
-
-        function clamp(value, min, max) {
-          return Math.max(min, Math.min(max, value));
-        }
-      })();
-    </script>
+    <script src="./renderer.js"></script>
   </body>
 </html>

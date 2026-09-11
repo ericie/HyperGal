@@ -191,6 +191,15 @@
         color: var(--ink);
       }
 
+      .glyph.is-untyped {
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .glyph.is-typing-in {
+        animation: type-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
       .glyph.is-deleted {
         visibility: hidden;
         pointer-events: none;
@@ -219,6 +228,13 @@
         color: var(--ink);
         font-variant-numeric: tabular-nums;
       }
+
+      .meter {
+        opacity: 0;
+        transition: opacity 260ms cubic-bezier(0.25, 1, 0.5, 1);
+      }
+
+      body.is-interactive .meter { opacity: 1; }
 
       .sr-only {
         position: absolute;
@@ -308,8 +324,8 @@
       body.is-debug .knife-cursor { display: none; }
 
       @media (pointer: fine) {
-        body:not(.is-debug),
-        body:not(.is-debug) * { cursor: none !important; }
+        body.is-interactive,
+        body.is-interactive * { cursor: none !important; }
       }
 
       @media (max-width: 1050px) and (min-width: 641px) {
@@ -323,6 +339,19 @@
         0% { transform: scale(1); }
         22% { transform: scale(0.9, 1.05); }
         100% { transform: scale(1); }
+      }
+
+      @keyframes type-in {
+        0% {
+          opacity: 0;
+          filter: blur(3px);
+          transform: translate3d(var(--type-x, 0), var(--type-y, -0.18em), 0) scale(0.82);
+        }
+        55% { opacity: 1; }
+        100% {
+          filter: blur(0);
+          transform: translate3d(0, 0, 0) scale(1);
+        }
       }
 
       @keyframes knife-cut {
@@ -348,6 +377,10 @@
         .instruction,
         .meter { font-size: 9px; }
 
+        .instruction {
+          bottom: max(31px, calc(env(safe-area-inset-bottom) + 31px));
+        }
+
         .debug-view {
           padding: 8px;
           gap: 8px;
@@ -371,7 +404,8 @@
       @media (prefers-reduced-motion: reduce) {
         .glyph,
         .glyph::after { transition: none; }
-        .glyph.is-struck { animation: none; }
+        .glyph.is-struck,
+        .glyph.is-typing-in { animation: none; }
         .knife-blade { transition: none; }
         .knife-icon.is-triggered { animation: none; }
       }
@@ -400,7 +434,7 @@
         ></blockquote>
       </div>
     </main>
-    <p class="instruction">Cut through any character</p>
+    <p class="instruction" id="instruction">The whole is coming together</p>
     <p class="meter">Active <output id="active-count">00</output> / 2.5 sec</p>
     <p class="sr-only" id="announcement" aria-live="polite"></p>
     <section class="debug-view" id="debug-view" aria-label="Animation comparison grid" hidden>
@@ -473,6 +507,9 @@
         const TEXT = "The greater whole is an illusion. Really it's nothing other than a collection of smaller pieces, joined together in such a way as to encourage the human tendency to see wholes.";
         const LIFE = 2500;
         const MODE_COUNT = 18;
+        const INITIAL_TYPE_DURATION = 1650;
+        const RETYPE_DURATION = 1250;
+        const RETYPE_DELAY = 720;
         const DEBUG = new URLSearchParams(window.location.search).get('debug') === 'true';
         const GROUND_COLOR = [248, 248, 246];
         const COLORS = [
@@ -489,6 +526,7 @@
         const knifeCursor = document.querySelector('#knife-cursor');
         const knifeIcon = document.querySelector('#knife-icon');
         const countOutput = document.querySelector('#active-count');
+        const instruction = document.querySelector('#instruction');
         const announcement = document.querySelector('#announcement');
         const debugView = document.querySelector('#debug-view');
         const debugCells = Array.from(document.querySelectorAll('.debug-cell'));
@@ -505,6 +543,11 @@
         let knifeColorTimer = 0;
         let dragPointerId = null;
         let lastDragPoint = null;
+        let lastPointerPoint = null;
+        let typingFrame = 0;
+        let typingGeneration = 0;
+        let phase = DEBUG ? 'debug' : 'typing';
+        let restoreFocusAfterTyping = false;
 
         if (DEBUG) {
           document.body.classList.add('is-debug');
@@ -514,7 +557,10 @@
         }
         resize();
         document.fonts.ready.then(() => {
-          if (!DEBUG) fitQuote();
+          if (!DEBUG) {
+            fitQuote();
+            typeQuote(true);
+          }
           resize();
           if (DEBUG && !frame) frame = requestAnimationFrame(drawDebug);
         });
@@ -543,11 +589,15 @@
               const button = document.createElement('button');
               let lastActivation = -Infinity;
               button.type = 'button';
-              button.className = 'glyph';
+              button.className = 'glyph is-untyped';
               button.textContent = character;
+              button.disabled = true;
+              button.tabIndex = -1;
+              button.setAttribute('aria-hidden', 'true');
               button.setAttribute('aria-label', `Cut away ${describeCharacter(character)}`);
 
               const activate = () => {
+                if (phase !== 'cutting' || button.disabled) return;
                 const now = performance.now();
                 if (now - lastActivation < 120) return;
                 lastActivation = now;
@@ -585,12 +635,103 @@
           );
           let size = Math.max(34, preferred);
           const available = shell.clientHeight - 4;
+          const availableWidth = shell.clientWidth;
           document.documentElement.style.setProperty('--quote-size', `${size}px`);
 
-          while (quote.scrollHeight > available && size > 25) {
+          while ((quote.scrollHeight > available || quote.scrollWidth > availableWidth) && size > 16) {
             size -= 1;
             document.documentElement.style.setProperty('--quote-size', `${size}px`);
           }
+        }
+
+        function typeQuote(isInitial) {
+          const glyphs = Array.from(quote.querySelectorAll('.glyph'));
+          const order = shuffle(glyphs.slice());
+          const generation = ++typingGeneration;
+          const duration = isInitial ? INITIAL_TYPE_DURATION : RETYPE_DURATION;
+
+          cancelAnimationFrame(typingFrame);
+          phase = 'typing';
+          document.body.classList.remove('is-interactive');
+          knifeCursor.classList.remove('is-visible');
+          quote.setAttribute('aria-busy', 'true');
+          instruction.textContent = isInitial ? 'The whole is coming together' : 'Retyping the whole';
+
+          glyphs.forEach((glyph) => {
+            glyph.disabled = true;
+            glyph.tabIndex = -1;
+            glyph.setAttribute('aria-hidden', 'true');
+            glyph.classList.remove('is-deleted', 'is-struck', 'is-typing-in');
+            glyph.classList.add('is-untyped');
+            glyph.style.setProperty('--type-x', `${randomBetween(-0.22, 0.22).toFixed(3)}em`);
+            glyph.style.setProperty('--type-y', `${randomBetween(-0.34, 0.34).toFixed(3)}em`);
+          });
+
+          fitQuote();
+
+          if (reducedMotion.matches) {
+            order.forEach(revealGlyph);
+            finishTyping(generation);
+            return;
+          }
+
+          const started = performance.now();
+          let revealed = 0;
+          const typeFrame = (now) => {
+            if (generation !== typingGeneration) return;
+            const progress = Math.min(1, (now - started) / duration);
+            const target = Math.min(order.length, Math.ceil(progress * order.length));
+
+            while (revealed < target) revealGlyph(order[revealed++]);
+
+            if (revealed < order.length) {
+              typingFrame = requestAnimationFrame(typeFrame);
+            } else {
+              window.setTimeout(() => finishTyping(generation), 260);
+            }
+          };
+          typingFrame = requestAnimationFrame(typeFrame);
+        }
+
+        function revealGlyph(glyph) {
+          glyph.classList.remove('is-untyped');
+          glyph.classList.add('is-typing-in');
+          window.setTimeout(() => glyph.classList.remove('is-typing-in'), 340);
+        }
+
+        function finishTyping(generation) {
+          if (generation !== typingGeneration) return;
+          const glyphs = Array.from(quote.querySelectorAll('.glyph'));
+          glyphs.forEach((glyph) => {
+            glyph.disabled = false;
+            glyph.tabIndex = 0;
+            glyph.removeAttribute('aria-hidden');
+            glyph.classList.remove('is-untyped', 'is-typing-in');
+          });
+
+          phase = 'cutting';
+          quote.removeAttribute('aria-busy');
+          document.body.classList.add('is-interactive');
+          instruction.textContent = 'Slash them all to retype the whole';
+          announcement.textContent = 'The complete statement is ready. Slash any character. Slash them all to retype the whole.';
+          if (lastPointerPoint && finePointer.matches) positionKnife(lastPointerPoint.x, lastPointerPoint.y);
+
+          if (restoreFocusAfterTyping) {
+            restoreFocusAfterTyping = false;
+            glyphs[0]?.focus({ preventScroll: true });
+          }
+        }
+
+        function shuffle(items) {
+          for (let index = items.length - 1; index > 0; index--) {
+            const swapIndex = Math.floor(Math.random() * (index + 1));
+            [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
+          }
+          return items;
+        }
+
+        function randomBetween(min, max) {
+          return min + Math.random() * (max - min);
         }
 
         function resize() {
@@ -645,6 +786,15 @@
           announcement.textContent = `${description[0].toUpperCase()}${description.slice(1)} cut away into a two and a half second animation.`;
 
           if (wasFocused && next) next.focus();
+          if (!next && !quote.querySelector('.glyph:not(.is-deleted)')) queueRetype(wasFocused);
+        }
+
+        function queueRetype(restoreFocus) {
+          phase = 'waiting';
+          restoreFocusAfterTyping = restoreFocus;
+          instruction.textContent = 'Nothing left · retyping the whole';
+          announcement.textContent = 'Every character has been slashed. The whole will now retype in a new random order.';
+          window.setTimeout(() => typeQuote(false), RETYPE_DELAY);
         }
 
         function describeCharacter(character) {
@@ -689,7 +839,7 @@
         }
 
         function beginKnifeDrag(event) {
-          if (DEBUG || !isDragPointer(event) || !event.isPrimary) return;
+          if (DEBUG || phase !== 'cutting' || !isDragPointer(event) || !event.isPrimary) return;
           event.preventDefault();
           dragPointerId = event.pointerId;
           lastDragPoint = { x: event.clientX, y: event.clientY };
@@ -700,6 +850,8 @@
 
         function moveKnife(event) {
           if (DEBUG) return;
+          lastPointerPoint = { x: event.clientX, y: event.clientY };
+          if (phase !== 'cutting' && phase !== 'waiting') return;
           if (isDragPointer(event)) {
             if (event.pointerId !== dragPointerId) return;
             event.preventDefault();

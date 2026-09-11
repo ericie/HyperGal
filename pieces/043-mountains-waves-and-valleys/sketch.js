@@ -15,6 +15,7 @@ let fxPeakHeight;
 let fxChaos;
 let layoutMode; // Set this to the desired layout mode
 let maxLines = 80; // Maximum number of lines
+const MIN_LINE_COUNT = 20;
 let maxPoints = 70;
 let animationOffset = 0;
 let animationSpeed = 0.00025; // Adjust this for faster or slower animation
@@ -192,7 +193,7 @@ function draw() {
 }
 
 let initLinesDone = false;
-let startY, endY, endX, lineCount, spacing, baseAmplitude, amplitude, yNoise, evenSpacing, erraticVariance;
+let startY, endY, endX, lineCount, spacing, baseAmplitude, amplitude, yNoise, evenSpacing, erraticVariance, maximumSparseSpacing;
 function initLines(){
   if (initLinesDone) return;
   startY = 0-height * 0.1;
@@ -228,6 +229,9 @@ function initLines(){
   if (layoutMode === 'Erratic' && fxLineWeightType === "Heavy") {
     startY = $fx.rand() * (height * .05) + height * .03;
   }
+
+  // Keep even the widest erratic gaps dense enough to draw the line-count floor.
+  maximumSparseSpacing = (endY - startY) / (MIN_LINE_COUNT - 1);
 
   initLinesDone = true;
 }
@@ -280,6 +284,7 @@ function calculateLinePoints() {
         spacing = (evenSpacing/4) + ($fx.rand() * (erraticVariance/3) );
 
       }
+      spacing = Math.min(spacing, maximumSparseSpacing);
     }
     yoff += animationSpeed * fxChaos;
   }
@@ -331,8 +336,6 @@ function adjustForTightnessParam(){
       if (fxLineWeightType == "Heavy") {
         animationSpeed *= 2;
         maxLines = 35;
-      } else {
-        animationSpeed *= .5
       }
       break;
     case "Normal":
@@ -342,14 +345,9 @@ function adjustForTightnessParam(){
         animationSpeed *= 4;
       }
       break;
-    case "Loose":
-      maxLines = 40;
-      if (fxLineWeightType == "Heavy") {
-        maxLines = 5;
-        animationSpeed *= 20;
-      }
-      break;
   }
+
+  maxLines = Math.max(maxLines, MIN_LINE_COUNT);
 }
 
 function setLineHeight() {

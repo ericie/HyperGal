@@ -1,6 +1,6 @@
 // The eleven configurable parameters, carried over from the fxhash build.
-// Defaults are drawn from the seeded generator in the original order, so an
-// unconfigured load is the same roll the platform would have made at mint.
+// Defaults are drawn from the seeded generator in the original order, with the
+// standalone edition's curated motion and spacing bounds applied.
 
 // Random helpers, verbatim from the shipped bundle.
 function rand(low, high) {
@@ -77,8 +77,8 @@ $fx.params([
     id: "anim_speed",
     name: "Animation Speed",
     type: "number",
-    options: { min: 1, max: 1000, step: 1 },
-    default: rand(90, 1000),
+    options: { min: 250, max: 1000, step: 1 },
+    default: rand(250, 1000),
   },
   {
     id: "chaos",
@@ -118,8 +118,8 @@ $fx.params([
     id: "line_space",
     name: "Line Space",
     type: "select",
-    options: { options: ["Close", "Normal", "Loose"] },
-    default: randchoice(["Close", "Normal", "Loose"]),
+    options: { options: ["Close", "Normal"] },
+    default: randchoice(["Close", "Normal"]),
   },
   {
     id: "layout_mode",

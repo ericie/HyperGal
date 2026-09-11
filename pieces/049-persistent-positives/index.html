@@ -16,20 +16,20 @@
         overflow: hidden;
       }
 
-      /* The piece is a fixed 1920×1920 square letterboxed into the window on
-         black — as it shipped. Only the composite canvas is shown. */
+      /* The piece fills the window edge to edge. The stage is sized to the
+         viewport's aspect ratio (see the entry script), so nothing stretches;
+         object-fit: cover only absorbs the small drift between a resize and
+         the next layout. Only the composite canvas is shown. */
       #hmcMain {
         position: absolute;
         top: 0; right: 0; bottom: 0; left: 0;
       }
       #hmcComp, #hmcBackground, #hmcBuffer {
-        max-width: 100%;
-        max-height: 100%;
-        margin: auto;
-        overflow: auto;
         position: fixed;
-        object-fit: contain;
-        top: 0; bottom: 0; left: 0; right: 0;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        display: block;
+        object-fit: cover;
         background-color: transparent;
       }
       /* Working layers: the ground, the word buffer the shapes sample, and the
@@ -87,8 +87,9 @@
         window.fxhash = search.get('hash') || newHash();
         window.fxrand = seedFrom(window.fxhash) || seedFrom((window.fxhash = newHash()));
         window.newHash = newHash;
-        window.reseed = () => {
-          window.fxhash = newHash();
+        // Deals a new hash, or rewinds the generator for a given one.
+        window.reseed = (hash) => {
+          window.fxhash = hash || newHash();
           window.fxrand = seedFrom(window.fxhash);
         };
 
@@ -118,22 +119,47 @@
 
     <script>
       // Stands in for the webpack entry: builds the container and the three
-      // 1920×1920 canvases the sketch expects, then starts it.
+      // canvases the sketch expects, sizes them to the window, then starts it.
       (() => {
         'use strict';
 
-        const stage = { w: 1920, h: 1920 };
+        // The sketch was tuned against a 1920 square: shape sizes, font sizes,
+        // shadow offsets and texture tiles are all in those pixels. The short
+        // side of the stage stays 1920 and the long side follows the window's
+        // aspect ratio, so the composition keeps its scale and the field
+        // extends to fill whatever shape the browser is. The long side is
+        // capped at three times the short — past that (a very squat window)
+        // the canvases would get unreasonably large, and cover crops instead.
+        const BASE = 1920;
+        const MAX_ASPECT = 3;
+        const stage = { w: BASE, h: BASE };
         const container = document.createElement('main');
         container.id = 'hmcMain';
 
         for (const id of ['hmcBuffer', 'hmcBackground', 'hmcComp']) {
           const c = document.createElement('canvas');
           c.id = id;
-          c.width = stage.w;
-          c.height = stage.h;
           container.appendChild(c);
         }
         document.body.prepend(container);
+
+        function viewportAspect() {
+          const w = Math.max(1, window.innerWidth);
+          const h = Math.max(1, window.innerHeight);
+          return Math.min(MAX_ASPECT, Math.max(1 / MAX_ASPECT, w / h));
+        }
+
+        // Sizing a canvas clears it, so this also empties the three layers.
+        function sizeStage() {
+          const aspect = viewportAspect();
+          stage.w = aspect >= 1 ? Math.round(BASE * aspect) : BASE;
+          stage.h = aspect >= 1 ? BASE : Math.round(BASE / aspect);
+          for (const c of container.querySelectorAll('canvas')) {
+            c.width = stage.w;
+            c.height = stage.h;
+          }
+        }
+        sizeStage();
 
         const composite = document.getElementById('hmcComp');
         composite.setAttribute('tabindex', '0');
@@ -146,6 +172,18 @@
         init(stage);
         describe();
         if (reduced.matches) settle();
+
+        // A resize that changes the window's shape lays the same iteration out
+        // again against the new stage; cover absorbs anything smaller than a
+        // few percent so a nudge of the window edge does not wipe the picture.
+        let resizeTimer = 0;
+        window.addEventListener('resize', () => {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => {
+            const drift = viewportAspect() / (stage.w / stage.h);
+            if (Math.abs(drift - 1) > 0.03) newIteration(window.fxhash);
+          }, 180);
+        }, { passive: true });
 
         // Reduced motion: run the system forward without animating until the
         // word has surfaced, then stop the frame loop on that picture. The
@@ -167,16 +205,17 @@
           if (window.debugMode) console.log(window.fxhash, f);
         }
 
-        function newIteration() {
+        // A new iteration deals a new hash; given a hash, it lays that
+        // iteration out again (the resize path).
+        function newIteration(hash) {
           // Stop the running loop, then start over from an empty room:
           // init() appends its texture tiles and shape layer to the library
-          // and paints the word buffer without clearing it first.
+          // and paints the word buffer without clearing it first. Sizing the
+          // stage clears the three canvases.
           cancelAnimationFrame(request);
           library.replaceChildren();
-          for (const c of container.querySelectorAll('canvas')) {
-            c.getContext('2d').clearRect(0, 0, stage.w, stage.h);
-          }
-          window.reseed();
+          sizeStage();
+          window.reseed(typeof hash === 'string' ? hash : undefined);
           window.$fxhashFeatures = {};
           featureList = {};
           init(stage);
@@ -191,7 +230,7 @@
           link.click();
         }
 
-        composite.addEventListener('click', newIteration);
+        composite.addEventListener('click', () => newIteration());
         // Keys are taken at the document, as the shipped build's S-to-save was.
         document.addEventListener('keydown', (event) => {
           const key = event.key.toLowerCase();

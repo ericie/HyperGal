@@ -6,5 +6,5 @@
   "type": "interactive",
   "rating": 75,
   "thumbnail": "thumbnail.jpg",
-  "description": "Twenty autonomous snakes hunt one mouse in an 8-bit underground Mega Man palette. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Continuous rounded bodies cross a cavern-dark field; death travels from head to tail, replacing each fading segment with abstract cross-hatching in place. Click to reseed."
+  "description": "Autonomous snakes hunt one mouse on a field that remembers its dead \u2014 eight to start, up to twenty as the winner's body is divided. Flat integer cells with a hard offset shadow, one of eight palettes per round, one swatch per snake. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Death travels from head to tail, and every segment it passes is painted into the memory beneath the living. Click to reseed."
 }

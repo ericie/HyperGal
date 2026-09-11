@@ -1,5 +1,5 @@
 function GrowthCircle(s) {
-  this.params = s, this.canvas = this.params.comp, this.canvasElem = this.params.canvasElem, this.background = this.params.bg, this.foreground = this.params.fg, this.buffer = this.params.buffer, this.bufferElem = this.params.bufferElem, this.seperate = this.params.seperate, this.systemSize = this.params.size, this.growthType = this.params.growthType, this.colors = this.params.colors, this.maxR = stage.w / 2, this.growMax = 25, this.growMin = 10, this.growDiff = this.growMax - this.growMin, this.rings = [], this.ringPoints = [], this.layout = this.params.layout, this.canvas.clearRect(0, 0, this.bufferElem.width, this.bufferElem.height), this.gridSize = this.params.gridSize, this.gridRealMax = this.params.gridRealMax, this.gridMin = this.params.gridMin
+  this.params = s, this.canvas = this.params.comp, this.canvasElem = this.params.canvasElem, this.background = this.params.bg, this.foreground = this.params.fg, this.buffer = this.params.buffer, this.bufferElem = this.params.bufferElem, this.seperate = this.params.seperate, this.systemSize = this.params.size, this.growthType = this.params.growthType, this.colors = this.params.colors, this.maxR = Math.max(stage.w, stage.h) / 2, this.growMax = 25, this.growMin = 10, this.growDiff = this.growMax - this.growMin, this.rings = [], this.ringPoints = [], this.layout = this.params.layout, this.canvas.clearRect(0, 0, this.bufferElem.width, this.bufferElem.height), this.gridSize = this.params.gridSize, this.gridCols = this.params.gridCols, this.gridRows = this.params.gridRows, this.gridRealMax = this.params.gridRealMax, this.gridMin = this.params.gridMin
 }
 GrowthCircle.prototype.init = function() {
   this.position = new Vector(stage.w / 2, stage.h / 2), console.log("LAYOUT", this.layout), this.ringPos = new Vector(this.position.x, this.position.y), this.r = 5, this.targR = this.r, this.a = 0, this.startA = this.a
@@ -45,7 +45,7 @@ GrowthCircle.prototype.init = function() {
   this.rings.push(a), this.ringPoints.push(i), this.a = 0
 }, GrowthCircle.prototype.update = function() {}, GrowthCircle.prototype.draw = function() {
   let s = 0;
-  for (1 == this.seperate && (this.maxR = .28 * stage.w); this.r < this.maxR;) {
+  for (1 == this.seperate && (this.maxR = .28 * Math.min(stage.w, stage.h)); this.r < this.maxR;) {
     let t = fxrand() * this.growDiff + this.growMin;
     const a = 20;
     1 == this.seperate && this.maxR - this.r < a && (t += a), this.buildCircle(s, t), s++, this.r += t
@@ -60,7 +60,7 @@ GrowthCircle.prototype.init = function() {
   }
   if ("Passage" == this.layout && (this.buffer.drawImage(this.canvasElem, 0, 0, stage.w, stage.h), this.canvas.clearRect(0, 0, stage.w, stage.h), this.canvas.drawImage(this.bufferElem, 0, .45 * stage.h, 1.2 * stage.w, 1.2 * stage.h), this.canvas.drawImage(this.bufferElem, 0, 0 - .6 * stage.h, 1.2 * stage.w, 1.2 * stage.h)), "Void" == this.layout) {
     this.buffer.drawImage(this.canvasElem, 0, 0, stage.w, stage.h), this.canvas.clearRect(0, 0, stage.w, stage.h), this.canvas.fillStyle = "white";
-    let s = stage.w / 5;
+    let s = Math.min(stage.w, stage.h) / 5;
     this.canvas.beginPath(), this.canvas.ellipse(stage.w / 2, .5 * stage.h, s, s, Math.PI, 0, 2 * Math.PI), this.canvas.fill()
   }
   if ("Joined" == this.layout) {
@@ -72,20 +72,25 @@ GrowthCircle.prototype.init = function() {
       i = "rgba(" + red + "," + grn + "," + blu + ",0.45)";
     this.canvas.fillStyle = s, this.canvas.shadowColor = i, this.canvas.shadowBlur = 55;
     let e = .4,
-      h = stage.w / 5.5;
+      h = Math.min(stage.w, stage.h) / 5.5;
     this.canvas.beginPath(), this.canvas.ellipse(stage.w * e, stage.h * e, h, h, Math.PI, 0, 2 * Math.PI), this.canvas.closePath(), this.canvas.fill(), this.canvas.fillStyle = a, this.canvas.shadowColor = t, this.canvas.shadowBlur = 55, this.canvas.beginPath(), this.canvas.ellipse(stage.w - stage.w * e, stage.h - stage.h * e, h, h, Math.PI, 0, 2 * Math.PI), this.canvas.closePath(), this.canvas.fill(), this.canvas.fillStyle = t, this.canvas.beginPath(), this.canvas.ellipse(stage.w * e, stage.h * e, h, h, Math.PI, 0, 2 * Math.PI), this.canvas.closePath(), this.canvas.fill()
   }
   if ("Four_Voids" == this.layout) {
     this.buffer.drawImage(this.canvasElem, 0, 0, stage.w, stage.h), this.canvas.clearRect(0, 0, stage.w, stage.h);
     let s = this.gridSize % 2 == 0,
-      t = Math.round(stage.w / this.gridSize),
+      tx = Math.round(stage.w / this.gridCols),
+      ty = Math.round(stage.h / this.gridRows),
+      t = Math.min(tx, ty),
       a = this.gridSize / this.gridRealMax,
       i = Math.round(.25 * this.gridSize * a);
     this.canvas.fillStyle = "white";
     let e = i * t / 2;
     0 == s ? e < t / 6.66666 && (e = t / 6.66666) : e < t / 4 && (e = t / 4);
-    let h = t * Math.round(this.gridSize / 4);
-    0 == s && (h = t * Math.round(this.gridSize / 3.333333333)), this.canvas.beginPath(), this.canvas.ellipse(h, h, e, e, Math.PI, 0, 2 * Math.PI), this.canvas.ellipse(stage.w - h, h, e, e, Math.PI, 0, 2 * Math.PI), this.canvas.closePath(), this.canvas.fill(), this.canvas.beginPath(), this.canvas.ellipse(h, stage.h - h, e, e, Math.PI, 0, 2 * Math.PI), this.canvas.ellipse(stage.w - h, stage.h - h, e, e, Math.PI, 0, 2 * Math.PI), this.canvas.fill()
+    let k = Math.round(this.gridSize / 4);
+    0 == s && (k = Math.round(this.gridSize / 3.333333333));
+    let h = tx * k,
+      v = ty * k;
+    this.canvas.beginPath(), this.canvas.ellipse(h, v, e, e, Math.PI, 0, 2 * Math.PI), this.canvas.ellipse(stage.w - h, v, e, e, Math.PI, 0, 2 * Math.PI), this.canvas.closePath(), this.canvas.fill(), this.canvas.beginPath(), this.canvas.ellipse(h, stage.h - v, e, e, Math.PI, 0, 2 * Math.PI), this.canvas.ellipse(stage.w - h, stage.h - v, e, e, Math.PI, 0, 2 * Math.PI), this.canvas.fill()
   }
   if ("Diagonal_Passage_1" == this.layout) {
     this.buffer.drawImage(this.canvasElem, 0, 0, stage.w, stage.h), this.canvas.clearRect(0, 0, stage.w, stage.h);

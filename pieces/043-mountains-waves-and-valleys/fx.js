@@ -5,8 +5,9 @@
 // resettable generator, the parameter store, and the feature record.
 //
 // fxhash's base58 hash format and sfc32 generator are kept verbatim, and the
-// parameter defaults are drawn in the original order, so an original "oo…" hash
-// passed as ?hash= reproduces that iteration's starting configuration.
+// parameter defaults are drawn in the original order. The standalone edition
+// intentionally narrows a few parameter bounds, so old hashes stay stable here
+// but do not necessarily reproduce their fxhash-era starting configuration.
 (() => {
   'use strict';
 
