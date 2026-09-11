@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Simple positive four-letter words struggle for legibility under a barrage of shapes. Four hundred textured circles, squares and triangles grow and die; some of them seek the word until it surfaces, then an eraser pass wipes it and the next layout begins."
+    />
+    <title>Persistent Positives · HyperGal</title>
+    <style>
+      :root { color-scheme: dark; --focus: oklch(0.85 0.16 95); }
+      html, body {
+        height: 100%; margin: 0; padding: 0;
+        background: #000; color: mintcream;
+        overflow: hidden;
+      }
+
+      /* The piece is a fixed 1920×1920 square letterboxed into the window on
+         black — as it shipped. Only the composite canvas is shown. */
+      #hmcMain {
+        position: absolute;
+        top: 0; right: 0; bottom: 0; left: 0;
+      }
+      #hmcComp, #hmcBackground, #hmcBuffer {
+        max-width: 100%;
+        max-height: 100%;
+        margin: auto;
+        overflow: auto;
+        position: fixed;
+        object-fit: contain;
+        top: 0; bottom: 0; left: 0; right: 0;
+        background-color: transparent;
+      }
+      /* Working layers: the ground, the word buffer the shapes sample, and the
+         library of texture tiles and the shape layer. */
+      #hmcBackground, #hmcBuffer, #library { display: none; }
+
+      #hmcComp { cursor: pointer; touch-action: manipulation; }
+      #hmcComp:focus-visible { outline: 3px solid var(--focus); outline-offset: -6px; }
+
+      .instructions {
+        position: fixed; width: 1px; height: 1px; padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+      }
+    </style>
+
+    <script>
+      // Persistent Positives — Eric Ishii Eckhardt, 2022, for Hypermedia Club.
+      //
+      // fxhash is gone. This replaces its boilerplate snippet with an equivalent
+      // that keeps the same base58 hash format and sfc32 generator, so an
+      // original "oo…" hash passed as ?hash= reproduces that exact iteration.
+      (() => {
+        'use strict';
+        const ALPHABET = '123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+
+        function sfc32(a, b, c, d) {
+          return () => {
+            a |= 0; b |= 0; c |= 0; d |= 0;
+            var t = (a + b | 0) + d | 0;
+            d = d + 1 | 0;
+            a = b ^ b >>> 9;
+            b = c + (c << 3) | 0;
+            c = c << 21 | c >>> 11;
+            c = c + t | 0;
+            return (t >>> 0) / 4294967296;
+          };
+        }
+
+        const newHash = () => 'oo' + Array(49).fill(0)
+          .map(() => ALPHABET[(Math.random() * ALPHABET.length) | 0]).join('');
+
+        function seedFrom(hash) {
+          const b58dec = (s) => [...s].reduce(
+            (p, c) => p * ALPHABET.length + ALPHABET.indexOf(c) | 0, 0
+          );
+          const parts = hash.slice(2).match(
+            new RegExp('.{' + ((hash.length / 4) | 0) + '}', 'g')
+          );
+          if (!parts || parts.length < 4) return null;
+          return sfc32(...parts.slice(0, 4).map(b58dec));
+        }
+
+        const search = new URLSearchParams(location.search);
+        window.debugMode = search.has('debug');
+        window.fxhash = search.get('hash') || newHash();
+        window.fxrand = seedFrom(window.fxhash) || seedFrom((window.fxhash = newHash()));
+        window.newHash = newHash;
+        window.reseed = () => {
+          window.fxhash = newHash();
+          window.fxrand = seedFrom(window.fxhash);
+        };
+
+        // The platform's preview trigger has nothing to talk to any more.
+        window.fxpreview = () => {};
+        window.isFxpreview = false;
+      })();
+    </script>
+
+    <script src="hmc-features.js"></script>
+    <script src="hmc-text.js"></script>
+    <script src="hmc-vector.js"></script>
+    <script src="hmc-texture.js"></script>
+    <script src="hmc-colors.js"></script>
+    <script src="hmc-app.js"></script>
+    <script src="hmc-prey.js"></script>
+    <script src="hmc-renderQueue.js"></script>
+    <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
+  </head>
+  <body>
+    <p class="instructions" id="instructions">
+      A positive four-letter word surfaces from a field of growing shapes,
+      is erased, and returns in a new layout. Click or tap for a new
+      iteration, or press R. Press S to save the picture.
+    </p>
+    <div id="library" class="library hidden"></div>
+
+    <script>
+      // Stands in for the webpack entry: builds the container and the three
+      // 1920×1920 canvases the sketch expects, then starts it.
+      (() => {
+        'use strict';
+
+        const stage = { w: 1920, h: 1920 };
+        const container = document.createElement('main');
+        container.id = 'hmcMain';
+
+        for (const id of ['hmcBuffer', 'hmcBackground', 'hmcComp']) {
+          const c = document.createElement('canvas');
+          c.id = id;
+          c.width = stage.w;
+          c.height = stage.h;
+          container.appendChild(c);
+        }
+        document.body.prepend(container);
+
+        const composite = document.getElementById('hmcComp');
+        composite.setAttribute('tabindex', '0');
+        composite.setAttribute('aria-describedby', 'instructions');
+        const library = document.getElementById('library');
+
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+        window.$fxhashFeatures = {};
+        init(stage);
+        describe();
+        if (reduced.matches) settle();
+
+        // Reduced motion: run the system forward without animating until the
+        // word has surfaced, then stop the frame loop on that picture. The
+        // word can only be found once the font is in, so wait for it.
+        function settle() {
+          if (!textFontLoaded) { setTimeout(settle, 50); return; }
+          cancelAnimationFrame(request);
+          for (let i = 0; i < 1100; i++) update();
+        }
+
+        function describe() {
+          const f = window.$fxhashFeatures;
+          composite.setAttribute(
+            'aria-label',
+            'Persistent Positives: the word ' + f.word + ' in the ' + f.colors +
+            ' palette, laid out ' + f.intial_layout + ', under ' +
+            String(f.shapes_in_background).toLowerCase() + ' shapes.'
+          );
+          if (window.debugMode) console.log(window.fxhash, f);
+        }
+
+        function newIteration() {
+          // Stop the running loop, then start over from an empty room:
+          // init() appends its texture tiles and shape layer to the library
+          // and paints the word buffer without clearing it first.
+          cancelAnimationFrame(request);
+          library.replaceChildren();
+          for (const c of container.querySelectorAll('canvas')) {
+            c.getContext('2d').clearRect(0, 0, stage.w, stage.h);
+          }
+          window.reseed();
+          window.$fxhashFeatures = {};
+          featureList = {};
+          init(stage);
+          describe();
+          if (reduced.matches) settle();
+        }
+
+        function savePicture() {
+          const link = document.createElement('a');
+          link.download = 'PersistentPositives_' + window.fxhash + '.png';
+          link.href = composite.toDataURL('image/png');
+          link.click();
+        }
+
+        composite.addEventListener('click', newIteration);
+        // Keys are taken at the document, as the shipped build's S-to-save was.
+        document.addEventListener('keydown', (event) => {
+          const key = event.key.toLowerCase();
+          if (key === 'r' || key === ' ' || key === 'enter') {
+            event.preventDefault();
+            newIteration();
+          } else if (key === 's') {
+            event.preventDefault();
+            savePicture();
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

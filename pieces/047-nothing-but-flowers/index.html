@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Dozens of particles got together and decided to draw. They drew nothing but flowers. Lines settle around drifting targets and scribble shadowed petals onto a square field that is never wiped."
+    />
+    <title>Nothing but Flowers · HyperGal</title>
+    <style>
+      :root { color-scheme: dark; --focus: oklch(0.85 0.16 95); }
+      html, body {
+        height: 100%; margin: 0; padding: 0;
+        background: #000; color: #fff;
+        overflow: hidden;
+      }
+
+      /* The piece is a fixed 1920×1920 square, letterboxed into whatever shape
+         the browser is — exactly as it shipped. The container takes the ground
+         colour once the hash has picked a palette, so the bars match the field. */
+      main { height: 100vh; height: 100dvh; }
+
+      #canvas, #layer01, #layer02, #layer03, #layer04, #layer05 {
+        max-width: 100%;
+        max-height: 100%;
+        margin: auto;
+        overflow: auto;
+        position: fixed;
+        object-fit: contain;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+      }
+
+      /* Working layers stay hidden; only the composite is shown. */
+      #layer01, #layer02, #layer03, #layer04, #layer05 { display: none; }
+
+      #canvas { cursor: pointer; touch-action: manipulation; }
+      #canvas:focus-visible { outline: 3px solid var(--focus); outline-offset: -6px; }
+
+      .instructions {
+        position: fixed; width: 1px; height: 1px; padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+      }
+    </style>
+
+    <script>
+      // Nothing but Flowers — Eric Ishii Eckhardt, 2022, for Hypermedia Club.
+      //
+      // fxhash is gone. This replaces its boilerplate snippet with an equivalent
+      // that keeps the same base58 hash format and sfc32 generator, so an
+      // original "oo…" hash passed as ?hash= reproduces that exact iteration.
+      (() => {
+        'use strict';
+        const ALPHABET = '123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+
+        function sfc32(a, b, c, d) {
+          return () => {
+            a |= 0; b |= 0; c |= 0; d |= 0;
+            var t = (a + b | 0) + d | 0;
+            d = d + 1 | 0;
+            a = b ^ b >>> 9;
+            b = c + (c << 3) | 0;
+            c = c << 21 | c >>> 11;
+            c = c + t | 0;
+            return (t >>> 0) / 4294967296;
+          };
+        }
+
+        const newHash = () => 'oo' + Array(49).fill(0)
+          .map(() => ALPHABET[(Math.random() * ALPHABET.length) | 0]).join('');
+
+        function seedFrom(hash) {
+          const b58dec = (s) => [...s].reduce(
+            (p, c) => p * ALPHABET.length + ALPHABET.indexOf(c) | 0, 0
+          );
+          const parts = hash.slice(2).match(
+            new RegExp('.{' + ((hash.length / 4) | 0) + '}', 'g')
+          );
+          if (!parts || parts.length < 4) return null;
+          return sfc32(...parts.slice(0, 4).map(b58dec));
+        }
+
+        const search = new URLSearchParams(location.search);
+        window.debugMode = search.has('debug');
+        window.fxhash = search.get('hash') || newHash();
+        window.fxrand = seedFrom(window.fxhash) || seedFrom((window.fxhash = newHash()));
+        window.newHash = newHash;
+        window.reseed = () => {
+          window.fxhash = newHash();
+          window.fxrand = seedFrom(window.fxhash);
+        };
+
+        // The platform's preview trigger has nothing to talk to any more.
+        window.fxpreview = () => {};
+        window.isFxpreview = false;
+      })();
+    </script>
+
+    <script src="adapted.vector.js"></script>
+    <script src="adapted.particles.js"></script>
+    <script src="adapted.library.js"></script>
+    <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
+  </head>
+  <body>
+    <p class="instructions" id="instructions">
+      Lines gather around drifting targets and scribble flowers onto a field
+      that is never wiped. Click or tap for a new iteration, or press R.
+      Press S to save the picture.
+    </p>
+
+    <script>
+      // Stands in for the webpack entry: builds the container and the six
+      // 1920×1920 canvases the sketch expects, then starts it.
+      (() => {
+        'use strict';
+
+        const container = document.createElement('main');
+        container.id = 'HMCmain';
+
+        for (const id of ['layer01', 'layer02', 'layer03', 'layer04', 'layer05', 'canvas']) {
+          const c = document.createElement('canvas');
+          c.id = id;
+          c.width = 1920;
+          c.height = 1920;
+          container.appendChild(c);
+        }
+        document.body.prepend(container);
+
+        const composite = document.getElementById('canvas');
+        composite.setAttribute('tabindex', '0');
+        composite.setAttribute('aria-describedby', 'instructions');
+
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+        init();
+        initParticleSystem();
+        describe();
+
+        // Reduced motion: run the system forward without animating, then hold
+        // the picture it has made by then. The frame loop keeps compositing but
+        // stops updating, which is what the sketch's own `paused` flag is for.
+        if (reduced.matches) settle();
+
+        function settle() {
+          for (let i = 0; i < 1500; i++) {
+            layer01.clearRect(0, 0, 1920, 1920);
+            system.update();
+          }
+          draw();
+          paused = true;
+        }
+
+        function describe() {
+          composite.setAttribute(
+            'aria-label',
+            'Nothing but Flowers: ' + titleParts.title + ' on a ' +
+            titleParts.background + ' field.'
+          );
+          window.$fxhashFeatures = {
+            'Iteration Title': titleParts.title,
+            'Color: Background': titleParts.background,
+            'Color: Lines': titleParts.lineColor,
+            'Shape': titleParts.shape
+          };
+          if (window.debugMode) console.log(window.fxhash, window.$fxhashFeatures);
+        }
+
+        function newIteration() {
+          // layer04 is the accumulated painting — never cleared during play.
+          // A new iteration starts on a clean field.
+          layer04.clearRect(0, 0, 1920, 1920);
+
+          window.reseed();
+          selectIteration();
+
+          // The sketch's own frame counters, back to their load-time values.
+          resetSquare = true;
+          resetSquareCount = 0;
+          delayTime = 10;
+          particleCount = { type: { orbit: 0, wander: 0, spiral: 0, follow: 0 },
+                            thickness: { hairline: 0, thin: 0, medium: 0, thick: 0 } };
+
+          initParticleSystem();
+          describe();
+          if (reduced.matches) {
+            paused = false;
+            settle();
+          }
+        }
+
+        function savePicture() {
+          const link = document.createElement('a');
+          link.download = 'NothingButFlowers_' + window.fxhash + '.png';
+          link.href = composite.toDataURL('image/png');
+          link.click();
+        }
+
+        composite.addEventListener('click', newIteration);
+        // Keys are taken at the document, as the shipped build's S-to-save was.
+        document.addEventListener('keydown', (event) => {
+          const key = event.key.toLowerCase();
+          if (key === 'r' || key === ' ' || key === 'enter') {
+            event.preventDefault();
+            newIteration();
+          } else if (key === 's') {
+            event.preventDefault();
+            savePicture();
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

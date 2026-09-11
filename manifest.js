@@ -11,7 +11,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 15,
       "thumbnail": "thumbnail.jpg",
       "description": "A patterned wall of falling bricks. One color pair and one high-contrast textile tile seed each run; staggered rows scroll downward while new faux-3D bricks tumble in from above, flatten, and join the wall. Click to reshuffle.",
-      "updated": "2026-09-09"
+      "updated": "2026-06-19"
     },
     {
       "slug": "003-unbreakable",
@@ -23,7 +23,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 50,
       "thumbnail": "thumbnail.jpg",
       "description": "Breakout in reverse. An infallible paddle sends one ball on a clean arc to the nearest low column of a level Renaissance-colored wall. Each underside hit reserves one new brick, and only that completed cell creeps the aligned lattice upward. No player, no losing. Click to rebuild.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-10"
     },
     {
       "slug": "004-hunt-prey-paint",
@@ -34,8 +34,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "rating": 50,
       "thumbnail": "thumbnail.jpg",
-      "description": "An abstract ecosystem that paints itself in watercolour and cartographic linework, then wipes the painting clean forever. Over a pale NES-bright pixel terrain, blocky prey graze, grow into spiny square emblems that age toward white, and flee hunters with their own alertness and sprint speed. Spiny prey trundle toward richer plant patches and, when they die, burst into clean eraser blasts that wipe stains, foliage, food, and husks instead of fertilizing the ground. Compact black arcade hunters run prey down, fatten, and breed only by splitting in half. Floored and capped so neither side ever wins. Click to reseed; ?warm= opens it already alive; ?debug for stats.",
-      "updated": "2026-09-09"
+      "description": "An abstract ecosystem that paints itself in watercolour and cartographic linework, then wipes the painting clean forever. Over a pale NES-bright pixel terrain, blocky prey graze, grow into spiny square emblems that age toward white, and flee hunters with their own alertness and sprint speed. Spiny prey trundle toward richer plant patches and, when they die, burst into clean eraser blasts that wipe stains, foliage, food, and husks instead of fertilizing the ground. Compact black arcade hunters run prey down, fatten, and breed only by splitting in half. Floored and capped so neither side ever wins. Tap or click to reseed; ?warm= opens it already alive; ?debug for stats.",
+      "updated": "2026-09-10"
     },
     {
       "slug": "005-only-invaders",
@@ -48,7 +48,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 50,
       "thumbnail": "thumbnail.jpg",
       "description": "Space Invaders after the invaders have vanished. Four small inset cannons fire only at the opposite edge, while any armed non-shooter may volunteer to intercept. The final round appears as a large pulsing bomb; once fired, the other three cannons need twelve hits to destroy it.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-10"
     },
     {
       "slug": "006-only-centipede",
@@ -61,7 +61,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 50,
       "thumbnail": "thumbnail.jpg",
       "description": "A Centipede riff with small defenders at the top and bottom, one straight bullet each, and fast, hard-edged centipedes that enter from offscreen once the field is nearly cleared. Head shots remove the head and promote the next segment; body shots split the chain. Every hit segment becomes a three-shot mushroom that dents and deforms in the centipede's color.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-10"
     },
     {
       "slug": "007-hydra",
@@ -73,7 +73,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
       "description": "Twenty autonomous snakes hunt one mouse in an 8-bit underground Mega Man palette. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Continuous rounded bodies cross a cavern-dark field; death travels from head to tail, replacing each fading segment with abstract cross-hatching in place. Click to reseed.",
-      "updated": "2026-09-11"
+      "updated": "2026-09-10"
     },
     {
       "slug": "008-vectrex-asteroids",
@@ -85,7 +85,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
       "description": "A black-and-white Vectrex-style Asteroids variant. The ship tries to park with visible retrograde burns, predicts asteroid paths, and fires tight two- or three-shot bursts one bullet at a time until a player takes over, thrusting mainly to dodge and keeping only three shots alive at once. Bullets split asteroids into deeper generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Heavier fragments accelerate slowly, drift together under stronger gravity, bump instead of passing through, settle before they glom, and weld into rough integrated asteroid outlines that animate from their joined pieces. Any asteroid can kill the ship on contact.",
-      "updated": "2026-09-09"
+      "updated": "2026-07-25"
     },
     {
       "slug": "009-mutual-command",
@@ -97,7 +97,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
       "description": "A two-sided Missile Command riff. A north row and south row of pixel towns and batteries launch paired attacks while their defenses try to erase incoming missiles at roughly the same rate. Each side starts at 1000 points and loses score as cities, batteries, and ground are destroyed; when a side reaches zero, the ruined row is cleared and a fresh set of towns slides in from the side.",
-      "updated": "2026-09-11"
+      "updated": "2026-09-10"
     },
     {
       "slug": "010-obstacles-and-how-to-avoid-them",
@@ -109,7 +109,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
       "description": "A full-window drawing of borderless Hokusai-toned walls, squares, and circles composed by adjustable gestalt forces. Boids sense each obstacle at individual distances, turn through distinct bounded lanes, and leave fine trails that slowly fan back out.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-20"
     },
     {
       "slug": "011-switch-stack",
@@ -122,7 +122,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 5,
       "thumbnail": "thumbnail.jpg",
       "description": "An edge-to-edge masonry of black-and-white labels and utilitarian light-switch diagrams. Each box flips between ON and OFF in a discrete ten-frame transition as its center crosses a hot-pink midpoint line.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-10"
     },
     {
       "slug": "012-happiness-hunter",
@@ -147,7 +147,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
       "description": "One-player Pong folded into a cylinder. A single paddle stands where the net used to be; the ball leaves one edge and returns from the other, so every save comes back around and the only way to be rid of the ball is to miss. The two counters tally edge crossings, left and right, and exactly one crossing happens per lap — a catch sends the ball back out the edge behind it, a miss lets it through to the far one. The paddle predicts every intercept, plays every ball, and strikes off-centre to keep the rally alive; catch or miss is decided by the actual collision.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-20"
     },
     {
       "slug": "014-to-big-for-this-world",
@@ -160,7 +160,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
       "description": "Pac hunts every power pellet across a full-frame maze.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-08"
     },
     {
       "slug": "015-growth-rings",
@@ -172,7 +172,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 50,
       "thumbnail": "thumbnail.jpg",
       "description": "A trunk cross-section that grows toward 200 years one ring at a time. Latitude, solar angle, wind exposure, temperature, rainfall, and ground slope push the cambium out of symmetry; heavy rain years bloom into wider uneven rings while severity-scaled fire and pest incidents suppress 1-5 years of growth without cutting into older wood.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-14"
     },
     {
       "slug": "016-up-mario",
@@ -198,7 +198,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
       "description": "An edge-to-edge field of loose Celtic interlace printed in dark brown on worn paper. Continuous rounded cords pass through a Truchet-like knot grid, alternating over and under at crossings and running beyond every side of the browser. Click or press Enter/Space to reseed.",
-      "updated": "2026-09-09"
+      "updated": "2026-07-28"
     },
     {
       "slug": "018-life-checkers",
@@ -211,7 +211,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
       "description": "Conway's Game of Life played across a shifting four-color checkerboard. At reset, the dead checkerboard changes from top to bottom before the new live cells fade in through ten quick batches.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-03"
     },
     {
       "slug": "019-city-of-signs",
@@ -224,7 +224,7 @@ window.HYPERGAL_MANIFEST = {
       "rejected": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A dense edge-to-edge black-and-white architecture built on a shared grid. Wide chambers and needle-thin towers repeat nested arches, circles, diamonds, miniature buildings, flags, and colonnades through alternating solid mass and carved negative space.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-19"
     },
     {
       "slug": "020-soft-collapse",
@@ -237,7 +237,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
       "description": "A field of black-and-white geometric cells where sixteen small frames merge into four-by-four forms, split apart again, and trade motifs through custom geometric transformations. Click to change a block; press Space to pause and R to recompose.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-20"
     },
     {
       "slug": "021-marbles",
@@ -249,7 +249,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 60,
       "thumbnail": "thumbnail.jpg",
       "description": "Four bookmatched marble tiles cut from one procedural slab. Each seed selects a Life Checkers palette and randomized marble settings for a photographic surface whose turbulence flows through a seamless five-second loop.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-10"
     },
     {
       "slug": "022-hyper-lichen",
@@ -261,7 +261,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 50,
       "thumbnail": "thumbnail.jpg",
       "description": "Crustose lichen colonies continuously recolonize an entire dark stone surface in full-coverage radial waves of mint, sage, cream, and pale pink. Each completed layer immediately gives way to the next.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-10"
     },
     {
       "slug": "023-marbled-water",
@@ -274,7 +274,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
       "description": "Layered mineral inks and open-water halos stretch through a shared current field, building blue-gray marbled ribbons with fine, muted iridescent veins.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-10"
     },
     {
       "slug": "024-fuel-seekers",
@@ -287,7 +287,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 10,
       "thumbnail": "thumbnail.jpg",
       "description": "Hermit-crab fuel shells cross an oil field between four-port diamond pumps, growing a wider whorl every time they drink. An emptied shell does not die; it lies inert until a pump releases an energy worm that moves in and carries it back onto the field.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-08"
     },
     {
       "slug": "025-cloudcutter",
@@ -299,7 +299,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 80,
       "thumbnail": "thumbnail.jpg",
       "description": "A black-and-white vector Asteroids variant flown against weather instead of rock. Rounds explosively punch broad chunks out of wide, scalloped cumulus, so the only way through a body is to bore a tunnel and fly down it. The ship never targets anything. It holds a wandering course with the guns held down, and where the sky is thick it grinds to a crawl until its own fire has opened the way — an icebreaker, not a hunter. Its hull reams out what the guns began, so it can never wedge itself in a bore too narrow to fly. Sparse cloudscapes pan endlessly left while the ship works up and down through them; the camera follows, keeping it in frame. Bites heal slowly like liquid, and a bore that reaches all the way through leaves the exact same cloud outline divided into two halves.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-10"
     },
     {
       "slug": "026-top-of-the-heap",
@@ -312,7 +312,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 45,
       "thumbnail": "thumbnail.jpg",
       "description": "A bright ball and frequent waves of spring-snakes fight for a twenty-storey cube pyramid, painting every landing yellow or green. The scoreboard tracks Yellow, Green, and unclaimed territory; the first side to claim 100% wins.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-19"
     },
     {
       "slug": "027-camouflage",
@@ -324,7 +324,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 70,
       "thumbnail": "thumbnail.jpg",
       "description": "Nine still, finely pixelated fields include zebra, leopard, ocelot, tiger, giraffe, fawn, crocodile, woodland, and desert camouflage. A shuffled cycle synchronizes each palette shift with a hard-edged distance-field morph that splits, merges, expands, and contracts each region into the next pattern.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-18"
     },
     {
       "slug": "028-overgrowth",
@@ -336,7 +336,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 76,
       "thumbnail": "thumbnail.jpg",
       "description": "A dense botanical wallpaper on aged rag paper, seen only through a window cut in a white mount — a triangle, a square, a circle, or a word set in heavy square letters: GROW, RUIN, FEAR, VOTE, HOPE. Every plant that grows afterwards is rooted inside that window and climbs out over the board until the mount is overrun.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-08"
     },
     {
       "slug": "029-eyes-open",
@@ -348,7 +348,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 45,
       "thumbnail": "thumbnail.png",
       "description": "A black field populated by bright graphic eyes. Ten to twenty are open at once on a phone, each arriving independently, holding its gaze, blinking shut, and vanishing before another appears elsewhere.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-10"
     },
     {
       "slug": "030-obstacles-and-how-to-go-around-them",
@@ -361,7 +361,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 44,
       "thumbnail": "thumbnail.jpg",
       "description": "A top-down field study plots how blossom-pink petals move around flat, contour-drawn rock obstacles through shoals, quick channels, and turbulent wakes.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-20"
     },
     {
       "slug": "031-elevator",
@@ -374,7 +374,7 @@ window.HYPERGAL_MANIFEST = {
       "rejected": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A perfectly ordinary elevator makes its rounds through five still, fantastical office rooms: flooded desks, indoor weather, a midnight orchard, a sky boardroom, and records without end.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-18"
     },
     {
       "slug": "032-obstacles-and-the-space-between",
@@ -387,7 +387,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 9,
       "thumbnail": "thumbnail.jpg",
       "description": "Black waves split at stone-to-stone junctions, rebound from the frame, and intensify where their nested, non-crossing samon overlap.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-07"
     },
     {
       "slug": "033-the-greater-whole",
@@ -399,7 +399,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 60,
       "thumbnail": "thumbnail.png",
       "description": "A field of Geist Sans makes every letter active: crossing one with the knife cursor cuts it from the statement and releases a 2.5-second abstract composition built only from that glyph; each composition can overlap the next.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-10"
     },
     {
       "slug": "034-forest-of-rings",
@@ -412,7 +412,7 @@ window.HYPERGAL_MANIFEST = {
       "rejected": true,
       "thumbnail": "thumbnail.jpg",
       "description": "Twenty colored trunk records fill a shared terrain: latitude, sun, and wind shape every tree, a broad directional fire crosses the stand, insects visit individual trunks, and two controls move the forest toward a synchronized orchard.",
-      "updated": "2026-09-09"
+      "updated": "2026-08-20"
     },
     {
       "slug": "035-hypermedia-title-01",
@@ -424,8 +424,8 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 30,
       "thumbnail": "thumbnail.png",
-      "description": "Ten colorful geometric letters land on a center-pivoting teeter-totter, sprout legs, and slide or walk off as the platform tips under their own weight.",
-      "updated": "2026-09-09"
+      "description": "A conveyor feeds ten geometric letters into a small Rube Goldberg machine where impacts tip a teeter-totter, walkers topple dominoes, and spinners trade momentum.",
+      "updated": "2026-09-08"
     },
     {
       "slug": "036-hypermedia-title-02",
@@ -438,7 +438,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 40,
       "thumbnail": "thumbnail.png",
       "description": "Ten uniquely colored HYPERMEDIA disks fall through white Plinko pegs on black, painting every peg they strike.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-10"
     },
     {
       "slug": "037-cover-ups",
@@ -451,7 +451,7 @@ window.HYPERGAL_MANIFEST = {
       "rejected": true,
       "thumbnail": "thumbnail.png",
       "description": "A permanent wall of varied-scale horizontal fantasy words accumulates tightly fitted repairs applied in horizontal or vertical roller passes.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-08"
     },
     {
       "slug": "038-many-frogs",
@@ -463,8 +463,8 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 30,
       "thumbnail": "thumbnail.png",
-      "description": "Twelve uniquely colored frogs begin on a monochrome lawn with moving mowers, then cross an endless grayscale course while leaving permanent, color-matched stains.",
-      "updated": "2026-09-09"
+      "description": "Natural-pigment frogs cross a wide grayscale course of sparse cars, bicycles, trains, rivers, and roving mowers, leaving reactive watercolor stains; catching a fly adds three matching frogs.",
+      "updated": "2026-09-08"
     },
     {
       "slug": "039-drips",
@@ -489,7 +489,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 25,
       "thumbnail": "thumbnail.png",
-      "description": "One persistent resource miner packs tight hairpins through rich pixel-cloud moss and wanders through thin growth.",
+      "description": "One persistent grazer mows rich pixel-cloud moss in tightly packed hairpin lanes, then prospects across thin growth for the next patch.",
       "updated": "2026-09-09"
     },
     {
@@ -529,7 +529,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 46,
       "thumbnail": "thumbnail.png",
       "description": "Layered noise lines drifting across the field as ridgelines. Eleven controls — palette, chaos, peak height, layout, line weight and spacing — reshape it from calm waves to mountain ranges to dense interference.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-10"
     },
     {
       "slug": "044-no-empty-places",
@@ -554,8 +554,8 @@ window.HYPERGAL_MANIFEST = {
       "wip": false,
       "rating": 60,
       "thumbnail": "thumbnail.png",
-      "description": "Thirty-two lines enter from beyond the edges of the window and converge on a grid of sixteen targets, then orbit, spiral and wander around them. Half the swarm draws sharp; the other half never resolves and survives only as the glow it leaves behind.",
-      "updated": "2026-09-09"
+      "description": "A responsive swarm of lines enters from beyond the edges of the window and converges on an evenly spaced field of targets, then orbits, spirals and wanders around them. Half the swarm draws sharp; the other half never resolves and survives only as the glow it leaves behind.",
+      "updated": "2026-09-10"
     },
     {
       "slug": "046-from-growth",
@@ -568,7 +568,43 @@ window.HYPERGAL_MANIFEST = {
       "rating": 50,
       "thumbnail": "thumbnail.png",
       "description": "A grid of cells filling with accumulated line marks, each cell further along than the last. The lines are held inside shapes, and sometimes overflow them. An exercise in process over composition — growing, filling, containment and breaking loose.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-10"
+    },
+    {
+      "slug": "047-nothing-but-flowers",
+      "title": "Nothing but Flowers",
+      "year": 2022,
+      "date": "2022-06-22",
+      "category": "generative",
+      "type": "interactive",
+      "wip": false,
+      "rating": 60,
+      "thumbnail": "thumbnail.jpg",
+      "description": "Dozens of particles got together and decided to draw. They drew nothing but flowers. Fifty to eighty lines fly to drifting targets, then scribble shadowed loops around them onto a square field that is never wiped, until the field fills with blossoms. Six layouts, eight palettes, and a few lines in every swarm that erase instead of paint. Click to reseed; S saves the picture."
+    },
+    {
+      "slug": "048-growth-rings-2022",
+      "title": "Growth Rings",
+      "year": 2022,
+      "date": "2022-06-13",
+      "category": "generative",
+      "type": "generative",
+      "wip": false,
+      "rating": 55,
+      "thumbnail": "thumbnail.jpg",
+      "description": "A still. Ten tree-ring cross-sections are grown from a seed, then a grid of three to twenty-two cells is filled with slices cut from near their centres, so every cell carries a fragment of curve. Over the grid sits one of nine overlays — a whole cross-section, a spread of three, a passage, a void, four voids, two joined discs, or a diagonal passage — in one of sixteen palettes. Click to reseed; S saves the picture."
+    },
+    {
+      "slug": "049-persistent-positives",
+      "title": "Persistent Positives",
+      "year": 2022,
+      "date": "2022-08-21",
+      "category": "typography",
+      "type": "interactive",
+      "wip": false,
+      "rating": 60,
+      "thumbnail": "thumbnail.jpg",
+      "description": "Communication and progress are a cycle of building, entropy and repair. A simple positive four-letter word — HOPE, LOVE, GIVE, MAKE, GROW or LIVE — struggles for legibility under a barrage of four hundred textured shapes that grow, die and pile up. Some of them seek the word until it surfaces; then they stop being replaced, the field grows over it, and it returns in a new layout. Fifteen palettes, eleven layouts, Space Mono. Click to reseed; S saves the picture."
     }
   ]
 };
