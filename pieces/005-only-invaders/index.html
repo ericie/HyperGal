@@ -18,16 +18,10 @@
 
       const COLORS = {
         bg: '#070a12',
-        grid: 'rgba(90, 126, 180, 0.10)',
-        midline: 'rgba(235, 244, 255, 0.14)',
         top: '#ff6b9d',
-        topSoft: 'rgba(255, 107, 157, 0.22)',
         bottom: '#7cf7c8',
-        bottomSoft: 'rgba(124, 247, 200, 0.22)',
         left: '#8fb7ff',
-        leftSoft: 'rgba(143, 183, 255, 0.22)',
         right: '#ffb86b',
-        rightSoft: 'rgba(255, 184, 107, 0.22)',
         attack: '#f8ff9a',
         super: '#fff1a8',
         superCore: '#ffffff',
@@ -35,12 +29,14 @@
 
       const ATTACK_SPEED_MIN = 245;
       const ATTACK_SPEED_MAX = 320;
-      const MAX_ATTACKS = 7;
-      const AMMO_CAPACITY = 48;
+      const MAX_ATTACKS = 12;
+      const AMMO_CAPACITY = 43;
       const DEFENDER_W = 42;
       const DEFENDER_H = 18;
+      const LAND_CONTACT = 7;
       const MUZZLE_LENGTH = 25;
-      const LAST_BULLET_HITS = 12;
+      const BOSS_BULLET_SPEED = 118;
+      const BOSS_HIT_GROWTH = 1.6;
       const SIDES = ['top', 'right', 'bottom', 'left'];
       const OPPOSITE = { top: 'bottom', right: 'left', bottom: 'top', left: 'right' };
       const BASE_ANGLE = { top: Math.PI, right: -Math.PI / 2, bottom: 0, left: Math.PI / 2 };
@@ -57,6 +53,7 @@
       let screenShake = 0;
       let whiteFlash = 0;
       let lastBullet = null;
+      let gameOver = null;
 
       const defenders = {
         top: makeDefender('top'),
@@ -82,7 +79,6 @@
           side,
           axis: side === 'top' || side === 'bottom' ? 'x' : 'y',
           color: COLORS[side],
-          softColor: COLORS[side + 'Soft'],
           x: 0,
           y: 0,
           baseX: 0,
@@ -91,10 +87,13 @@
           goalCoord: 0,
           railMin: 0,
           railMax: 0,
+          land: null,
+          surfaceAngle: BASE_ANGLE[side],
           aimX: 0,
           aimY: 0,
           wobble: Math.random() * Math.PI * 2,
           muzzleGlow: 0,
+          bossLaunchFlash: 0,
           ammo: AMMO_CAPACITY,
           alive: true,
           nextFocusShotAt: 0,
@@ -128,6 +127,7 @@
         screenShake = 0;
         whiteFlash = 0;
         lastBullet = null;
+        gameOver = null;
         raf = requestAnimationFrame(tick);
       }
 
@@ -143,8 +143,8 @@
       }
 
       function configureDefenders() {
-        const insetX = clamp(W * 0.10, 78, 150);
-        const insetY = clamp(H * 0.13, 78, 120);
+        const insetX = clamp(W * 0.06, 44, 86);
+        const insetY = clamp(H * 0.075, 46, 74);
         const railX = clamp(W * 0.16, 110, 240);
         const railY = clamp(H * 0.18, 96, 150);
         const specs = {
@@ -162,14 +162,35 @@
           def.goalCoord = spec.coord;
           def.railMin = spec.min;
           def.railMax = spec.max;
+          def.land = makeLandGeometry(def);
           def.ammo = AMMO_CAPACITY;
           def.alive = true;
           def.muzzleGlow = 0;
+          def.bossLaunchFlash = 0;
           def.nextFocusShotAt = 0;
           def.aimX = W / 2;
           def.aimY = H / 2;
-          applyDefenderPosition(def, 0);
+          applyDefenderPosition(def);
         }
+      }
+
+      function makeLandGeometry(def) {
+        const axisLength = def.axis === 'x' ? W : H;
+        const midpoint = (def.railMin + def.railMax) / 2;
+        const halfChord = (def.railMax - def.railMin) / 2 + DEFENDER_W / 2 + 14;
+        const sag = clamp(axisLength * 0.05, 24, 58);
+        const radius = (halfChord * halfChord + sag * sag) / (2 * sag);
+
+        if (def.side === 'top') {
+          return { centerX: midpoint, centerY: def.baseY - LAND_CONTACT - radius, radius };
+        }
+        if (def.side === 'bottom') {
+          return { centerX: midpoint, centerY: def.baseY + LAND_CONTACT + radius, radius };
+        }
+        if (def.side === 'left') {
+          return { centerX: def.baseX - LAND_CONTACT - radius, centerY: midpoint, radius };
+        }
+        return { centerX: def.baseX + LAND_CONTACT + radius, centerY: midpoint, radius };
       }
 
       function tick(t) {
@@ -177,18 +198,31 @@
         lastT = t;
         now += dt;
 
-        if (!lastBullet) launchPendingAttacks();
+        if (gameOver) {
+          updateGameOver(dt);
+          draw();
+          if (!gameOver.blank) raf = requestAnimationFrame(tick);
+          return;
+        }
 
-        if (!lastBullet && now >= nextAttackAt && attacks.length + pendingAttacks.length < MAX_ATTACKS) {
+        launchPendingAttacks();
+
+        if (now >= nextAttackAt && attacks.length + pendingAttacks.length < MAX_ATTACKS) {
           const volley = launchVolley(nextSide);
           nextSide = nextShooterSide(nextSide);
-          nextAttackAt = now + (volley.count === 0 ? 0.18 : rand(0.82, 1.46));
+          nextAttackAt = now + (
+            volley.count === 0
+              ? 0.14
+              : volley.spasm ? rand(0.48, 0.72) : rand(0.72, 1.18)
+          );
         }
 
         updateLastBullet(dt);
-        updateDefenders(dt);
-        if (lastBullet) updateFocusBattle(dt);
-        else updateBullets(dt);
+        if (!gameOver) {
+          updateDefenders(dt);
+          updateBullets(dt);
+          if (lastBullet) updateFocusBattle(dt);
+        }
         updateSparks(dt);
         screenShake = Math.max(0, screenShake - dt * 1.8);
         whiteFlash = Math.max(0, whiteFlash - dt * 2.35);
@@ -198,12 +232,17 @@
 
       function launchVolley(side) {
         const available = availableAmmo(side);
-        if (!defenders[side].alive || available <= 0) return { count: 0 };
+        if (!defenders[side].alive || available <= 0) return { count: 0, spasm: false };
         const mood = Math.random();
-        const requestedCount = mood > 0.76 ? 3 : mood > 0.48 ? 2 : 1;
+        const spasm = mood > 0.82;
+        const requestedCount = spasm
+          ? Math.floor(rand(5, 9))
+          : mood > 0.56 ? 3 : mood > 0.3 ? 2 : 1;
         const count = Math.min(requestedCount, available);
-        const aggression = count === 1 ? rand(0.15, 0.65) : rand(0.62, 1);
-        const cadence = aggression > 0.75 ? rand(0.11, 0.18) : rand(0.18, 0.28);
+        const aggression = spasm ? 1 : count === 1 ? rand(0.15, 0.65) : rand(0.62, 1);
+        const cadence = spasm
+          ? rand(0.045, 0.085)
+          : aggression > 0.75 ? rand(0.1, 0.16) : rand(0.16, 0.25);
         const shooter = defenders[side];
         const targetSide = OPPOSITE[side];
         const targetPoint = pickTargetPoint(targetSide, aggression);
@@ -220,7 +259,7 @@
             shotCount: count,
           });
         }
-        return { count };
+        return { count, spasm };
       }
 
       function launchPendingAttacks() {
@@ -340,7 +379,10 @@
 
       function pickInterceptor(attack) {
         const eligible = SIDES.filter((side) => (
-          side !== attack.owner && defenders[side].alive && availableAmmo(side) > 0
+          side !== attack.owner
+          && defenders[side].alive
+          && (!lastBullet || side !== lastBullet.targetSide)
+          && availableAmmo(side) > 0
         ));
         if (eligible.length === 0) return null;
         const volunteers = eligible.filter(() => Math.random() < 0.62);
@@ -352,29 +394,34 @@
         const target = defenders[targetSide];
         const spread = (target.axis === 'x' ? W : H) * (0.025 + aggression * 0.05);
         const coord = clamp(target.coord + rand(-spread, spread), target.railMin, target.railMax);
-        return target.axis === 'x'
-          ? { x: coord, y: target.baseY }
-          : { x: target.baseX, y: coord };
+        const point = pointOnLand(target, coord);
+        return { x: point.x, y: point.y };
       }
 
       function constrainTargetToSide(side, x, y) {
         const target = defenders[side];
-        return target.axis === 'x'
-          ? { x: clamp(x, target.railMin, target.railMax), y: target.baseY }
-          : { x: target.baseX, y: clamp(y, target.railMin, target.railMax) };
+        const coord = target.axis === 'x'
+          ? clamp(x, target.railMin, target.railMax)
+          : clamp(y, target.railMin, target.railMax);
+        const point = pointOnLand(target, coord);
+        return { x: point.x, y: point.y };
       }
 
       function availableAmmo(side) {
-        if (!defenders[side].alive || lastBullet) return 0;
+        if (
+          !defenders[side].alive
+          || gameOver
+          || (lastBullet && side === lastBullet.targetSide)
+        ) return 0;
         const reservedAttacks = pendingAttacks.filter((b) => b.side === side).length;
         const reservedCounters = counters.filter((b) => b.owner === side && !b.fired && !b.done).length;
         return Math.max(0, defenders[side].ammo - reservedAttacks - reservedCounters);
       }
 
       function useAmmunition(defender) {
-        if (!defender.alive || defender.ammo <= 0 || lastBullet) return false;
+        if (!defender.alive || defender.ammo <= 0 || gameOver) return false;
         if (defender.ammo === 1) {
-          fireLastBullet(defender);
+          if (!lastBullet) fireLastBullet(defender);
           return false;
         }
         defender.ammo -= 1;
@@ -383,12 +430,17 @@
 
       function fireLastBullet(defender) {
         defender.ammo = 0;
-        clearBullets();
-        const targetX = W / 2;
-        const targetY = H / 2;
+        defender.bossLaunchFlash = 1;
+        const targetSide = OPPOSITE[defender.side];
+        const opponent = defenders[targetSide];
+        const targetX = opponent.x;
+        const targetY = opponent.y;
         const muzzle = muzzlePoint(defender, targetX, targetY, MUZZLE_LENGTH + 8);
+        const travel = Math.hypot(targetX - muzzle.x, targetY - muzzle.y);
+        const travelDuration = travel / BOSS_BULLET_SPEED;
         lastBullet = {
           owner: defender.side,
+          targetSide,
           x: muzzle.x,
           y: muzzle.y,
           px: muzzle.x,
@@ -397,24 +449,25 @@
           startY: muzzle.y,
           targetX,
           targetY,
-          radius: clamp(Math.min(W, H) * 0.085, 46, 82),
-          health: LAST_BULLET_HITS,
-          maxHealth: LAST_BULLET_HITS,
+          vx: (targetX - muzzle.x) / travelDuration,
+          vy: (targetY - muzzle.y) / travelDuration,
+          radius: clamp(Math.min(W, H) * 0.035, 22, 30),
+          hits: 0,
           age: 0,
-          travelDuration: REDUCED_MOTION ? 0.01 : 1.55,
+          targetTime: now + travelDuration,
           hitFlash: 0,
+          color: defender.color,
         };
         defender.aimX = targetX;
         defender.aimY = targetY;
         defender.muzzleGlow = 1;
-        let hunterIndex = 0;
-        for (const side of SIDES) {
-          if (side === defender.side) continue;
-          defenders[side].nextFocusShotAt = now + 0.08 + hunterIndex * 0.075;
-          hunterIndex++;
-        }
-        atomicBurst(muzzle.x, muzzle.y, defender.color, COLORS.super);
-        whiteFlash = REDUCED_MOTION ? 0.12 : 0.28;
+        opponent.nextFocusShotAt = now + 0.05;
+        opponent.aimX = muzzle.x;
+        opponent.aimY = muzzle.y;
+        pendingAttacks = pendingAttacks.filter((shot) => shot.side !== targetSide);
+        counters = counters.filter((counter) => counter.owner !== targetSide || counter.fired);
+        burst(muzzle.x, muzzle.y, defender.color, COLORS.superCore);
+        whiteFlash = REDUCED_MOTION ? 0.04 : 0.1;
       }
 
       function setDefenderGoal(def, targetX, targetY, offset) {
@@ -430,20 +483,46 @@
         };
       }
 
-      function applyDefenderPosition(def, wobble) {
+      function pointOnLand(def, coord) {
+        const land = def.land;
+        const boundedCoord = clamp(coord, def.railMin, def.railMax);
+        let surfaceX;
+        let surfaceY;
+
         if (def.axis === 'x') {
-          def.x = def.coord;
-          def.y = def.baseY + wobble * (def.side === 'top' ? 1 : -1);
+          const dx = boundedCoord - land.centerX;
+          const arc = Math.sqrt(Math.max(0, land.radius * land.radius - dx * dx));
+          surfaceX = boundedCoord;
+          surfaceY = def.side === 'top' ? land.centerY + arc : land.centerY - arc;
         } else {
-          def.x = def.baseX + wobble * (def.side === 'left' ? 1 : -1);
-          def.y = def.coord;
+          const dy = boundedCoord - land.centerY;
+          const arc = Math.sqrt(Math.max(0, land.radius * land.radius - dy * dy));
+          surfaceX = def.side === 'left' ? land.centerX + arc : land.centerX - arc;
+          surfaceY = boundedCoord;
         }
+
+        const inwardX = (land.centerX - surfaceX) / land.radius;
+        const inwardY = (land.centerY - surfaceY) / land.radius;
+        return {
+          x: surfaceX - inwardX * LAND_CONTACT,
+          y: surfaceY - inwardY * LAND_CONTACT,
+          angle: Math.atan2(-inwardX, inwardY),
+        };
+      }
+
+      function applyDefenderPosition(def) {
+        const point = pointOnLand(def, def.coord);
+        def.x = point.x;
+        def.y = point.y;
+        def.surfaceAngle = point.angle;
       }
 
       function updateDefenders(dt) {
         for (const def of Object.values(defenders)) {
           if (!def.alive) continue;
-          if (lastBullet && def.side !== lastBullet.owner) {
+          const facingBoss = lastBullet && def.side === lastBullet.targetSide;
+          const escapingBoss = lastBullet && !facingBoss;
+          if (facingBoss) {
             def.aimX = lastBullet.x;
             def.aimY = lastBullet.y;
             def.goalCoord = clamp(
@@ -451,13 +530,20 @@
               def.railMin,
               def.railMax,
             );
+          } else if (escapingBoss) {
+            const bulletCoord = def.axis === 'x' ? lastBullet.x : lastBullet.y;
+            const minDistance = Math.abs(bulletCoord - def.railMin);
+            const maxDistance = Math.abs(bulletCoord - def.railMax);
+            def.goalCoord = minDistance > maxDistance ? def.railMin : def.railMax;
           }
           const drift = lastBullet ? 0 : Math.sin(now * 1.4 + def.wobble + driftSeed) * 24;
           const shimmer = lastBullet ? 0 : Math.sin(now * 3.1 + def.wobble * 0.6) * 6;
           const target = clamp(def.goalCoord + drift + shimmer, def.railMin, def.railMax);
-          def.coord = ease(def.coord, target, Math.min(1, dt * 4.2));
-          applyDefenderPosition(def, Math.sin(now * 2.2 + def.wobble) * 3);
+          const movementRate = facingBoss ? 8.5 : escapingBoss ? 7.2 : 4.2;
+          def.coord = ease(def.coord, target, Math.min(1, dt * movementRate));
+          applyDefenderPosition(def);
           def.muzzleGlow = Math.max(0, def.muzzleGlow - dt * 4.6);
+          def.bossLaunchFlash = Math.max(0, def.bossLaunchFlash - dt * 2.5);
         }
       }
 
@@ -472,7 +558,6 @@
         for (const b of counters) {
           if (b.done) continue;
           if (!b.fired && now >= b.fireTime) fireCounter(b);
-          if (lastBullet) break;
           if (!b.fired) continue;
           b.px = b.x;
           b.py = b.y;
@@ -551,23 +636,22 @@
         bullet.hitFlash = Math.max(0, bullet.hitFlash - dt * 5.5);
         bullet.px = bullet.x;
         bullet.py = bullet.y;
-        const travel = clamp(bullet.age / bullet.travelDuration, 0, 1);
-        const easedTravel = 1 - Math.pow(1 - travel, 4);
-        const hover = REDUCED_MOTION || travel < 1 ? 0 : 1;
-        bullet.x = bullet.startX + (bullet.targetX - bullet.startX) * easedTravel
-          + Math.sin(now * 1.7) * 18 * hover;
-        bullet.y = bullet.startY + (bullet.targetY - bullet.startY) * easedTravel
-          + Math.cos(now * 1.3) * 14 * hover;
+        bullet.x += bullet.vx * dt;
+        bullet.y += bullet.vy * dt;
+        if (
+          now >= bullet.targetTime
+          || Math.hypot(bullet.targetX - bullet.x, bullet.targetY - bullet.y) <= bullet.radius
+        ) detonateBossBullet();
       }
 
       function updateFocusBattle(dt) {
         const target = lastBullet;
         if (!target) return;
 
-        for (const defender of Object.values(defenders)) {
-          if (!defender.alive || defender.side === target.owner || now < defender.nextFocusShotAt) continue;
+        const defender = defenders[target.targetSide];
+        if (defender.alive && now >= defender.nextFocusShotAt) {
           fireFocusShot(defender, target);
-          defender.nextFocusShotAt = now + rand(0.34, 0.52);
+          defender.nextFocusShotAt = now + rand(0.1, 0.16);
         }
 
         for (const shot of focusShots) {
@@ -583,9 +667,9 @@
           shot.vy = ease(shot.vy, desiredVy, Math.min(1, dt * 8));
           shot.x += shot.vx * dt;
           shot.y += shot.vy * dt;
-          if (Math.hypot(target.x - shot.x, target.y - shot.y) <= target.radius * 0.82 + shot.r) {
+          if (Math.hypot(target.x - shot.x, target.y - shot.y) <= target.radius + shot.r) {
             hitLastBullet(shot);
-            if (!lastBullet) break;
+            if (!lastBullet || gameOver) break;
           }
         }
         focusShots = focusShots.filter((shot) => !shot.done && (
@@ -598,7 +682,7 @@
         const dx = target.x - muzzle.x;
         const dy = target.y - muzzle.y;
         const distance = Math.max(0.001, Math.hypot(dx, dy));
-        const speed = rand(500, 620);
+        const speed = rand(720, 860);
         focusShots.push({
           owner: defender.side,
           x: muzzle.x,
@@ -621,20 +705,67 @@
         const target = lastBullet;
         if (!target) return;
         shot.done = true;
-        target.health -= 1;
+        target.hits += 1;
+        target.radius += BOSS_HIT_GROWTH;
         target.hitFlash = 1;
         screenShake = Math.max(screenShake, 0.15);
-        impactSparks(shot.x, shot.y, shot.color, COLORS.super);
-        if (target.health > 0) return;
+        impactSparks(shot.x, shot.y, shot.color, target.color);
+      }
 
-        const x = target.x;
-        const y = target.y;
-        const ownerColor = defenders[target.owner].color;
+      function detonateBossBullet() {
+        if (!lastBullet || gameOver) return;
+        const x = lastBullet.x;
+        const y = lastBullet.y;
+        const maxRadius = Math.max(
+          Math.hypot(x, y),
+          Math.hypot(W - x, y),
+          Math.hypot(x, H - y),
+          Math.hypot(W - x, H - y),
+        ) + 80;
         lastBullet = null;
-        focusShots = [];
-        atomicBurst(x, y, ownerColor, COLORS.superCore);
-        whiteFlash = REDUCED_MOTION ? 0.18 : 0.58;
-        nextAttackAt = now + 0.9;
+        clearBullets();
+        sparks = [];
+        stars = [];
+        for (const defender of Object.values(defenders)) {
+          defender.alive = false;
+          defender.ammo = 0;
+          defender.muzzleGlow = 0;
+        }
+        gameOver = {
+          x,
+          y,
+          age: 0,
+          radius: REDUCED_MOTION ? maxRadius : 0,
+          maxRadius,
+          expandDuration: REDUCED_MOTION ? 0.01 : 1.05,
+          fadeDuration: REDUCED_MOTION ? 0.12 : 0.8,
+          alpha: 1,
+          pulse: 1,
+          shake: 0,
+          blank: false,
+        };
+        screenShake = REDUCED_MOTION ? 0 : 1;
+        whiteFlash = 0;
+      }
+
+      function updateGameOver(dt) {
+        const blast = gameOver;
+        if (!blast || blast.blank) return;
+        blast.age += dt;
+        const progress = clamp(blast.age / blast.expandDuration, 0, 1);
+        blast.radius = blast.maxRadius * (1 - Math.pow(1 - progress, 3));
+        blast.pulse = REDUCED_MOTION ? 1 : 1 + Math.sin(blast.age * 20) * 0.055;
+        blast.shake = REDUCED_MOTION
+          ? 0
+          : blast.alpha * (5 + (1 - progress) * 12) * (0.62 + Math.abs(Math.sin(blast.age * 27)) * 0.38);
+        const fadeStart = blast.expandDuration + 0.16;
+        if (blast.age > fadeStart) {
+          blast.alpha = clamp(1 - (blast.age - fadeStart) / blast.fadeDuration, 0, 1);
+          if (blast.alpha <= 0) {
+            blast.blank = true;
+            blast.shake = 0;
+          }
+        }
       }
 
       function impactSparks(x, y, colorA, colorB) {
@@ -692,40 +823,6 @@
         });
       }
 
-      function atomicBurst(x, y, colorA, colorB) {
-        whiteFlash = 1;
-        screenShake = 1;
-        burst(x, y, colorA, colorB);
-        const count = 90;
-        for (let i = 0; i < count; i++) {
-          const a = (i / count) * Math.PI * 2 + rand(-0.08, 0.08);
-          const speed = rand(180, 560);
-          sparks.push({
-            x,
-            y,
-            vx: Math.cos(a) * speed,
-            vy: Math.sin(a) * speed,
-            age: 0,
-            life: rand(0.75, 1.55),
-            color: Math.random() < 0.45 ? colorA : colorB,
-            size: rand(2, 6.5),
-          });
-        }
-        for (let i = 0; i < 4; i++) {
-          sparks.push({
-            x,
-            y,
-            vx: 0,
-            vy: 0,
-            age: -i * 0.08,
-            life: 0.72 + i * 0.18,
-            color: '#ffffff',
-            size: 46 + i * 38,
-            ring: true,
-          });
-        }
-      }
-
       function updateSparks(dt) {
         for (const s of sparks) {
           s.age += dt;
@@ -741,14 +838,18 @@
 
       function draw() {
         ctx.clearRect(0, 0, W, H);
+        if (gameOver) {
+          drawGameOver();
+          return;
+        }
+        drawField();
+        drawLand();
         ctx.save();
         if (screenShake > 0) {
           const p = screenShake * screenShake;
           ctx.translate(rand(-18, 18) * p, rand(-14, 14) * p);
           ctx.rotate(rand(-0.012, 0.012) * p);
         }
-        drawField();
-        drawAimThreads();
         for (const b of attacks) drawBullet(b, b.color, 8);
         for (const b of counters) if (b.fired) drawBullet(b, b.color, 6);
         for (const b of focusShots) drawBullet(b, b.color, 12);
@@ -763,6 +864,17 @@
         }
       }
 
+      function drawLand() {
+        for (const side of SIDES) {
+          const def = defenders[side];
+          const land = def.land;
+          ctx.fillStyle = def.color;
+          ctx.beginPath();
+          ctx.arc(land.centerX, land.centerY, land.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
       function drawField() {
         ctx.fillStyle = COLORS.bg;
         ctx.fillRect(0, 0, W, H);
@@ -772,62 +884,6 @@
           ctx.fillStyle = `rgba(200, 224, 255, ${star.a * twinkle})`;
           ctx.fillRect(star.x, star.y, star.r, star.r);
         }
-
-        ctx.strokeStyle = COLORS.grid;
-        ctx.lineWidth = 1;
-        const gap = Math.max(34, Math.min(58, W / 18));
-        ctx.beginPath();
-        for (let x = (now * 8) % gap; x < W; x += gap) {
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, H);
-        }
-        for (let y = 0; y < H; y += gap) {
-          ctx.moveTo(0, y);
-          ctx.lineTo(W, y);
-        }
-        ctx.stroke();
-
-        ctx.setLineDash([8, 12]);
-        ctx.strokeStyle = COLORS.midline;
-        ctx.beginPath();
-        ctx.moveTo(0, H / 2);
-        ctx.lineTo(W, H / 2);
-        ctx.moveTo(W / 2, 0);
-        ctx.lineTo(W / 2, H);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
-      function drawAimThreads() {
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        if (lastBullet) {
-          for (const def of Object.values(defenders)) {
-            if (!def.alive || def.side === lastBullet.owner) continue;
-            const muzzle = muzzlePoint(def, lastBullet.x, lastBullet.y, MUZZLE_LENGTH);
-            ctx.strokeStyle = hexA(def.color, 0.24);
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(muzzle.x, muzzle.y);
-            ctx.lineTo(lastBullet.x, lastBullet.y);
-            ctx.stroke();
-          }
-          ctx.restore();
-          return;
-        }
-        for (const c of counters) {
-          if (c.fired || c.done) continue;
-          const def = defenders[c.owner];
-          const alpha = clamp((c.fireTime - now) / 0.55, 0.1, 0.55);
-          ctx.strokeStyle = hexA(def.color, 0.34 * alpha);
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          const muzzle = muzzlePoint(def, c.impactX, c.impactY, MUZZLE_LENGTH);
-          ctx.moveTo(muzzle.x, muzzle.y);
-          ctx.lineTo(c.impactX, c.impactY);
-          ctx.stroke();
-        }
-        ctx.restore();
       }
 
       function drawBullet(b, color, glow) {
@@ -872,49 +928,77 @@
       function drawLastBullet() {
         if (!lastBullet) return;
         const bullet = lastBullet;
-        const pulse = REDUCED_MOTION ? 1 : 1 + Math.sin(now * 6.2) * 0.15;
+        const pulse = REDUCED_MOTION ? 1 : 1 + Math.sin(now * 7.2) * 0.1;
         const radius = bullet.radius * pulse * (1 + bullet.hitFlash * 0.12);
-        const damage = bullet.health / bullet.maxHealth;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
+
+        ctx.strokeStyle = hexA(bullet.color, 0.62);
+        ctx.lineWidth = Math.max(2, radius * 0.16);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(bullet.px, bullet.py);
+        ctx.lineTo(bullet.x, bullet.y);
+        ctx.stroke();
 
         const aura = ctx.createRadialGradient(
           bullet.x, bullet.y, radius * 0.18,
           bullet.x, bullet.y, radius * 1.9,
         );
         aura.addColorStop(0, `rgba(255,255,255,${0.34 + bullet.hitFlash * 0.24})`);
-        aura.addColorStop(0.36, 'rgba(255,241,168,0.25)');
-        aura.addColorStop(1, 'rgba(255,241,168,0)');
+        aura.addColorStop(0.36, hexA(bullet.color, 0.28));
+        aura.addColorStop(1, hexA(bullet.color, 0));
         ctx.fillStyle = aura;
         ctx.beginPath();
         ctx.arc(bullet.x, bullet.y, radius * 1.9, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.shadowColor = '#ffffff';
+        ctx.shadowColor = bullet.color;
         ctx.shadowBlur = 32 + bullet.hitFlash * 18;
-        ctx.fillStyle = COLORS.super;
+        ctx.fillStyle = bullet.color;
         ctx.beginPath();
         ctx.arc(bullet.x, bullet.y, radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = COLORS.superCore;
         ctx.beginPath();
-        ctx.arc(bullet.x, bullet.y, radius * (0.48 + damage * 0.2), 0, Math.PI * 2);
+        ctx.arc(bullet.x, bullet.y, radius * 0.5, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
+      }
 
-        ctx.shadowBlur = 10;
-        ctx.lineCap = 'round';
-        for (let i = 0; i < bullet.maxHealth; i++) {
-          const angle = -Math.PI / 2 + i / bullet.maxHealth * Math.PI * 2;
-          const lit = i < bullet.health;
-          const inner = radius * 1.18;
-          const outer = radius * (lit ? 1.38 : 1.28);
-          ctx.strokeStyle = lit ? 'rgba(255,255,255,0.88)' : 'rgba(255,241,168,0.16)';
-          ctx.lineWidth = lit ? 3 : 1.5;
-          ctx.beginPath();
-          ctx.moveTo(bullet.x + Math.cos(angle) * inner, bullet.y + Math.sin(angle) * inner);
-          ctx.lineTo(bullet.x + Math.cos(angle) * outer, bullet.y + Math.sin(angle) * outer);
-          ctx.stroke();
+      function drawGameOver() {
+        ctx.fillStyle = COLORS.bg;
+        ctx.fillRect(0, 0, W, H);
+        if (gameOver.blank) return;
+        ctx.save();
+        if (gameOver.shake > 0) {
+          ctx.translate(
+            rand(-gameOver.shake, gameOver.shake),
+            rand(-gameOver.shake, gameOver.shake),
+          );
+          ctx.rotate(rand(-0.006, 0.006) * Math.min(1, gameOver.shake / 10));
         }
+        ctx.globalCompositeOperation = 'lighter';
+        const energyPulse = REDUCED_MOTION
+          ? 1
+          : 0.84 + Math.abs(Math.sin(gameOver.age * 20)) * 0.16;
+        const radius = Math.max(1, gameOver.radius * gameOver.pulse);
+        ctx.fillStyle = `rgba(255,255,255,${gameOver.alpha * energyPulse})`;
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 30 + energyPulse * 28;
+        ctx.beginPath();
+        ctx.arc(gameOver.x, gameOver.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(255,255,255,${gameOver.alpha * 0.86})`;
+        ctx.lineWidth = 5 + energyPulse * 5;
+        ctx.beginPath();
+        ctx.arc(gameOver.x, gameOver.y, Math.max(1, radius - 8), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(255,241,168,${gameOver.alpha * 0.48})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(gameOver.x, gameOver.y, radius * 1.025, 0, Math.PI * 2);
+        ctx.stroke();
         ctx.restore();
       }
 
@@ -923,33 +1007,63 @@
         const y = def.y;
         const angle = Math.atan2(def.aimY - y, def.aimX - x);
         const barrelLen = 20 + def.muzzleGlow * 4;
+        const bossReady = def.ammo === 1 && !lastBullet && !gameOver;
+        const readyPulse = bossReady
+          ? REDUCED_MOTION ? 0.72 : 0.5 + Math.sin(now * 8.4 + def.wobble) * 0.5
+          : 0;
+        const flashBeat = bossReady
+          ? REDUCED_MOTION ? 0.28 : Math.pow(0.5 + Math.sin(now * 17 + def.wobble) * 0.5, 5)
+          : 0;
+        const charge = Math.max(readyPulse, def.bossLaunchFlash);
+        const bodyScale = REDUCED_MOTION
+          ? 1
+          : 1 + readyPulse * 0.1 + def.bossLaunchFlash * 0.16;
+
+        if (charge > 0) {
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.shadowColor = def.color;
+          ctx.shadowBlur = 18 + charge * 28;
+          ctx.fillStyle = hexA(def.color, 0.1 + charge * 0.2);
+          ctx.beginPath();
+          ctx.arc(x, y, 28 + charge * 15, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = hexA(def.color, 0.35 + charge * 0.4);
+          ctx.lineWidth = 2 + charge * 2;
+          ctx.beginPath();
+          ctx.arc(x, y, 30 + charge * 12, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
 
         ctx.save();
         ctx.translate(x, y);
-        ctx.rotate(BASE_ANGLE[def.side]);
+        ctx.scale(bodyScale, bodyScale);
+        ctx.rotate(def.surfaceAngle);
 
-        ctx.save();
         ctx.shadowColor = def.color;
         ctx.shadowBlur = 12 + def.muzzleGlow * 10;
-        ctx.fillStyle = def.softColor;
-        ctx.fillRect(-DEFENDER_W / 2 - 7, -DEFENDER_H / 2 - 4, DEFENDER_W + 14, DEFENDER_H + 8);
-        ctx.restore();
-
         ctx.fillStyle = def.color;
         ctx.fillRect(-DEFENDER_W / 2, 4, DEFENDER_W, 7);
         ctx.fillRect(-DEFENDER_W / 2 + 7, -3, DEFENDER_W - 14, 9);
         ctx.fillRect(-8, -10, 16, 11);
 
-        ctx.fillStyle = 'rgba(255,255,255,0.76)';
-        ctx.fillRect(-DEFENDER_W / 2 + 3, 6, DEFENDER_W - 6, 1.5);
+        if (charge > 0) {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = clamp(flashBeat * 0.58 + def.bossLaunchFlash * 0.48, 0, 0.7);
+          ctx.fillStyle = def.color;
+          ctx.fillRect(-DEFENDER_W / 2, 4, DEFENDER_W, 7);
+          ctx.fillRect(-DEFENDER_W / 2 + 7, -3, DEFENDER_W - 14, 9);
+          ctx.fillRect(-8, -10, 16, 11);
+        }
         ctx.restore();
 
         ctx.save();
         ctx.translate(x, y);
+        ctx.scale(bodyScale, bodyScale);
         ctx.rotate(angle + Math.PI / 2);
-        ctx.fillStyle = '#dfffee';
-        ctx.fillRect(-3, -barrelLen, 6, barrelLen);
         ctx.fillStyle = def.color;
+        ctx.fillRect(-3, -barrelLen, 6, barrelLen);
         ctx.fillRect(-5, -barrelLen - 2, 10, 4);
         ctx.restore();
 
@@ -965,19 +1079,6 @@
           ctx.restore();
         }
 
-        ctx.strokeStyle = def.softColor;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        if (def.axis === 'x') {
-          const railY = def.baseY + (def.side === 'top' ? 24 : -24);
-          ctx.moveTo(0, railY);
-          ctx.lineTo(W, railY);
-        } else {
-          const railX = def.baseX + (def.side === 'left' ? 24 : -24);
-          ctx.moveTo(railX, 0);
-          ctx.lineTo(railX, H);
-        }
-        ctx.stroke();
       }
 
       function drawAmmunition() {
@@ -994,62 +1095,57 @@
         const horizontal = def.axis === 'x';
         const longEdge = horizontal ? W : H;
         const gap = 2;
-        const longSize = clamp((longEdge - 118 - gap * (AMMO_CAPACITY - 1)) / AMMO_CAPACITY, 3, 7);
-        const shortSize = 5;
-        const stockLength = AMMO_CAPACITY * longSize + (AMMO_CAPACITY - 1) * gap;
+        const longSize = clamp((longEdge - 76 - gap * (AMMO_CAPACITY - 1)) / AMMO_CAPACITY, 5, 9);
+        const shortSize = 7;
+        const bossExtra = 7;
+        const stockLength = AMMO_CAPACITY * longSize + (AMMO_CAPACITY - 1) * gap + bossExtra;
         const bombPulse = REDUCED_MOTION ? 1 : 1 + Math.sin(now * 5.4) * 0.18;
 
         ctx.save();
         ctx.globalAlpha = def.alive ? 1 : 0.22;
         if (horizontal) {
-          ctx.translate((W - stockLength) / 2, side === 'top' ? 10 : H - 15);
+          ctx.translate((W - stockLength) / 2, side === 'top' ? 10 : H - 17);
         } else {
-          ctx.translate(side === 'left' ? 10 : W - 15, (H - stockLength) / 2);
+          ctx.translate(side === 'left' ? 10 : W - 17, (H - stockLength) / 2);
         }
 
         for (let i = 0; i < AMMO_CAPACITY; i++) {
-          const x = horizontal ? i * (longSize + gap) : 0;
-          const y = horizontal ? 0 : i * (longSize + gap);
+          const position = i * (longSize + gap) + (i > 0 ? bossExtra : 0);
+          const x = horizontal ? position : 0;
+          const y = horizontal ? 0 : position;
           const width = horizontal ? longSize : shortSize;
           const height = horizontal ? shortSize : longSize;
+          const isBossRound = i === 0;
+          const bossRadius = Math.max(5.5, Math.max(width, height) * 0.78);
           if (i < def.ammo) {
-            if (def.alive && def.ammo === 1 && i === 0) {
-              const radius = clamp(Math.max(width, height) * 1.5, 8, 10) * bombPulse;
-              let centerX = x + width / 2;
-              let centerY = y + height / 2;
-              const edgeShift = 4;
-              if (side === 'top') centerY += edgeShift;
-              else if (side === 'bottom') centerY -= edgeShift;
-              else if (side === 'left') centerX += edgeShift;
-              else centerX -= edgeShift;
-
+            if (isBossRound) {
+              const pulse = def.ammo === 1 ? bombPulse : 1;
+              const radius = bossRadius * pulse;
+              const centerX = x + width / 2;
+              const centerY = y + height / 2;
               ctx.save();
               ctx.globalCompositeOperation = 'lighter';
-              ctx.shadowColor = COLORS.super;
-              ctx.shadowBlur = 12 + bombPulse * 5;
-              ctx.fillStyle = COLORS.super;
+              ctx.shadowColor = '#ffffff';
+              ctx.shadowBlur = def.ammo === 1 ? 10 : 4;
+              ctx.fillStyle = '#ffffff';
               ctx.beginPath();
               ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
               ctx.fill();
-              ctx.fillStyle = COLORS.superCore;
-              ctx.beginPath();
-              ctx.arc(centerX, centerY, radius * 0.42, 0, Math.PI * 2);
-              ctx.fill();
-              ctx.shadowBlur = 0;
-              ctx.strokeStyle = 'rgba(255,241,168,0.58)';
-              ctx.lineWidth = 1.5;
-              ctx.beginPath();
-              ctx.arc(centerX, centerY, radius * 1.32, 0, Math.PI * 2);
-              ctx.stroke();
               ctx.restore();
             } else {
-              ctx.fillStyle = def.color;
+              ctx.fillStyle = 'rgba(255,255,255,0.92)';
               ctx.fillRect(x, y, width, height);
             }
           } else {
-            ctx.strokeStyle = hexA(def.color, 0.18);
+            ctx.strokeStyle = 'rgba(255,255,255,0.16)';
             ctx.lineWidth = 1;
-            ctx.strokeRect(x + 0.5, y + 0.5, Math.max(1, width - 1), Math.max(1, height - 1));
+            if (isBossRound) {
+              ctx.beginPath();
+              ctx.arc(x + width / 2, y + height / 2, bossRadius, 0, Math.PI * 2);
+              ctx.stroke();
+            } else {
+              ctx.strokeRect(x + 0.5, y + 0.5, Math.max(1, width - 1), Math.max(1, height - 1));
+            }
           }
         }
         ctx.restore();

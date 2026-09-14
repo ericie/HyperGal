@@ -134,23 +134,23 @@
         composite.setAttribute('aria-describedby', 'instructions');
 
         const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+        const PREBAKE_FRAMES = 1500;
 
         init();
         initParticleSystem();
+        prebake();
         describe();
 
-        // Reduced motion: run the system forward without animating, then hold
-        // the picture it has made by then. The frame loop keeps compositing but
-        // stops updating, which is what the sketch's own `paused` flag is for.
-        if (reduced.matches) settle();
-
-        function settle() {
-          for (let i = 0; i < 1500; i++) {
+        // Skip the slow opening build and begin with a mature field. Working
+        // layers are still hidden here, so none of these frames are displayed.
+        // Reduced motion opens on the same field and holds it; otherwise the
+        // regular frame loop carries on from this exact state.
+        function prebake() {
+          for (let i = 0; i < PREBAKE_FRAMES; i++) {
             layer01.clearRect(0, 0, 1920, 1920);
             system.update();
           }
-          draw();
-          paused = true;
+          paused = reduced.matches;
         }
 
         function describe() {
@@ -184,11 +184,8 @@
                             thickness: { hairline: 0, thin: 0, medium: 0, thick: 0 } };
 
           initParticleSystem();
+          prebake();
           describe();
-          if (reduced.matches) {
-            paused = false;
-            settle();
-          }
         }
 
         function savePicture() {

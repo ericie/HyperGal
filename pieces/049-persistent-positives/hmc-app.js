@@ -2,7 +2,8 @@ let comp, compElem, buffer, bufferElem, bg, fg, bgElem, fgElem, params, obstacle
 var strategy, preySystem, predatorSystem, textRender, obsWidth = 300,
   stage = {
     w: 2920,
-    h: 2920
+    h: 2920,
+    scale: 1
   },
   centerPoint = {
     x: stage.w / 2,
@@ -11,7 +12,7 @@ var strategy, preySystem, predatorSystem, textRender, obsWidth = 300,
 let texture, layoutTime, layoutMaxTime, layoutPauseTime, renderQueue, request, featureList = {};
 
 function init(e) {
-  comp = document.getElementById("hmcComp").getContext("2d"), compElem = document.getElementById("hmcComp"), stage.w = compElem.width, stage.h = compElem.height, layoutMaxTime = 1600, layoutPauseTime = 1e3, layoutTime = Math.round(.8 * (layoutMaxTime + layoutPauseTime)), buffer = document.getElementById("hmcBuffer").getContext("2d"), bufferElem = document.getElementById("hmcBuffer"), bg = document.getElementById("hmcBackground").getContext("2d"), bgElem = document.getElementById("hmcBackground");
+  compElem = document.getElementById("hmcComp"), bufferElem = document.getElementById("hmcBuffer"), bgElem = document.getElementById("hmcBackground"), comp = compElem.getContext("2d"), buffer = bufferElem.getContext("2d"), bg = bgElem.getContext("2d"), stage.w = e.w, stage.h = e.h, stage.scale = e.scale || 1, comp.setTransform(stage.scale, 0, 0, stage.scale, 0, 0), buffer.setTransform(stage.scale, 0, 0, stage.scale, 0, 0), bg.setTransform(stage.scale, 0, 0, stage.scale, 0, 0), layoutMaxTime = 1600, layoutPauseTime = 1e3, layoutTime = Math.round(.8 * (layoutMaxTime + layoutPauseTime));
   const t = Math.round(fxrand() * (palletList.length - 1));
   let a = palletList[t];
   texture = new TextureObject({
@@ -63,12 +64,12 @@ function init(e) {
     colors: a,
     bgShapeMix: r.id,
     wordShapeMix: m.id
-  }, bg.fillStyle = a.background.color, bg.fillRect(0, 0, this.stage.w, this.stage.h), textRender = new TextRender(this.systemParams);
+  }, bg.fillStyle = a.background.color, bg.fillRect(0, 0, stage.w, stage.h), textRender = new TextRender(this.systemParams);
   let s = document.getElementById("library"),
     i = document.createElement("canvas"),
-    l = i.getContext("2d"),
+    l,
     o = "layer_0";
-  i.setAttribute("id", o), i.setAttribute("height", stage.h), i.setAttribute("width", stage.w), s.appendChild(i);
+  i.setAttribute("id", o), i.setAttribute("height", Math.max(1, Math.round(stage.h * stage.scale))), i.setAttribute("width", Math.max(1, Math.round(stage.w * stage.scale))), s.appendChild(i), l = i.getContext("2d"), l.setTransform(stage.scale, 0, 0, stage.scale, 0, 0);
   let u = {
     id: o,
     elem: i,
@@ -80,8 +81,8 @@ const performAnimation = () => {
   update(), request = requestAnimationFrame(performAnimation)
 };
 
-function update() {
-  layoutTime++, layoutTime > layoutMaxTime && layoutTime < layoutMaxTime + 2 && this.newSystem.setEraserMode(), layoutTime > layoutMaxTime + layoutPauseTime && (textRender.pickLayout(), this.newSystem.resetWordList(), layoutTime = 0, textRender.draw()), this.newSystem.update(), this.newSystem.draw(), renderQueue.update(), composite()
+function update(present = !0) {
+  layoutTime++, layoutTime > layoutMaxTime && layoutTime < layoutMaxTime + 2 && this.newSystem.setEraserMode(), layoutTime > layoutMaxTime + layoutPauseTime && (textRender.pickLayout(), this.newSystem.resetWordList(), layoutTime = 0, textRender.draw()), this.newSystem.update(), this.newSystem.draw(), renderQueue.update(), present && composite()
 }
 
 function updateBG() {

@@ -1,5 +1,5 @@
 function PreySystem(t) {
-  this.params = t, this.canvas = this.params.myLayer, this.background = this.params.bg, this.foreground = this.params.fg, this.bgShapeMix = this.params.bgShapeMix, this.wordShapeMix = this.params.wordShapeMix, this.buffer = this.params.buffer, this.bufferElem = this.params.bufferElem, this.layerObj = this.params.layerObj, this.systemSize = Math.round(400 * stage.w * stage.h / (1920 * 1920)), this.growthType = this.params.growthType, this.wordTargList = [], this.introMode = !0, this.wordTargetMin = 2200, this.shapeTypes = ["circle", "rectangle", "triangle"], this.eraserMode = !1
+  this.params = t, this.canvas = this.params.myLayer, this.background = this.params.bg, this.foreground = this.params.fg, this.bgShapeMix = this.params.bgShapeMix, this.wordShapeMix = this.params.wordShapeMix, this.buffer = this.params.buffer, this.bufferElem = this.params.bufferElem, this.layerObj = this.params.layerObj, this.systemSize = Math.round(400 * stage.w * stage.h / (1920 * 1920)), this.growthType = this.params.growthType, this.wordTargList = [], this.wordMask = null, this.introMode = !0, this.wordTargetMin = 2200, this.shapeTypes = ["circle", "rectangle", "triangle"], this.eraserMode = !1
 }
 
 function Prey(t) {
@@ -21,21 +21,42 @@ PreySystem.prototype.init = function(t, e) {
   let i = new Prey(e);
   this.preyList.push(i)
 }, PreySystem.prototype.resetWordList = function(t) {
-  this.wordTargList = [], this.eraserMode = !1, this.introMode = !1
+  this.wordTargList = [], this.wordMask = null, this.eraserMode = !1, this.introMode = !1
 }, PreySystem.prototype.setEraserMode = function(t) {
   this.eraserMode = !0
 }, PreySystem.prototype.update = function(t) {}, PreySystem.prototype.buildTargetList = function() {
-  if (this.buffer)
+  if (this.buffer) {
+    if (!this.wordMask) {
+      const t = this.bufferElem.width,
+        e = this.bufferElem.height,
+        i = this.buffer.getImageData(0, 0, t, e).data,
+        s = new Uint8Array(t * e);
+      let r = !1;
+      for (let e = 0, t = 3; t < i.length; e++, t += 4) s[e] = i[t], i[t] && (r = !0);
+      if (!r) return;
+      this.wordMask = {
+        alpha: s,
+        width: t,
+        height: e,
+        scaleX: t / stage.w,
+        scaleY: e / stage.h
+      }
+    }
+    const e = this.wordMask;
     for (let t = 0; t < 50; t++) {
       let t = {
         x: 0,
         y: 0
       };
-      t.x = fxrand() * stage.w, t.y = fxrand() * stage.h, myPixelCheck = this.buffer.getImageData(t.x, t.y, 1, 1), 0 != myPixelCheck.data[3] && this.wordTargList.push({
+      t.x = fxrand() * stage.w, t.y = fxrand() * stage.h;
+      const i = Math.min(e.width - 1, Math.floor(t.x * e.scaleX)),
+        s = Math.min(e.height - 1, Math.floor(t.y * e.scaleY));
+      0 != e.alpha[s * e.width + i] && this.wordTargList.push({
         x: t.x,
         y: t.y
       })
     }
+  }
 }, PreySystem.prototype.draw = function() {
   1 != this.introMode && this.wordTargList && this.wordTargList.length < this.wordTargetMin && this.buildTargetList(), renderQueue.add({
     type: "clear",

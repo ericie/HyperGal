@@ -64,7 +64,9 @@ its dead.
 square drawn first, pushed down and right by a tenth of a cell, in a darker
 version of its colour — or a lighter one if the colour is dark, grey if it is
 black. Every living shadow goes down before any body, so a shadow never lands
-on a neighbour. Only the head and the tail slide between cells; the body snaps.
+on a neighbour. Every square slides between cells, while square-width
+orthogonal joins keep the snake continuous through each bend. The grid stays
+crisp without either snapping or breaking the body into loose squares.
 
 **Palettes.** The multicolour palettes of Snake Memories, verbatim: retro,
 neon, desert, hokusai, pastel, vaporwave, nordic, and a procedural one that
@@ -74,32 +76,49 @@ their own remains. One palette per round; each snake takes one swatch from it.
 The golden heir is gold regardless.
 
 **Memory.** Everything that has ever died is painted into a layer beneath the
-living as flat cells in its own colour, and later deaths paint over earlier
-ones. The field opens empty and fills only with what dies in play. (Snake
-Memories opened on a full mosaic instead, filled before the first frame by
-greedy snakes that never appear; `LOOK.prewarm` turns that on.)
+living as crosshatched cells in its own colour. Each corpse gets its own loose,
+hand-drawn hatch: wandering strokes, uneven pressure and opacity, varied angles
+and spacing, and occasional lifted gaps. Four tightly spaced stroke families
+are always used, with a fifth appearing at random. The individual lines are
+finer so the much denser weave stays visibly hatched instead of becoming a
+solid fill. Later deaths accumulate over earlier ones instead of erasing
+them, making overlaps visibly denser and multicoloured. Like Snake Memories,
+the field now opens on a full mosaic, filled before the first frame by greedy
+snakes that never appear. A final clipped hatch pass closes any isolated gaps
+without delaying the first frame. Set `LOOK.prewarm` to `false` to start empty
+instead.
 
 Snake Memories painted its dead at full strength and let its one snake hide in
 them, found by motion alone. Twenty snakes and their death fronts need to
 read, so the dead are set back from the living, with two dials in `LOOK`: a
-memory is desaturated halfway toward its own grey (`memoryDesaturate`, 0.5)
-and pushed a little toward the ground (`memoryFade`, 0.22). The living keep
-their full colour and nothing else is added to them — no outline, no head
-marker. Both dials at zero is the original camouflage.
+memory is desaturated halfway toward its own grey (`memoryDesaturate`, 0.5) and
+pushed a little toward the ground (`memoryFade`, 0.22). A newly dead body turns
+into that muted crosshatching immediately, then the front commits it into the
+permanent memory layer one cell at a time. The living remain solid and keep
+their full colour — no outline, no head marker. Both dials at zero restore the
+original memory colour while retaining the hatch texture.
 
 **Death.** A dying snake keeps its shape while a bright front travels from its
-head to its tail — a pale cell with five sparking rays. As the front reaches
-each segment, that cell is painted into the memory layer and the living cell
-above it fades out, so the body crossfades from shadowed pigment into flat
-memory one segment at a time. The sweep takes 0.28–0.72 seconds depending on
-length. The final survivor's victory beat is unchanged: its future head section
-blinks gold six times, then the body cleaves into the next field's snakes.
+head to its tail — a pale cell with five sparking rays. The body is crosshatched
+for the whole sweep; as the front reaches each segment, that cell is transferred
+into permanent memory beneath it. The sweep takes 0.28–0.72 seconds depending
+on length. The final survivor's victory beat is unchanged: its future head
+section blinks gold six times, then the body cleaves into the next field's
+snakes.
 
-**The mouse** flickers, a fresh warm colour every frame.
+**The mouse** takes one fresh warm colour each time it spawns and rapidly toggles
+on and off while remaining exactly one grid cell. Reduced-motion mode keeps it
+continuously visible.
 
 The arena is a fixed grid of integer cells centred in the window; the margins
 are the ground colour. There is no vignette, no blur, and no anti-aliased
 curve anywhere: one image blit and a few hundred rectangles a frame.
+
+As a leader grows, its food-chasing shortcuts contract. If more than a small
+share of its body falls out of packing order, it commits early to the arena's
+cell-by-cell cycle; otherwise that commitment becomes absolute as it matures.
+The ordered head path then catches the tail and closes the stray pockets left
+by earlier turns instead of preserving loose gaps inside the coil.
 
 ## Interaction
 

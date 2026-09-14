@@ -20,9 +20,9 @@
       // varied length and aggression, which tilt each one between chasing the
       // mouse and preserving room around bodies. The leaders compound their
       // advantage, but also become increasingly careful about future escape space.
-      // Edge, self, and other-snake contact kill one snake; a bright extinction
-      // front travels from head to tail, and each segment it passes is painted
-      // into a memory layer as the living pigment above it fades.
+      // Edge, self, and other-snake contact kill one snake; its body turns to
+      // crosshatching while a bright extinction front travels from head to tail,
+      // committing each segment it passes into the permanent memory layer.
       //
       // The look is borrowed from Snake Memories (2025): flat integer cells, a
       // hard offset shadow instead of a glow, one palette per round with one
@@ -46,6 +46,9 @@
       const DEATH_FADE_PER_SEG = 0.003;
       const DEATH_FADE_MAX = 0.72;
       const DEATH_FADE_WIDTH = 3.2;
+      const MOUSE_BLINK_PERIOD = 0.24;
+      const MOUSE_BLINK_OFF = 0.10;
+      const PREWARM_MAX_GENERATIONS = 120;
       const AGGRESSION_MIN = 0.42, AGGRESSION_MAX = 0.88;
       const AGGRESSION_PER_SEG = 0.045;
       const AGGRESSION_CAP = 0.97;
@@ -77,6 +80,10 @@
       const PACKING_CYCLE_SPAN_RATIO = 0.04;
       const PACKING_CYCLE_REWARD = 3200;
       const PACKING_SHORTCUT_REWARD = 0.9;
+      const PACKING_SHORTCUT_MAX_ADVANCE = 10;
+      const PACKING_STRICT_DRIVE = 0.72;
+      const PACKING_DISORDER_DRIVE = 0.2;
+      const PACKING_DISORDER_LIMIT = 0.12;
       const VICTORY_DURATION = 2.8;
       const VICTORY_REDUCED_DURATION = 0.7;
       const GOLDEN_HEIR_RATIO = 0.3;  // the leading share of a winner that becomes the heir
@@ -85,12 +92,13 @@
       // Separating the living from the dead. Snake Memories painted its dead at
       // full strength and let its one snake hide in them, found by motion
       // alone; twenty snakes and their death fronts need to read. Memories are
-      // desaturated toward their own grey and pushed toward the ground; the
-      // living keep their full colour.
+      // slightly desaturated and pushed toward the ground; the living keep
+      // their full colour. The stronger distinction comes from texture: dead
+      // cells are crosshatched instead of solid.
       const LOOK = {
         memoryDesaturate: 0.5,  // 0 = full colour, 1 = grey
         memoryFade: 0.22,       // toward the ground
-        prewarm: false,         // true: fill the field with the dead before the first frame, as Snake Memories did
+        prewarm: true,          // fill the field with the dead before the first frame, as Snake Memories did
       };
 
       // Ground and winner colours. Everything else comes from the palette dealt
@@ -159,6 +167,10 @@
           return '#' + hex2(50 + Math.random() * 206) + hex2(50 + Math.random() * 206) + hex2(50 + Math.random() * 206);
         }
         return palette[(Math.random() * palette.length) | 0].toLowerCase();
+      }
+
+      function dealMouseColor() {
+        return `rgb(${rand(200, 255) | 0},${rand(100, 255) | 0},${rand(80, 150) | 0})`;
       }
 
       // ---- state ----------------------------------------------------------
@@ -453,6 +465,8 @@
 
       function spawnMouse(list = snakes) {
         mouse = randomFreeCell(list);
+        mouse.color = dealMouseColor();
+        mouse.blinkAge = 0;
       }
 
       function reset() {
@@ -500,6 +514,8 @@
           return;
         }
         choosePackingDirection(s);
+        const packingDrive = packingCycleDrive(s);
+        const strictPacking = shouldStrictPack(s, packingDrive);
         const choices = [];
         for (const d of opts) {
           const detail = {};
@@ -507,6 +523,18 @@
         }
 
         let contenders = choices.filter(choice => choice.legal);
+        // Once the leader is densely packing, prefer the next cell on its
+        // Hamiltonian sweep whenever that step survives the full lookahead.
+        // This lets the ordered head path reach the tail and erase the loose
+        // pockets left by earlier food-chasing shortcuts.
+        if (strictPacking && contenders.length) {
+          const requiredHorizon = smartLookaheadDepth(intelligence);
+          const cycleFollowers = contenders.filter(choice => {
+            const next = { x: h.x + choice.d.x, y: h.y + choice.d.y };
+            return isPackingCycleStep(s, next) && choice.horizon >= requiredHorizon;
+          });
+          if (cycleFollowers.length) contenders = cycleFollowers;
+        }
         // A corner has fewer nominal exits, so the general safety tiers can
         // otherwise make a snake orbit a perfectly reachable mouse forever.
         // Lock onto the shortest approach only when it includes a legal exit
@@ -541,7 +569,7 @@
         // shortest available mouse route, then let survival and density break
         // ties. If the static body blocks every computed route, direct distance
         // keeps the head hunting instead of retiring into box-filling mode.
-        if (mouse && packingCycleDrive(s) > 0 && contenders.length) {
+        if (mouse && packingDrive > 0 && !strictPacking && contenders.length) {
           const safeHunters = contenders.filter(choice => choice.huntSafe);
           const huntDistance = choice => Number.isFinite(choice.path)
             ? choice.path
@@ -587,6 +615,35 @@
           : (from - to + packingCycle.length) % packingCycle.length;
       }
 
+      function isPackingCycleStep(s, p) {
+        if (!s.packingDirection || !packingCycle.length) return false;
+        const headRank = packingRank.get(key(s.body[0]));
+        const nextRank = packingRank.get(key(p));
+        if (headRank === undefined || nextRank === undefined) return false;
+        return nextRank === (headRank + s.packingDirection + packingCycle.length) % packingCycle.length;
+      }
+
+      function packingDisorder(s) {
+        if (!s.packingDirection || s.body.length < 2 || !packingCycle.length) return 1;
+        let breaks = 0;
+        for (let i = 1; i < s.body.length; i++) {
+          const ahead = packingRank.get(key(s.body[i - 1]));
+          const behind = packingRank.get(key(s.body[i]));
+          if (ahead === undefined || behind === undefined) {
+            breaks++;
+            continue;
+          }
+          const expected = (ahead - s.packingDirection + packingCycle.length) % packingCycle.length;
+          if (behind !== expected) breaks++;
+        }
+        return breaks / (s.body.length - 1);
+      }
+
+      function shouldStrictPack(s, drive = packingCycleDrive(s)) {
+        return drive >= PACKING_STRICT_DRIVE
+          || (drive >= PACKING_DISORDER_DRIVE && packingDisorder(s) > PACKING_DISORDER_LIMIT);
+      }
+
       function packingCycleScore(s, p) {
         const drive = packingCycleDrive(s);
         if (drive <= 0 || !s.packingDirection || !packingCycle.length) return 0;
@@ -612,7 +669,16 @@
           const distance = cycleDistance(headRank, rank, s.packingDirection);
           if (distance > 0) nearestBody = Math.min(nearestBody, distance);
         }
+        // Early in packing, small ordered shortcuts keep food acquisition from
+        // stalling. Their allowance contracts to one cycle step as the body
+        // densifies, preventing cross-lane jumps from leaving persistent holes.
+        const shortcutAllowance = shouldStrictPack(s, drive)
+          ? 1
+          : Math.max(1, Math.floor(
+              PACKING_SHORTCUT_MAX_ADVANCE * (1 - Math.min(1, drive / PACKING_STRICT_DRIVE))
+            ));
         const orderedFoodShortcut = advance > 1
+          && advance <= shortcutAllowance
           && advance < nearestBody
           && mouseAdvance >= advance;
         return orderedFoodShortcut
@@ -1051,12 +1117,15 @@
 
       function beginDeath(s) {
         const colors = snakeColor(s);
+        const seed = Math.random() * 1000;
         dying.push({
           body: copyBody(s.body),
           colors,
-          seed: Math.random() * 1000,
+          hatch: buildHatchLayer(s.body, colors.body, seed),
+          seed,
           age: 0,
           stamped: 0,
+          sweep: 0,
           duration: Math.min(DEATH_FADE_MAX, DEATH_FADE_BASE + s.body.length * DEATH_FADE_PER_SEG),
         });
       }
@@ -1065,9 +1134,12 @@
         for (let i = dying.length - 1; i >= 0; i--) {
           const death = dying[i];
           death.age += dt;
+          death.sweep = updateDeathStamps(death);
           if (death.age < death.duration) continue;
           // Whatever the front has not reached by the end goes into memory now.
-          for (; death.stamped < death.body.length; death.stamped++) stampCell(death.body[death.stamped], death.colors.body);
+          for (; death.stamped < death.body.length; death.stamped++) {
+            transferDeathHatchCell(death, death.body[death.stamped]);
+          }
           dying.splice(i, 1);
         }
       }
@@ -1146,10 +1218,10 @@
       }
 
       // ---- memory layer ---------------------------------------------------
-      // Everything that has ever died is painted here as flat cells in its own
-      // colour, and later deaths paint over earlier ones. The layer is drawn
-      // once per frame beneath the living snakes and is never faded or wiped
-      // except by reset.
+      // Everything that has ever died is painted here as crosshatched cells in
+      // its own colour. Later deaths accumulate over earlier ones so their
+      // overlap remains visible. The layer is drawn once per frame beneath the
+      // living snakes and is never faded or wiped except by reset.
       let memory = null, mctx = null;
       let memoryCells = new Set();
 
@@ -1163,31 +1235,164 @@
         memoryCells = new Set();
       }
 
-      function stampCell(p, color) {
+      function strokeHatchPattern(target, x, y, width, height, color, seed, originX = 0, originY = 0) {
+        const gx = x + originX, gy = y + originY;
+        target.strokeStyle = memoryTone(color);
+        target.lineCap = 'round';
+        target.lineJoin = 'round';
+
+        const corners = [
+          { x: gx, y: gy },
+          { x: gx + width, y: gy },
+          { x: gx, y: gy + height },
+          { x: gx + width, y: gy + height },
+        ];
+        const familyCount = 4 + (hash01(seed + 13, 7) > 0.62 ? 1 : 0);
+        for (let family = 0; family < familyCount; family++) {
+          let angle;
+          if (family === 0) angle = Math.PI * (0.12 + hash01(seed + 17, family) * 0.22);
+          else if (family === 1) angle = -Math.PI * (0.12 + hash01(seed + 17, family) * 0.22);
+          else if (family === 2) angle = Math.PI * (0.38 + hash01(seed + 17, family) * 0.2);
+          else if (family === 3) angle = Math.PI * (0.02 + hash01(seed + 17, family) * 0.1) * (hash01(seed + 23, family) < 0.5 ? -1 : 1);
+          else angle = Math.PI * (0.24 + hash01(seed + 17, family) * 0.52);
+          const dx = Math.cos(angle), dy = Math.sin(angle);
+          const nx = -dy, ny = dx;
+          const normalProjections = corners.map(corner => nx * corner.x + ny * corner.y);
+          const lineProjections = corners.map(corner => dx * corner.x + dy * corner.y);
+          const spacing = Math.max(2, CELL * (0.13 + hash01(seed + 31, family) * 0.12));
+          const phase = hash01(seed + 47, family) * spacing;
+          const first = Math.floor((Math.min(...normalProjections) - phase) / spacing) - 1;
+          const last = Math.ceil((Math.max(...normalProjections) - phase) / spacing) + 1;
+          const step = Math.max(3, CELL * (0.24 + hash01(seed + 59, family) * 0.18));
+          const firstStep = Math.floor(Math.min(...lineProjections) / step) - 1;
+          const lastStep = Math.ceil(Math.max(...lineProjections) / step) + 1;
+
+          for (let lane = first; lane <= last; lane++) {
+            const lineSeed = seed + family * 101 + lane * 0.731;
+            const irregularity = (hash01(lineSeed, 3) - 0.5) * spacing * 0.46;
+            const projection = phase + lane * spacing + irregularity;
+            const pressure = 0.65 + hash01(lineSeed, 11) * 0.85;
+            target.lineWidth = Math.max(0.55, CELL * 0.038 * pressure);
+            target.globalAlpha = 0.22 + hash01(lineSeed, 19) * 0.28;
+            target.beginPath();
+
+            for (let point = firstStep; point <= lastStep; point++) {
+              const along = point * step;
+              const wobble = (hash01(lineSeed + 37, point) - 0.5) * CELL * 0.3;
+              const lineX = dx * along + nx * (projection + wobble) - originX;
+              const lineY = dy * along + ny * (projection + wobble) - originY;
+              const lifts = point > firstStep && hash01(lineSeed + 73, point) < 0.055;
+              if (point === firstStep || lifts) target.moveTo(lineX, lineY);
+              else target.lineTo(lineX, lineY);
+            }
+            target.stroke();
+          }
+        }
+      }
+
+      function paintHatchCell(target, p, color, seed = 0, originX = 0, originY = 0) {
+        const x = p.x * CELL, y = p.y * CELL;
+        target.save();
+        target.beginPath();
+        target.rect(x, y, CELL, CELL);
+        target.clip();
+        strokeHatchPattern(target, x, y, CELL, CELL, color, seed, originX, originY);
+        target.restore();
+      }
+
+      function buildHatchLayer(body, color, seed) {
+        const visible = body.filter(p => inB(p.x, p.y));
+        if (!visible.length) return null;
+        const minX = Math.min(...visible.map(p => p.x));
+        const maxX = Math.max(...visible.map(p => p.x));
+        const minY = Math.min(...visible.map(p => p.y));
+        const maxY = Math.max(...visible.map(p => p.y));
+        const width = (maxX - minX + 1) * CELL;
+        const height = (maxY - minY + 1) * CELL;
+        const layer = document.createElement('canvas');
+        layer.width = Math.max(1, width * dpr);
+        layer.height = Math.max(1, height * dpr);
+        const target = layer.getContext('2d');
+        target.setTransform(dpr, 0, 0, dpr, 0, 0);
+        target.imageSmoothingEnabled = false;
+        const originX = minX * CELL, originY = minY * CELL;
+        target.save();
+        target.beginPath();
+        for (const p of visible) {
+          target.rect((p.x - minX) * CELL, (p.y - minY) * CELL, CELL, CELL);
+        }
+        target.clip();
+        strokeHatchPattern(target, 0, 0, width, height, color, seed, originX, originY);
+        target.restore();
+        return { canvas: layer, target, minX, minY, x: minX * CELL, y: minY * CELL, width, height };
+      }
+
+      function stampCell(p, color, seed = 0) {
         if (!inB(p.x, p.y)) return;
-        mctx.fillStyle = memoryTone(color);
-        mctx.fillRect(p.x * CELL, p.y * CELL, CELL, CELL);
+        paintHatchCell(mctx, p, color, seed);
         memoryCells.add(key(p));
       }
 
-      // Optional (LOOK.prewarm): before the first frame, fill the arena with the
+      function stampHatchBody(body, color, seed) {
+        const layer = buildHatchLayer(body, color, seed);
+        if (!layer) return;
+        mctx.drawImage(layer.canvas, layer.x, layer.y, layer.width, layer.height);
+        for (const p of body) if (inB(p.x, p.y)) memoryCells.add(key(p));
+      }
+
+      function transferDeathHatchCell(death, p) {
+        if (!inB(p.x, p.y)) return;
+        const layer = death.hatch;
+        if (!layer) {
+          stampCell(p, death.colors.body, death.seed);
+          return;
+        }
+        const localX = (p.x - layer.minX) * CELL;
+        const localY = (p.y - layer.minY) * CELL;
+        mctx.drawImage(
+          layer.canvas,
+          localX * dpr,
+          localY * dpr,
+          CELL * dpr,
+          CELL * dpr,
+          p.x * CELL,
+          p.y * CELL,
+          CELL,
+          CELL,
+        );
+        layer.target.clearRect(localX, localY, CELL, CELL);
+        memoryCells.add(key(p));
+      }
+
+      // When LOOK.prewarm is enabled, before the first frame fill the arena with
       // remains of snakes that never appear — one greedy snake at a time chases
       // a mouse until it hits a wall or itself, and is painted where it fell,
-      // until every cell has been painted at least once. Off, the field opens
-      // empty and is painted only by what dies in play.
+      // until every cell has been painted at least once. If disabled, the field
+      // opens empty and is painted only by what dies in play.
       function prewarmMemory() {
         const total = GW * GH;
         let generations = 0;
-        for (let guard = 0; memoryCells.size < total && guard < 40000; guard++) {
+        for (let guard = 0; memoryCells.size < total && guard < PREWARM_MAX_GENERATIONS; guard++) {
           prewarmRun((Math.random() * GW) | 0, (Math.random() * GH) | 0);
           generations++;
         }
+
+        // The last isolated holes otherwise cause a coupon-collector tail of
+        // hundreds of invisible generations. Close them with one clipped hatch
+        // pass so the field is still complete before the first frame.
+        const uncovered = [];
+        for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+          const p = { x, y };
+          if (!memoryCells.has(key(p))) uncovered.push(p);
+        }
+        if (uncovered.length) stampHatchBody(uncovered, dealSwatch(), Math.random() * 1000);
         return generations;
       }
 
       function prewarmRun(x, y) {
         const body = [{ x, y }];
         const color = dealSwatch();
+        const hatchSeed = Math.random() * 1000;
         let dir = { x: 1, y: 0 };
         let food = randomFreeCell([{ body }]);
         for (let steps = 0; steps < 1000; steps++) {
@@ -1207,7 +1412,10 @@
           if (sameCell(next, food)) food = randomFreeCell([{ body }]);
           else body.pop();
         }
-        for (const p of body) stampCell(p, color);
+        // Draw this simulated corpse as one clipped layer. Painting the same
+        // dense hatch separately for every cell makes prewarming needlessly
+        // expensive, especially where generations overlap.
+        stampHatchBody(body, color, hatchSeed);
       }
 
       // ---- render ---------------------------------------------------------
@@ -1230,45 +1438,73 @@
       }
 
       const memoryCache = new Map();
+      const deadColorCache = new Map();
+      function desaturatedHex(hex, amount = 1) {
+        let [r, g, b] = parseHex(hex);
+        const grey = 0.299 * r + 0.587 * g + 0.114 * b;
+        r = mixChannel(r, grey, amount);
+        g = mixChannel(g, grey, amount);
+        b = mixChannel(b, grey, amount);
+        return '#' + hex2(r) + hex2(g) + hex2(b);
+      }
+
       function memoryTone(hex) {
         let tone = memoryCache.get(hex);
         if (tone) return tone;
-        let [r, g, b] = parseHex(hex);
-        const grey = 0.299 * r + 0.587 * g + 0.114 * b;
-        r = mixChannel(r, grey, LOOK.memoryDesaturate);
-        g = mixChannel(g, grey, LOOK.memoryDesaturate);
-        b = mixChannel(b, grey, LOOK.memoryDesaturate);
-        tone = mixHex('#' + hex2(r) + hex2(g) + hex2(b), C_BG, LOOK.memoryFade);
+        tone = mixHex(desaturatedHex(hex, LOOK.memoryDesaturate), C_BG, LOOK.memoryFade);
         memoryCache.set(hex, tone);
         return tone;
       }
+
+      function deadColorsFor(hex) {
+        let colors = deadColorCache.get(hex);
+        if (colors) return colors;
+        colors = colorsForSwatch(desaturatedHex(hex, LOOK.memoryDesaturate));
+        deadColorCache.set(hex, colors);
+        return colors;
+      }
       const cellPx = (x, y) => ({ px: Math.floor(OX + x * CELL), py: Math.floor(OY + y * CELL) });
 
-      // Where each segment of a snake is drawn this frame. Only the head and the
-      // tail slide between cells; the body snaps. A snake that just grew keeps
-      // its tail still.
+      // Where each segment of a snake is drawn this frame. Every square slides
+      // between cells, keeping the flat grid look without making the body snap.
+      // A snake that just grew has no previous position for its new tail, so
+      // that final square correctly stays still for the first move.
       function snakeCells(s) {
         const alpha = Math.min(1, (s.moveAcc || 0) / moveInterval(s));
         const body = s.body, prev = s.prev || body, n = body.length;
         const cells = new Array(n);
         for (let i = 0; i < n; i++) {
           const cur = body[i];
-          if (i === 0 && prev[0]) {
-            cells[i] = cellPx(prev[0].x + (cur.x - prev[0].x) * alpha, prev[0].y + (cur.y - prev[0].y) * alpha);
-          } else if (i === n - 1 && n > 1 && prev.length >= n) {
-            const ahead = body[i - 1];
-            cells[i] = cellPx(cur.x + (ahead.x - cur.x) * alpha, cur.y + (ahead.y - cur.y) * alpha);
-          } else {
-            cells[i] = cellPx(cur.x, cur.y);
-          }
+          const old = prev[i] || cur;
+          cells[i] = cellPx(old.x + (cur.x - old.x) * alpha, old.y + (cur.y - old.y) * alpha);
+          // Consecutive segments trade this grid cell during a move. Keeping it
+          // as their joint lets the rendered body follow both orthogonal legs
+          // of a turn instead of opening a diagonal gap between two squares.
+          if (i + 1 < n) cells[i].joint = cellPx(body[i + 1].x, body[i + 1].y);
         }
         return cells;
       }
 
-      function fillCells(cells, color, offset = 0, from = 0, to = cells.length) {
+      function connectCellToJoint(cell, joint, offset) {
+        ctx.rect(
+          Math.min(cell.px, joint.px) + offset,
+          Math.min(cell.py, joint.py) + offset,
+          Math.abs(cell.px - joint.px) + CELL,
+          Math.abs(cell.py - joint.py) + CELL,
+        );
+      }
+
+      function fillConnectedCells(cells, color, offset = 0, from = 0, to = cells.length) {
         ctx.fillStyle = color;
         ctx.beginPath();
-        for (let i = from; i < to; i++) ctx.rect(cells[i].px + offset, cells[i].py + offset, CELL, CELL);
+        for (let i = from; i < to; i++) {
+          const cell = cells[i];
+          ctx.rect(cell.px + offset, cell.py + offset, CELL, CELL);
+          if (i + 1 >= to || !cell.joint) continue;
+          const next = cells[i + 1];
+          connectCellToJoint(cell, cell.joint, offset);
+          connectCellToJoint(next, cell.joint, offset);
+        }
         ctx.fill();
       }
 
@@ -1281,45 +1517,35 @@
         return Math.max(0, Math.min(1, (index + DEATH_FADE_WIDTH - sweep) / DEATH_FADE_WIDTH));
       }
 
-      // A dying snake keeps its shape. A bright front travels from the head to
-      // the tail; as it reaches each segment, that cell is painted into the
-      // memory layer and the living cell above it fades out, so the body
-      // crossfades from shadowed pigment into flat memory one segment at a time.
+      // A dying snake keeps its crosshatched shape while a bright front travels
+      // from head to tail. As the front reaches each segment, that cell is
+      // committed into the permanent memory layer beneath it.
       function updateDeathStamps(death) {
         const sweep = Math.min(1, death.age / death.duration) * (death.body.length + DEATH_FADE_WIDTH);
         while (death.stamped < death.body.length && deathVisibility(death.stamped, sweep) < 1) {
-          stampCell(death.body[death.stamped], death.colors.body);
+          const cell = death.body[death.stamped];
+          transferDeathHatchCell(death, cell);
           death.stamped++;
         }
         return sweep;
       }
 
       function drawDeaths() {
-        const shadowOffset = Math.max(1, Math.round(CELL * 0.1));
         for (const death of dying) {
           const n = death.body.length;
           if (!n) continue;
-          const sweep = updateDeathStamps(death);
+          const sweep = death.sweep;
           const cells = death.body.map(p => cellPx(p.x, p.y));
-          const colors = death.colors;
-          const shade = shadowFor(colors.body);
-
-          // Untouched remainder at full strength, then the transition band
-          // segment by segment.
-          const solidStart = Math.min(n, Math.max(0, Math.ceil(sweep)));
-          if (solidStart < n) {
-            fillCells(cells, shade, shadowOffset, solidStart, n);
-            fillCells(cells, colors.body, 0, solidStart, n);
+          const colors = deadColorsFor(death.colors.body);
+          if (death.hatch) {
+            ctx.drawImage(
+              death.hatch.canvas,
+              OX + death.hatch.x,
+              OY + death.hatch.y,
+              death.hatch.width,
+              death.hatch.height,
+            );
           }
-          const bandStart = Math.max(0, Math.floor(sweep - DEATH_FADE_WIDTH));
-          for (let i = bandStart; i < solidStart; i++) {
-            const visibility = deathVisibility(i, sweep);
-            if (visibility <= 0) continue;
-            ctx.globalAlpha = visibility;
-            fillCells(cells, shade, shadowOffset, i, i + 1);
-            fillCells(cells, colors.body, 0, i, i + 1);
-          }
-          ctx.globalAlpha = 1;
 
           // The hot front: a bright cell and five sparking rays, travelling
           // from the head through the final tail segment.
@@ -1354,31 +1580,34 @@
 
         drawDeaths();
 
-        // The mouse flickers: a fresh warm colour every frame, as it did in
-        // Snake Memories.
-        if (mouse) {
+        // A rapid one-cell hard blink suits the pixel-grid language without
+        // reintroducing the old every-frame colour jitter.
+        const mousePhase = mouse ? mouse.blinkAge % MOUSE_BLINK_PERIOD : 0;
+        const mouseVisible = mouse && (reducedMotion || mousePhase < MOUSE_BLINK_PERIOD - MOUSE_BLINK_OFF);
+        if (mouseVisible) {
           const m = cellPx(mouse.x, mouse.y);
-          ctx.fillStyle = `rgb(${rand(200, 255) | 0},${rand(100, 255) | 0},${rand(80, 150) | 0})`;
+          ctx.fillStyle = mouse.color;
           ctx.fillRect(m.px, m.py, CELL, CELL);
         }
 
         // Living snakes: every shadow, then every body, then the heir's gold.
         const shadowOffset = Math.max(1, Math.round(CELL * 0.1));
         const drawn = snakes.map(s => ({ s, cells: snakeCells(s), colors: snakeColor(s), gold: winnerGoldAmount(s) }));
-        for (const d of drawn) fillCells(d.cells, shadowFor(d.colors.body), shadowOffset);
-        for (const d of drawn) fillCells(d.cells, d.colors.body);
+        for (const d of drawn) fillConnectedCells(d.cells, shadowFor(d.colors.body), shadowOffset);
+        for (const d of drawn) fillConnectedCells(d.cells, d.colors.body);
         for (const d of drawn) {
           if (d.gold <= 0) continue;
           const heir = winnerHeadColor(d.s, d.gold);
           const heirLength = Math.min(d.cells.length, winnerHeadLength(d.s.body.length));
-          fillCells(d.cells, shadowFor(heir.body), shadowOffset, 0, heirLength);
-          fillCells(d.cells, heir.body, 0, 0, heirLength);
+          fillConnectedCells(d.cells, shadowFor(heir.body), shadowOffset, 0, heirLength);
+          fillConnectedCells(d.cells, heir.body, 0, 0, heirLength);
         }
       }
 
       // ---- loop -----------------------------------------------------------
       function tick(t) {
         const dt = Math.min(0.1, (t - last) / 1000 || 0); last = t; frame++;
+        if (mouse) mouse.blinkAge = (mouse.blinkAge || 0) + dt;
         updateDeaths(dt);
         const celebrating = updateVictory(dt);
         if (!celebrating) {

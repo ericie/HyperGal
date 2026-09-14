@@ -132,7 +132,12 @@
         // the canvases would get unreasonably large, and cover crops instead.
         const BASE = 1920;
         const MAX_ASPECT = 3;
-        const stage = { w: BASE, h: BASE };
+        const MOBILE_MAX_DIMENSION = 2048;
+        const MOBILE_MAX_DPR = 2;
+        const originalQuality = new URLSearchParams(location.search)
+          .get('quality') === 'original';
+        const coarsePointer = window.matchMedia('(pointer: coarse)');
+        const stage = { w: BASE, h: BASE, scale: 1 };
         const container = document.createElement('main');
         container.id = 'hmcMain';
 
@@ -149,24 +154,42 @@
           return Math.min(MAX_ASPECT, Math.max(1 / MAX_ASPECT, w / h));
         }
 
-        // Sizing a canvas clears it, so this also empties the three layers.
+        function useAdaptiveBackingStore() {
+          return !originalQuality &&
+            (coarsePointer.matches || Math.min(window.innerWidth, window.innerHeight) <= 600);
+        }
+
+        // Keep the composition in its original 1920-based coordinate space,
+        // but do not make a phone rasterise several times more pixels than its
+        // screen can show. Sizing a canvas clears it, so this also empties the
+        // three layers.
         function sizeStage() {
           const aspect = viewportAspect();
           stage.w = aspect >= 1 ? Math.round(BASE * aspect) : BASE;
           stage.h = aspect >= 1 ? BASE : Math.round(BASE / aspect);
+          stage.scale = 1;
+          if (useAdaptiveBackingStore()) {
+            const viewportLongSide = Math.max(window.innerWidth, window.innerHeight);
+            const targetLongSide = Math.min(
+              MOBILE_MAX_DIMENSION,
+              Math.ceil(viewportLongSide * Math.min(window.devicePixelRatio || 1, MOBILE_MAX_DPR))
+            );
+            stage.scale = Math.min(1, targetLongSide / Math.max(stage.w, stage.h));
+          }
           for (const c of container.querySelectorAll('canvas')) {
-            c.width = stage.w;
-            c.height = stage.h;
+            c.width = Math.max(1, Math.round(stage.w * stage.scale));
+            c.height = Math.max(1, Math.round(stage.h * stage.scale));
           }
         }
         sizeStage();
 
-        const composite = document.getElementById('hmcComp');
-        composite.setAttribute('tabindex', '0');
-        composite.setAttribute('aria-describedby', 'instructions');
+        const compositeElem = document.getElementById('hmcComp');
+        compositeElem.setAttribute('tabindex', '0');
+        compositeElem.setAttribute('aria-describedby', 'instructions');
         const library = document.getElementById('library');
 
         const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+        let settleRun = 0;
 
         window.$fxhashFeatures = {};
         init(stage);
@@ -189,14 +212,36 @@
         // word has surfaced, then stop the frame loop on that picture. The
         // word can only be found once the font is in, so wait for it.
         function settle() {
-          if (!textFontLoaded) { setTimeout(settle, 50); return; }
+          const run = ++settleRun;
           cancelAnimationFrame(request);
-          for (let i = 0; i < 1100; i++) update();
+
+          const waitForFont = () => {
+            if (run !== settleRun) return;
+            if (!textFontLoaded) { setTimeout(waitForFont, 50); return; }
+
+            let remaining = 1100;
+            const advance = () => {
+              if (run !== settleRun) return;
+              const chunkStart = performance.now();
+              do {
+                update(false);
+                remaining--;
+              } while (remaining > 0 && performance.now() - chunkStart < 8);
+
+              if (remaining > 0) {
+                request = requestAnimationFrame(advance);
+              } else {
+                composite();
+              }
+            };
+            advance();
+          };
+          waitForFont();
         }
 
         function describe() {
           const f = window.$fxhashFeatures;
-          composite.setAttribute(
+          compositeElem.setAttribute(
             'aria-label',
             'Persistent Positives: the word ' + f.word + ' in the ' + f.colors +
             ' palette, laid out ' + f.intial_layout + ', under ' +
@@ -212,6 +257,7 @@
           // init() appends its texture tiles and shape layer to the library
           // and paints the word buffer without clearing it first. Sizing the
           // stage clears the three canvases.
+          settleRun++;
           cancelAnimationFrame(request);
           library.replaceChildren();
           sizeStage();
@@ -226,11 +272,11 @@
         function savePicture() {
           const link = document.createElement('a');
           link.download = 'PersistentPositives_' + window.fxhash + '.png';
-          link.href = composite.toDataURL('image/png');
+          link.href = compositeElem.toDataURL('image/png');
           link.click();
         }
 
-        composite.addEventListener('click', () => newIteration());
+        compositeElem.addEventListener('click', () => newIteration());
         // Keys are taken at the document, as the shipped build's S-to-save was.
         document.addEventListener('keydown', (event) => {
           const key = event.key.toLowerCase();

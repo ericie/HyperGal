@@ -51,14 +51,16 @@ out but not in the pile.
 - S: save the picture as a PNG
 - `?hash=oo…` reproduces a specific iteration; `?debug` logs the feature
   record to the console
+- `?quality=original` keeps the original full-resolution backing canvases on
+  mobile instead of using the adaptive renderer
 
 ## Fitting the window
 
 The original drew into a fixed 1920 square and let the browser letterbox it on
 black. The piece now fills the window edge to edge, whatever its shape, without
-stretching: the short side of the stage stays 1920 and the long side follows
-the window's aspect ratio, so shapes, type and texture keep the scale they were
-tuned at and the field simply extends. Because the hash's random draws come in
+stretching: the short side of the logical stage stays 1920 and the long side
+follows the window's aspect ratio, so shapes, type and texture keep the scale
+they were tuned at and the field simply extends. Because the hash's random draws come in
 the same order, a given hash keeps its word, palette, layouts and shape mixes
 at any window shape; only where things land changes. The field grows with the
 area — 400 shapes on the square, about 710 on a 16:9 screen, 870 on a phone —
@@ -66,8 +68,14 @@ so the barrage is as thick as it was. A resize that changes the window's shape
 lays the same iteration out again against the new stage; a nudge of a few
 percent is absorbed by cropping instead, so dragging a window edge does not
 wipe a picture that has been accumulating for minutes. The long side is capped
-at three times the short — beyond that the canvases would be enormous, and the
-picture is cropped to fit.
+at three times the short — beyond that the composition would be enormous, and
+the picture is cropped to fit.
+
+On a phone, that 1920-based stage remains the coordinate system but is rendered
+into a smaller backing store: no more than two physical pixels per CSS pixel or
+2,048 pixels on the long side. This avoids allocating four multi-megapixel
+canvases that exceed what the screen can display. Desktop keeps the original
+backing resolution, and `?quality=original` opts back into it on any device.
 
 Four things in the sketch assumed a square and had to be adapted (they are all
 no-ops on the 1920 square, which is how parity with the minted build was kept):
@@ -135,9 +143,11 @@ Quirks kept because they are in the picture:
   list come up half as often: Dandelions on Teal and Green Gate, the first Even
   Mix slot and Right Angles.
 - The feature record spells it `intial_layout`, as minted.
-- Sampling the word buffer fifty times a frame makes Chrome warn that the
-  canvas would be faster with `willReadFrequently`. Setting it would change
-  the rasteriser and risk the pixel match, so it is left alone.
+- The word buffer is read once per layout into a compact alpha mask. The same
+  fifty random coordinates are then sampled from that mask each frame, keeping
+  the random sequence while avoiding synchronous canvas reads in the loop.
 
 Reduced motion: once the font is in, the system is run forward 1,100 frames
-without animating — past the word's arrival — and the loop is stopped there.
+without presenting the intermediate pictures — past the word's arrival — and
+the loop is stopped there. The work is split into short yielding chunks so the
+page remains responsive, and only the settled picture is composited.
