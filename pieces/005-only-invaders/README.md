@@ -7,7 +7,8 @@ and left edges of a clean star field. Each landmass is the shallow visible cap
 of a giant circle centered far beyond the screen. Every cannon has one degree
 of travel along its own arc and tilts to stay planted on the changing curve.
 Each cannon is rendered entirely in its own color, without targeting guides.
-The cannons take turns sending bullets directly toward the opposite edge,
+Every projectile inherits the exact color of the cannon that fired it. The
+cannons take turns sending bullets directly toward the opposite edge,
 sometimes as single shots and sometimes as sudden aggressive volleys. North
 only attacks south, east only attacks west, and vice versa. Occasional rapid
 spasms burn through five to eight rounds in a fraction of a second.

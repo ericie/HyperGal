@@ -77,6 +77,11 @@ into a smaller backing store: no more than two physical pixels per CSS pixel or
 canvases that exceed what the screen can display. Desktop keeps the original
 backing resolution, and `?quality=original` opts back into it on any device.
 
+The persistent ground and transparent live-shape canvas are displayed as two
+stacked browser layers. The save canvas is no longer cleared and rebuilt on
+every animation frame; it is composited only when exporting a PNG or holding a
+still image while reduced-motion mode settles.
+
 Four things in the sketch assumed a square and had to be adapted (they are all
 no-ops on the 1920 square, which is how parity with the minted build was kept):
 
@@ -118,12 +123,11 @@ window-fitting changes were checked the same way afterwards: at a square
 viewport eight more hashes, including one of each of the three rewritten
 layouts, are still byte-identical over 900 frames, and two over 3,400.
 
-One change to the sketch beyond the window fitting above. `init()` started the
-frame loop with a bare `requestAnimationFrame(performAnimation)` and only
-stored the id from the second frame on, so the loop could not be reliably
-cancelled. The call now assigns to `request` like every later frame does.
-Around it, a new iteration cancels the loop, empties the library of texture
-tiles and the shape layer (which `init()` appends afresh), sizes the three
+The port also fixes the original frame-loop bookkeeping. `init()` started the
+loop with a bare `requestAnimationFrame(performAnimation)` and only stored the
+id from the second frame on, so the loop could not be reliably cancelled. The
+call now assigns to `request` like every later frame does. Around it, a new
+iteration cancels the loop, empties the texture library, sizes the four
 canvases to the window (which clears them — the word buffer is painted without
 clearing), and resets the feature record.
 

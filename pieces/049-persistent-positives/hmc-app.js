@@ -65,11 +65,10 @@ function init(e) {
     bgShapeMix: r.id,
     wordShapeMix: m.id
   }, bg.fillStyle = a.background.color, bg.fillRect(0, 0, stage.w, stage.h), textRender = new TextRender(this.systemParams);
-  let s = document.getElementById("library"),
-    i = document.createElement("canvas"),
-    l,
-    o = "layer_0";
-  i.setAttribute("id", o), i.setAttribute("height", Math.max(1, Math.round(stage.h * stage.scale))), i.setAttribute("width", Math.max(1, Math.round(stage.w * stage.scale))), s.appendChild(i), l = i.getContext("2d"), l.setTransform(stage.scale, 0, 0, stage.scale, 0, 0);
+  let i = document.getElementById("hmcLive"),
+    l = i.getContext("2d"),
+    o = "hmcLive";
+  l.setTransform(stage.scale, 0, 0, stage.scale, 0, 0);
   let u = {
     id: o,
     elem: i,
@@ -78,11 +77,11 @@ function init(e) {
   this.systemParams.myLayer = l, this.systemParams.layerObj = u, this.newSystem = new PreySystem(this.systemParams), this.newSystem.init(stage, a), featureList.pallet = a.name, featureList.word = textRender.getWord(), featureList.posterLayout = textRender.getLayout(), featureList.bgShapes = r.name, featureList.wordShapes = m.name, addFeatures(featureList), request = requestAnimationFrame(performAnimation)
 }
 const performAnimation = () => {
-  update(), request = requestAnimationFrame(performAnimation)
+  update(!1), request = requestAnimationFrame(performAnimation)
 };
 
 function update(present = !0) {
-  layoutTime++, layoutTime > layoutMaxTime && layoutTime < layoutMaxTime + 2 && this.newSystem.setEraserMode(), layoutTime > layoutMaxTime + layoutPauseTime && (textRender.pickLayout(), this.newSystem.resetWordList(), layoutTime = 0, textRender.draw()), this.newSystem.update(), this.newSystem.draw(), renderQueue.update(), present && composite()
+  layoutTime++, layoutTime > layoutMaxTime && layoutTime < layoutMaxTime + 2 && this.newSystem.setEraserMode(), layoutTime > layoutMaxTime + layoutPauseTime && (textRender.pickLayout(), this.newSystem.resetWordList(), layoutTime = 0, textRender.draw()), this.newSystem.update(), this.newSystem.draw(), renderQueue.update(), textRender.fontLoaded() && !textRender.firstDraw() && textRender.draw(), present && composite()
 }
 
 function updateBG() {
@@ -97,7 +96,7 @@ function updateBG() {
 function composite() {
   comp.clearRect(0, 0, stage.w, stage.h), comp.drawImage(bgElem, 0, 0, stage.w, stage.h);
   let e = this.newSystem.layerObj.elem;
-  comp.drawImage(e, 0, 0, stage.w, stage.h), textRender.fontLoaded() && !textRender.firstDraw() && textRender.draw()
+  comp.drawImage(e, 0, 0, stage.w, stage.h)
 }
 
 function colorToObj(e) {

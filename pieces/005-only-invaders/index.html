@@ -22,8 +22,6 @@
         bottom: '#7cf7c8',
         left: '#8fb7ff',
         right: '#ffb86b',
-        attack: '#f8ff9a',
-        super: '#fff1a8',
         superCore: '#ffffff',
       };
 
@@ -325,7 +323,7 @@
           targetY: target.y,
           targetTime,
           r: 4,
-          color: COLORS.attack,
+          color: shooter.color,
           aggression: shot.aggression,
           armed: true,
         };
@@ -945,7 +943,7 @@
           bullet.x, bullet.y, radius * 0.18,
           bullet.x, bullet.y, radius * 1.9,
         );
-        aura.addColorStop(0, `rgba(255,255,255,${0.34 + bullet.hitFlash * 0.24})`);
+        aura.addColorStop(0, hexA(bullet.color, 0.42 + bullet.hitFlash * 0.28));
         aura.addColorStop(0.36, hexA(bullet.color, 0.28));
         aura.addColorStop(1, hexA(bullet.color, 0));
         ctx.fillStyle = aura;
@@ -958,10 +956,6 @@
         ctx.fillStyle = bullet.color;
         ctx.beginPath();
         ctx.arc(bullet.x, bullet.y, radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = COLORS.superCore;
-        ctx.beginPath();
-        ctx.arc(bullet.x, bullet.y, radius * 0.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
