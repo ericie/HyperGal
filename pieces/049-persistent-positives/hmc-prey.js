@@ -1,5 +1,8 @@
 function PreySystem(t) {
-  this.params = t, this.canvas = this.params.myLayer, this.background = this.params.bg, this.foreground = this.params.fg, this.bgShapeMix = this.params.bgShapeMix, this.wordShapeMix = this.params.wordShapeMix, this.buffer = this.params.buffer, this.bufferElem = this.params.bufferElem, this.layerObj = this.params.layerObj, this.systemSize = Math.round(400 * stage.w * stage.h / (1920 * 1920)), this.growthType = this.params.growthType, this.wordTargList = [], this.wordMask = null, this.introMode = !0, this.wordTargetMin = 2200, this.shapeTypes = ["circle", "rectangle", "triangle"], this.eraserMode = !1
+  this.params = t, this.canvas = this.params.myLayer, this.background = this.params.bg, this.foreground = this.params.fg, this.bgShapeMix = this.params.bgShapeMix, this.wordShapeMix = this.params.wordShapeMix, this.buffer = this.params.buffer, this.bufferElem = this.params.bufferElem, this.layerObj = this.params.layerObj, this.systemSize = Math.round(400 * stage.w * stage.h / (1920 * 1920)), this.growthType = this.params.growthType, this.wordTargList = [], this.wordMask = null, this.introMode = !0, this.wordTargetMin = 2200, this.shapeTypes = ["circle", "rectangle", "triangle"], this.eraserMode = !1, this.clearCommand = {
+    type: "clear",
+    canvas: this.canvas
+  }
 }
 
 function Prey(t) {
@@ -15,16 +18,33 @@ PreySystem.prototype.init = function(t, e) {
   this.stage = t, this.preyList = [];
   for (let t = 0; t < this.systemSize; t++) this.colors = e.list, this.highlight = e.highlight, this.addNew(t);
   this.preyList.sort(((t, e) => t.maxLife - e.maxLife))
-}, PreySystem.prototype.addNew = function(t) {
+}, PreySystem.prototype.prepareParams = function() {
   let e = this.params;
   e.type = this.growthType, e.colors = this.colors, e.highlight = this.highlight, e.d = 20, e.canvas = this.canvas, e.background = this.background, e.foreground = this.foreground, e.buffer = this.buffer, e.bufferElem = this.bufferElem, e.compositeCall = this.params.compositeCall, e.shapeTypes = this.shapeTypes, e.wordShapeMix = this.wordShapeMix, e.bgShapeMix = this.bgShapeMix, e.eraserMode = this.eraserMode, e.introMode = this.introMode, e.stage = this.stage, e.wordTargList = this.wordTargList;
-  let i = new Prey(e);
-  this.preyList.push(i)
+  return e
+}, PreySystem.prototype.addNew = function(t) {
+  this.preyList.push(new Prey(this.prepareParams()))
+}, PreySystem.prototype.reduceToLiveShapeLimit = function(t) {
+  const e = Math.min(this.preyList.length, Math.max(0, t)),
+    i = this.preyList;
+  if (e >= i.length) return;
+  const s = i.length / Math.max(1, e),
+    r = new Array(e);
+  for (let t = 0; t < e; t++) r[t] = i[Math.floor(t * s)];
+  this.preyList = r, this.systemSize = e
+}, PreySystem.prototype.enableIncrementalRendering = function(t) {
+  this.renderBatchCount = Math.max(1, Math.round(t)), this.renderBatchIndex = 0, this.background = this.canvas, this.params.bg = this.canvas;
+  for (let e = 0; e < this.preyList.length; e++) this.preyList[e].renderBatch = e % this.renderBatchCount, this.preyList[e].background = this.canvas
+}, PreySystem.prototype.recycle = function(t) {
+  // Reinitialize the object in place so its render-command storage survives
+  // instead of becoming JavaScript garbage.
+  t.wordTargList = null, Prey.call(t, this.prepareParams());
+  return t
 }, PreySystem.prototype.resetWordList = function(t) {
   this.wordTargList = [], this.wordMask = null, this.eraserMode = !1, this.introMode = !1
 }, PreySystem.prototype.setEraserMode = function(t) {
   this.eraserMode = !0
-}, PreySystem.prototype.update = function(t) {}, PreySystem.prototype.buildTargetList = function() {
+}, PreySystem.prototype.update = function(t) {}, PreySystem.prototype.buildTargetList = function(t = 1) {
   if (this.buffer) {
     if (!this.wordMask) {
       const t = this.bufferElem.width,
@@ -43,133 +63,66 @@ PreySystem.prototype.init = function(t, e) {
       }
     }
     const e = this.wordMask;
-    for (let t = 0; t < 50; t++) {
-      let t = {
-        x: 0,
-        y: 0
-      };
-      t.x = fxrand() * stage.w, t.y = fxrand() * stage.h;
-      const i = Math.min(e.width - 1, Math.floor(t.x * e.scaleX)),
-        s = Math.min(e.height - 1, Math.floor(t.y * e.scaleY));
+    for (let a = 0; a < 50 * t; a++) {
+      const t = fxrand() * stage.w,
+        r = fxrand() * stage.h,
+        i = Math.min(e.width - 1, Math.floor(t * e.scaleX)),
+        s = Math.min(e.height - 1, Math.floor(r * e.scaleY));
       0 != e.alpha[s * e.width + i] && this.wordTargList.push({
-        x: t.x,
-        y: t.y
+        x: t,
+        y: r
       })
     }
   }
-}, PreySystem.prototype.draw = function() {
-  1 != this.introMode && this.wordTargList && this.wordTargList.length < this.wordTargetMin && this.buildTargetList(), renderQueue.add({
-    type: "clear",
-    canvas: this.canvas,
-    height: this.stage.h,
-    width: this.stage.w,
-    location: {
-      x: 0,
-      y: 0
-    }
-  });
-  for (let t = 0; t < this.preyList.length; t++) {
-    const e = this.preyList[t];
-    1 == e.alive && e.draw()
+}, PreySystem.prototype.draw = function(frameStep = 1, renderLive = !0) {
+  const batchCount = renderLive ? this.renderBatchCount || 1 : 1,
+    batch = batchCount > 1 ? this.renderBatchIndex++ % batchCount : 0,
+    preyFrameStep = frameStep * batchCount;
+  1 != this.introMode && this.wordTargList && this.wordTargList.length < this.wordTargetMin && this.buildTargetList(frameStep), renderLive && 1 == batchCount && renderQueue.add(this.clearCommand);
+  for (let index = 0; index < this.preyList.length; index++) {
+    const prey = this.preyList[index];
+    1 == prey.alive && (1 == batchCount || prey.renderBatch == batch) && prey.draw(preyFrameStep, renderLive)
   }
-  for (let t = 0; t < this.preyList.length; t++)
-    if (1 == this.preyList[t].alive);
-    else {
-      let e = this.preyList.splice(t, 1);
-      e = 0, this.addNew(), this.preyList.sort(((t, e) => t.lifeRemaining - e.lifeRemaining))
-    }
+  let a = !1;
+  for (let e = 0; e < this.preyList.length; e++)
+    1 != this.preyList[e].alive && (this.preyList[e] = this.recycle(this.preyList[e]), a = !0);
+  // Several shapes often expire in one frame. Restore lifespan ordering once
+  // after all replacements instead of repeatedly sorting the whole population.
+  a && this.preyList.sort(((t, e) => t.lifeRemaining - e.lifeRemaining))
+}, PreySystem.prototype.drawCurrentFrame = function() {
+  renderQueue.add(this.clearCommand);
+  for (let t = 0; t < this.preyList.length; t++) 1 == this.preyList[t].alive && this.preyList[t].drawShape(0);
+  renderQueue.update()
 }, Prey.prototype.reset = function() {
-  this.life = 0, this.position = this.pickNewLocation(this.mode), this.rMax = this.params.sizeMin + this.sizeRange * fxrand(), this.currentR = 0, this.currentA = 360 * fxrand(), this.oldLoc = new Vector(this.position.x, this.position.y), this.startPos = new Vector(this.position.x, this.position.y), this.angleSpeed = .03, this.textureOffset = {
-    x: (stage.w - 100) * fxrand(),
-    y: (stage.h - 100) * fxrand(),
-    a: .25 * fxrand()
-  }, this.makeTexture({
-    drawCanvas: this.canvas
-  }), this.circleRMax = 1 * (this.params.sizeMin + this.sizeRange * fxrand())
+  this.life = 0, this.position = this.pickNewLocation(this.mode), this.rMax = this.params.sizeMin + this.sizeRange * fxrand(), this.currentR = 0, this.currentA = 360 * fxrand(), this.startPos = new Vector(this.position.x, this.position.y);
+  // Preserve the original seeded random sequence. These four values formerly
+  // fed unused per-shape texture and radius fields.
+  fxrand(), fxrand(), fxrand(), fxrand()
 }, Prey.prototype.die = function() {
   this.alive = !1
-}, Prey.prototype.draw = function() {
-  this.life++, this.lifeRemaining = this.maxLife - this.life, 1 == this.splitGeneration && this.generation, this.life < this.delayLife || (this.life < this.delayLife + this.growLife ? this.drawShape() : 1 == this.alive && (this.drawShape({
-    holding: !0,
-    die: !0
-  }), this.die()))
+}, Prey.prototype.draw = function(t = 1, e = !0) {
+  const i = this.life,
+    s = this.delayLife + this.growLife,
+    r = Math.max(i + 1, Math.ceil(this.delayLife)),
+    h = Math.min(i + t, Math.ceil(s) - 1),
+    a = Math.max(0, h - r + 1);
+  this.life += t, this.lifeRemaining = this.maxLife - this.life, 1 == this.splitGeneration && this.generation, this.life < this.delayLife || (this.life < s ? e ? this.drawShape(a) : a > 0 && (this.currentR += a * this.maxD / this.growLife) : 1 == this.alive && (a > 0 && (this.currentR += a * this.maxD / this.growLife), this.drawShape(0, !0), this.die()))
 }, Prey.prototype.pickColor = function(t) {
   let e = t[Math.floor(fxrand() * t.length)];
   return this.textureNum = Math.floor(6 * fxrand()), this.textureNum > 5 && (this.textureState = !1), e.color
-}, Prey.prototype.drawShadow = function(t) {
-  let e = t.xOffset / t.steps,
-    i = t.yOffset / t.steps,
-    s = t.alpha / t.steps,
-    r = this.currentR * t.shadowScale,
-    h = t.drawCanvas;
-  for (let a = 0; a < t.steps; a++) h.fillStyle = `rgba(0,0,0,${s})`, h.beginPath(), h.arc(this.position.x + e * a, this.position.y + i * a, r, 0, 2 * Math.PI), h.closePath(), h.fill()
-}, Prey.prototype.makeTexture = function(t) {
-  let e = t.drawCanvas;
-  this.pattern = e.createPattern(texture.getElem(), "repeat");
-  let i = new DOMMatrix([1, .2, .8, 1, 0, 0]);
-  this.pattern.setTransform(i.translate(this.textureOffset.x, this.textureOffset.y))
-}, Prey.prototype.drawTexture = function(t) {
-  let e = t.drawCanvas;
-  e.fillStyle = this.pattern, e.globalAlpha = this.textureOffset.a, e.beginPath(), e.arc(this.position.x, this.position.y, this.currentR, 0, 2 * Math.PI), e.closePath(), e.fill(), e.globalAlpha = 1
-}, Prey.prototype.drawShape = function(t) {
-  let e = this.canvas,
-    i = !1;
-  if (t && 1 == t.holding && (i = !0), 0 == i) {
-    let t = this.maxD / this.growLife;
-    this.currentR += t
-  }
-  if (t && 1 == t.die && (e = this.background), this.position.x = this.startPos.x, this.position.y = this.startPos.y, "circle" == this.shapeType) renderQueue.add({
-    type: "drawCircle",
-    canvas: e,
-    height: this.currentR,
-    width: this.currentR,
-    color: this.color,
-    alpha: this.currentA,
-    rotation: this.rotation,
-    position: this.position,
-    shadow: !0,
-    texture: this.textureState,
-    textureNumber: this.textureNum
-  });
-  else if ("rectangle" == this.shapeType) {
-    let t = this.heightMod * this.currentR,
-      i = this.widthMod * this.currentR;
-    renderQueue.add({
-      type: "drawRect",
-      canvas: e,
-      height: t,
-      width: i,
-      color: this.color,
-      alpha: this.currentA,
-      rotation: this.rotation,
+}, Prey.prototype.drawShape = function(t = 1, e = !1) {
+  let i = e ? this.background : this.canvas;
+  t > 0 && (this.currentR += this.maxD / this.growLife * t), this.position.x = this.startPos.x, this.position.y = this.startPos.y;
+  const s = e ? "finalCommand" : "liveCommand",
+    r = this[s] || (this[s] = {
       position: {
-        x: this.position.x - this.currentR / 2,
-        y: this.position.y - this.currentR / 2
+        x: 0,
+        y: 0
       },
-      shadow: !0,
-      texture: this.textureState,
-      textureNumber: this.textureNum
-    })
-  } else if ("triangle" == this.shapeType) {
-    let t = this.heightMod * this.currentR,
-      i = this.widthMod * this.currentR;
-    renderQueue.add({
-      type: "drawTriangle",
-      canvas: e,
-      height: t,
-      width: i,
-      color: this.color,
-      alpha: this.currentA,
-      rotation: this.rotation,
-      position: {
-        x: this.position.x - this.currentR / 2,
-        y: this.position.y - this.currentR / 2
-      },
-      shadow: !0,
-      texture: this.textureState,
-      textureNumber: this.textureNum
-    })
-  }
+      shadow: !0
+    }),
+    h = "circle" == this.shapeType;
+  r.type = h ? "drawCircle" : "rectangle" == this.shapeType ? "drawRect" : "drawTriangle", r.canvas = i, r.height = h ? this.currentR : this.heightMod * this.currentR, r.width = h ? this.currentR : this.widthMod * this.currentR, r.color = this.color, r.alpha = this.currentA, r.rotation = this.rotation, r.position.x = h ? this.position.x : this.position.x - this.currentR / 2, r.position.y = h ? this.position.y : this.position.y - this.currentR / 2, r.texture = this.textureState, r.textureNumber = this.textureNum, renderQueue.add(r)
 }, Prey.prototype.pickNewLocation = function(t) {
   let e = new Vector(0, 0);
   if (this.distanceMax = this.params.distanceMax, e.x = fxrand() * this.params.stage.w, e.y = fxrand() * this.params.stage.h, this.color = this.pickColor(this.colors), this.textureState = !0, this.wordSeeker && null != this.wordTargList && this.wordTargList.length > 50) {

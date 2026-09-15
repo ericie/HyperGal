@@ -886,7 +886,6 @@
 
       function drawBullet(b, color, glow) {
         ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
         ctx.strokeStyle = color;
         ctx.lineWidth = b.r * 1.2;
         ctx.lineCap = 'round';
@@ -951,6 +950,7 @@
         ctx.arc(bullet.x, bullet.y, radius * 1.9, 0, Math.PI * 2);
         ctx.fill();
 
+        ctx.globalCompositeOperation = 'source-over';
         ctx.shadowColor = bullet.color;
         ctx.shadowBlur = 32 + bullet.hitFlash * 18;
         ctx.fillStyle = bullet.color;

@@ -1,0 +1,10 @@
+{
+  "title": "Strega Nona",
+  "year": 2026,
+  "date": "2026-09-15",
+  "category": "generative",
+  "type": "interactive",
+  "wip": false,
+  "thumbnail": "thumbnail.png",
+  "description": "An overflowing drawing of olive-ink spirals, curling tendrils and nested arcs. Several drawing points work together, each tracing one continuous line at a time, until the pattern grows beyond every edge of the window. Click to regrow, Space to pause, S to save."
+}

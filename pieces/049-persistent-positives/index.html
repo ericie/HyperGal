@@ -40,6 +40,8 @@
       /* The word buffer, texture library, and save-only composite stay hidden.
          Reduced motion briefly shows the frozen composite while it settles. */
       #hmcComp, #hmcBuffer, #library { display: none; }
+      #hmcMain.is-prebaking #hmcBackground,
+      #hmcMain.is-prebaking #hmcLive { visibility: hidden; }
       #hmcMain.is-settling #hmcBackground,
       #hmcMain.is-settling #hmcLive { visibility: hidden; }
       #hmcMain.is-settling #hmcComp { display: block; z-index: 2; }
@@ -122,14 +124,14 @@
       })();
     </script>
 
-    <script src="hmc-features.js?v=4.1"></script>
-    <script src="hmc-text.js?v=4.1"></script>
-    <script src="hmc-vector.js?v=4.1"></script>
-    <script src="hmc-texture.js?v=4.1"></script>
-    <script src="hmc-colors.js?v=4.1"></script>
-    <script src="hmc-app.js?v=4.1"></script>
-    <script src="hmc-prey.js?v=4.1"></script>
-    <script src="hmc-renderQueue.js?v=4.1"></script>
+    <script src="hmc-features.js?v=5.1"></script>
+    <script src="hmc-text.js?v=5.1"></script>
+    <script src="hmc-vector.js?v=5.1"></script>
+    <script src="hmc-texture.js?v=5.1"></script>
+    <script src="hmc-colors.js?v=5.1"></script>
+    <script src="hmc-app.js?v=5.1"></script>
+    <script src="hmc-prey.js?v=5.1"></script>
+    <script src="hmc-renderQueue.js?v=5.1"></script>
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
   <body>
@@ -138,8 +140,8 @@
       is erased, and returns in a new layout. Click or tap for a new
       iteration, or press R. Press S to save the picture.
     </p>
-    <div id="buildBadge" aria-label="Persistent Positives performance test version 4.1 cache-safe layered renderer">
-      PP PERF TEST · v4.1 · CACHE-SAFE
+    <div id="buildBadge" aria-label="Persistent Positives performance test version 5.1 incremental mobile renderer">
+      PP PERF TEST · v5.1 · BATCH-3
     </div>
     <div id="library" class="library hidden"></div>
 
@@ -160,12 +162,16 @@
         const MAX_ASPECT = 3;
         const MOBILE_MAX_DIMENSION = 2048;
         const MOBILE_MAX_DPR = 2;
+        const MOBILE_LIVE_SHAPES = 256;
+        const PREBAKE_FRAMES = 1100;
+        const PREBAKE_FRAME_STEP = 8;
         const originalQuality = new URLSearchParams(location.search)
           .get('quality') === 'original';
         const coarsePointer = window.matchMedia('(pointer: coarse)');
-        const stage = { w: BASE, h: BASE, scale: 1 };
+        const stage = { w: BASE, h: BASE, scale: 1, frameStep: 1 };
         const container = document.createElement('main');
         container.id = 'hmcMain';
+        container.classList.add('is-prebaking');
 
         for (const id of ['hmcBuffer', 'hmcBackground', 'hmcLive', 'hmcComp']) {
           const c = document.createElement('canvas');
@@ -191,10 +197,13 @@
         // three layers.
         function sizeStage() {
           const aspect = viewportAspect();
+          const adaptive = useAdaptiveBackingStore();
           stage.w = aspect >= 1 ? Math.round(BASE * aspect) : BASE;
           stage.h = aspect >= 1 ? BASE : Math.round(BASE / aspect);
           stage.scale = 1;
-          if (useAdaptiveBackingStore()) {
+          stage.frameStep = adaptive ? 2 : 1;
+          stage.mobileOptimized = adaptive;
+          if (adaptive) {
             const viewportLongSide = Math.max(window.innerWidth, window.innerHeight);
             const targetLongSide = Math.min(
               MOBILE_MAX_DIMENSION,
@@ -221,6 +230,7 @@
         init(stage);
         describe();
         if (reduced.matches) settle();
+        else prebake();
 
         // A resize that changes the window's shape lays the same iteration out
         // again against the new stage; cover absorbs anything smaller than a
@@ -241,6 +251,7 @@
           const run = ++settleRun;
           cancelAnimationFrame(request);
           composite();
+          container.classList.remove('is-prebaking');
           container.classList.add('is-settling');
 
           const waitForFont = () => {
@@ -268,6 +279,48 @@
           waitForFont();
         }
 
+        // Start on a mature composition instead of making the visitor watch
+        // hundreds of shapes build from zero. Large logical steps make this
+        // inexpensive; short time slices keep touch and browser chrome
+        // responsive while the offscreen state is prepared.
+        function prebake() {
+          const run = ++settleRun;
+          const startedAt = performance.now();
+          cancelAnimationFrame(request);
+          container.classList.remove('is-settling');
+          container.classList.add('is-prebaking');
+          container.dataset.ready = 'false';
+
+          const waitForFont = () => {
+            if (run !== settleRun) return;
+            if (!textFontLoaded) { setTimeout(waitForFont, 50); return; }
+
+            let remaining = PREBAKE_FRAMES;
+            const advance = () => {
+              if (run !== settleRun) return;
+              const chunkStart = performance.now();
+              do {
+                const frameStep = Math.min(PREBAKE_FRAME_STEP, remaining);
+                update(false, frameStep, false);
+                remaining -= frameStep;
+              } while (remaining > 0 && performance.now() - chunkStart < 8);
+
+              if (remaining > 0) {
+                request = requestAnimationFrame(advance);
+              } else {
+                newSystem.drawCurrentFrame();
+                if (stage.mobileOptimized) bakeLiveLayer(MOBILE_LIVE_SHAPES);
+                container.dataset.prebakeMs = Math.round(performance.now() - startedAt);
+                container.dataset.ready = 'true';
+                container.classList.remove('is-prebaking');
+                startAnimation();
+              }
+            };
+            advance();
+          };
+          waitForFont();
+        }
+
         function describe() {
           const f = window.$fxhashFeatures;
           container.setAttribute(
@@ -288,7 +341,7 @@
           // canvases.
           settleRun++;
           cancelAnimationFrame(request);
-          container.classList.remove('is-settling');
+          container.classList.remove('is-settling', 'is-prebaking');
           library.replaceChildren();
           sizeStage();
           window.reseed(typeof hash === 'string' ? hash : undefined);
@@ -297,6 +350,7 @@
           init(stage);
           describe();
           if (reduced.matches) settle();
+          else prebake();
         }
 
         function savePicture() {

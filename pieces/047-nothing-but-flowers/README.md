@@ -63,7 +63,7 @@ The piece is a fixed 1920 × 1920 square, letterboxed into the window, with the
 bars in the ground colour — as it shipped.
 
 The slow first build is prebaked: on load and after every reseed, the system
-runs its first 1500 updates on the hidden working layers before showing the
+runs its first 4500 updates on the hidden working layers before showing the
 field. The animation then carries on from that state.
 
 ## Notes on the port
@@ -122,5 +122,5 @@ Quirks kept because they shape the output:
 The original CSS hid layers one to four and, by a typo, left the fifth
 visible; it was always empty. All five working layers are hidden here.
 
-Reduced motion uses the same 1500-update prebake, then holds the picture instead
+Reduced motion uses the same 4500-update prebake, then holds the picture instead
 of continuing the animation.

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-15T07:47:18Z",
+  "title": "Design System: City of Signs",
+  "extensions": {
+    "colorMeta": {
+      "ink": { "role": "primary", "displayName": "Ink" },
+      "paper": { "role": "neutral", "displayName": "Paper" },
+      "catalog-background": { "role": "neutral", "displayName": "Catalog background only" },
+      "catalog-ink": { "role": "neutral", "displayName": "Catalog text only" },
+      "catalog-description": { "role": "neutral", "displayName": "Catalog description only" },
+      "catalog-muted": { "role": "neutral", "displayName": "Catalog metadata only" },
+      "catalog-rule": { "role": "neutral", "displayName": "Catalog dividers only" }
+    },
+    "typographyMeta": {
+      "catalog-title": { "displayName": "Catalog title", "purpose": "Debug header only; the normal artwork is wordless." },
+      "catalog-name": { "displayName": "Block name", "purpose": "Debug specimen names." },
+      "catalog-group": { "displayName": "Block role and ID", "purpose": "Debug specimen metadata." }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [{ "name": "catalog-header-stack", "value": "520px" }]
+  },
+  "components": [
+    {
+      "name": "Catalog caption",
+      "kind": "custom",
+      "refersTo": "catalog-caption",
+      "description": "Static debug specimen caption. Runtime geometry remains in city.js; this snippet demonstrates its catalog typography only.",
+      "html": "<div class=\"ds-caption\"><span class=\"ds-number\">01</span><span><span class=\"ds-name\">Scalloped threshold</span><span class=\"ds-group\">base · scallop-door</span></span></div>",
+      "css": ".ds-caption{display:grid;grid-template-columns:2.5rem minmax(0,1fr);gap:10px;min-height:66px;padding:12px 14px;border-top:1px solid #aaa;background:#dededb;color:#111;font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.ds-number{color:#666;font-variant-numeric:tabular-nums}.ds-name,.ds-group{display:block;line-height:1.2}.ds-name{font-size:.9375rem}.ds-group{margin-top:4px;color:#666;font-size:.75rem}"
+    }
+  ],
+  "narrative": {
+    "northStar": "A wordless geometric dream",
+    "overview": "Scope: pieces/019-city-of-signs/ only. Interchangeable architectural blocks create a dense black-and-white city with unequal chambers and improbable rooftops. The user-approved geometric AI image established visual direction; the shipped artwork is procedural Canvas geometry. thumbnail.jpg is a square screenshot of the renderer at seed 1907, not an AI raster used as code. Independent review disposition: Ship for square, desktop, mobile, and catalog, with no blocking findings.",
+    "keyCharacteristics": [
+      "26 blocks: 6 ground-only bases, 12 chambers, 6 crowns, 2 connectors",
+      "5–22 unequal bays recomposed for the viewport",
+      "Unframed variable-height geometry with guaranteed fan, folding-stair, and swelling-wall features",
+      "Immediate regeneration through click, tap, Enter, or Space",
+      "No text or pictorial illustrations in the normal canvas"
+    ],
+    "rules": [
+      { "name": "Binary artwork", "body": "Only Ink and Paper are authored drawing colors. Catalog grays are inspection UI only.", "section": "colors" },
+      { "name": "Wordless city", "body": "Visible typography belongs to the debug catalog; accessible instructions describe the normal canvas.", "section": "typography" },
+      { "name": "Cutout depth", "body": "Use overlap, apertures, polarity, and scale without shadows or gradients.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do preserve ground-only bases and viewport-specific composition.",
+      "Do keep block drawing functions reusable across dimensions and polarity.",
+      "Do capture shipping thumbnails from the renderer with recorded seed and framing."
+    ],
+    "donts": [
+      "Don't add room frames, uniform rounded geometry, or a gray drawing palette.",
+      "Don't substitute the approved reference raster for procedural geometry.",
+      "Don't impose this artwork's design system on other HyperGal pieces."
+    ]
+  }
+}

@@ -49,13 +49,13 @@
         top: 18px;
         left: 18px;
         width: auto;
-        min-height: 36px;
+        min-height: 44px;
         padding: 0 12px;
         border: 0;
         background: var(--panel);
         color: var(--panel-ink);
         box-shadow: 4px 4px 0 rgba(20, 37, 28, 0.16);
-        font-size: 10px;
+        font-size: 11px;
       }
 
       .panel-toggle:hover {
@@ -66,7 +66,7 @@
       .panel {
         position: fixed;
         z-index: 2;
-        top: 62px;
+        top: 70px;
         left: 18px;
         width: min(278px, calc(100vw - 36px));
         padding: 18px;
@@ -131,7 +131,7 @@
 
       input[type='range'] {
         width: 100%;
-        height: 22px;
+        height: 36px;
         margin: 0;
         appearance: none;
         background: transparent;
@@ -179,7 +179,7 @@
         justify-content: space-between;
         margin-top: 3px;
         color: var(--panel-muted);
-        font-size: 9px;
+        font-size: 11px;
       }
 
       .actions {
@@ -192,13 +192,13 @@
 
       button {
         flex: 1;
-        min-height: 34px;
+        min-height: 44px;
         border: 1px solid rgba(241, 237, 207, 0.65);
         border-radius: 0;
         background: transparent;
         color: var(--panel-ink);
         font: inherit;
-        font-size: 9px;
+        font-size: 11px;
         cursor: pointer;
       }
 
@@ -210,7 +210,7 @@
       .hint {
         margin: 12px 0 0;
         color: var(--panel-muted);
-        font-size: 9px;
+        font-size: 11px;
         line-height: 1.45;
       }
 
@@ -247,7 +247,7 @@
 
         .control__line {
           margin-bottom: 3px;
-          font-size: 9px;
+          font-size: 11px;
         }
 
         .ends {
@@ -273,7 +273,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Forest of Rings: twenty animated tree-ring cross sections can be arranged from an irregular mixed-age wild forest to an evenly spaced orchard planted all at once."
+      aria-label="Forest of Rings: one vertical line in the center grows wide, lengthwise wood grain outward until the tree fills the entire window. Height stays fixed; no ground or roots."
     ></canvas>
 
     <button id="panel-toggle" class="panel-toggle" type="button" aria-expanded="false" aria-controls="variables-panel">
@@ -283,46 +283,23 @@
     <aside id="variables-panel" class="panel" aria-label="Forest variables" hidden>
       <div class="panel__header">
         <h1>FOREST OF RINGS</h1>
-        <span class="count">20 TREES</span>
+        <span class="count">1 TREE</span>
       </div>
-      <div id="mode" class="mode" aria-live="polite">MIXED STAND</div>
-      <div class="controls">
-        <div class="control">
-          <div class="control__line">
-            <label for="spacing">SPACING REGULARITY</label>
-            <output id="spacing-value" for="spacing">18</output>
-          </div>
-          <input id="spacing" type="range" min="0" max="100" value="18" />
-          <div class="ends" aria-hidden="true"><span>WILD</span><span>ROWS</span></div>
-        </div>
-        <div class="control">
-          <div class="control__line">
-            <label for="planting">PLANTING REGULARITY</label>
-            <output id="planting-value" for="planting">12</output>
-          </div>
-          <input id="planting" type="range" min="0" max="100" value="12" />
-          <div class="ends" aria-hidden="true"><span>MIXED AGE</span><span>ONE YEAR</span></div>
-        </div>
-      </div>
+      <div id="mode" class="mode" aria-live="polite">SINGLE TREE · OUTWARD GROWTH</div>
       <div class="actions">
-        <button id="reseed" type="button">NEW FOREST</button>
+        <button id="reseed" type="button">NEW TREE</button>
         <button id="replay" type="button">REPLAY GROWTH</button>
       </div>
-      <p class="hint">Point to a trunk to read its record. Arrow keys adjust a focused variable.</p>
+      <p class="hint">Point or tap the tree to read its record. Replay starts again from the center line.</p>
     </aside>
 
     <script>
       const canvas = document.getElementById('stage');
       const ctx = canvas.getContext('2d', { alpha: false });
-      const spacingInput = document.getElementById('spacing');
-      const plantingInput = document.getElementById('planting');
-      const spacingValue = document.getElementById('spacing-value');
-      const plantingValue = document.getElementById('planting-value');
-      const modeLabel = document.getElementById('mode');
       const panelToggle = document.getElementById('panel-toggle');
       const variablesPanel = document.getElementById('variables-panel');
       const TAU = Math.PI * 2;
-      const TREE_COUNT = 20;
+      const TREE_COUNT = 1;
       const MAX_AGE = 96;
       const SAMPLE_COUNT = 72;
       const YEAR_MS = 145;
@@ -343,15 +320,6 @@
       let focusedTree = -1;
       let pointer = { x: -1000, y: -1000 };
       let raf = 0;
-
-      spacingInput.value = String(parseControl(params.get('spacing'), 18));
-      plantingInput.value = String(parseControl(params.get('planting'), 12));
-
-      function parseControl(value, fallback) {
-        if (value === null || value === '') return fallback;
-        const number = Number(value);
-        return Number.isFinite(number) ? clamp(Math.round(number), 0, 100) : fallback;
-      }
 
       function parseAge(value) {
         if (value === null || value === '') return null;
@@ -460,6 +428,15 @@
         return points;
       }
 
+      function depthColor(hex, depth, alpha = 1) {
+        const channels = [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16));
+        const gray = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+        const saturation = 1 - depth * 0.8;
+        const brightness = 1 - depth * 0.55;
+        const [r, g, b] = channels.map((value) => Math.round(lerp(gray, value, saturation) * brightness));
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+
       function makeTree(random, index, position, rainfall, forces) {
         const phase = random() * TAU;
         const sunBias = lerp(0.045, 0.09, random()) * clamp((90 - forces.solarElevation) / 48, 0.45, 1.25);
@@ -537,8 +514,14 @@
           for (let i = 0; i < boundary.length; i++) boundary[i] /= maxRadius;
         }
 
+        // The single tree sits in the foreground.
+        const depth = 0;
         return {
           id: index + 1,
+          depth,
+          palette: PALETTE.map((color) => depthColor(color, depth)),
+          ink: depthColor(INK, depth),
+          grainStroke: depthColor(INK, depth, 0.25),
           wildX: position.x,
           wildY: position.y,
           wildPlantYear,
@@ -582,30 +565,17 @@
         return output;
       }
 
-      function fieldBounds() {
-        return { left: 0, top: 0, right: width, bottom: height };
-      }
-
+      // One centered core. Its final width reaches both window edges.
       function updateLayout() {
-        const bounds = fieldBounds();
-        const fieldWidth = Math.max(100, bounds.right - bounds.left);
-        const fieldHeight = Math.max(100, bounds.bottom - bounds.top);
-        const spacingT = smoothstep(Number(spacingInput.value) / 100);
-        const cellWidth = fieldWidth / 5;
-        const cellHeight = fieldHeight / 4;
-        const baseRadius = clamp(Math.min(cellWidth, cellHeight) * 0.37, 18, 65);
-
-        forest.trees.forEach((tree, index) => {
-          const column = index % 5;
-          const row = Math.floor(index / 5);
-          const gridX = bounds.left + (column + 0.5) * cellWidth;
-          const gridY = bounds.top + (row + 0.5) * cellHeight;
-          const wildX = lerp(bounds.left - baseRadius * 0.2, bounds.right + baseRadius * 0.2, tree.wildX);
-          const wildY = lerp(bounds.top - baseRadius * 0.2, bounds.bottom + baseRadius * 0.2, tree.wildY);
-          tree.x = lerp(wildX, gridX, spacingT);
-          tree.y = lerp(wildY, gridY, spacingT);
-          tree.radius = baseRadius * lerp(tree.matureScale, 0.94, spacingT);
-        });
+        const tree = forest.trees[0];
+        tree.x = width / 2;
+        tree.y = height;
+        tree.trunkHeight = height;
+        const mature = tree.boundaries[MAX_AGE];
+        tree.radius = Math.max(width * 0.38,
+          (width / 2 + 2) / radiusAt(mature, Math.PI),
+          (width / 2 + 2) / radiusAt(mature, 0));
+        tree.hitPath = null;
       }
 
       function forestAge(now) {
@@ -615,22 +585,18 @@
       }
 
       function treeAge(tree, sharedAge) {
-        const plantingT = smoothstep(Number(plantingInput.value) / 100);
-        const plantYear = Math.round(lerp(tree.wildPlantYear, 0, plantingT));
-        return { age: clamp(sharedAge - plantYear, 0, MAX_AGE), plantYear };
+        return { age: clamp(sharedAge, 0, MAX_AGE), plantYear: 0 };
       }
 
       function draw(now) {
         const age = forestAge(now);
         ctx.fillStyle = FIELD;
         ctx.fillRect(0, 0, width, height);
-        drawSurveyField(age);
-        drawOrchardGuides();
         drawUniversalForces();
-        drawFireFront(age);
 
-        const drawOrder = [...forest.trees].sort((a, b) => a.y - b.y);
+        const drawOrder = [...forest.trees].sort((a, b) => b.depth - a.depth || a.id - b.id);
         for (const tree of drawOrder) drawTree(tree, treeAge(tree, age));
+        drawFireFront(age);
         drawFieldReadout(age);
         drawInspector(age);
 
@@ -639,42 +605,8 @@
         }
       }
 
-      function drawSurveyField(age) {
-        const bounds = fieldBounds();
-        const gap = clamp(Math.min(width, height) / 18, 26, 48);
-        ctx.save();
-        ctx.strokeStyle = 'rgba(20, 37, 28, 0.11)';
-        ctx.lineWidth = 1;
-        for (let x = bounds.left; x <= bounds.right; x += gap) {
-          ctx.beginPath();
-          ctx.moveTo(x + 0.5, bounds.top);
-          ctx.lineTo(x + 0.5, bounds.bottom);
-          ctx.stroke();
-        }
-        for (let y = bounds.top; y <= bounds.bottom; y += gap) {
-          ctx.beginPath();
-          ctx.moveTo(bounds.left, y + 0.5);
-          ctx.lineTo(bounds.right, y + 0.5);
-          ctx.stroke();
-        }
-
-        ctx.strokeStyle = 'rgba(33, 90, 74, 0.16)';
-        for (let band = 0; band < 7; band++) {
-          const baseY = lerp(bounds.top, bounds.bottom, (band + 0.6) / 7);
-          ctx.beginPath();
-          for (let step = 0; step <= 80; step++) {
-            const x = lerp(bounds.left, bounds.right, step / 80);
-            const y = baseY + Math.sin(step * 0.18 + forest.contourPhase + band * 0.8) * 10 + Math.sin(step * 0.057 + age * 0.008) * 5;
-            if (step === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-          }
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
-
       function drawUniversalForces() {
-        const length = Math.hypot(width, height) * 0.18;
+        const length = Math.min(width, height) * 0.16;
         const anchors = [0.24, 0.52, 0.8];
         ctx.save();
         ctx.strokeStyle = 'rgba(20, 37, 28, 0.22)';
@@ -682,12 +614,12 @@
         ctx.lineWidth = 1;
         for (const anchor of anchors) {
           const x = width * anchor;
-          const y = height * (0.12 + 0.05 * Math.sin(anchor * 12));
-          drawFieldArrow(x, y, forest.windAngle, length * 0.42, 5);
+          const y = Math.max(102, height * 0.105);
+          drawFieldArrow(x, y, Math.cos(forest.windAngle) >= 0 ? 0 : Math.PI, length * 0.42, 5);
         }
 
         const sunX = width - clamp(width * 0.055, 28, 72);
-        const sunY = clamp(height * 0.09, 34, 72);
+        const sunY = Math.max(105, height * 0.09);
         ctx.beginPath();
         ctx.arc(sunX, sunY, 8, 0, TAU);
         ctx.stroke();
@@ -716,184 +648,175 @@
       }
 
       function drawFireFront(age) {
-        if (age < forest.fire.year - 1) return;
-        const duration = 7;
-        const progress = clamp((age - forest.fire.year + 1) / duration, 0, 1);
-        const active = age <= forest.fire.year + duration;
-        const diagonal = Math.hypot(width, height);
-        const offset = forest.fire.offset * Math.min(width, height);
+        const progress = (age - forest.fire.year) / 7;
+        if (progress < 0 || progress > 1) return;
+        const direction = Math.cos(forest.fire.direction) >= 0 ? 1 : -1;
+        const front = lerp(-width * 0.15, width * 1.15, direction > 0 ? progress : 1 - progress);
         ctx.save();
-        ctx.translate(width / 2, height / 2);
-        ctx.rotate(forest.fire.direction);
-        const frontX = lerp(-diagonal * 0.62, diagonal * 0.62, progress);
-        ctx.globalAlpha = active ? Math.sin(progress * Math.PI) * 0.72 : 0.2;
-        ctx.strokeStyle = active ? '#8c2f37' : INK;
-        ctx.lineWidth = active ? clamp(diagonal * 0.006, 4, 11) : 1;
-        ctx.setLineDash(active ? [] : [7, 10]);
-        if (active) {
-          ctx.beginPath();
-          ctx.moveTo(frontX, -diagonal * 0.62 + offset);
-          ctx.lineTo(frontX, diagonal * 0.62 + offset);
-          ctx.stroke();
-          ctx.strokeStyle = '#c26736';
+        ctx.globalAlpha = Math.sin(progress * Math.PI) * 0.8;
+        for (let trail = 0; trail < 18; trail++) {
+          const x = front - direction * trail * Math.max(3, width * 0.004);
+          const flame = (0.4 + 0.6 * Math.sin(trail * 2.4 + age * 8) ** 2) * height * 0.07;
+          ctx.strokeStyle = trail % 3 ? '#c26736' : '#8c2f37';
           ctx.lineWidth = 2;
-          for (let trail = 1; trail <= 4; trail++) {
-            const x = frontX - trail * 9;
-            ctx.beginPath();
-            ctx.moveTo(x, -diagonal * 0.58 + offset);
-            ctx.lineTo(x, diagonal * 0.58 + offset);
-            ctx.stroke();
-          }
-        } else {
-          const corridorHalf = forest.fire.width * Math.min(width, height) * 0.62;
-          for (const side of [-1, 1]) {
-            const y = offset + side * corridorHalf;
-            ctx.beginPath();
-            ctx.moveTo(-diagonal * 0.62, y);
-            ctx.lineTo(diagonal * 0.62, y);
-            ctx.stroke();
-          }
-          ctx.setLineDash([]);
-          drawFieldArrow(-diagonal * 0.16, offset, 0, diagonal * 0.32, 8);
+          ctx.beginPath();
+          ctx.moveTo(x, height + 2);
+          ctx.quadraticCurveTo(x - direction * 5, height - flame * 0.45,
+            x + direction * 6, height - flame);
+          ctx.stroke();
         }
         ctx.restore();
       }
 
-      function drawOrchardGuides() {
-        const spacingT = smoothstep((Number(spacingInput.value) - 58) / 42);
-        if (spacingT <= 0) return;
-        const bounds = fieldBounds();
-        const cellWidth = (bounds.right - bounds.left) / 5;
-        const cellHeight = (bounds.bottom - bounds.top) / 4;
-        ctx.save();
-        ctx.globalAlpha = spacingT * 0.65;
-        ctx.strokeStyle = '#215a4a';
-        ctx.setLineDash([4, 7]);
-        for (let row = 0; row < 4; row++) {
-          const y = bounds.top + (row + 0.5) * cellHeight;
-          ctx.beginPath();
-          ctx.moveTo(bounds.left, y);
-          ctx.lineTo(bounds.right, y);
-          ctx.stroke();
+      function trunkHalfWidth(tree, boundary, side) {
+        return radiusAt(boundary, side < 0 ? Math.PI : 0) * tree.radius;
+      }
+
+      function trunkPath(tree, boundary) {
+        const path = new Path2D();
+        const trunkHeight = tree.trunkHeight;
+        const left = trunkHalfWidth(tree, boundary, -1);
+        const right = trunkHalfWidth(tree, boundary, 1);
+        // Only the board silhouette is rectangular; its grain is continuous.
+        path.rect(tree.x - left, tree.y - trunkHeight, left + right, trunkHeight);
+        return path;
+      }
+
+      // A radial, lengthwise section through the vertical pith. Every annual
+      // boundary is a pair of open, mostly vertical lines, never a closed ring.
+      function grainX(tree, boundary, elevation, side) {
+        const level = elevation / tree.trunkHeight;
+        const pith = tree.x + tree.radius * 0.012
+          * (Math.sin(level * 6.2 + tree.phase) - Math.sin(tree.phase));
+        const angle = (side < 0 ? Math.PI : 0) + level * 0.28;
+        const distance = radiusAt(boundary, angle) * tree.radius;
+        const grain = 0.94 + Math.sin(level * 8.3 + tree.phase + side * 0.3) * 0.025
+          + Math.sin(level * 19.1 - tree.phase) * 0.009;
+        return pith + side * distance * grain;
+      }
+
+      function grainPath(tree, boundary) {
+        const path = new Path2D();
+        // Close the filled strip outside the cut ends. Only its long sides
+        // appear inside the board; every band continues all the way through.
+        const bottom = -2;
+        const top = tree.visibleHeight + 2;
+        const steps = Math.max(2, Math.ceil(top / 8));
+        for (const side of [-1, 1]) {
+          for (let sample = 0; sample <= steps; sample++) {
+            const t = side < 0 ? sample / steps : 1 - sample / steps;
+            const elevation = lerp(bottom, top, t);
+            const x = grainX(tree, boundary, elevation, side);
+            const y = tree.y - elevation;
+            if (side < 0 && sample === 0) path.moveTo(x, y);
+            else path.lineTo(x, y);
+          }
         }
-        for (let column = 0; column < 5; column++) {
-          const x = bounds.left + (column + 0.5) * cellWidth;
-          ctx.beginPath();
-          ctx.moveTo(x, bounds.top);
-          ctx.lineTo(x, bounds.bottom);
-          ctx.stroke();
+        path.closePath();
+        return path;
+      }
+
+      function drawGrain(tree, age, formingBoundary) {
+        const wholeAge = Math.floor(age);
+        const formingYear = Math.min(MAX_AGE, Math.ceil(age));
+        ctx.fillStyle = tree.palette[tree.ringColors[formingYear]];
+        ctx.fillRect(tree.x - tree.radius * 2, tree.y - tree.visibleHeight,
+          tree.radius * 4, tree.visibleHeight);
+        ctx.fill(grainPath(tree, formingBoundary));
+        for (let year = wholeAge; year >= 1; year--) {
+          const grain = grainPath(tree, tree.boundaries[year]);
+          ctx.fillStyle = tree.palette[tree.ringColors[year]];
+          ctx.fill(grain);
+          ctx.strokeStyle = tree.grainStroke;
+          ctx.lineWidth = 0.55;
+          ctx.stroke(grain);
         }
-        ctx.restore();
+        // The pith is a full-height axis. Existing grain coordinates stay fixed
+        // as new wood is added outside; both cut ends remain fixed.
+        ctx.beginPath();
+        for (let elevation = 0; elevation <= tree.visibleHeight + 8; elevation += 8) {
+          const x = grainX(tree, tree.boundaries[0], elevation, 1);
+          if (!elevation) ctx.moveTo(x, tree.y);
+          else ctx.lineTo(x, tree.y - elevation);
+        }
+        ctx.strokeStyle = tree.palette[0];
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
       }
 
       function drawTree(tree, record) {
+        tree.hitPath = null;
+        tree.visibleHeight = tree.trunkHeight;
         if (record.age <= 0.02) {
-          ctx.fillStyle = INK;
-          ctx.beginPath();
-          ctx.arc(tree.x, tree.y, 1.5, 0, TAU);
-          ctx.fill();
+          const core = new Path2D();
+          core.moveTo(tree.x, tree.y);
+          core.lineTo(tree.x, tree.y - tree.trunkHeight);
+          tree.hitPath = core;
+          ctx.save();
+          ctx.strokeStyle = tree.ink;
+          ctx.lineWidth = 1;
+          ctx.stroke(core);
+          ctx.restore();
           return;
         }
-
         const wholeAge = Math.floor(record.age);
-        const partial = record.age - wholeAge;
+        const partial = smoothstep(record.age - wholeAge);
+        const boundary = wholeAge < MAX_AGE
+          ? interpolateBoundary(tree.boundaries[wholeAge], tree.boundaries[wholeAge + 1], partial)
+          : tree.boundaries[MAX_AGE];
+        const outer = trunkPath(tree, boundary);
+        tree.hitPath = outer;
         ctx.save();
-        ctx.translate(tree.x, tree.y);
-
-        if (wholeAge < MAX_AGE && partial > 0) {
-          const boundary = interpolateBoundary(tree.boundaries[wholeAge], tree.boundaries[wholeAge + 1], smoothstep(partial));
-          pathBoundary(boundary, tree.radius);
-          ctx.fillStyle = PALETTE[tree.ringColors[wholeAge + 1]];
-          ctx.fill();
-        }
-        for (let year = wholeAge; year >= 1; year--) {
-          pathBoundary(tree.boundaries[year], tree.radius);
-          ctx.fillStyle = PALETTE[tree.ringColors[year]];
-          ctx.fill();
-        }
-
-        ctx.strokeStyle = 'rgba(20, 37, 28, 0.48)';
-        ctx.lineWidth = clamp(tree.radius * 0.014, 0.45, 1.1);
-        for (let year = 3; year <= wholeAge; year += wholeAge > 70 ? 3 : 2) {
-          pathBoundary(tree.boundaries[year], tree.radius);
-          ctx.stroke();
-        }
-
-        const outer = tree.boundaries[Math.max(1, wholeAge)];
-        pathBoundary(outer, tree.radius);
-        ctx.strokeStyle = INK;
-        ctx.lineWidth = clamp(tree.radius * 0.075, 1.7, 4.4);
-        ctx.stroke();
-
-        if (wholeAge >= forest.fire.year && tree.fireExposure > 0.1) drawFireScar(tree, outer, wholeAge);
-        if (tree.pestAffected && wholeAge >= tree.pestYear) drawPestDamage(tree, outer, wholeAge);
-
-        ctx.fillStyle = '#f1edcf';
-        ctx.strokeStyle = INK;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(0, 0, clamp(tree.radius * 0.045, 1.8, 3.4), 0, TAU);
-        ctx.fill();
-        ctx.stroke();
+        ctx.save();
+        ctx.clip(outer);
+        drawGrain(tree, record.age, boundary);
         ctx.restore();
-
+        ctx.strokeStyle = tree.ink;
+        ctx.lineWidth = clamp(tree.radius * 0.045, 0.7, 1.8);
+        ctx.stroke(outer);
+        ctx.save();
+        ctx.clip(outer);
+        if (wholeAge >= forest.fire.year && tree.fireExposure > 0.1) drawFireScar(tree);
+        if (tree.pestAffected && wholeAge >= tree.pestYear) drawPestDamage(tree);
+        ctx.restore();
         const active = tree.id - 1 === hoveredTree || tree.id - 1 === focusedTree;
         if (active) {
-          ctx.save();
-          ctx.strokeStyle = INK;
-          ctx.setLineDash([3, 4]);
-          ctx.beginPath();
-          ctx.arc(tree.x, tree.y, tree.radius + 7, 0, TAU);
-          ctx.stroke();
-          ctx.restore();
+          ctx.strokeStyle = '#f1edcf';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke(outer);
         }
-      }
-
-      function drawFireScar(tree, boundary, age) {
-        const healed = clamp((age - forest.fire.year) / 22, 0, 1);
-        const angle = forest.fire.direction + Math.PI;
-        const radius = radiusAt(boundary, angle) * tree.radius;
-        ctx.save();
-        ctx.rotate(angle);
-        ctx.strokeStyle = `rgba(20, 37, 28, ${lerp(0.9, 0.5, healed)})`;
-        ctx.lineWidth = clamp(tree.radius * lerp(0.11, 0.035, healed) * tree.fireExposure, 1, 5);
-        ctx.beginPath();
-        ctx.moveTo(radius * lerp(0.52, 0.78, healed), 0);
-        ctx.lineTo(radius * 1.03, 0);
-        ctx.stroke();
         ctx.restore();
       }
 
-      function drawPestDamage(tree, boundary, age) {
-        const active = clamp((age - tree.pestYear) / 7, 0, 1);
-        const healed = clamp((age - tree.pestYear - 7) / 20, 0, 1);
-        const radius = radiusAt(boundary, tree.pestAngle) * tree.radius;
-        ctx.save();
-        ctx.rotate(tree.pestAngle);
-        ctx.fillStyle = `rgba(20, 37, 28, ${lerp(0.88, 0.46, healed)})`;
-        const boreSize = clamp(tree.radius * 0.025 * tree.pestSeverity, 0.8, 2.2);
+      function drawFireScar(tree) {
+        const side = Math.cos(forest.fire.direction) >= 0 ? -1 : 1;
+        const boundary = tree.boundaries[forest.fire.year];
+        const x = tree.x + side * radiusAt(boundary, side < 0 ? Math.PI : 0) * tree.radius * 0.65;
+        const scarHeight = tree.trunkHeight * (0.15 + tree.fireExposure * 0.18);
+        ctx.strokeStyle = tree.ink;
+        ctx.lineWidth = clamp(tree.radius * tree.fireExposure * 0.035, 1, 3);
+        ctx.beginPath();
+        ctx.moveTo(x, tree.y);
+        ctx.quadraticCurveTo(x - side * tree.radius * 0.2, tree.y - scarHeight * 0.5,
+          x, tree.y - scarHeight);
+        ctx.stroke();
+      }
+
+      function drawPestDamage(tree) {
+        const eventHeight = tree.trunkHeight;
+        const boundary = tree.boundaries[tree.pestYear];
+        const side = Math.cos(tree.pestAngle) >= 0 ? 1 : -1;
+        ctx.fillStyle = tree.ink;
         for (let bore = 0; bore < 3; bore++) {
-          const along = radius * lerp(0.58, 0.88, (bore + active) / 3);
-          const across = (bore - 1) * boreSize * 1.8;
+          const fraction = 0.32 + bore * 0.11;
+          const elevation = eventHeight * fraction;
+          const x = tree.x + side * trunkHalfWidth(tree, boundary, side) * 0.7;
           ctx.beginPath();
-          ctx.arc(along, across, boreSize, 0, TAU);
+          ctx.ellipse(x, tree.y - elevation, clamp(tree.radius * 0.009, 0.65, 1.7),
+            clamp(tree.radius * 0.024, 1.4, 4), tree.pestAngle * 0.15, 0, TAU);
           ctx.fill();
         }
-        ctx.restore();
-      }
-
-      function pathBoundary(boundary, radius) {
-        ctx.beginPath();
-        for (let i = 0; i <= SAMPLE_COUNT; i++) {
-          const index = i % SAMPLE_COUNT;
-          const angle = (index / SAMPLE_COUNT) * TAU;
-          const r = boundary[index] * radius;
-          const x = Math.cos(angle) * r;
-          const y = Math.sin(angle) * r;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.closePath();
       }
 
       function interpolateBoundary(from, to, amount) {
@@ -911,16 +834,16 @@
       function drawFieldReadout(age) {
         const mature = forest.trees.filter((tree) => treeAge(tree, age).age > 0).length;
         const compact = width < 680;
-        const top = compact ? 58 : 24;
-        const left = compact ? 10 : 170;
+        const top = compact ? 68 : 32;
+        const left = compact ? 10 : 190;
         ctx.save();
         ctx.fillStyle = INK;
-        ctx.font = '9px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+        ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
         ctx.textBaseline = 'middle';
         if (compact) {
           ctx.fillText(`SEASON ${String(Math.floor(age)).padStart(2, '0')}/${MAX_AGE}  LAT ${formatSigned(forest.latitude, 1)}`, left, top);
           ctx.textAlign = 'right';
-          ctx.fillText(`${String(mature).padStart(2, '0')}/20`, width - 10, top);
+          ctx.fillText(`${String(mature).padStart(2, '0')}/${TREE_COUNT}`, width - 10, top);
           ctx.textAlign = 'left';
           ctx.fillText(
             `SUN ${Math.round(forest.solarElevation)}deg  WIND ${directionName(forest.windAngle)} ${forest.windStrength.toFixed(2)}  FIRE Y${forest.fire.year}`,
@@ -934,7 +857,7 @@
             top
           );
           ctx.textAlign = 'right';
-          ctx.fillText(`${String(mature).padStart(2, '0')}/20  FIRE Y${forest.fire.year}`, width - 12, top);
+          ctx.fillText(`${String(mature).padStart(2, '0')}/${TREE_COUNT}  FIRE Y${forest.fire.year}`, width - 12, top);
         }
         ctx.restore();
       }
@@ -953,19 +876,20 @@
           tree.pestAffected ? `PESTS Y${tree.pestYear}` : 'PESTS NONE',
           tree.fireExposure > 0.1 ? `FIRE ${Math.round(tree.fireExposure * 100)}%` : 'FIRE OUTSIDE PATH',
         ];
-        const w = 128;
-        const h = 94;
+        const w = 156;
+        const h = 112;
         let x = tree.x + tree.radius + 12;
-        let y = tree.y - h / 2;
+        let y = tree.y - tree.visibleHeight * 0.65 - h / 2;
         if (x + w > width - 8) x = tree.x - tree.radius - w - 12;
-        y = clamp(y, 28, height - h - 8);
+        x = clamp(x, 8, width - w - 8);
+        y = clamp(y, 84, height - h - 8);
         ctx.save();
         ctx.fillStyle = '#173a2b';
         ctx.fillRect(x, y, w, h);
         ctx.fillStyle = '#f1edcf';
-        ctx.font = '9px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+        ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
         ctx.textBaseline = 'top';
-        lines.forEach((line, lineIndex) => ctx.fillText(line, x + 8, y + 7 + lineIndex * 12));
+        lines.forEach((line, lineIndex) => ctx.fillText(line, x + 8, y + 7 + lineIndex * 14));
         ctx.restore();
       }
 
@@ -977,27 +901,6 @@
         const directions = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'];
         const normalized = ((angle % TAU) + TAU) % TAU;
         return directions[Math.round((normalized / TAU) * directions.length) % directions.length];
-      }
-
-      function updateControls() {
-        const spacing = Number(spacingInput.value);
-        const planting = Number(plantingInput.value);
-        spacingValue.textContent = String(spacing);
-        plantingValue.textContent = String(planting);
-        if (spacing <= 4 && planting <= 4) modeLabel.textContent = 'WILD FOREST · MIXED AGES, IRREGULAR GROUND';
-        else if (spacing >= 96 && planting >= 96) modeLabel.textContent = 'ORCHARD · EVEN ROWS, ONE PLANTING YEAR';
-        else if (spacing >= 72 && planting < 40) modeLabel.textContent = 'AGED ROWS · REGULAR GROUND, MIXED YEARS';
-        else if (spacing < 40 && planting >= 72) modeLabel.textContent = 'SAME COHORT · ONE YEAR, IRREGULAR GROUND';
-        else modeLabel.textContent = 'MIXED STAND · PART WILD, PART MANAGED';
-        canvas.setAttribute(
-          'aria-label',
-          `Forest of Rings with twenty trees. Spacing regularity ${spacing} of 100. Planting regularity ${planting} of 100. Shared latitude, sun, and wind shape every tree; a directional fire crosses the stand and pests affect individual trees.`
-        );
-        if (forest) {
-          updateLayout();
-          cancelAnimationFrame(raf);
-          raf = requestAnimationFrame(draw);
-        }
       }
 
       function reset(nextSeed = randomSeed()) {
@@ -1040,22 +943,18 @@
       }
 
       function nearestTree(x, y) {
-        let nearest = -1;
-        let distance = Infinity;
-        forest.trees.forEach((tree, index) => {
-          const dx = x - tree.x;
-          const dy = y - tree.y;
-          const d = Math.hypot(dx, dy) - tree.radius;
-          if (d < distance) {
-            distance = d;
-            nearest = index;
-          }
-        });
-        return distance < 18 ? nearest : -1;
+        // Test the visible silhouette, frontmost first, in CSS coordinates.
+        const drawOrder = [...forest.trees].sort((a, b) => a.depth - b.depth || b.id - a.id);
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.lineWidth = 12;
+        const tree = drawOrder.find((item) => item.hitPath
+          ? ctx.isPointInPath(item.hitPath, x, y) || ctx.isPointInStroke(item.hitPath, x, y)
+          : Math.hypot(x - item.x, y - item.y) < 8);
+        ctx.restore();
+        return tree ? tree.id - 1 : -1;
       }
 
-      spacingInput.addEventListener('input', updateControls);
-      plantingInput.addEventListener('input', updateControls);
       panelToggle.addEventListener('click', () => setPanelOpen(variablesPanel.hidden));
       document.getElementById('reseed').addEventListener('click', () => {
         history.replaceState(null, '', location.pathname);
@@ -1108,7 +1007,6 @@
         raf = requestAnimationFrame(draw);
       });
 
-      updateControls();
       resize();
       forest = makeForest(seed);
       updateLayout();

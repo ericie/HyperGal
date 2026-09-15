@@ -16,12 +16,10 @@ is stamped onto the ground canvas for good and a new shape is born somewhere
 else. The ground is therefore the accumulation of everything that has died —
 that is the persistence — and the live layer is only what is still growing.
 
-**The word.** One of HOPE, LOVE, GIVE, MAKE, GROW, LIVE, set in Space Mono at
-five hundred to a thousand pixels in one of eleven layouts: a row across the
-top, the centre, or the bottom; the four letters scattered around the centre;
-the four as a giant two-by-two block; two diagonals; three verticals (left,
-centre, right); and the word twice, stacked. The word is drawn into a hidden
-buffer; it never appears on screen directly.
+**The word.** One of HOPE, LOVE, GIVE, MAKE, GROW, LIVE, set in Space Mono in
+one of two large-letter layouts: the four letters as a giant two-by-two block,
+or the full word twice, stacked. The word is drawn into a hidden buffer; it
+never appears on screen directly.
 
 **Seeking.** After the opening 520 frames the shapes begin sampling that
 buffer — fifty random points a frame — collecting up to 2,200 places where

@@ -47,8 +47,8 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 50,
       "thumbnail": "thumbnail.jpg",
-      "description": "Space Invaders after the invaders have vanished. Four small inset cannons fire only at the opposite edge, while any armed non-shooter may volunteer to intercept. The final round appears as a large pulsing bomb; once fired, the other three cannons need twelve hits to destroy it.",
-      "updated": "2026-09-10"
+      "description": "Space Invaders after the invaders have vanished. Four inset cannons burn through forty-three rounds in volleys and sudden spasms. Each rail ends in an unstoppable circular boss round that grows under defensive fire, reaches the opposite cannon, and detonates to wipe the field blank.",
+      "updated": "2026-09-14"
     },
     {
       "slug": "006-only-centipede",
@@ -73,7 +73,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
       "description": "Autonomous snakes hunt one mouse on a field that remembers its dead — eight to start, up to twenty as the winner's body is divided. Flat integer cells with a hard offset shadow, one of eight palettes per round, one swatch per snake. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Death travels from head to tail, and every segment it passes is painted into the memory beneath the living. Click to reseed.",
-      "updated": "2026-09-10"
+      "updated": "2026-09-14"
     },
     {
       "slug": "008-vectrex-asteroids",
@@ -223,7 +223,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rejected": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A dense edge-to-edge black-and-white architecture built on a shared grid. Wide chambers and needle-thin towers repeat nested arches, circles, diamonds, miniature buildings, flags, and colonnades through alternating solid mass and carved negative space.",
+      "description": "A wordless geometric dream built from unfolding fans, folding stairs, swelling walls, scalloped towers, and improbable rooftop balances. Ground-floor thresholds anchor a changing city of black-and-white architectural blocks.",
       "updated": "2026-08-19"
     },
     {
@@ -273,8 +273,8 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
-      "description": "A continuous field of mineral pigment folds into broad blue marbled rivers, with cloudy granulation and a concentrated basin of muted iridescent veins.",
-      "updated": "2026-09-10"
+      "description": "Muted mineral ink falls onto still water, blooming into translucent Suminagashi films that push earlier pigment outward.",
+      "updated": "2026-09-11"
     },
     {
       "slug": "024-fuel-seekers",
@@ -399,7 +399,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 60,
       "thumbnail": "thumbnail.png",
       "description": "A field of Geist Sans makes every letter active: crossing one with the knife cursor cuts it from the statement and releases a 2.5-second abstract composition built only from that glyph; each composition can overlap the next.",
-      "updated": "2026-09-10"
+      "updated": "2026-09-11"
     },
     {
       "slug": "034-forest-of-rings",
@@ -411,7 +411,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rejected": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "Twenty colored trunk records fill a shared terrain: latitude, sun, and wind shape every tree, a broad directional fire crosses the stand, insects visit individual trunks, and two controls move the forest toward a synchronized orchard.",
+      "description": "One vertical line in the center grows wide, lengthwise wood grain outward until the tree fills the entire window. Height and older grain stay fixed. Weather, fire, and insects shape its history. No ground or roots.",
       "updated": "2026-08-20"
     },
     {
@@ -425,7 +425,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 30,
       "thumbnail": "thumbnail.png",
       "description": "A conveyor feeds ten geometric letters into a small Rube Goldberg machine where impacts tip a teeter-totter, walkers topple dominoes, and spinners trade momentum.",
-      "updated": "2026-09-08"
+      "updated": "2026-09-11"
     },
     {
       "slug": "036-hypermedia-title-02",
@@ -438,7 +438,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 40,
       "thumbnail": "thumbnail.png",
       "description": "Ten uniquely colored HYPERMEDIA disks fall through white Plinko pegs on black, painting every peg they strike.",
-      "updated": "2026-09-10"
+      "updated": "2026-09-11"
     },
     {
       "slug": "037-cover-ups",
@@ -464,7 +464,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 30,
       "thumbnail": "thumbnail.png",
       "description": "Natural-pigment frogs cross a wide grayscale course of sparse cars, bicycles, trains, rivers, and roving mowers, leaving reactive watercolor stains; catching a fly adds three matching frogs.",
-      "updated": "2026-09-08"
+      "updated": "2026-09-11"
     },
     {
       "slug": "039-drips",
@@ -489,8 +489,8 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 25,
       "thumbnail": "thumbnail.png",
-      "description": "One persistent grazer mows rich pixel-cloud moss in tightly packed hairpin lanes, then prospects across thin growth for the next patch.",
-      "updated": "2026-09-09"
+      "description": "A small colony of grazers mows rich pixel-cloud moss in tightly packed, gently wobbling hairpin lanes, prospecting between patches.",
+      "updated": "2026-09-11"
     },
     {
       "slug": "041-broken-patterns",
@@ -529,7 +529,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 46,
       "thumbnail": "thumbnail.png",
       "description": "Layered noise lines drifting across the field as ridgelines. Eleven controls — palette, chaos, peak height, layout, line weight and spacing — reshape it from calm waves to mountain ranges to dense interference.",
-      "updated": "2026-09-10"
+      "updated": "2026-09-11"
     },
     {
       "slug": "044-no-empty-places",
@@ -581,7 +581,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 60,
       "thumbnail": "thumbnail.jpg",
       "description": "Dozens of particles got together and decided to draw. They drew nothing but flowers. Fifty to eighty lines fly to drifting targets, then scribble shadowed loops around them onto a square field that is never wiped, until the field fills with blossoms. Six layouts, eight palettes, and a few lines in every swarm that erase instead of paint. Click to reseed; S saves the picture.",
-      "updated": "2026-09-11"
+      "updated": "2026-09-14"
     },
     {
       "slug": "048-growth-rings-2022",
@@ -606,8 +606,41 @@ window.HYPERGAL_MANIFEST = {
       "wip": false,
       "rating": 60,
       "thumbnail": "thumbnail.jpg",
-      "description": "Communication and progress are a cycle of building, entropy and repair. A simple positive four-letter word — HOPE, LOVE, GIVE, MAKE, GROW or LIVE — struggles for legibility under a barrage of four hundred textured shapes that grow, die and pile up. Some of them seek the word until it surfaces; then they stop being replaced, the field grows over it, and it returns in a new layout. Fifteen palettes, eleven layouts, Space Mono. Click to reseed; S saves the picture.",
-      "updated": "2026-09-11"
+      "description": "Communication and progress are a cycle of building, entropy and repair. A simple positive four-letter word — HOPE, LOVE, GIVE, MAKE, GROW or LIVE — struggles for legibility under a barrage of four hundred textured shapes that grow, die and pile up. Some of them seek the word until it surfaces; then they stop being replaced, the field grows over it, and it returns in a new layout. Fifteen palettes, two large-letter layouts, Space Mono. Click to reseed; S saves the picture.",
+      "updated": "2026-09-14"
+    },
+    {
+      "slug": "050-strega-nona",
+      "title": "Strega Nona",
+      "year": 2026,
+      "date": "2026-09-15",
+      "category": "generative",
+      "type": "interactive",
+      "wip": false,
+      "thumbnail": "thumbnail.png",
+      "description": "An overflowing drawing of olive-ink spirals, curling tendrils and nested arcs. Several drawing points work together, each tracing one continuous line at a time, until the pattern grows beyond every edge of the window. Click to regrow, Space to pause, S to save."
+    },
+    {
+      "slug": "051-agate",
+      "title": "Agate",
+      "year": 2026,
+      "date": "2026-09-15",
+      "category": "generative",
+      "type": "interactive",
+      "wip": false,
+      "thumbnail": "thumbnail.png",
+      "description": "A field of tightly fitted, irregular ink spirals grows from several places at once across warm paper. Each drawing point traces one little stone at a time, winding inward as the clusters spread and meet. Click to regrow, Space to pause, F to finish, S to save."
+    },
+    {
+      "slug": "052-negative-fill",
+      "title": "Negative Fill",
+      "year": 2026,
+      "date": "2026-09-15",
+      "category": "generative",
+      "type": "interactive",
+      "wip": false,
+      "thumbnail": "thumbnail.png",
+      "description": "Silver arcs, curled tendrils, stippled fields and bright patches grow across charcoal paper. Several drawing points work at once, fitting marks around one another and leaving irregular islands of negative space. Click to regrow, Space to pause, F to finish, S to save."
     }
   ]
 };

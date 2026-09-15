@@ -5,12 +5,96 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Snake Pit · HyperGal</title>
     <style>
+      :root { color-scheme: dark; }
       html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
       #stage { position: fixed; inset: 0; display: block; }
+      #palette-panel {
+        position: fixed;
+        z-index: 2;
+        top: 12px;
+        left: 12px;
+        width: min(268px, calc(100vw - 24px));
+        border: 1px solid rgba(255, 255, 255, 0.46);
+        background: rgba(0, 0, 0, 0.92);
+        color: #fff;
+        font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      #palette-panel.is-collapsed { width: auto; min-width: 132px; }
+      .palette-panel__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 34px;
+        padding-left: 10px;
+      }
+      .palette-panel__title { margin: 0; font: inherit; }
+      #palette-toggle,
+      .palette-option {
+        appearance: none;
+        border: 0;
+        border-radius: 0;
+        color: inherit;
+        font: inherit;
+        letter-spacing: inherit;
+        text-transform: inherit;
+        cursor: pointer;
+      }
+      #palette-toggle {
+        align-self: stretch;
+        padding: 0 10px;
+        background: transparent;
+        border-left: 1px solid rgba(255, 255, 255, 0.24);
+      }
+      #palette-options { border-top: 1px solid rgba(255, 255, 255, 0.32); }
+      .palette-option {
+        position: relative;
+        display: grid;
+        grid-template-columns: 72px 1fr;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        min-height: 35px;
+        padding: 6px 8px 6px 10px;
+        background: #050505;
+        text-align: left;
+      }
+      .palette-option + .palette-option { border-top: 1px solid rgba(255, 255, 255, 0.14); }
+      .palette-option:hover { background: #1a1a1a; }
+      .palette-option[aria-checked="true"] {
+        background: #fff;
+        color: #000;
+      }
+      #palette-toggle:hover { background: #1a1a1a; }
+      #palette-toggle:focus-visible,
+      .palette-option:focus-visible {
+        z-index: 1;
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+      }
+      .palette-swatches {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 1px;
+        height: 18px;
+        background: #000;
+      }
+      .palette-swatch { min-width: 0; }
+      @media (max-width: 520px) {
+        #palette-panel { top: 8px; left: 8px; width: min(252px, calc(100vw - 16px)); }
+      }
     </style>
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
   <body>
+    <section id="palette-panel" aria-label="Palette controls">
+      <header class="palette-panel__header">
+        <h1 class="palette-panel__title">Palette</h1>
+        <button id="palette-toggle" type="button" aria-expanded="true" aria-controls="palette-options">Hide</button>
+      </header>
+      <div id="palette-options" role="radiogroup" aria-label="Choose a palette"></div>
+    </section>
     <canvas id="stage"></canvas>
     <script>
       // Snake Pit — autonomous traditional Snake, painted in flat cells over the
@@ -30,6 +114,9 @@
 
       const canvas = document.getElementById('stage');
       const ctx = canvas.getContext('2d');
+      const palettePanel = document.getElementById('palette-panel');
+      const paletteOptions = document.getElementById('palette-options');
+      const paletteToggle = document.getElementById('palette-toggle');
       ctx.imageSmoothingEnabled = false;
 
       // ---- tunables -------------------------------------------------------
@@ -49,6 +136,7 @@
       const MOUSE_BLINK_PERIOD = 0.24;
       const MOUSE_BLINK_OFF = 0.10;
       const PREWARM_MAX_GENERATIONS = 120;
+      const PREWARM_HATCH_STRIDE = 2.4;
       const AGGRESSION_MIN = 0.42, AGGRESSION_MAX = 0.88;
       const AGGRESSION_PER_SEG = 0.045;
       const AGGRESSION_CAP = 0.97;
@@ -70,76 +158,39 @@
       const LEADER_VETERAN_SPAN = 45;
       const SMART_LOOKAHEAD_MIN = 2;
       const SMART_LOOKAHEAD_MAX = 7;
-      const DENSIFY_AT = 36;
-      const DENSIFY_SPAN = 28;
-      const DENSITY_RADIUS = 4;
-      const DENSITY_REWARD = 30;
-      const FINAL_BODY_RESERVE = 0.06;
-      const MIN_DENSE_RESERVE = 8;
-      const PACKING_CYCLE_AT_RATIO = 0.08;
-      const PACKING_CYCLE_SPAN_RATIO = 0.04;
-      const PACKING_CYCLE_REWARD = 3200;
-      const PACKING_SHORTCUT_REWARD = 0.9;
-      const PACKING_SHORTCUT_MAX_ADVANCE = 10;
-      const PACKING_STRICT_DRIVE = 0.72;
-      const PACKING_DISORDER_DRIVE = 0.2;
-      const PACKING_DISORDER_LIMIT = 0.12;
-      const VICTORY_DURATION = 2.8;
-      const VICTORY_REDUCED_DURATION = 0.7;
-      const GOLDEN_HEIR_RATIO = 0.3;  // the leading share of a winner that becomes the heir
-      const GOLDEN_HEIR_MIN = 2;
-      const GOLDEN_HEIR_SIZE_ADVANTAGE = 3; // and at least this many times the largest offspring
+      const MIN_ESCAPE_AREA = 8;
+      const VICTORY_BLINKS = 5;
+      const VICTORY_BLINK_PERIOD = 0.24;
+      const VICTORY_FINAL_HOLD = 0.28;
+      const VICTORY_REDUCED_DURATION = 0.55;
+      const HEIR_RATIO = 0.3;  // the leading share of a winner that becomes the heir
+      const HEIR_MIN = 2;
+      const HEIR_SIZE_ADVANTAGE = 3; // and at least this many times the largest offspring
       // Separating the living from the dead. Snake Memories painted its dead at
       // full strength and let its one snake hide in them, found by motion
       // alone; twenty snakes and their death fronts need to read. Memories are
       // slightly desaturated and pushed toward the ground; the living keep
-      // their full colour. The stronger distinction comes from texture: dead
-      // cells are crosshatched instead of solid.
+      // their full colour. The prebaked field is muted much further so a fresh
+      // death remains readable above it. Texture supplies the other distinction:
+      // dead cells are crosshatched instead of solid.
       const LOOK = {
-        memoryDesaturate: 0.5,  // 0 = full colour, 1 = grey
-        memoryFade: 0.22,       // toward the ground
+        memoryDesaturate: 0.2,  // actual deaths retain enough colour to remain legible
+        memoryFade: 0.08,       // actual deaths sit only slightly toward the ground
+        prewarmDesaturate: 0.9,
+        prewarmFade: 0.32,
         prewarm: true,          // fill the field with the dead before the first frame, as Snake Memories did
       };
 
-      // Ground and winner colours. Everything else comes from the palette dealt
-      // for the round.
+      // Ground colour. Every snake colour comes from the palette or a winner's
+      // interpolation toward the palette's next swatch.
       const C_BG = '#000000';
-      const WINNER_COLORS = {
-        body: '#d99a00',
-        head: '#fff3a0',
-        glow: '#ffc928',
-        ring: '217,154,0',
-        accent: '255,243,160',
-        dark: '92,51,0',
-      };
 
-      // The multicolour palettes of Snake Memories, verbatim. (Its five
-      // monochromes and the black-and-white pair are left out: one hue can't
-      // separate twenty snakes from their own remains.) One palette is dealt
-      // per round; every snake takes one swatch from it. "rando" deals a fresh
-      // random colour to each snake instead.
+      // Three selected palettes from Snake Memories. One palette is dealt per
+      // round; every snake takes one swatch from it.
       const PALETTES = {
-        rando: ['#FFF000', '#BBB000', '#AAA000', '#DDD000', '#EEE000'],
-        retro: [
-          '#FF6F61', '#6B5B95', '#88B04B', '#F7CAC9', '#92A8D1',
-          '#955251', '#B565A7', '#009B77', '#DD4124', '#45B8AC'
-        ],
         neon: [
           '#39FF14', '#FF073A', '#F8F32B', '#0FF0FC', '#FF00FF',
-          '#FC00FF', '#00FFFF', '#FFAA00', '#FF5F1F', '#7CFC00'
-        ],
-        desert: [
-          '#EDC9AF', '#C2B280', '#E97451', '#C19A6B', '#9C661F',
-          '#DEB887', '#F4A460', '#D2B48C', '#C68642', '#8B5A2B'
-        ],
-        hokusai: [
-          '#2e4a62', '#6a8e7f', '#e9d8a6', '#f4a261', '#e76f51',
-          '#264653', '#2a9d8f', '#e9c46a', '#f4a261', '#e76f51'
-        ],
-        pastel: [
-          '#fff1f7', '#ffd1dc', '#ffc8dd', '#fbcfe8', '#fce1a8',
-          '#e2cfea', '#d5e1df', '#c1f0f6', '#bae6fd', '#d7e8ba',
-          '#e0f7fa', '#daf0e0', '#f8d5c4', '#f5d5d3', '#f3e8ff'
+          '#FC00FF', '#0000FF', '#FFAA00', '#FF5F1F', '#7CFC00'
         ],
         vaporwave: [
           '#ff71ce', '#fe3c9e', '#ff00c8', '#ff00aa', '#ff0066',
@@ -147,25 +198,61 @@
           '#b967ff', '#7c4dff', '#8c00ff', '#5500ff', '#fffb96',
           '#ffe347', '#ffc600'
         ],
-        nordic: [
-          '#3b3c36', '#7d8471', '#d8cfc4', '#ece9e1', '#8a7968', '#b2b1a8',
-          '#6b705c', '#cb997e', '#ddbea9', '#ffe8d6', '#a5a58d', '#ffe5b4',
-          '#d4a373', '#9c6644', '#22333b', '#b65d1f', '#c26c36', '#a95a32'
+        hokusai: [
+          '#2e4a62', '#6a8e7f', '#e9d8a6', '#f4a261', '#e76f51',
+          '#264653', '#2a9d8f', '#e9c46a', '#f4a261', '#e76f51'
         ],
       };
-      let paletteName = 'retro', palette = PALETTES.retro;
+      let paletteName = 'neon', palette = PALETTES.neon;
 
       function dealPalette() {
-        const names = Object.keys(PALETTES);
-        paletteName = names[(Math.random() * names.length) | 0];
-        palette = PALETTES[paletteName];
+        palette = PALETTES[paletteName] || PALETTES.neon;
+        syncPaletteControls();
+      }
+
+      function syncPaletteControls() {
+        for (const button of paletteOptions.querySelectorAll('.palette-option')) {
+          button.setAttribute('aria-checked', String(button.dataset.palette === paletteName));
+        }
+      }
+
+      function choosePalette(name) {
+        if (!PALETTES[name]) return;
+        paletteName = name;
+        palette = PALETTES[name];
+        syncPaletteControls();
+        reset();
+      }
+
+      function buildPaletteControls() {
+        for (const [name, swatches] of Object.entries(PALETTES)) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'palette-option';
+          button.dataset.palette = name;
+          button.setAttribute('role', 'radio');
+          button.setAttribute('aria-checked', 'false');
+
+          const label = document.createElement('span');
+          label.textContent = name;
+          const preview = document.createElement('span');
+          preview.className = 'palette-swatches';
+          preview.setAttribute('aria-hidden', 'true');
+          for (let i = 0; i < 6; i++) {
+            const chip = document.createElement('span');
+            chip.className = 'palette-swatch';
+            chip.style.backgroundColor = swatches[Math.floor(i * swatches.length / 6)];
+            preview.appendChild(chip);
+          }
+          button.append(label, preview);
+          button.addEventListener('click', () => choosePalette(name));
+          paletteOptions.appendChild(button);
+        }
+        syncPaletteControls();
       }
 
       const hex2 = (v) => (v | 0).toString(16).padStart(2, '0');
       function dealSwatch() {
-        if (paletteName === 'rando') {
-          return '#' + hex2(50 + Math.random() * 206) + hex2(50 + Math.random() * 206) + hex2(50 + Math.random() * 206);
-        }
         return palette[(Math.random() * palette.length) | 0].toLowerCase();
       }
 
@@ -176,7 +263,6 @@
       // ---- state ----------------------------------------------------------
       let W = 0, H = 0, dpr = 1, CELL = 18, GW = 0, GH = 0, OX = 0, OY = 0;
       let snakes = [], mouse = null, dying = [], lastEater = null;
-      let packingCycle = [], packingRank = new Map();
       let brainOwners = null;
       let last = 0, frame = 0, colorCursor = 0;
       const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -202,6 +288,21 @@
         const a = parseHex(from), b = parseHex(to);
         return '#' + hex2(mixChannel(a[0], b[0], amount)) + hex2(mixChannel(a[1], b[1], amount)) + hex2(mixChannel(a[2], b[2], amount));
       };
+      const colorDistance = (from, to) => {
+        const a = parseHex(from), b = parseHex(to);
+        return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+      };
+      const nextPaletteSwatch = (current) => {
+        const normalized = current.toLowerCase();
+        let index = palette.findIndex(swatch => swatch.toLowerCase() === normalized);
+        if (index < 0) {
+          index = palette.reduce((closest, swatch, candidate) =>
+            colorDistance(normalized, swatch) < colorDistance(normalized, palette[closest])
+              ? candidate
+              : closest, 0);
+        }
+        return palette[(index + 1) % palette.length].toLowerCase();
+      };
       // A snake's colour set, built from its one swatch. The accent is the
       // swatch pushed toward white; it lights the death front.
       const colorsForSwatch = (hex) => {
@@ -219,48 +320,30 @@
         if (!s._colors || s._colors.body !== s.swatch) s._colors = colorsForSwatch(s.swatch);
         return s._colors;
       };
-      const mixRgb = (from, to, amount) => {
-        const a = from.split(',').map(Number), b = to.split(',').map(Number);
-        return `${mixChannel(a[0], b[0], amount)},${mixChannel(a[1], b[1], amount)},${mixChannel(a[2], b[2], amount)}`;
+      const snakeColor = (s) => baseSnakeColor(s);
+      const victoryDuration = () => reducedMotion
+        ? VICTORY_REDUCED_DURATION
+        : VICTORY_BLINKS * VICTORY_BLINK_PERIOD + VICTORY_FINAL_HOLD;
+      const victoryBlinkVisible = (s) => {
+        if (!s.victoryActive || reducedMotion) return true;
+        const blinkDuration = VICTORY_BLINKS * VICTORY_BLINK_PERIOD;
+        if ((s.victoryAge || 0) >= blinkDuration) return true;
+        return (s.victoryAge || 0) % VICTORY_BLINK_PERIOD < VICTORY_BLINK_PERIOD / 2;
       };
-      const victoryDuration = () => reducedMotion ? VICTORY_REDUCED_DURATION : VICTORY_DURATION;
-      const winnerHeadLength = (totalLength) => {
+      const heirFragmentLength = (totalLength) => {
         let headLength = Math.min(
           totalLength,
-          Math.max(GOLDEN_HEIR_MIN, Math.ceil(totalLength * GOLDEN_HEIR_RATIO))
+          Math.max(HEIR_MIN, Math.ceil(totalLength * HEIR_RATIO))
         );
         while (headLength < totalLength) {
           const remainder = totalLength - headLength;
           const fragments = Math.min(MAX_SNAKES - 1, remainder);
           const largestFragment = fragments ? Math.ceil(remainder / fragments) : 0;
-          if (headLength >= largestFragment * GOLDEN_HEIR_SIZE_ADVANTAGE) break;
+          if (headLength >= largestFragment * HEIR_SIZE_ADVANTAGE) break;
           headLength++;
         }
         return headLength;
       };
-      const winnerGoldAmount = (s) => {
-        if (!s.winner) return 0;
-        if (!s.victoryActive || reducedMotion) return 1;
-        const progress = Math.min(1, (s.victoryAge || 0) / victoryDuration());
-        const blink = Math.pow(0.5 - 0.5 * Math.cos(progress * Math.PI * 12), 2.2);
-        const settleProgress = Math.max(0, Math.min(1, (progress - 0.7) / 0.3));
-        const settle = 1 - Math.pow(1 - settleProgress, 4);
-        return Math.max(blink, settle);
-      };
-      const mixedWinnerColor = (base, gold) => {
-        return {
-          body: mixHex(base.body, WINNER_COLORS.body, gold),
-          head: mixHex(base.head, WINNER_COLORS.head, gold),
-          glow: mixHex(base.glow, WINNER_COLORS.glow, gold),
-          ring: mixRgb(base.ring, WINNER_COLORS.ring, gold),
-          accent: mixRgb(base.accent, WINNER_COLORS.accent, gold),
-          dark: mixRgb(base.dark, WINNER_COLORS.dark, gold),
-        };
-      };
-      const snakeColor = (s) => s.golden
-        ? mixedWinnerColor(baseSnakeColor(s), 1)
-        : baseSnakeColor(s);
-      const winnerHeadColor = (s, gold = winnerGoldAmount(s)) => mixedWinnerColor(baseSnakeColor(s), gold);
       const nextColorIndex = () => colorCursor++;
       const newStartLength = () => START_LEN_MIN + ((Math.random() * (START_LEN_MAX - START_LEN_MIN + 1)) | 0);
       const newAggression = () => rand(AGGRESSION_MIN, AGGRESSION_MAX);
@@ -281,14 +364,9 @@
         const veteranDepth = Math.floor(Math.max(0, intelligence - 1) * 2 + 1e-6);
         return Math.min(SMART_LOOKAHEAD_MAX, trainedDepth + veteranDepth);
       };
-      const densifyDrive = (s) => Math.min(1, Math.max(0, (s.body.length - DENSIFY_AT) / DENSIFY_SPAN));
-      const hungerDrive = (s) => 1 + densifyDrive(s) * 8;
-      const packingCycleDrive = (s) => {
-        const arena = Math.max(1, packingCycle.length || GW * GH);
-        const start = arena * PACKING_CYCLE_AT_RATIO;
-        const span = Math.max(1, arena * PACKING_CYCLE_SPAN_RATIO);
-        return Math.min(1, Math.max(0, (s.body.length - start) / span));
-      };
+      const safetyTierTolerance = (intelligence) => Math.max(0, Math.floor(3 - intelligence * 1.75));
+      const horizonTolerance = (intelligence) => Math.max(0, Math.ceil((1 - Math.min(1, intelligence)) * 2));
+      const hungerDrive = (s) => 1 + Math.min(8, Math.max(0, s.body.length - START_LEN_MIN) / 8);
       const moveInterval = (s) => Math.max(MIN_STEP, STEP - Math.max(0, s.body.length - START_LEN_MIN) * SPEEDUP_PER_SEG - Math.min(0.032, (s.eatStreak || 0) * STREAK_SPEEDUP));
       const occupiedBySnakes = (x, y, list = snakes) => list.some(s => s.body.some(p => p.x === x && p.y === y));
 
@@ -306,41 +384,13 @@
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.imageSmoothingEnabled = false;
         CELL = Math.max(13, Math.round(Math.min(W, H) / 34));
-        GW = Math.max(12, Math.floor((W - CELL * 3) / CELL));
-        GH = Math.max(12, Math.floor((H - CELL * 4) / CELL));
-        // Odd-by-odd grids cannot contain a Hamiltonian cycle. Trim one column
-        // so a mature snake always has a route through every arena cell.
-        if (GW % 2 === 1 && GH % 2 === 1) GW--;
-        OX = Math.round((W - GW * CELL) / 2);
-        OY = Math.round((H - GH * CELL) / 2);
-        buildPackingCycle();
+        // Overdraw the viewport by the fractional outer cells so paint and
+        // snakes meet every screen edge instead of sitting inside a black mat.
+        GW = Math.max(12, Math.ceil(W / CELL));
+        GH = Math.max(12, Math.ceil(H / CELL));
+        OX = Math.floor((W - GW * CELL) / 2);
+        OY = Math.floor((H - GH * CELL) / 2);
         buildMemory();
-      }
-
-      function buildPackingCycle() {
-        packingCycle = [{ x: 0, y: 0 }];
-        if (GH % 2 === 0) {
-          // Sweep every row except the first column, then return up that column.
-          for (let y = 0; y < GH; y++) {
-            if (y % 2 === 0) {
-              for (let x = 1; x < GW; x++) packingCycle.push({ x, y });
-            } else {
-              for (let x = GW - 1; x >= 1; x--) packingCycle.push({ x, y });
-            }
-          }
-          for (let y = GH - 1; y >= 1; y--) packingCycle.push({ x: 0, y });
-        } else {
-          // Transposed form for an even-width, odd-height arena.
-          for (let x = 0; x < GW; x++) {
-            if (x % 2 === 0) {
-              for (let y = 1; y < GH; y++) packingCycle.push({ x, y });
-            } else {
-              for (let y = GH - 1; y >= 1; y--) packingCycle.push({ x, y });
-            }
-          }
-          for (let x = GW - 1; x >= 1; x--) packingCycle.push({ x, y: 0 });
-        }
-        packingRank = new Map(packingCycle.map((p, i) => [key(p), i]));
       }
 
       // ---- seeding --------------------------------------------------------
@@ -425,35 +475,38 @@
         return { x: fallback.x, y: fallback.y };
       }
 
-      function winnerFragment(winner, source, start, end, golden = false) {
+      function winnerFragment(winner, source, start, end, swatch, heir = false) {
         const body = copyBody(source.slice(start, end));
-        const colorIndex = golden ? winner.colorIndex : nextColorIndex();
+        const colorIndex = heir ? winner.colorIndex : nextColorIndex();
         return {
           body,
           dir: fragmentDirection(source, start, body, winner.dir),
           grow: Math.max(0, START_LEN_MIN - body.length),
           prev: copyBody(body),
           colorIndex,
-          swatch: golden ? winner.swatch : dealSwatch(),
-          aggression: golden ? winner.aggression : newAggression(),
+          swatch,
+          aggression: heir ? winner.aggression : newAggression(),
           moveAcc: 0,
           eatStreak: 0,
-          golden,
         };
       }
 
       function splitWinner(winner) {
         const source = copyBody(winner.body);
         if (!source.length) return;
-        const goldenLength = winnerHeadLength(source.length);
-        const offspring = [winnerFragment(winner, source, 0, goldenLength, true)];
-        const remainder = source.length - goldenLength;
+        const heirLength = heirFragmentLength(source.length);
+        const headSwatch = winner.swatch.toLowerCase();
+        const tailSwatch = nextPaletteSwatch(headSwatch);
+        const offspring = [winnerFragment(winner, source, 0, heirLength, headSwatch, true)];
+        const remainder = source.length - heirLength;
         const fragmentCount = Math.min(MAX_SNAKES - 1, remainder);
 
         for (let i = 0; i < fragmentCount; i++) {
-          const start = goldenLength + Math.floor(i * remainder / fragmentCount);
-          const end = goldenLength + Math.floor((i + 1) * remainder / fragmentCount);
-          offspring.push(winnerFragment(winner, source, start, end));
+          const start = heirLength + Math.floor(i * remainder / fragmentCount);
+          const end = heirLength + Math.floor((i + 1) * remainder / fragmentCount);
+          const progress = (i + 1) / fragmentCount;
+          const swatch = mixHex(headSwatch, tailSwatch, progress);
+          offspring.push(winnerFragment(winner, source, start, end, swatch));
         }
 
         for (let i = 0; i < offspring.length; i++) {
@@ -479,7 +532,6 @@
       }
 
       function beginVictory(s) {
-        s.winner = true;
         s.victoryActive = true;
         s.victoryAge = 0;
         s.moveAcc = 0;
@@ -502,20 +554,13 @@
         const h = s.body[0];
         const opts = DIRS.filter(d => !(d.x === -s.dir.x && d.y === -s.dir.y));
         const intelligence = leaderIntelligence(s);
-        // Hunger is absolute: if the mouse is one legal step away, bite it even
-        // when that step leaves a young snake's preferred route. Leaders still
-        // evaluate the bite so food cannot lure them into a sealed pocket.
+        // An adjacent mouse is still evaluated like any other move. Even a
+        // young snake refuses a bite with no exit; length buys deeper judgment,
+        // not permission for the shortest snakes to choose certain death.
         const bite = opts.find(d => {
           const p = { x: h.x + d.x, y: h.y + d.y };
           return sameCell(p, mouse) && inB(p.x, p.y) && !hitSelf(s, p) && !hitOtherSnake(s, p);
         });
-        if (bite && intelligence < 0.2) {
-          s.dir = bite;
-          return;
-        }
-        choosePackingDirection(s);
-        const packingDrive = packingCycleDrive(s);
-        const strictPacking = shouldStrictPack(s, packingDrive);
         const choices = [];
         for (const d of opts) {
           const detail = {};
@@ -523,63 +568,35 @@
         }
 
         let contenders = choices.filter(choice => choice.legal);
-        // Once the leader is densely packing, prefer the next cell on its
-        // Hamiltonian sweep whenever that step survives the full lookahead.
-        // This lets the ordered head path reach the tail and erase the loose
-        // pockets left by earlier food-chasing shortcuts.
-        if (strictPacking && contenders.length) {
-          const requiredHorizon = smartLookaheadDepth(intelligence);
-          const cycleFollowers = contenders.filter(choice => {
-            const next = { x: h.x + choice.d.x, y: h.y + choice.d.y };
-            return isPackingCycleStep(s, next) && choice.horizon >= requiredHorizon;
-          });
-          if (cycleFollowers.length) contenders = cycleFollowers;
-        }
-        // A corner has fewer nominal exits, so the general safety tiers can
-        // otherwise make a snake orbit a perfectly reachable mouse forever.
-        // Lock onto the shortest approach only when it includes a legal exit
-        // after the bite; a genuinely sealed corner still falls back to safety.
-        if (isCornerCell(mouse) && contenders.length) {
-          const cornerHunters = contenders.filter(choice => choice.huntSafe && Number.isFinite(choice.cornerPath));
-          if (cornerHunters.length) {
-            const shortestCornerPath = Math.min(...cornerHunters.map(choice => choice.cornerPath));
-            contenders = cornerHunters.filter(choice => choice.cornerPath === shortestCornerPath);
-          }
-        }
-        // Intelligence is lexicographic before it is numeric: a mature snake
-        // first discards moves with a meaningfully worse survival class, then
-        // chooses among the remaining routes. This prevents a food bonus or a
-        // tiny distance gain from buying entry into an obvious cul-de-sac.
+        // Longer snakes become lexicographically stricter before food distance
+        // is considered. A mature snake will take a longer route rather than
+        // sacrifice escape class or proven survival depth for a quick mouse.
         if (intelligence > 0.05 && contenders.length) {
           const bestSafety = Math.max(...contenders.map(choice => choice.safetyTier));
-          const toleratedDrop = intelligence < 0.35 ? 2 : intelligence < 0.7 ? 1 : 0;
-          const safer = contenders.filter(choice => choice.safetyTier >= bestSafety - toleratedDrop);
+          const safetyFloor = bestSafety - safetyTierTolerance(intelligence);
+          const safer = contenders.filter(choice => choice.safetyTier >= safetyFloor);
           if (safer.length) contenders = safer;
-        }
-        // Veteran leaders compare the full survival horizon inside the best
-        // safety class. The longest snakes stop accepting a route that fails
-        // even one move earlier when a deeper escape remains available.
-        if (intelligence > 1 && contenders.length) {
+
           const bestHorizon = Math.max(...contenders.map(choice => choice.horizon));
-          const toleratedShortfall = intelligence < 1.5 ? 1 : 0;
-          const farsighted = contenders.filter(choice => choice.horizon >= bestHorizon - toleratedShortfall);
+          const horizonFloor = bestHorizon - horizonTolerance(intelligence);
+          const farsighted = contenders.filter(choice => choice.horizon >= horizonFloor);
           if (farsighted.length) contenders = farsighted;
         }
-        // Once packing activates, hunger becomes lexicographic: first take the
-        // shortest available mouse route, then let survival and density break
-        // ties. If the static body blocks every computed route, direct distance
-        // keeps the head hunting instead of retiring into box-filling mode.
-        if (mouse && packingDrive > 0 && !strictPacking && contenders.length) {
-          const safeHunters = contenders.filter(choice => choice.huntSafe);
-          const huntDistance = choice => Number.isFinite(choice.path)
-            ? choice.path
-            : GW + GH + choice.mouseDist;
-          if (safeHunters.length) {
-            const shortest = Math.min(...safeHunters.map(huntDistance));
-            contenders = safeHunters.filter(choice => huntDistance(choice) === shortest);
+
+        // Hunt only inside the safety set. Corner routes have already proven
+        // that the snake can leave the corner after the bite.
+        const safeBite = bite && contenders.find(choice => sameDir(choice.d, bite) && choice.huntSafe);
+        if (safeBite) {
+          contenders = [safeBite];
+        } else if (mouse && contenders.length) {
+          const viableHunters = contenders.filter(choice =>
+            Number.isFinite(choice.path) && choice.huntSafe
+          );
+          if (viableHunters.length) {
+            const shortest = Math.min(...viableHunters.map(choice => choice.path));
+            contenders = viableHunters.filter(choice => choice.path === shortest);
           }
         }
-
         const ranked = contenders.length ? contenders : choices;
         let bestChoice = ranked[0];
         for (const choice of ranked) if (!bestChoice || choice.score > bestChoice.score) bestChoice = choice;
@@ -587,103 +604,6 @@
         const straight = ranked.find(choice => sameDir(choice.d, s.dir));
         if (!sameDir(best, s.dir) && straight && straight.score >= bestChoice.score - turnMarginFor(s)) best = s.dir;
         s.dir = best;
-      }
-
-      function choosePackingDirection(s) {
-        if (packingCycleDrive(s) <= 0 || s.packingDirection === 1 || s.packingDirection === -1) return;
-        const count = packingCycle.length;
-        const headRank = packingRank.get(key(s.body[0]));
-        if (headRank === undefined || !count) return;
-
-        const forward = { x: s.body[0].x + s.dir.x, y: s.body[0].y + s.dir.y };
-        const forwardRank = packingRank.get(key(forward));
-        if (forwardRank === (headRank + 1) % count) s.packingDirection = 1;
-        else if (forwardRank === (headRank - 1 + count) % count) s.packingDirection = -1;
-        else {
-          // Enter the cycle in the direction that reaches the current mouse
-          // first; once selected, direction stays stable so the body aligns.
-          const mouseRank = mouse ? packingRank.get(key(mouse)) : undefined;
-          const clockwise = mouseRank === undefined ? 0 : (mouseRank - headRank + count) % count;
-          const counter = mouseRank === undefined ? 0 : (headRank - mouseRank + count) % count;
-          s.packingDirection = clockwise <= counter ? 1 : -1;
-        }
-      }
-
-      function cycleDistance(from, to, direction) {
-        return direction === 1
-          ? (to - from + packingCycle.length) % packingCycle.length
-          : (from - to + packingCycle.length) % packingCycle.length;
-      }
-
-      function isPackingCycleStep(s, p) {
-        if (!s.packingDirection || !packingCycle.length) return false;
-        const headRank = packingRank.get(key(s.body[0]));
-        const nextRank = packingRank.get(key(p));
-        if (headRank === undefined || nextRank === undefined) return false;
-        return nextRank === (headRank + s.packingDirection + packingCycle.length) % packingCycle.length;
-      }
-
-      function packingDisorder(s) {
-        if (!s.packingDirection || s.body.length < 2 || !packingCycle.length) return 1;
-        let breaks = 0;
-        for (let i = 1; i < s.body.length; i++) {
-          const ahead = packingRank.get(key(s.body[i - 1]));
-          const behind = packingRank.get(key(s.body[i]));
-          if (ahead === undefined || behind === undefined) {
-            breaks++;
-            continue;
-          }
-          const expected = (ahead - s.packingDirection + packingCycle.length) % packingCycle.length;
-          if (behind !== expected) breaks++;
-        }
-        return breaks / (s.body.length - 1);
-      }
-
-      function shouldStrictPack(s, drive = packingCycleDrive(s)) {
-        return drive >= PACKING_STRICT_DRIVE
-          || (drive >= PACKING_DISORDER_DRIVE && packingDisorder(s) > PACKING_DISORDER_LIMIT);
-      }
-
-      function packingCycleScore(s, p) {
-        const drive = packingCycleDrive(s);
-        if (drive <= 0 || !s.packingDirection || !packingCycle.length) return 0;
-        const headRank = packingRank.get(key(s.body[0]));
-        const nextRank = packingRank.get(key(p));
-        if (headRank === undefined || nextRank === undefined) return 0;
-        const desired = (headRank + s.packingDirection + packingCycle.length) % packingCycle.length;
-        if (nextRank === desired) return drive * PACKING_CYCLE_REWARD;
-
-        // A mature snake may jump forward across the empty portion of its
-        // Hamiltonian loop to hunt. The shortcut must stay before the nearest
-        // occupied rank and before the mouse, preserving body order and the
-        // dense coil instead of opening a self-locking hole.
-        const advance = cycleDistance(headRank, nextRank, s.packingDirection);
-        const mouseRank = mouse ? packingRank.get(key(mouse)) : undefined;
-        const mouseAdvance = mouseRank === undefined
-          ? 0
-          : cycleDistance(headRank, mouseRank, s.packingDirection);
-        let nearestBody = packingCycle.length;
-        for (let i = 1; i < s.body.length; i++) {
-          const rank = packingRank.get(key(s.body[i]));
-          if (rank === undefined) continue;
-          const distance = cycleDistance(headRank, rank, s.packingDirection);
-          if (distance > 0) nearestBody = Math.min(nearestBody, distance);
-        }
-        // Early in packing, small ordered shortcuts keep food acquisition from
-        // stalling. Their allowance contracts to one cycle step as the body
-        // densifies, preventing cross-lane jumps from leaving persistent holes.
-        const shortcutAllowance = shouldStrictPack(s, drive)
-          ? 1
-          : Math.max(1, Math.floor(
-              PACKING_SHORTCUT_MAX_ADVANCE * (1 - Math.min(1, drive / PACKING_STRICT_DRIVE))
-            ));
-        const orderedFoodShortcut = advance > 1
-          && advance <= shortcutAllowance
-          && advance < nearestBody
-          && mouseAdvance >= advance;
-        return orderedFoodShortcut
-          ? drive * PACKING_CYCLE_REWARD * PACKING_SHORTCUT_REWARD
-          : -drive * PACKING_CYCLE_REWARD * 0.65;
       }
 
       function turnMarginFor(s) {
@@ -735,24 +655,6 @@
           }
         }
         return seen.size;
-      }
-
-      function pathDistanceToMouse(s, start, body) {
-        if (!mouse) return 0;
-        const blocked = blockedCells(s, body, start);
-        const seen = new Set([key(start)]);
-        const q = [{ p: start, dist: 0 }];
-        for (let qi = 0; qi < q.length; qi++) {
-          const cur = q[qi];
-          if (sameCell(cur.p, mouse)) return cur.dist;
-          for (const d of DIRS) {
-            const n = { x: cur.p.x + d.x, y: cur.p.y + d.y };
-            const nk = key(n);
-            if (!inB(n.x, n.y) || blocked.has(nk) || seen.has(nk)) continue;
-            seen.add(nk); q.push({ p: n, dist: cur.dist + 1 });
-          }
-        }
-        return Infinity;
       }
 
       function isCornerCell(p) {
@@ -823,48 +725,6 @@
           for (const b of other.body) best = Math.min(best, tdist(p, b));
         }
         return Number.isFinite(best) ? best : GW + GH;
-      }
-
-      function olderBodyDensity(body, p) {
-        const older = body.slice(Math.min(8, body.length));
-        const occupied = new Set(older.map(key));
-        let density = 0, enclosedDirections = 0;
-
-        // Nearby non-neck segments reward tight parallel lanes. Multiple body
-        // walls around the head add an enclosure bonus, guiding it into holes
-        // that earlier passes left inside an otherwise dense coil.
-        for (const b of older) {
-          const distance = tdist(p, b);
-          if (distance <= DENSITY_RADIUS) density += DENSITY_RADIUS + 1 - distance;
-        }
-        for (const d of DIRS) {
-          for (let distance = 1; distance <= DENSITY_RADIUS + 1; distance++) {
-            if (!occupied.has(`${p.x + d.x * distance},${p.y + d.y * distance}`)) continue;
-            enclosedDirections++;
-            break;
-          }
-        }
-        return Math.min(16, density + Math.max(0, enclosedDirections - 1) * 2.5);
-      }
-
-      function canReachTail(s, start, body) {
-        if (body.length < 2) return true;
-        const tail = body[body.length - 1];
-        const blocked = blockedCells(s, body, start);
-        blocked.delete(key(tail));
-        const seen = new Set([key(start)]);
-        const q = [start];
-        for (let qi = 0; qi < q.length; qi++) {
-          const p = q[qi];
-          if (sameCell(p, tail)) return true;
-          for (const d of DIRS) {
-            const n = { x: p.x + d.x, y: p.y + d.y };
-            const nk = key(n);
-            if (!inB(n.x, n.y) || blocked.has(nk) || seen.has(nk)) continue;
-            seen.add(nk); q.push(n);
-          }
-        }
-        return false;
       }
 
       function rivalHeadRisk(s, p) {
@@ -1013,22 +873,19 @@
         }
 
         const future = futureBodyAfter(s, nx, ate);
-        const densify = densifyDrive(s);
         const eatGrowth = ate ? growthForNextMouse(s) : 0;
-        const bodyNeed = s.body.length + s.grow + eatGrowth;
         const intelligence = leaderIntelligence(s);
         const reachability = reachabilityProfile(s, nx, future);
         const area = reachability.area;
         const cornerPath = isCornerCell(mouse) ? safeCornerPathDistance(s, nx, future, d) : Infinity;
         const path = isCornerCell(mouse) ? cornerPath : reachability.path;
         if (detail) Object.assign(detail, { legal: true, path, cornerPath, mouseDist });
-        // Requiring one free cell for every body segment imposes a permanent
-        // 50% density ceiling. A mature snake instead follows its tail through
-        // a much smaller reserve, letting it occupy most of the arena.
-        const bodyReserveScale = 1 - densify * (1 - FINAL_BODY_RESERVE);
-        const bufferScale = 1 - densify * 0.9;
-        const safeNeed = Math.max(MIN_DENSE_RESERVE, Math.round(
-          bodyNeed * bodyReserveScale + SAFE_BODY_BUFFER * intelligence * bufferScale
+        // A longer body needs a larger escape pocket, but the square-root curve
+        // avoids turning open-area preservation back into a field-filling goal.
+        const lengthReserve = Math.sqrt(Math.max(0, s.body.length - START_LEN_MIN))
+          * (1 + intelligence);
+        const safeNeed = Math.max(MIN_ESCAPE_AREA, Math.round(
+          MIN_ESCAPE_AREA + SAFE_BODY_BUFFER * intelligence + lengthReserve
         ));
         const crampedPenalty = Math.max(0, safeNeed - area) * (55 + intelligence * 150);
         const escape = futureEscapeProfile(s, nx, future, d, intelligence);
@@ -1059,21 +916,17 @@
         const pathScore = Number.isFinite(path)
           ? 180 - path * HUNT_DISTANCE_WEIGHT
           : -mouseDist * HUNT_DISTANCE_WEIGHT - 120;
-        // Once the body is very long, extra empty acreage stops being valuable.
-        // Enough room to turn and reach the tail still scores fully; beyond that,
-        // the leader is free to fold into denser parallel lanes.
-        const spaceCeiling = safeNeed * (2.5 - densify * 1.35);
+        // Space beyond a useful escape reserve adds no incentive to sweep or
+        // fill the arena; it exists only as a bounded survival signal.
+        const spaceCeiling = safeNeed * 2.5;
         const usefulArea = Math.min(area, spaceCeiling);
-        const exitFreedom = 1 - densify * 0.82;
         const dangerScore = usefulArea * 3
           + Math.min(8, nearestOtherDistance(s, nx)) * 16
-          + escape.exits * (24 + intelligence * 54) * exitFreedom
+          + escape.exits * (24 + intelligence * 54)
           + Math.min(usefulArea, escape.bestArea) * intelligence * 1.8
           + (tailReachable ? 45 * intelligence : -220 * intelligence)
           - headRisk * (0.7 + intelligence * 1.8)
           - crampedPenalty;
-        const densityScore = densify * olderBodyDensity(future, nx) * DENSITY_REWARD;
-        const cycleScore = packingCycleScore(s, nx);
         const huntScore = pathScore + (ate ? FOOD_CAPTURE_BONUS + eatGrowth * 45 : 0);
         const trapScore = boxingScore(s, nx, future);
         const edgePressure = Math.max(0, 2 - borderDistance(h));
@@ -1092,8 +945,8 @@
         // Aggression must remain a real tradeoff. Leader intelligence still
         // rejects sealed traps, but no longer overwhelms every step toward food.
         const survivalWeight = 0.14 + (1 - aggression) * 0.7 + intelligence * 0.55;
-        return huntScore * aggression * hungerDrive(s) + dangerScore * survivalWeight + densityScore + cycleScore
-          + trapScore * (0.12 + aggression * 0.1) * (1 - densify * 0.9)
+        return huntScore * aggression * hungerDrive(s) + dangerScore * survivalWeight
+          + trapScore * (0.12 + aggression * 0.1)
           + edgeScore - mobilityPenalty - contestedPenalty - horizonPenalty + Math.random() * 0.01;
       }
 
@@ -1235,9 +1088,9 @@
         memoryCells = new Set();
       }
 
-      function strokeHatchPattern(target, x, y, width, height, color, seed, originX = 0, originY = 0) {
+      function strokeHatchPattern(target, x, y, width, height, color, seed, originX = 0, originY = 0, tone = memoryTone(color), stride = 1) {
         const gx = x + originX, gy = y + originY;
-        target.strokeStyle = memoryTone(color);
+        target.strokeStyle = tone;
         target.lineCap = 'round';
         target.lineJoin = 'round';
 
@@ -1247,7 +1100,7 @@
           { x: gx, y: gy + height },
           { x: gx + width, y: gy + height },
         ];
-        const familyCount = 4 + (hash01(seed + 13, 7) > 0.62 ? 1 : 0);
+        const familyCount = 5 + (hash01(seed + 13, 7) > 0.58 ? 1 : 0);
         for (let family = 0; family < familyCount; family++) {
           let angle;
           if (family === 0) angle = Math.PI * (0.12 + hash01(seed + 17, family) * 0.22);
@@ -1259,11 +1112,11 @@
           const nx = -dy, ny = dx;
           const normalProjections = corners.map(corner => nx * corner.x + ny * corner.y);
           const lineProjections = corners.map(corner => dx * corner.x + dy * corner.y);
-          const spacing = Math.max(2, CELL * (0.13 + hash01(seed + 31, family) * 0.12));
+          const spacing = Math.max(1.5, CELL * (0.08 + hash01(seed + 31, family) * 0.08));
           const phase = hash01(seed + 47, family) * spacing;
           const first = Math.floor((Math.min(...normalProjections) - phase) / spacing) - 1;
           const last = Math.ceil((Math.max(...normalProjections) - phase) / spacing) + 1;
-          const step = Math.max(3, CELL * (0.24 + hash01(seed + 59, family) * 0.18));
+          const step = Math.max(3, CELL * (0.24 + hash01(seed + 59, family) * 0.18) * stride);
           const firstStep = Math.floor(Math.min(...lineProjections) / step) - 1;
           const lastStep = Math.ceil(Math.max(...lineProjections) / step) + 1;
 
@@ -1272,8 +1125,8 @@
             const irregularity = (hash01(lineSeed, 3) - 0.5) * spacing * 0.46;
             const projection = phase + lane * spacing + irregularity;
             const pressure = 0.65 + hash01(lineSeed, 11) * 0.85;
-            target.lineWidth = Math.max(0.55, CELL * 0.038 * pressure);
-            target.globalAlpha = 0.22 + hash01(lineSeed, 19) * 0.28;
+            target.lineWidth = Math.max(0.42, CELL * 0.03 * pressure);
+            target.globalAlpha = 0.18 + hash01(lineSeed, 19) * 0.24;
             target.beginPath();
 
             for (let point = firstStep; point <= lastStep; point++) {
@@ -1281,7 +1134,7 @@
               const wobble = (hash01(lineSeed + 37, point) - 0.5) * CELL * 0.3;
               const lineX = dx * along + nx * (projection + wobble) - originX;
               const lineY = dy * along + ny * (projection + wobble) - originY;
-              const lifts = point > firstStep && hash01(lineSeed + 73, point) < 0.055;
+              const lifts = point > firstStep && hash01(lineSeed + 73, point) < 0.04;
               if (point === firstStep || lifts) target.moveTo(lineX, lineY);
               else target.lineTo(lineX, lineY);
             }
@@ -1290,17 +1143,17 @@
         }
       }
 
-      function paintHatchCell(target, p, color, seed = 0, originX = 0, originY = 0) {
+      function paintHatchCell(target, p, color, seed = 0, originX = 0, originY = 0, tone = memoryTone(color), stride = 1) {
         const x = p.x * CELL, y = p.y * CELL;
         target.save();
         target.beginPath();
         target.rect(x, y, CELL, CELL);
         target.clip();
-        strokeHatchPattern(target, x, y, CELL, CELL, color, seed, originX, originY);
+        strokeHatchPattern(target, x, y, CELL, CELL, color, seed, originX, originY, tone, stride);
         target.restore();
       }
 
-      function buildHatchLayer(body, color, seed) {
+      function buildHatchLayer(body, color, seed, tone = memoryTone(color), stride = 1) {
         const visible = body.filter(p => inB(p.x, p.y));
         if (!visible.length) return null;
         const minX = Math.min(...visible.map(p => p.x));
@@ -1322,19 +1175,19 @@
           target.rect((p.x - minX) * CELL, (p.y - minY) * CELL, CELL, CELL);
         }
         target.clip();
-        strokeHatchPattern(target, 0, 0, width, height, color, seed, originX, originY);
+        strokeHatchPattern(target, 0, 0, width, height, color, seed, originX, originY, tone, stride);
         target.restore();
         return { canvas: layer, target, minX, minY, x: minX * CELL, y: minY * CELL, width, height };
       }
 
-      function stampCell(p, color, seed = 0) {
+      function stampCell(p, color, seed = 0, tone = memoryTone(color)) {
         if (!inB(p.x, p.y)) return;
-        paintHatchCell(mctx, p, color, seed);
+        paintHatchCell(mctx, p, color, seed, 0, 0, tone);
         memoryCells.add(key(p));
       }
 
-      function stampHatchBody(body, color, seed) {
-        const layer = buildHatchLayer(body, color, seed);
+      function stampHatchBody(body, color, seed, tone = memoryTone(color), stride = 1) {
+        const layer = buildHatchLayer(body, color, seed, tone, stride);
         if (!layer) return;
         mctx.drawImage(layer.canvas, layer.x, layer.y, layer.width, layer.height);
         for (const p of body) if (inB(p.x, p.y)) memoryCells.add(key(p));
@@ -1385,7 +1238,10 @@
           const p = { x, y };
           if (!memoryCells.has(key(p))) uncovered.push(p);
         }
-        if (uncovered.length) stampHatchBody(uncovered, dealSwatch(), Math.random() * 1000);
+        if (uncovered.length) {
+          const color = dealSwatch();
+          stampHatchBody(uncovered, color, Math.random() * 1000, prewarmTone(color), PREWARM_HATCH_STRIDE);
+        }
         return generations;
       }
 
@@ -1415,7 +1271,7 @@
         // Draw this simulated corpse as one clipped layer. Painting the same
         // dense hatch separately for every cell makes prewarming needlessly
         // expensive, especially where generations overlap.
-        stampHatchBody(body, color, hatchSeed);
+        stampHatchBody(body, color, hatchSeed, prewarmTone(color), PREWARM_HATCH_STRIDE);
       }
 
       // ---- render ---------------------------------------------------------
@@ -1438,6 +1294,7 @@
       }
 
       const memoryCache = new Map();
+      const prewarmCache = new Map();
       const deadColorCache = new Map();
       function desaturatedHex(hex, amount = 1) {
         let [r, g, b] = parseHex(hex);
@@ -1453,6 +1310,14 @@
         if (tone) return tone;
         tone = mixHex(desaturatedHex(hex, LOOK.memoryDesaturate), C_BG, LOOK.memoryFade);
         memoryCache.set(hex, tone);
+        return tone;
+      }
+
+      function prewarmTone(hex) {
+        let tone = prewarmCache.get(hex);
+        if (tone) return tone;
+        tone = mixHex(desaturatedHex(hex, LOOK.prewarmDesaturate), C_BG, LOOK.prewarmFade);
+        prewarmCache.set(hex, tone);
         return tone;
       }
 
@@ -1590,18 +1455,14 @@
           ctx.fillRect(m.px, m.py, CELL, CELL);
         }
 
-        // Living snakes: every shadow, then every body, then the heir's gold.
+        // Living snakes: every shadow, then every body. A winner blinks as one
+        // continuous silhouette in its own colour before splitting.
         const shadowOffset = Math.max(1, Math.round(CELL * 0.1));
-        const drawn = snakes.map(s => ({ s, cells: snakeCells(s), colors: snakeColor(s), gold: winnerGoldAmount(s) }));
+        const drawn = snakes
+          .filter(victoryBlinkVisible)
+          .map(s => ({ s, cells: snakeCells(s), colors: snakeColor(s) }));
         for (const d of drawn) fillConnectedCells(d.cells, shadowFor(d.colors.body), shadowOffset);
         for (const d of drawn) fillConnectedCells(d.cells, d.colors.body);
-        for (const d of drawn) {
-          if (d.gold <= 0) continue;
-          const heir = winnerHeadColor(d.s, d.gold);
-          const heirLength = Math.min(d.cells.length, winnerHeadLength(d.s.body.length));
-          fillConnectedCells(d.cells, shadowFor(heir.body), shadowOffset, 0, heirLength);
-          fillConnectedCells(d.cells, heir.body, 0, 0, heirLength);
-        }
       }
 
       // ---- loop -----------------------------------------------------------
@@ -1623,8 +1484,17 @@
         requestAnimationFrame(tick);
       }
 
+      palettePanel.addEventListener('click', event => event.stopPropagation());
+      paletteToggle.addEventListener('click', () => {
+        const open = paletteToggle.getAttribute('aria-expanded') !== 'true';
+        paletteToggle.setAttribute('aria-expanded', String(open));
+        paletteToggle.textContent = open ? 'Hide' : 'Show';
+        paletteOptions.hidden = !open;
+        palettePanel.classList.toggle('is-collapsed', !open);
+      });
       addEventListener('click', reset);
       addEventListener('resize', () => { resize(); reset(); });
+      buildPaletteControls();
       resize();
       reset();
       requestAnimationFrame(tick);

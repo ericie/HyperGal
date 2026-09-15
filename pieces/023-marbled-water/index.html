@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="A continuous field of mineral pigment folds into blue marbled rivers, with cloudy granulation and a concentrated basin of muted iridescent veins."
+      content="Muted mineral ink falls onto still water, blooming into translucent Suminagashi films that push earlier pigment outward."
     />
     <title>Marbled Water · HyperGal</title>
     <style>
@@ -40,9 +40,24 @@
         display: block;
         width: 100%;
         height: 100%;
+        background: transparent;
+      }
+
+      #bath {
+        z-index: 0;
         background: #d9e2e5;
+        pointer-events: none;
+      }
+
+      #stage {
+        z-index: 1;
         cursor: crosshair;
         touch-action: none;
+      }
+
+      #effects {
+        z-index: 2;
+        pointer-events: none;
       }
 
       canvas:focus-visible {
@@ -93,6 +108,16 @@
         line-height: 1.05;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .panel-version {
+        margin-left: 5px;
+        color: var(--panel-muted);
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 9px;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        vertical-align: 1px;
       }
 
       .panel-heading p {
@@ -181,7 +206,7 @@
       }
 
       .water-panel.is-dragging .panel-header { cursor: grabbing; }
-      .water-panel.is-collapsed { width: 206px; }
+      .water-panel.is-collapsed { width: 230px; }
       .water-panel.is-collapsed .panel-header { border-bottom: 0; }
       .water-panel.is-collapsed .panel-controls,
       .water-panel.is-collapsed .panel-note,
@@ -205,8 +230,8 @@
         grid-template-columns: minmax(0, 1fr) 150px;
         align-items: center;
         gap: 8px;
-        min-height: 35px;
-        padding-block: 4px;
+        min-height: 39px;
+        padding-block: 7px;
         border-bottom: 1px solid var(--panel-rule);
       }
 
@@ -340,18 +365,20 @@
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
   <body>
+    <canvas id="bath" aria-hidden="true"></canvas>
     <canvas
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Marbled Water: a continuous field of blue-gray mineral pigment folds into broad rivers with cloudy granulation and fine iridescent veins. Use the panel to adjust the currents or click the bath to create an eddy."
+      aria-label="Marbled Water: a still blue-gray Suminagashi bath where colored ink drops bloom into translucent films and push earlier floating pigment outward. Use the panel to adjust the bath or click to drop ink."
     ></canvas>
+    <canvas id="effects" aria-hidden="true"></canvas>
 
     <aside class="water-panel is-collapsed" aria-label="Marbled water controls">
       <div class="panel-header">
         <div class="panel-heading">
-          <h1>Marbled Water</h1>
-          <p id="bath-number">BATH 0000 · EDDIES 000</p>
+          <h1>Marbled Water <span class="panel-version">V11</span></h1>
+          <p id="bath-number">BATH 0000 · INK 000</p>
         </div>
         <div class="panel-actions">
           <button
@@ -382,39 +409,39 @@
 
       <div class="panel-controls" id="water-controls">
         <section class="control-group" aria-labelledby="ink-title">
-          <h2 class="group-title" id="ink-title">Ink drops</h2>
+          <h2 class="group-title" id="ink-title">Mineral ink</h2>
           <div class="palette-row">
             <label for="palette">Palette</label>
             <select id="palette">
               <option value="0">Ebru classic</option>
               <option value="1" selected>Mineral current</option>
               <option value="2">Garden pigments</option>
-              <option value="3">Primary press</option>
+              <option value="3">Oxide press</option>
               <option value="4">Sea glass</option>
               <option value="5">Earth and oxide</option>
             </select>
           </div>
 
           <div class="range-row">
-            <label for="tempo">Eddy tempo</label>
-            <output class="control-value" for="tempo">84/min</output>
-            <input id="tempo" type="range" min="24" max="150" value="84" />
+            <label for="tempo">Drop tempo</label>
+            <output class="control-value" for="tempo">5/min</output>
+            <input id="tempo" type="range" min="1" max="14" value="5" />
           </div>
 
           <div class="range-row">
-            <label for="drop-size">Eddy size</label>
+            <label for="drop-size">Drop size</label>
             <output class="control-value" for="drop-size">4.2%</output>
             <input id="drop-size" type="range" min="15" max="100" value="42" />
           </div>
 
           <div class="range-row">
-            <label for="size-variation">Size variation</label>
+            <label for="size-variation">Edge variation</label>
             <output class="control-value" for="size-variation">42%</output>
             <input id="size-variation" type="range" min="0" max="100" value="42" />
           </div>
 
           <div class="range-row">
-            <label for="repulsion">Current force</label>
+            <label for="repulsion">Push strength</label>
             <output class="control-value" for="repulsion">100%</output>
             <input id="repulsion" type="range" min="50" max="160" value="100" />
           </div>
@@ -422,11 +449,11 @@
         </section>
       </div>
 
-      <p class="panel-note">CLICK TO STIR · SPACE PAUSE · R NEW BATH</p>
+      <p class="panel-note">CLICK TO DROP INK · SPACE PAUSE · R NEW BATH</p>
     </aside>
 
     <p id="status" class="status" aria-live="polite"></p>
 
-    <script src="./renderer.js"></script>
+    <script src="./renderer.js?v=11"></script>
   </body>
 </html>

@@ -3,12 +3,16 @@
 A dry-garden companion to **Obstacles and How to Avoid Them** and
 **Obstacles and How to Go Around Them**.
 
-The current study is intentionally reduced to three stones and one samon system.
-The trio inherits the plan-view language of the petals study: irregular
-survey-like footprints, quiet gray-beige fills, dark outlines, two nested
-contours, sparse flecks, and small specimen numbers. The stones sit far enough
-apart for nested furrows to enter the interval between them, then merge into a
-larger field without crossing or passing beneath either stone.
+Three stones and the sand between them are drawn as one contour field. Each
+stone keeps its irregular plan-view footprint, but its fill, flecks, and specimen
+number have dissolved into evenly spaced ink lines. The contours continue inward
+to the stone centers and outward into the garden. Where expanding rings meet,
+they join into larger contours instead of crossing.
+
+The field uses signed distance to the original stone outlines: negative values
+inside each stone, zero at its edge, and positive values in the sand. Taking the
+minimum across the three fields and tracing a single sequence of contour levels
+makes the interior and exterior one drawing. The sand-and-ink palette remains.
 
 Black waves repeatedly travel outward along those nested furrows. Their
 intensity is governed by two variables: distance traveled steadily fades the

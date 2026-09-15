@@ -1,35 +1,22 @@
 # Forest of Rings
 
-A companion to *Growth Rings*. Twenty top-down trunk sections grow edge to edge
-across a single surveyed field. Latitude determines the shared solar direction;
-the same sun, wind, and annual rainfall act on every tree. Elevation, slope,
-soil, moisture, and cambium memory vary across the terrain, making every history
-distinct. Each annual ring uses a different color from its two neighbors.
+A companion to *Growth Rings*, now focused on one tree. A bare vertical line
+starts in the exact center and spans the window from top to bottom. Wide,
+lengthwise grain grows outward until the tree covers the whole screen.
 
-A large fire follows the prevailing wind through a broad corridor, crossing
-multiple trees in one directional event and leaving aligned scars. Insect
-outbreaks remain individual: only selected trunks receive bore marks and the
-suppressed rings around them.
+The top and bottom stay fixed. Older grain stays in place as new layers
+accumulate on both sides of the vertical pith. There are no closed annual
+ovals, stacked caps, ground illustration, or roots. The final width is fitted
+to both screen edges on every resize.
 
-Two variables continuously reorganize the stand:
+Latitude, sun, wind, rainfall, elevation, soil, fire, and insect history still
+shape the grain. The single tree uses the foreground palette. Forest spacing
+and planting controls have been removed; growth starts immediately.
 
-- **Spacing regularity** moves trees from a blue-noise woodland distribution
-  toward an even five-by-four orchard plan. Size variation also settles as the
-  spacing becomes more deliberate.
-- **Planting regularity** moves germination dates from a mixed-age spread toward
-  one shared planting year.
+The panel starts closed. `New tree` generates a new history; `Replay growth`
+keeps the same tree and starts again from the center line. Point or tap the tree
+to inspect its record. Reduced motion shows the completed tree immediately.
 
-At `0 / 0` the piece is a wild forest. At `100 / 100` it is a synchronized
-orchard, planted in rows all at once. Every setting between them is a different
-kind of managed or unmanaged stand.
-
-The variable panel starts closed so the forest occupies the first view. The
-field grows to 96 seasons. `New forest` reseeds climate, terrain, fire path,
-placement, and individual tree histories; `Replay growth` keeps the stand and
-restarts its timeline. Pointer or keyboard focus reveals elevation, fire
-exposure, and insect history for individual trees. Reduced motion renders the
-mature stand immediately.
-
-Query parameters `spacing`, `planting`, `seed`, and `age` can be used to open a
-specific state directly. For example, `?spacing=100&planting=100&age=96`
-opens the mature orchard.
+Query parameters `seed` and `age` open a specific state. `?seed=woodland&age=0`
+shows the starting line; `?seed=woodland&age=96` shows the full-width tree.
+The piece remains self-contained Canvas 2D and runs directly from `index.html`.

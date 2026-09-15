@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="A top-down dry garden composes odd-numbered groups of contour-drawn rocks and rakes the open space between them."
+      content="Three stones dissolve into nested ink contours that join across a shared dry-garden field."
     />
     <title>Obstacles, and The Space Between · HyperGal</title>
     <style>
@@ -269,7 +269,7 @@
       id="garden"
       tabindex="0"
       role="img"
-      aria-label="A top-down dry garden where black waves split when three stones connect, strike the surrounding frame, return inward, and intensify where their samon fronts overlap."
+      aria-label="A dry garden drawn entirely in nested lines. Contours grow from three stone centers and merge across the sand, carrying outward and reflected waves."
     ></canvas>
 
     <aside class="garden-panel" aria-label="Dry garden composition controls">
@@ -285,7 +285,7 @@
       </header>
 
       <div class="panel-body">
-        <p class="panel-intro">Meet. Split. Strike the wall. Return.</p>
+        <p class="panel-intro">Three stones. One continuous contour field.</p>
 
         <p class="section-label">Samon / raked space</p>
         <div class="range-row">
@@ -312,13 +312,6 @@
         const spacingInput = document.getElementById('rake-spacing');
 
         const TAU = Math.PI * 2;
-        const ROCK_COLORS = [
-          ['#d8cfba', '#342a2d'],
-          ['#c8c1ad', '#342a2d'],
-          ['#ded8c7', '#342a2d'],
-          ['#cfc6b0', '#342a2d'],
-          ['#d6cfbd', '#342a2d'],
-        ];
         const PULSE_PERIOD = 10400;
         const reducedMotionQuery = matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -468,8 +461,6 @@
             radius: Math.max(rx, ry),
             rotation: mix(0, anchor.rotation + rand(-0.18, 0.18), nature),
             points: [],
-            flecks: [],
-            colors: ROCK_COLORS[index % ROCK_COLORS.length],
           };
 
           const pointCount = 18;
@@ -480,16 +471,8 @@
             const roughness = 1 + Math.sin(angle * 3 + wobble) * 0.055 + rand(-0.07, 0.07) * nature;
             rock.points.push({ angle, roughness });
           }
-          for (let f = 0; f < 10; f++) {
-            const angle = rand(0, TAU);
-            const radius = Math.sqrt(random()) * 0.72;
-            rock.flecks.push({
-              x: Math.cos(angle) * radius,
-              y: Math.sin(angle) * radius,
-              r: rand(0.8, 2.1),
-              alpha: rand(0.08, 0.22),
-            });
-          }
+          // Preserve the seed sequence formerly used for the ten surface flecks.
+          for (let f = 0; f < 40; f++) random();
           return rock;
         }
 
@@ -514,15 +497,20 @@
           return Math.hypot(x - (a.x + dx * amount), y - (a.y + dy * amount));
         }
 
-        function distanceToOutline(x, y, outline) {
+        function distanceToOutline(x, y, outline, signed = false) {
           let nearest = Infinity;
+          let inside = false;
           for (let i = 0; i < outline.length; i++) {
-            nearest = Math.min(
-              nearest,
-              pointSegmentDistance(x, y, outline[i], outline[(i + 1) % outline.length]),
-            );
+            const a = outline[i];
+            const b = outline[(i + 1) % outline.length];
+            nearest = Math.min(nearest, pointSegmentDistance(x, y, a, b));
+            if (signed && (a.y > y) !== (b.y > y) &&
+                x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) {
+              inside = !inside;
+            }
           }
-          return nearest;
+          // Negative levels inset the stone; positive levels expand into the sand.
+          return inside ? -nearest : nearest;
         }
 
         function interpolateContour(a, b, level) {
@@ -539,12 +527,13 @@
           const spacing = settings.rakeSpacing;
           const paths = [];
           const outlines = rocks.map(rockOutlinePoints);
-          const gridStep = clamp(Math.min(width, height) / 150, 4.5, 9);
+          const gridStep = Math.min(3, spacing / 3);
           const columns = Math.ceil(width / gridStep) + 1;
           const rows = Math.ceil(height / gridStep) + 1;
           const values = new Float32Array(columns * rows);
           const rockValues = outlines.map(() => new Float32Array(columns * rows));
           let maximumDistance = 0;
+          let minimumDistance = 0;
 
           pulseContactDistances = [];
           for (let first = 0; first < outlines.length; first++) {
@@ -573,14 +562,18 @@
               const x = Math.min(width, column * gridStep);
               const gridIndex = row * columns + column;
               for (let rockIndex = 0; rockIndex < outlines.length; rockIndex++) {
-                rockValues[rockIndex][gridIndex] = distanceToOutline(x, y, outlines[rockIndex]);
+                rockValues[rockIndex][gridIndex] = distanceToOutline(x, y, outlines[rockIndex], true);
               }
               values[gridIndex] = Math.min(...rockValues.map(field => field[gridIndex]));
               maximumDistance = Math.max(maximumDistance, values[gridIndex]);
+              minimumDistance = Math.min(minimumDistance, values[gridIndex]);
             }
           }
 
-          const firstOffset = spacing * 0.82;
+          // A single level sequence passes through zero (the original outlines).
+          // Taking the minimum of the signed fields joins equal-distance rings
+          // at their meeting points instead of overprinting separate rock loops.
+          const firstOffset = Math.ceil(minimumDistance / spacing) * spacing;
           const segmentTable = {
             1: [[3, 0]], 2: [[0, 1]], 3: [[3, 1]], 4: [[1, 2]],
             6: [[0, 2]], 7: [[3, 2]], 8: [[2, 3]], 9: [[0, 2]],
@@ -656,9 +649,10 @@
             if (path.length) paths.push(path);
           }
           maximumRakeDistance = maximumDistance;
-          canvas.dataset.samonPattern = 'nested-distance';
+          canvas.dataset.samonPattern = 'merged-signed-distance';
+          canvas.dataset.contourInteriorLevels = String(paths.filter(path => path[0].rakeDistance < 0).length);
           canvas.dataset.samonCrossings = '0';
-          canvas.dataset.samonMinimumGap = spacing.toFixed(2);
+          canvas.dataset.samonInterval = spacing.toFixed(2);
           canvas.dataset.pulsePalette = 'black';
           canvas.dataset.pulsePath = 'samon-only';
           canvas.dataset.pulseResponse = 'contact-split,wall-return,interference';
@@ -694,8 +688,7 @@
           target.rect(4, 4, width - 8, height - 8);
           target.clip();
           for (const path of rakePaths) {
-            drawRakeStroke(target, path, 0.7, 'rgba(255, 253, 241, 0.72)', 1.15);
-            drawRakeStroke(target, path, 0, 'rgba(71, 58, 53, 0.29)', 0.82);
+            drawRakeStroke(target, path, 0, 'rgba(43, 23, 32, 0.76)', 1);
           }
           target.restore();
         }
@@ -971,70 +964,6 @@
           drawWallImpact(route, travelDistance);
         }
 
-        function rockPath(rock) {
-          ctx.beginPath();
-          for (let i = 0; i < rock.points.length; i++) {
-            const point = rock.points[i];
-            const x = Math.cos(point.angle) * rock.rx * point.roughness;
-            const y = Math.sin(point.angle) * rock.ry * point.roughness;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-          }
-          ctx.closePath();
-        }
-
-        function drawRocks() {
-          for (const rock of rocks) {
-            ctx.save();
-            ctx.translate(rock.x, rock.y);
-            ctx.rotate(rock.rotation);
-            rockPath(rock);
-            ctx.fillStyle = rock.colors[0];
-            ctx.fill();
-            ctx.strokeStyle = rock.colors[1];
-            ctx.lineWidth = 1.35;
-            ctx.stroke();
-
-            ctx.save();
-            rockPath(rock);
-            ctx.clip();
-            for (const fleck of rock.flecks) {
-              ctx.beginPath();
-              const x = fleck.x * rock.rx;
-              const y = fleck.y * rock.ry;
-              ctx.moveTo(x - fleck.r * 1.6, y + fleck.r * 0.45);
-              ctx.lineTo(x + fleck.r * 1.6, y - fleck.r * 0.45);
-              ctx.strokeStyle = `rgba(52, 42, 45, ${0.22 + fleck.alpha})`;
-              ctx.lineWidth = 0.55;
-              ctx.stroke();
-            }
-            ctx.restore();
-
-            for (const scale of [0.78, 0.56]) {
-              ctx.save();
-              ctx.scale(scale, scale);
-              rockPath(rock);
-              ctx.strokeStyle = scale > 0.7
-                ? 'rgba(52, 42, 45, 0.34)'
-                : 'rgba(52, 42, 45, 0.2)';
-              ctx.lineWidth = 0.7 / scale;
-              ctx.stroke();
-              ctx.restore();
-            }
-            ctx.restore();
-
-            if (rock.radius > 44 && rock.x > 0 && rock.x < width && rock.y > 0 && rock.y < height) {
-              ctx.save();
-              ctx.fillStyle = 'rgba(43, 23, 32, 0.68)';
-              ctx.font = '7px "SFMono-Regular", Consolas, monospace';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(`R${String(rock.id + 1).padStart(2, '0')}`, rock.x, rock.y);
-              ctx.restore();
-            }
-          }
-        }
-
         function drawFrame() {
           ctx.save();
           ctx.strokeStyle = 'rgba(43, 23, 32, 0.54)';
@@ -1051,7 +980,6 @@
         function render(time = performance.now()) {
           ctx.drawImage(baseCanvas, 0, 0, width, height);
           drawPulses(time);
-          drawRocks();
           drawFrame();
         }
 

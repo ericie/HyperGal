@@ -9,10 +9,10 @@ var strategy, preySystem, predatorSystem, textRender, obsWidth = 300,
     x: stage.w / 2,
     y: stage.h / 2
   };
-let texture, layoutTime, layoutMaxTime, layoutPauseTime, renderQueue, request, featureList = {};
+let texture, layoutTime, layoutMaxTime, layoutPauseTime, renderQueue, request, lastAnimationTime = 0, performanceBadge, performanceWindowStart = 0, performanceFrameCount = 0, performanceUpdateTime = 0, featureList = {};
 
 function init(e) {
-  compElem = document.getElementById("hmcComp"), bufferElem = document.getElementById("hmcBuffer"), bgElem = document.getElementById("hmcBackground"), comp = compElem.getContext("2d"), buffer = bufferElem.getContext("2d"), bg = bgElem.getContext("2d"), stage.w = e.w, stage.h = e.h, stage.scale = e.scale || 1, comp.setTransform(stage.scale, 0, 0, stage.scale, 0, 0), buffer.setTransform(stage.scale, 0, 0, stage.scale, 0, 0), bg.setTransform(stage.scale, 0, 0, stage.scale, 0, 0), layoutMaxTime = 1600, layoutPauseTime = 1e3, layoutTime = Math.round(.8 * (layoutMaxTime + layoutPauseTime));
+  compElem = document.getElementById("hmcComp"), bufferElem = document.getElementById("hmcBuffer"), bgElem = document.getElementById("hmcBackground"), comp = compElem.getContext("2d"), buffer = bufferElem.getContext("2d"), bg = bgElem.getContext("2d"), stage.w = e.w, stage.h = e.h, stage.scale = e.scale || 1, stage.frameStep = e.frameStep || 1, lastAnimationTime = 0, performanceBadge = document.getElementById("buildBadge"), performanceWindowStart = 0, performanceFrameCount = 0, performanceUpdateTime = 0, comp.setTransform(stage.scale, 0, 0, stage.scale, 0, 0), buffer.setTransform(stage.scale, 0, 0, stage.scale, 0, 0), bg.setTransform(stage.scale, 0, 0, stage.scale, 0, 0), layoutMaxTime = 1600, layoutPauseTime = 1e3, layoutTime = Math.round(.8 * (layoutMaxTime + layoutPauseTime));
   const t = Math.round(fxrand() * (palletList.length - 1));
   let a = palletList[t];
   texture = new TextureObject({
@@ -74,14 +74,41 @@ function init(e) {
     elem: i,
     canvas: l
   };
-  this.systemParams.myLayer = l, this.systemParams.layerObj = u, this.newSystem = new PreySystem(this.systemParams), this.newSystem.init(stage, a), featureList.pallet = a.name, featureList.word = textRender.getWord(), featureList.posterLayout = textRender.getLayout(), featureList.bgShapes = r.name, featureList.wordShapes = m.name, addFeatures(featureList), request = requestAnimationFrame(performAnimation)
+  this.systemParams.myLayer = l, this.systemParams.layerObj = u, this.newSystem = new PreySystem(this.systemParams), this.newSystem.init(stage, a), featureList.pallet = a.name, featureList.word = textRender.getWord(), featureList.posterLayout = textRender.getLayout(), featureList.bgShapes = r.name, featureList.wordShapes = m.name, addFeatures(featureList)
 }
-const performAnimation = () => {
-  update(!1), request = requestAnimationFrame(performAnimation)
+const performAnimation = e => {
+  const t = stage.frameStep || 1,
+    a = 1e3 / 60 * t;
+  if (0 == lastAnimationTime || e - lastAnimationTime >= a - 1) {
+    lastAnimationTime = e;
+    const a = performance.now();
+    update(!1, t), reportPerformance(e, performance.now() - a)
+  }
+  request = requestAnimationFrame(performAnimation)
 };
 
-function update(present = !0) {
-  layoutTime++, layoutTime > layoutMaxTime && layoutTime < layoutMaxTime + 2 && this.newSystem.setEraserMode(), layoutTime > layoutMaxTime + layoutPauseTime && (textRender.pickLayout(), this.newSystem.resetWordList(), layoutTime = 0, textRender.draw()), this.newSystem.update(), this.newSystem.draw(), renderQueue.update(), textRender.fontLoaded() && !textRender.firstDraw() && textRender.draw(), present && composite()
+function reportPerformance(t, e) {
+  0 == performanceWindowStart && (performanceWindowStart = t), performanceFrameCount++, performanceUpdateTime += e;
+  const a = t - performanceWindowStart;
+  if (a >= 1e3 && performanceBadge) {
+    const t = Math.round(1e3 * performanceFrameCount / a),
+      e = (performanceUpdateTime / performanceFrameCount).toFixed(1);
+    performanceBadge.textContent = `PP PERF TEST · v5.1 · ${t} FPS · ${e} MS`, performanceBadge.dataset.fps = t, performanceBadge.dataset.updateMs = e, performanceWindowStart = 0, performanceFrameCount = 0, performanceUpdateTime = 0
+  }
+}
+
+function startAnimation() {
+  lastAnimationTime = 0, request = requestAnimationFrame(performAnimation)
+}
+
+function bakeLiveLayer(liveShapeLimit) {
+  const liveLayer = this.newSystem.layerObj.elem;
+  bg.drawImage(liveLayer, 0, 0, stage.w, stage.h), this.newSystem.canvas.clearRect(0, 0, stage.w, stage.h), this.newSystem.reduceToLiveShapeLimit(liveShapeLimit), this.newSystem.enableIncrementalRendering(3)
+}
+
+function update(present = !0, frameStep = 1, renderLive = !0) {
+  const e = layoutTime;
+  layoutTime += frameStep, e <= layoutMaxTime && layoutTime > layoutMaxTime && this.newSystem.setEraserMode(), layoutTime > layoutMaxTime + layoutPauseTime && (textRender.pickLayout(), this.newSystem.resetWordList(), layoutTime = 0, textRender.draw()), this.newSystem.update(frameStep), this.newSystem.draw(frameStep, renderLive), renderQueue.update(), textRender.fontLoaded() && !textRender.firstDraw() && textRender.draw(), present && composite()
 }
 
 function updateBG() {

@@ -13,45 +13,9 @@ TextRender.prototype.getWord = function() {
   return this.layoutName
 }, TextRender.prototype.pickLayout = function() {
   if (layoutOptions = [{
-      id: "top",
-      percent: .2,
-      name: "Top"
-    }, {
-      id: "center",
-      percent: .2,
-      name: "Center"
-    }, {
-      id: "bottom",
-      percent: .2,
-      name: "Bottom"
-    }, {
-      id: "centerPlus",
-      percent: .35,
-      name: "Center Plus"
-    }, {
       id: "bigFour",
       percent: .5,
       name: "Big Four Letters"
-    }, {
-      id: "diagonalTLBR",
-      percent: .3,
-      name: "Diagonal Top Left"
-    }, {
-      id: "diagonalBLTR",
-      percent: .3,
-      name: "Diagonal Bottom Left"
-    }, {
-      id: "vertical0",
-      percent: .25,
-      name: "Vertical Left"
-    }, {
-      id: "vertical1",
-      percent: .25,
-      name: "Vertical Center"
-    }, {
-      id: "vertical2",
-      percent: .25,
-      name: "Vertical Right"
     }, {
       id: "repeater",
       percent: .55,

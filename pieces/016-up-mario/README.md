@@ -15,7 +15,10 @@ The piece plays itself by default at a measured climbing cadence. The lead
 runner chooses a local intention: jump to a reachable platform. The player can
 interrupt with left/right/jump input, after which the climb resumes. The other
 runners independently choose reachable surfaces, line up broad lateral jumps,
-land, and look for the next step up.
+land, and look for the next step up. Each runner commits to a route while lining
+up, reserves a landing point away from other runners, and replans if that
+footing disappears. Recovery arcs are checked for intervening platforms so
+a runner does not repeatedly jump back onto the same shelf.
 
 ## Physics
 
@@ -24,47 +27,69 @@ runners facing one another cancel their inward momentum in a stalemate. A
 runner moving into another runner's back transfers momentum instead, so the
 front runner can be shoved beyond the footing and fall. A runner whose center
 loses a platform edge falls under gravity and can still catch a surface below.
-No runner dies at the bottom edge. A Mario with no route makes one desperate
-physical jump instead of waiting forever. If the highest Mario is falling, the
+No runner dies at the bottom edge. Runners line up on their actual footing before jumping, hold a consistent
+landing point in flight, and steer toward a reachable lower ledge after a miss. If the highest Mario is falling, the
 camera follows that fall until another Mario becomes the highest. The current
 leader uses gentler steering and lingers after landing, giving the pack time to
 remain in the scene.
 
+## Barrels
+
+Wooden barrels tumble in from above after a short amber arrow warning, then roll
+across ledges and fall off their edges. They can wear down crumbly blocks and
+clouds too. Drops are staggered, with at most three active barrels.
+
+A barrel hit knocks a Mario out with crossed eyes and a tumbling fall. Defeated
+runners cannot jump, land, or lead the camera; the highest survivor takes over.
+Once a defeated Mario has left the screen, it can return through the same spaced,
+below-leader entrances as the rest of the crowd. This includes the controllable
+Mario. If nobody survives, the camera holds while a fresh runner walks in.
+
 ## World
 
-Platforms are generated well above the camera from a seeded random stream. Four
-altitude zones repeat through the climb: stable black ink lines; square brick
-tiles that crack and fall one square at a time whenever a runner stands on them,
-then rebuild themselves a few seconds later so a course is worn down rather than
-destroyed; trapdoors with a triggering lever on the ledge above; and cloud
-platforms that shed painted chunks into drifting particles on every landing.
+Platforms are generated well above the camera from a seeded random stream.
+Flat mint ledges with plum outlines, crumbly pink blocks, and soft white cloud
+platforms are mixed throughout the climb, with no altitude zones. Each shuffled
+group of ten contains five solid ledges, three crumbly platforms, and two clouds.
+The starting platform is solid. Final placement reserves space for each platform
+and its full movement range, including offscreen shelf extensions. Unseen optional
+branches yield to the main route when they would overlap the next ledge.
 
-A trapdoor is ordinary ground until its lever is thrown. Runners stand and walk
-on a closed one indefinitely, and landing on one does nothing. Throwing the lever
-swings every trapdoor it governs open on that same frame, whether or not anyone
-is standing on them, dropping whoever is. The lever is edge triggered, so holding
-it down does not keep re-firing.
+Cloud platforms shed painted chunks on landing and regrow after a quiet interval.
+Closely grouped arrivals share one impact, so a crowd cannot destroy an entire
+cloud at once. Runners hurry off clouds that are nearly worn away.
 
-An open door takes one runner and no more. The first body down through the gap
-slams it shut behind them, which means a Mario dropped through a stack of open
-doors closes each one on the way past. A door that catches nobody simply times
-out after a couple of seconds.
+Crumbly tiles crack and fall one square at a time whenever a runner stands on
+them, then rebuild themselves a few seconds later so the course is worn down
+rather than destroyed. Solid platforms give the runners places to gather
+between the fragile steps.
 
 The climb does not empty out behind the leader. Roughly a quarter of platforms
 are generated as shelves that run off the side of the frame, and when the
 visible crowd thins a runner is placed on the offscreen tail of one and simply
-walks in. Nobody is ever launched into the scene through the air. Existing
+walks in. Nobody is ever launched into the scene through the air. Entrances must be below the highest active Mario, with a full body of clearance.
+Arrivals are spaced out, with at most two runners inbound at once. Each entrance
+area rests for eight seconds before reuse; nearby ledges on the same side share
+that cooldown. Entrances favor the opposite side when a suitable shelf is
+available, and a shelf never queues another arrival while one is still walking
+in. If no eligible entrance is ready, the scene waits.
+
+An entrant waits offscreen if the leader falls below its shelf before it arrives.
+Only when every established runner is knocked out or has fallen below the frame
+with no reachable recovery ledge may a new entrance start above them. Waiting entrants do not lead
+the camera. Existing
 offscreen runners are reused before the bounded pool grows, so nobody pops into
 existence in the visible scene and nobody is deleted for falling below it.
 
-Runners are more reckless the further they have fallen behind. Aggression is
-read straight off vertical screen position: the leader, whom the camera holds
-near the middle of the frame, waits about two seconds between jumps, picks
-roomy landings and never leaps without a route. A runner down near the bottom
-edge jumps roughly every half second, reaches further sideways, and will throw
-itself at open air rather than be left behind. Everyone now pulls up at a
-platform lip instead of strolling off it, so falling is the result of a failed
-jump rather than idle drift.
+Runners pick routes using their actual jump arc and the same conservative reach
+used to generate the course. They favor ledges with another step above them and
+room away from the crowd. Stable individual preferences keep their routes varied.
+Runners near the front pause according to the gap behind them; trailing runners
+shorten that pause and favor upward progress. On crumbling bricks, everyone reacts quickly before their footing disappears. Bricks give a
+short, readable crack warning before breaking. Narrow but usable ledges remain valid steps, including on
+phones. A runner without an upward route can reposition onto a nearby ledge with
+an onward path. They no longer make blind desperation jumps.
+
 There are no spring launchers. The camera continuously follows whichever Mario
 is currently highest and is free to move downward as well as upward.
 
@@ -72,8 +97,11 @@ is currently highest and is free to move downward as well as upward.
 
 The game runs on one dependency-free canvas. Its background is composed at
 runtime from three transparent anime-painted raster assets rather than one
-finished backdrop. Platforms remain code-drawn so cracks, hinges, levers,
-fragmentation, and impact states can animate precisely. The pastel material
+finished backdrop. The background scrolls continuously with altitude: distant
+wisps move slowly, towers at a middle speed, and the nearest cloud banks faster.
+Layers repeat beyond the screen edges for an endless climb, reverse when the
+camera descends, and move more gently with reduced motion enabled.
+Platforms remain code-drawn so cracks, fragmentation, and impact states can animate precisely. The pastel material
 colors stay soft around stark black-and-white runners. Each figure uses a
 continuous charcoal silhouette: a long pointed hood, two animated white eyes, a
 broad round belly, floppy handless arms, thin legs, and sharp feet. Ground poses
