@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="Muted mineral ink falls onto still water, blooming into translucent Suminagashi films that push earlier pigment outward."
+      content="Mineral ink spreads through a shared water surface, folding blue currents and muted color into drifting Suminagashi veins."
     />
     <title>Marbled Water · HyperGal</title>
     <style>
@@ -370,14 +370,14 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Marbled Water: a still blue-gray Suminagashi bath where colored ink drops bloom into translucent films and push earlier floating pigment outward. Use the panel to adjust the bath or click to drop ink."
+      aria-label="Marbled Water: a gently flowing blue-gray Suminagashi bath. Colored drops move earlier pigment outward and stretch into fine folds. Click to add ink; Space pauses and R starts a new bath."
     ></canvas>
     <canvas id="effects" aria-hidden="true"></canvas>
 
     <aside class="water-panel is-collapsed" aria-label="Marbled water controls">
       <div class="panel-header">
         <div class="panel-heading">
-          <h1>Marbled Water <span class="panel-version">V11</span></h1>
+          <h1>Marbled Water <span class="panel-version">V14</span></h1>
           <p id="bath-number">BATH 0000 · INK 000</p>
         </div>
         <div class="panel-actions">
@@ -424,8 +424,8 @@
 
           <div class="range-row">
             <label for="tempo">Drop tempo</label>
-            <output class="control-value" for="tempo">5/min</output>
-            <input id="tempo" type="range" min="1" max="14" value="5" />
+            <output class="control-value" for="tempo">8/min</output>
+            <input id="tempo" type="range" min="1" max="14" value="8" />
           </div>
 
           <div class="range-row">
@@ -454,6 +454,7 @@
 
     <p id="status" class="status" aria-live="polite"></p>
 
-    <script src="./renderer.js?v=11"></script>
+    <script src="./fluid.js?v=14"></script>
+    <script src="./renderer.js?v=14"></script>
   </body>
 </html>

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="A wordless geometric dream assembled from folding stairs, fan chambers, scalloped towers, and impossible rooftop balances."
+      content="A wordless geometric Tokyo of stacked businesses, exposed stairs, projecting signs and working rooftops."
     />
     <title>City of Signs · HyperGal</title>
     <style>
@@ -87,6 +87,10 @@
         font-size: 0.875rem;
       }
 
+      .catalog-links { display: flex; gap: 16px; margin-top: 10px; font-size: 0.875rem; }
+      .catalog-links a { color: inherit; text-underline-offset: 3px; }
+      .catalog-links a:focus-visible { outline: 2px solid #111; outline-offset: 4px; }
+
       .debug-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
@@ -154,13 +158,13 @@
       id="city"
       tabindex="0"
       role="img"
-      aria-label="A black-and-white geometric dream city with unfolding fans, folding stairs, scalloped chambers, and balancing rooftops. Click, tap, or press Enter or Space to construct another arrangement."
+      aria-label="A black-and-white geometric Tokyo with stacked businesses, external stair towers, signboards, balconies, rooftop tanks, and a fan-shaped hall. Click, tap, or press Enter or Space to construct another arrangement."
     ></canvas>
 
     <main id="debug-catalog" class="debug-catalog" hidden>
       <header class="debug-header">
-        <h1>City of Signs shape index</h1>
-        <p id="debug-count"></p>
+        <h1>City of Signs · block studies</h1>
+        <div><p id="debug-count"></p><nav class="catalog-links" aria-label="Artwork views"><a href="./?seed=1907">View city</a><a href="./?debug=true">Active blocks</a><a href="./?debug=true&amp;all=true">Full archive</a></nav></div>
       </header>
       <div id="debug-grid" class="debug-grid"></div>
     </main>

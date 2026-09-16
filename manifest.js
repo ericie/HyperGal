@@ -223,7 +223,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rejected": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A wordless geometric dream built from unfolding fans, folding stairs, swelling walls, scalloped towers, and improbable rooftop balances. Ground-floor thresholds anchor a changing city of black-and-white architectural blocks.",
+      "description": "A wordless geometric Tokyo of stacked businesses, exposed stair towers, projecting signs, shallow balconies and working rooftops. A fan-shaped hall and swelling facade interrupt its dense black-and-white architecture.",
       "updated": "2026-08-19"
     },
     {
@@ -273,7 +273,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
-      "description": "Muted mineral ink falls onto still water, blooming into translucent Suminagashi films that push earlier pigment outward.",
+      "description": "Mineral ink spreads through a shared water surface, folding blue currents and muted color into drifting Suminagashi veins.",
       "updated": "2026-09-11"
     },
     {
@@ -411,7 +411,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rejected": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "One vertical line in the center grows wide, lengthwise wood grain outward until the tree fills the entire window. Height and older grain stay fixed. Weather, fire, and insects shape its history. No ground or roots.",
+      "description": "A full-height sequence of 24 wood slices loops from bark through the core to the opposite bark. Scars, sun, and wind shape the grain; debug mode reveals the matching rings, slice grid, and controls.",
       "updated": "2026-08-20"
     },
     {

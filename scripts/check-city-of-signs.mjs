@@ -21,8 +21,8 @@ const env = {
   addEventListener: (name, callback) => events[name] = callback
 };
 vm.createContext(env);
-vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.test = { compose, drawCity, blocks, library, resize }; })();'), env);
-const { compose, drawCity, blocks, library } = env.test;
+vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.test = { compose, drawCity, blocks, library, resize, profileAt, contentBox, drawBlock }; })();'), env);
+const { compose, drawCity, blocks, library, profileAt, contentBox, drawBlock } = env.test;
 const roles = ['base', 'chamber', 'crown', 'connector'];
 assert.equal(new Set(blocks.map(b => b.id)).size, blocks.length);
 for (const role of roles) assert.ok(blocks.some(b => b.role === role), role);
@@ -32,7 +32,8 @@ for (const [w, h] of [[1254, 1254], [1440, 900], [390, 844], [320, 1800], [2560,
   for (let seed = 0; seed < 80; seed++) {
     const city = compose(w, h, seed);
     assert.equal(JSON.stringify(city), JSON.stringify(compose(w, h, seed)), 'seed reproduces composition');
-    assert.ok(city.towers.length >= 5 && city.towers.length <= 22);
+    assert.ok(city.towers.length >= 5 && city.towers.length <= 16);
+    assert.ok(city.towers.filter(t => t.crown === 'striped-orb').length <= 1, 'only one surreal rooftop accent');
     const features = new Set();
     let right = Math.min(w, h) * 0.009;
     for (const tower of city.towers) {
@@ -41,27 +42,55 @@ for (const [w, h] of [[1254, 1254], [1440, 900], [390, 844], [320, 1800], [2560,
       assert.ok(tower.w > 0 && tower.top > tower.crownTop && tower.baseTop > tower.top);
       assert.ok(tower.baseLine <= h && tower.crownTop >= 0);
       assert.equal(library[tower.base].role, 'base');
+      assert.equal(library[tower.base].collection, 'tokyo', 'street level uses the Tokyo block vocabulary');
+      assert.ok(!library[tower.crown].catalogOnly, 'legacy roof ornaments remain in the archive');
       assert.equal(library[tower.crown].role, 'crown');
       used.add(tower.base); used.add(tower.crown);
       let y = tower.top;
       for (const block of tower.modules) {
         assert.equal(library[block.id].role, 'chamber', 'storefronts never appear upstairs');
+        assert.ok(!library[block.id].catalogOnly, 'archived chambers do not leak into the city');
         assert.ok(Math.abs(block.y - y) < 0.00001 && block.h > 0);
         assert.ok(block.ink !== block.paper);
         assert.ok(['#000', '#fff'].includes(block.ink));
+        const box = contentBox(tower, block);
+        assert.ok(box.w > 0 && Number.isFinite(box.x), 'usable content width inside tower profile');
+        for (let i = 0; i <= 20; i++) {
+          const t = (block.y + block.h * (0.02 + i * 0.048) - tower.top) / (tower.baseTop - tower.top);
+          const [left, right] = profileAt(tower, t);
+          assert.ok(box.x >= left - 0.00001 && box.x + box.w <= right + 0.00001, 'openings fit curved and stepped exteriors');
+        }
         features.add(block.id); used.add(block.id); y += block.h;
       }
       assert.ok(Math.abs(y - tower.baseTop) < 0.00001, 'stack stops at its dedicated base');
     }
     assert.ok(right <= w + 0.00001);
-    for (const feature of ['fan', 'folding-stair', 'swell']) assert.ok(features.has(feature), `${feature} survives every aspect ratio`);
+    for (const feature of ['fan', 'external-stair', 'swell']) assert.ok(features.has(feature), `${feature} survives every aspect ratio`);
     for (const connector of city.connectors) {
       assert.equal(library[connector.id].role, 'connector'); used.add(connector.id);
+      assert.ok(connector.x >= 0 && connector.x + connector.w <= w + 0.00001, 'connections stay within the canvas');
+      assert.ok(connector.y >= 0 && connector.y + connector.h < city.towers[0].baseLine, 'connections stay above the ground');
+    }
+    assert.ok(city.courts.length > 0, 'every composition has a shared architectural space');
+    for (const court of city.courts) {
+      const a = city.towers[court.leftTower], b = city.towers[court.rightTower];
+      assert.equal(court.rightTower, court.leftTower + 1, 'court joins neighboring buildings');
+      assert.ok(court.x < a.x + a.w && court.x + court.w > b.x, 'court crosses the building boundary');
+      assert.ok(court.x >= 0 && court.x + court.w <= w, 'court remains on canvas');
+      assert.ok(court.y >= Math.max(a.top, b.top) && court.h > 0, 'court lies within its supporting buildings');
+      assert.ok(court.y + court.h * 1.075 < Math.min(a.baseTop, b.baseTop), 'court clears entrances and ground floors');
+      const fan = [...a.modules, ...b.modules].find(m => m.id === 'fan');
+      if (fan) assert.ok(court.y >= fan.y + fan.h || court.y + court.h <= fan.y, 'shared court preserves fan hall');
     }
     drawCity(city, w, h); layouts++;
   }
 }
-for (const block of blocks) assert.ok(used.has(block.id), `${block.id} is reachable by the composer`);
+for (const block of blocks) {
+  if (!block.catalogOnly) assert.ok(used.has(block.id), `${block.id} is reachable by the composer`);
+  // Studies remain renderable in the catalog, even when not used in a city.
+  for (const [w, h] of [[150, 240], [40, 170], [280, 80]])
+    drawBlock({ id: block.id, x: 0, y: 0, w, h, ink: '#000', paper: '#fff', variant: 1 });
+}
 assert.equal(canvas.dataset.seed, '1907');
 const beforeClick = canvas.dataset.seed; events.click(); assert.notEqual(canvas.dataset.seed, beforeClick);
 for (const key of ['Enter', ' ']) {
@@ -74,4 +103,4 @@ const beforeResize = canvas.dataset.seed;
 env.innerWidth = 390; env.innerHeight = 844; events.resize();
 assert.equal(canvas.dataset.seed, beforeResize, 'resize preserves seed');
 assert.equal(canvas.width, 780); assert.equal(canvas.height, 1688);
-console.log(`Passed ${layouts} seeded layouts, ${blocks.length} reachable blocks, ${geometryCalls} finite drawing calls; ground-only bases, three feature chambers, deterministic layout, click/keyboard regeneration and DPR resize.`);
+console.log(`Passed ${layouts} seeded layouts, ${blocks.length} catalog blocks, ${geometryCalls} finite drawing calls; Tokyo blocks, shared courts, ground-only bases, three feature chambers, deterministic layout, click/keyboard regeneration and DPR resize.`);

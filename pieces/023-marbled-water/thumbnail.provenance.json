@@ -1,0 +1,8 @@
+{
+  "type": "runtime-screenshot",
+  "source": "index.html?seed=water-v14&panel=0",
+  "rendererVersion": "V14",
+  "capturedAt": "2026-09-16",
+  "processing": "Center crop to 720 by 720 pixels; JPEG quality 88",
+  "description": "Actual evolving procedural pigment surface, captured from the local running artwork. No generated image assets."
+}

@@ -4,16 +4,29 @@ Primary target: pieces/019-city-of-signs/index.html
 Related target: pieces/019-city-of-signs/city.js
 Mode: Experience
 
-## Direction contract
+USER DIRECTION: Make it feel like a place without burning personality away.
+The user likes some of the architectural pass but selected vertical Tokyo:
+stacked businesses, external stairs and rooftop structures. Revisit the blocks.
 
-THESIS: A wordless geometric dream assembled from interchangeable architectural blocks. The user approved the final generated exploration after rejecting literal Tokyo buildings and uniform rounded geometry.
+WORLD: Wordless black-and-white geometric city. Tokyo's ordinary vertical
+architecture leads: separate tenant entrances, projecting sign boxes, exterior
+steel stairs, shallow balconies, service walls, water tanks, billboard gantries,
+lift overruns and antennas. Retain the fan, swelling facade and at most one striped
+sky vessel as surreal exceptions. No visible lettering or gray palette.
 
-OWN-WORLD: Pure black and white. Unframed cutouts, folding stair ribbons, scalloped stacks, fan chambers, swelling walls, slender spindles, extravagant roof balances. Contrast large quiet chambers with miniature repeated openings. No text or pictorial symbols in the artwork.
+CURRENT: Twenty Tokyo blocks and three retained active blocks. The user’s 21
+photos guide nested window frames, fine balcony rails, round stairwell apertures,
+AC fan grilles, tile panels, routed pipes, louvered fronts, noren, marquees, roof
+eaves, atrium ribs and crane structures. Quiet wall areas balance dense systems. 33 earlier
+blocks remain archived. 5–16 unequal bays, three chambers per building,
+rectangular service courts spanning neighbors. Default catalog presents the
+active vocabulary first; all=true exposes the full archive.
 
-STORY: Visitors discover an impossible city, then click, tap, or press Enter/Space to construct another. Storefront blocks belong only at the bottom. The block catalog remains available through ?debug=true.
+EVIDENCE: .impeccable/review/city-photo-details/ holds before/current source, mobile and
+square seed-1907 captures, desktop seed 420, and the catalog. 480 geometry layouts
+and live browser rendering/interaction checks pass. README.md records the user-supplied photographic references and earlier
+architectural sources; no photos are embedded in the renderer.
 
-FIRST VIEWPORT: Full-bleed architecture; unequal narrow and broad bays, very small sky pockets, a ground band about one eighth of the height, oversized fan and stair chambers, varied roof silhouettes. Mobile composes fewer towers, without shrinking a desktop drawing.
-
-FORM: User-pinned final image, exec-d5b22e4b-5ef2-426f-aa6e-e1ca0a1971c6.png. The deliverable is a procedural Canvas block system, not a static reproduction of its pixels. No new direction selection required.
-
-FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+STATUS: Awaiting user response to the photo-inspired detail pass. The vertical bay framework
+and service-court repetition remain. Earlier approvals and stopping points are
+historical, not evidence of user acceptance of this attempt.

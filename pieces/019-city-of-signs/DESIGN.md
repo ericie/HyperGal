@@ -1,6 +1,6 @@
 ---
 name: City of Signs
-description: A wordless geometric dream assembled from interchangeable architectural blocks.
+description: A wordless geometric Tokyo assembled from occupied floors, exposed stairs and working rooftops.
 colors:
   ink: "#000"
   paper: "#fff"
@@ -16,6 +16,9 @@ typography:
     fontWeight: 700
     lineHeight: 1
     letterSpacing: "-0.025em"
+  catalog-description:
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: "0.875rem"
   catalog-name:
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "0.9375rem"
@@ -40,67 +43,71 @@ components:
 
 # Design System: City of Signs
 
-## Overview
+## Direction
 
-**Creative North Star: “A wordless geometric dream.”**
+The user chose vertical Tokyo: stacked businesses, external stairs and rooftop
+structures. This supersedes the previous arcaded fantasy-city vocabulary. Keep
+pure black/white and the wordless procedural format. Personality should come
+from architecture rather than added clutter or indiscriminate simplification.
 
-This document applies only to `pieces/019-city-of-signs/`. Other HyperGal artworks retain their own visual languages. The approved geometric image established this piece's direction: impossible architecture, unequal stacked chambers, miniature openings, and extravagant roof balances.
+## Blocks
 
-The shipped artwork is drawn procedurally by `city.js`. The user-approved AI raster was a visual reference, never an image embedded into the renderer or substituted for code. `thumbnail.jpg` is a square screenshot of the actual renderer at seed `1907`.
+The active vocabulary has 23 blocks: twenty Tokyo drawings plus the retained
+fan hall, swelling facade and striped sky vessel. The user’s 21 reference photos
+now guide detail: nested sliding-window frames, varied curtain infill, balcony
+slabs and fine rails, circular stairwell openings, louver banks, AC fan grilles,
+tile joints and conduits routed to meter boxes and vents. Five street-level
+blocks, nine occupied-floor types and six rooftop types create distinct facade
+systems. Older shop canopies, noren and stepped marquees contrast with glazed
+structural ribs, utility walls, tile eaves and a construction crane. Keep quiet
+wall areas between concentrated detail. No pseudo-Japanese lettering or visible
+text is drawn. See README.md for the inventory and photographic reference notes.
 
-**Key characteristics:** pure binary color, variable unframed blocks, grounded entrances, and a skyline that recomposes for its viewport. Independent finish review returned **Ship** for square, desktop, mobile, and catalog views, with no blocking findings.
+The fan and swelling facade have rectangular window infill; the vessel is
+limited to one per composition. Older arches, domes, ornamental gates and floating
+connectors remain available only in the full archive, not the city. All 56 blocks
+remain procedural and renderable; the 33 inactive drawings are labeled studies.
 
-## Colors
+## Composition
 
-### Primary
+5–16 unequal bays use `clamp(round(width / height * 7), 5, 16)`. Width weights are
+0.36, 0.44, 0.55 for narrow bays and 0.85, 1.2, 1.7 for broad bays. Margin is 0.9%
+of the shorter side. Ground floors occupy 10–14.5% of height. Each building has
+three variable-height chambers, selected as architectural sequences. Narrow
+towers emphasize service walls; broad towers mix tenant floors, exposed stairs,
+balconies, setbacks, round bays, louvered fronts and ribbed glazing. The fan tower starts at 19% of height; others start at
+17–41%. Surfaces group black and white across adjacent buildings. Profiles are
+straight or stepped except for the curved swelling-wall tower.
 
-**Ink** and **Paper** are the only authored drawing colors in the normal artwork. Bays alternate polarity; individual chambers may invert it. Browser antialiasing softens geometric edges without introducing an authored gray palette.
+Shared service courts join neighboring buildings. Rectangular shafts, thick
+side piers, rear sash windows, doors, upper/lower landings, a stair and roof walk
+replace the previous vaulted galleries. Their regions are reserved during facade
+drawing, and they clear the fan hall and ground-floor entrances.
 
-### Neutral
+## Drawing and interaction
 
-The catalog-only background, ink, description, muted text, and rule tokens support inspection labels and dividers. These neutral grays belong exclusively to `?debug=true`.
+Use binary cutouts, offsets and occlusion for depth. No gray shading, gradients,
+textures, lighting effects or raster substitution. Rail caps and plinths are
+stronger than their uprights; upright count reduces with available width. Window
+frames, infill and tracks use separate weights. Fan grilles and louvers reduce
+their line counts at small sizes. AC case proportions and feet remain bounded;
+tile-eave height is capped by its width. Only one crane appears per composition.
 
-## Typography
+The normal canvas has no visible UI text and supplies an accessible description.
+Click, tap, Enter or Space regenerates. Normal loads start with a random seed;
+`?seed=1907` fixes the opening composition at a given viewport. Resize preserves
+the seed, DPR caps at two, and keyboard focus uses an inset 3px black outline.
 
-The normal artwork has no visible type. Its accessible canvas description provides the subject and regeneration instructions. Catalog headings and specimen labels use the system sans-serif roles above; specimen numbers use tabular numerals. Catalog metadata describes blocks rather than decorating the city.
+`?debug=true` shows active blocks, Tokyo first, and one composed city.
+`?debug=true&all=true` shows all 56 blocks. Catalog links connect the city, active
+set and full archive. The links use the documented 0.875rem description size;
+all other catalog styling retains the token definitions above.
 
-## Layout
+## Evidence and limitations
 
-The canvas fills the viewport. The composer chooses `clamp(round(width / height × 11), 5, 22)` bays, mixing narrow stacks with broad chambers. The outer margin is 0.9% of the shorter viewport dimension. Bases share a ground line and occupy 11–14.5% of the viewport height; their top edges vary.
-
-Tall fan, folding-stair, and swelling-wall chambers anchor every composition. Ordinary towers have two to four variable-height chambers; narrow towers have two or three. Crowns reach into small sky pockets and may overhang their bays. Resize preserves the seed and recomposes geometry for the new aspect ratio. Rendering resolution is capped at a device pixel ratio of two.
-
-The debug catalog uses an automatic grid with a preferred minimum column width of 230px, shrinking to the available width when necessary. Preview height ranges from 250px to 340px. Below 520px, its header stacks vertically.
-
-## Elevation & Depth
-
-There are no shadows, gradients, textures, or lighting effects. Depth comes from cutouts, black/white inversion, overlap, tiny repeated apertures, suspended connections, and changes of scale.
-
-## Shapes
-
-Chambers have no ornamental frames. Arches, folds, pleats, scallops, disks, fans, and tapering silhouettes create variety without a universal rounded-corner treatment. Crisp straight edges use miter joins and butt line caps. A fine ground-level seam separates inverted bases without enclosing every room.
-
-## Components
-
-### Architectural block library
-
-The 26 blocks have stable IDs, local drawing functions, roles, and narrow-bay eligibility. Each receives dimensions, polarity, and a variant. Six **bases** occur only at ground level; twelve **chambers** fill the towers; six **crowns** define the skyline; two **connectors** bridge or hang between neighbors. See `README.md` for the inventory.
-
-Adjacent bases and crowns avoid repetition. Striped sky vessels are limited to two and kept away from the canvas edges; off-center moons also avoid edge bays. Composition rules preserve architectural rhythm while allowing a new arrangement with each regeneration.
-
-### Interactive canvas
-
-Click, tap, Enter, or Space generates another seed and redraws immediately. Keyboard focus uses a black 3px outline inset by 8px. There is no continuous animation or transition. `?seed=1907` reproduces the opening composition at a given viewport.
-
-### Block catalog
-
-`?debug=true` exposes 26 labeled specimens plus a complete composition. Specimen figures use thin dividers, a two-column caption, and readable role/ID metadata. Catalog canvases are static inspection surfaces.
-
-## Do's and Don'ts
-
-- **Do** keep each block procedural, dimension-aware, and useful in multiple compositions.
-- **Do** preserve ground-only bases, unequal bay widths, and the three large chamber features.
-- **Do** regenerate thumbnails from the renderer and record their seed and framing.
-- **Don't** add visible words or pictorial illustrations to the normal artwork.
-- **Don't** introduce a gray drawing palette, gradients, room frames, or uniform rounded geometry.
-- **Don't** turn the reference raster into the runtime artwork or apply this piece's identity to the entire gallery.
+`.impeccable/review/city-photo-details/` contains before/current source and browser captures.
+The square seed-1907 renderer supplies `thumbnail.jpg`. Tests exercise 480 layouts,
+active vocabulary restrictions, all catalog drawings and regeneration/resize.
+The vertical bay organization and repeated service-court form remain apparent.
+This is a design attempt awaiting user response, not a Ship disposition or a
+claim of acceptance. Earlier visual passes are historical evidence.

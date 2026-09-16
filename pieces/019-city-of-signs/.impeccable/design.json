@@ -1,25 +1,64 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-15T07:47:18Z",
+  "generatedAt": "2026-09-16T05:23:51.910673Z",
   "title": "Design System: City of Signs",
   "extensions": {
     "colorMeta": {
-      "ink": { "role": "primary", "displayName": "Ink" },
-      "paper": { "role": "neutral", "displayName": "Paper" },
-      "catalog-background": { "role": "neutral", "displayName": "Catalog background only" },
-      "catalog-ink": { "role": "neutral", "displayName": "Catalog text only" },
-      "catalog-description": { "role": "neutral", "displayName": "Catalog description only" },
-      "catalog-muted": { "role": "neutral", "displayName": "Catalog metadata only" },
-      "catalog-rule": { "role": "neutral", "displayName": "Catalog dividers only" }
+      "ink": {
+        "role": "primary",
+        "displayName": "Ink"
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper"
+      },
+      "catalog-background": {
+        "role": "neutral",
+        "displayName": "Catalog background only"
+      },
+      "catalog-ink": {
+        "role": "neutral",
+        "displayName": "Catalog text only"
+      },
+      "catalog-description": {
+        "role": "neutral",
+        "displayName": "Catalog description only"
+      },
+      "catalog-muted": {
+        "role": "neutral",
+        "displayName": "Catalog metadata only"
+      },
+      "catalog-rule": {
+        "role": "neutral",
+        "displayName": "Catalog dividers only"
+      }
     },
     "typographyMeta": {
-      "catalog-title": { "displayName": "Catalog title", "purpose": "Debug header only; the normal artwork is wordless." },
-      "catalog-name": { "displayName": "Block name", "purpose": "Debug specimen names." },
-      "catalog-group": { "displayName": "Block role and ID", "purpose": "Debug specimen metadata." }
+      "catalog-title": {
+        "displayName": "Catalog title",
+        "purpose": "Debug header only; the normal artwork is wordless."
+      },
+      "catalog-name": {
+        "displayName": "Block name",
+        "purpose": "Debug specimen names."
+      },
+      "catalog-group": {
+        "displayName": "Block role and ID",
+        "purpose": "Debug specimen metadata."
+      },
+      "catalog-description": {
+        "displayName": "Catalog description",
+        "purpose": "Existing debug header description; 0.875rem role now recorded in DESIGN.md without a CSS change."
+      }
     },
     "shadows": [],
     "motion": [],
-    "breakpoints": [{ "name": "catalog-header-stack", "value": "520px" }]
+    "breakpoints": [
+      {
+        "name": "catalog-header-stack",
+        "value": "520px"
+      }
+    ]
   },
   "components": [
     {
@@ -33,18 +72,31 @@
   ],
   "narrative": {
     "northStar": "A wordless geometric dream",
-    "overview": "Scope: pieces/019-city-of-signs/ only. Interchangeable architectural blocks create a dense black-and-white city with unequal chambers and improbable rooftops. The user-approved geometric AI image established visual direction; the shipped artwork is procedural Canvas geometry. thumbnail.jpg is a square screenshot of the renderer at seed 1907, not an AI raster used as code. Independent review disposition: Ship for square, desktop, mobile, and catalog, with no blocking findings.",
+    "overview": "Scope: pieces/019-city-of-signs/ only. Procedural black-and-white architecture with whole-tower straight, terraced, and curved profiles; contents fit through contentBox. The approved AI image remains a visual reference. thumbnail.jpg derives from the renderer screenshot 06-square.png, seed 1907, in .impeccable/review/city-six-rounds/2026-09-16/. The user rejected the earlier review approval. Fresh review of the six-round result returned Ship conditional on stale documentation being updated; evidence covers six source/render pairs and final square, mobile, screenshot-proportion, alternate-seed, and catalog views. The result is materially richer but remains more columnar and repetitive than the dream reference, with some bridge overlaps less defined on black facades. These limitations remain at the user’s six-round stopping point; this is not user acceptance.",
     "keyCharacteristics": [
-      "26 blocks: 6 ground-only bases, 12 chambers, 6 crowns, 2 connectors",
-      "5–22 unequal bays recomposed for the viewport",
-      "Unframed variable-height geometry with guaranteed fan, folding-stair, and swelling-wall features",
+      "32 blocks: 6 ground-only bases, 15 chambers, 8 crowns, 3 connectors",
+      "5–20 unequal bays using round(width / height × 9), recomposed for the viewport",
+      "Whole-tower profiles and fitted contents; compact seven-blade fan on a straight tower",
+      "Balanced crown usage and arched skybridges, crossing stairs, hanging crescents",
       "Immediate regeneration through click, tap, Enter, or Space",
       "No text or pictorial illustrations in the normal canvas"
     ],
     "rules": [
-      { "name": "Binary artwork", "body": "Only Ink and Paper are authored drawing colors. Catalog grays are inspection UI only.", "section": "colors" },
-      { "name": "Wordless city", "body": "Visible typography belongs to the debug catalog; accessible instructions describe the normal canvas.", "section": "typography" },
-      { "name": "Cutout depth", "body": "Use overlap, apertures, polarity, and scale without shadows or gradients.", "section": "elevation" }
+      {
+        "name": "Binary artwork",
+        "body": "Only Ink and Paper are authored drawing colors. Catalog grays are inspection UI only.",
+        "section": "colors"
+      },
+      {
+        "name": "Wordless city",
+        "body": "Visible typography belongs to the debug catalog; accessible instructions describe the normal canvas.",
+        "section": "typography"
+      },
+      {
+        "name": "Cutout depth",
+        "body": "Use overlap, apertures, polarity, and scale without shadows or gradients.",
+        "section": "elevation"
+      }
     ],
     "dos": [
       "Do preserve ground-only bases and viewport-specific composition.",
