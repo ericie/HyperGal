@@ -10,8 +10,10 @@ are seeded together into the same field. Gentle currents carry all of that
 pigment continuously. New ink arrives as a small falling bead, then spreads by
 inserting successive increments of area. Each increment pushes earlier pigment
 outward, including the color deposited by earlier increments of the same drop.
-A temporary local strain stretches and folds the deposit and its neighbors;
-its strength decays after the drop arrives. This is a stylized transport effect,
+A gentle local strain briefly relaxes the deposit's edge and its neighbors;
+its strength decays over five seconds. Background drift is restrained so fresh
+ink can spread and retain its body, with later drops supplying most of the
+visible displacement. This is a stylized transport effect,
 not a claim of physical fluid accuracy.
 
 ## Interaction

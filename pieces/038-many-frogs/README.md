@@ -46,14 +46,39 @@ new set of broken, directional tire streaks through it.
 When the last frog dies, the camera pauses on the aftermath, then eases back
 down the accumulated field to a new group of twelve waiting at the start.
 
-The course, traffic, water, obstacles, and animals use a grayscale palette. The
+The drawing uses a worn field-print language: charcoal ground, mineral grays
+with an olive cast, and ash-colored machinery, all seen from overhead. Frogs
+have narrow anatomical bodies and articulated folded legs, without smiles or
+white eye discs. Cars, bicycles, mowers, and trains share the same overhead
+view. Fixed substrate pits, irregular contours, incised lines, and worn road
+paint belong to the objects and terrain instead of flickering over the screen. The
 twelve frogs use a close family of natural pigments—madder, oxblood, oxide,
 umber, and plum—instead of a spectral rainbow. Every bloodstain keeps the
 pigment of the frog that left it, even as water or traffic transforms the mark.
 
 There are no controls, labels, scores, instructions, or other visible interface.
 The frogs play continuously on their own. Reduced-motion preferences remove the
-hop arcs, camera easing, and death particles while preserving the simulation.
+limb extension, camera easing, and death particles while preserving the simulation.
 
 The piece is one self-contained HTML file with no runtime dependencies. Open
 `index.html` directly in a modern browser.
+
+## Performance
+
+Terrain definitions and obstacles are cached. Traffic clearance is solved over
+the complete swept interval of each landing window; the planner no longer
+allocates a full row of traffic for each sample. Distant frog reservations are
+rejected before predicting their positions. The three-move look-ahead remains.
+
+Terrain impressions are cached in a 128-row raster cache. Pigment is printed to
+a small offscreen canvas once; water impressions are softened in four cached
+stages as they spread and fade. Drawing each visible stain is then a single
+image operation instead of dozens of paths and a live blur every frame. The
+latest 640 stains are retained across cohorts, bounding long-running history.
+Hidden tabs stop animation frames completely and resume without catching up.
+
+Run `node scripts/check-many-frogs.mjs` from the repository root for collision,
+cache, visibility, resize, and lifecycle checks. Add `--benchmark` for a seeded
+60-second simulation-only timing run. `--baseline=/path/to/old/index.html`
+compares an earlier self-contained version and verifies the same final state.
+The timing test does not measure browser rasterization.

@@ -223,7 +223,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rejected": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A wordless geometric Tokyo of stacked businesses, exposed stair towers, projecting signs, shallow balconies and working rooftops. A fan-shaped hall and swelling facade interrupt its dense black-and-white architecture.",
+      "description": "An architectural ink city of sunlit white walls, deep black recesses, projecting balconies and fine steel railings. Stacked tenants, connected service lines and working rooftops form a different Tokyo with every arrangement.",
       "updated": "2026-08-19"
     },
     {
@@ -411,7 +411,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rejected": true,
       "thumbnail": "thumbnail.jpg",
-      "description": "A full-height sequence of 24 wood slices loops from bark through the core to the opposite bark. Scars, sun, and wind shape the grain; debug mode reveals the matching rings, slice grid, and controls.",
+      "description": "A loop of 192 eighth-centimeter wood slices shares the 200-ring growth model of Growth Rings. One proportional scale preserves the trunk’s shape, with the widest slice filling 90% of the screen width. Debug mode reveals the end grain and slice grid.",
       "updated": "2026-08-20"
     },
     {
@@ -463,7 +463,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 30,
       "thumbnail": "thumbnail.png",
-      "description": "Natural-pigment frogs cross a wide grayscale course of sparse cars, bicycles, trains, rivers, and roving mowers, leaving reactive watercolor stains; catching a fly adds three matching frogs.",
+      "description": "An endless field print: anatomical pigment frogs cross overhead traffic and mineral-gray terrain, leaving stains worked by tires and water; catching a fly adds three matching frogs.",
       "updated": "2026-09-11"
     },
     {

@@ -4,29 +4,23 @@ Primary target: pieces/019-city-of-signs/index.html
 Related target: pieces/019-city-of-signs/city.js
 Mode: Experience
 
-USER DIRECTION: Make it feel like a place without burning personality away.
-The user likes some of the architectural pass but selected vertical Tokyo:
-stacked businesses, external stairs and rooftop structures. Revisit the blocks.
+USER DIRECTION, 2026-09-17: Replace the entire active block style using the two
+supplied architectural ink drawings. Broad white walls, deep black recesses,
+shallow projecting volumes, fine railing and service linework. First reference
+sets contrast and detail balance; second sets repetition and density. Earlier
+Tokyo photographs continue to inform the subjects. Keep the work 2D and black/white.
 
-WORLD: Wordless black-and-white geometric city. Tokyo's ordinary vertical
-architecture leads: separate tenant entrances, projecting sign boxes, exterior
-steel stairs, shallow balconies, service walls, water tanks, billboard gantries,
-lift overruns and antennas. Retain the fan, swelling facade and at most one striped
-sky vessel as surreal exceptions. No visible lettering or gray palette.
+CURRENT: All 22 active blocks redrawn. Stable numbers 01–19 and 21–23. 20 absent.
+36 archive drawings remain historical. New shared ink drawing kit uses isotropic
+scaling and capped roof proportions. Black describes structural depth; facade
+palette inversion is removed. Whole modules meet along white walls and dark
+side returns. No nested court overlay or cross-facade masking.
 
-CURRENT: Twenty Tokyo blocks and three retained active blocks. The user’s 21
-photos guide nested window frames, fine balcony rails, round stairwell apertures,
-AC fan grilles, tile panels, routed pipes, louvered fronts, noren, marquees, roof
-eaves, atrium ribs and crane structures. Quiet wall areas balance dense systems. 33 earlier
-blocks remain archived. 5–16 unequal bays, three chambers per building,
-rectangular service courts spanning neighbors. Default catalog presents the
-active vocabulary first; all=true exposes the full archive.
+INTERACTION: Seeded, click/tap/Enter/Space regeneration. Responsive Canvas, DPR 2
+maximum. Existing debug catalog and numbered anchors are retained.
 
-EVIDENCE: .impeccable/review/city-photo-details/ holds before/current source, mobile and
-square seed-1907 captures, desktop seed 420, and the catalog. 480 geometry layouts
-and live browser rendering/interaction checks pass. README.md records the user-supplied photographic references and earlier
-architectural sources; no photos are embedded in the renderer.
+EVIDENCE: .impeccable/review/city-ink-redraw/. 480 seeded layouts and all catalog
+blocks checked, plus desktop/catalog/mobile browser review. Gallery thumbnail
+comes from the square renderer. Previous review folders show superseded drawings.
 
-STATUS: Awaiting user response to the photo-inspired detail pass. The vertical bay framework
-and service-court repetition remain. Earlier approvals and stopping points are
-historical, not evidence of user acceptance of this attempt.
+STATUS: Complete redraw for user review; no claim of acceptance.

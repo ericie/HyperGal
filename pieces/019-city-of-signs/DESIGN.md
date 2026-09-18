@@ -1,6 +1,6 @@
 ---
 name: City of Signs
-description: A wordless geometric Tokyo assembled from occupied floors, exposed stairs and working rooftops.
+description: An architectural ink city of white walls, deep recesses and finely drawn working details.
 colors:
   ink: "#000"
   paper: "#fff"
@@ -45,69 +45,56 @@ components:
 
 ## Direction
 
-The user chose vertical Tokyo: stacked businesses, external stairs and rooftop
-structures. This supersedes the previous arcaded fantasy-city vocabulary. Keep
-pure black/white and the wordless procedural format. Personality should come
-from architecture rather than added clutter or indiscriminate simplification.
+The user rejected the previous graphic block style on 2026-09-17 and supplied
+two architectural ink references. The first establishes large sunlit white walls,
+solid black recesses and building returns, shallow projecting balconies, fine
+metal railings and small utility details. The second supplies the denser rhythm
+of repeated inhabited floors. These references supersede the earlier treatment.
 
-## Blocks
+All 22 active studies have been redrawn. White is the wall surface; black locates
+a recess, underside, party-wall gap or unlit opening. Buildings no longer invert
+their entire facade palette. Outlines and hardware are fine; shadows carry the
+visual weight. Projection uses a shallow consistent oblique angle, drawn as flat
+black and white planes. No gradients, gray fills, raster assets or textures.
+The artwork remains a procedural 2D Canvas drawing.
 
-The active vocabulary has 23 blocks: twenty Tokyo drawings plus the retained
-fan hall, swelling facade and striped sky vessel. The user’s 21 reference photos
-now guide detail: nested sliding-window frames, varied curtain infill, balcony
-slabs and fine rails, circular stairwell openings, louver banks, AC fan grilles,
-tile joints and conduits routed to meter boxes and vents. Five street-level
-blocks, nine occupied-floor types and six rooftop types create distinct facade
-systems. Older shop canopies, noren and stepped marquees contrast with glazed
-structural ribs, utility walls, tile eaves and a construction crane. Keep quiet
-wall areas between concentrated detail. No pseudo-Japanese lettering or visible
-text is drawn. See README.md for the inventory and photographic reference notes.
+## Drawing grammar
 
-The fan and swelling facade have rectangular window infill; the vessel is
-limited to one per composition. Older arches, domes, ornamental gates and floating
-connectors remain available only in the full archive, not the city. All 56 blocks
-remain procedural and renderable; the 33 inactive drawings are labeled studies.
+Each study uses a 100-unit-wide local coordinate system with isotropic scaling.
+This preserves the proportions of fans, narrow railings and window hardware.
+Structural lines are about 0.5–0.8 units; secondary lines about 0.2–0.45. Windows
+have thin metal frames, offset reveals, unequal lit panes and shallow sills.
+Balconies have deep black openings, white slab fronts, black undersides and fine
+returning guard rails. Roof studies have maximum height-to-width ratios so the
+catalog and narrow buildings cannot stretch roof houses or gables into towers.
 
-## Composition
+Stair flights still share exact landing endpoints. Tank supports and equipment
+feet meet their decks. AC routes begin at the outlet returned by the fitted case.
+Meter routes meet each cabinet's actual bottom edge; no later background masks
+can erase the connections. Material seams remain sparse and subordinate.
 
-5–16 unequal bays use `clamp(round(width / height * 7), 5, 16)`. Width weights are
-0.36, 0.44, 0.55 for narrow bays and 0.85, 1.2, 1.7 for broad bays. Margin is 0.9%
-of the shorter side. Ground floors occupy 10–14.5% of height. Each building has
-three variable-height chambers, selected as architectural sequences. Narrow
-towers emphasize service walls; broad towers mix tenant floors, exposed stairs,
-balconies, setbacks, round bays, louvered fronts and ribbed glazing. The fan tower starts at 19% of height; others start at
-17–41%. Surfaces group black and white across adjacent buildings. Profiles are
-straight or stepped except for the curved swelling-wall tower.
+## Composition and catalog
 
-Shared service courts join neighboring buildings. Rectangular shafts, thick
-side piers, rear sash windows, doors, upper/lower landings, a stair and roof walk
-replace the previous vaulted galleries. Their regions are reserved during facade
-drawing, and they clear the fan hall and ground-floor entrances.
+There are 22 active studies, numbered 01–19 and 21–23. Number 20 remains retired;
+all other numbers retain their subject and review anchor. The 36 old archive
+studies remain accessible only through the full archive. The rejected crane,
+large fan, swelling facade and striped vessel do not enter generated cities.
 
-## Drawing and interaction
+The city retains its seeded assembly of 5–16 unequal building bays and three
+facade modules per building. Continuous white walls and black side returns join
+adjacent modules. Current building profiles are straight; setback rooms and
+terraces provide the changing volumes within them. Crown decks align with their
+buildings, with no lateral random shift. Chambers use the full bay width.
 
-Use binary cutouts, offsets and occlusion for depth. No gray shading, gradients,
-textures, lighting effects or raster substitution. Rail caps and plinths are
-stronger than their uprights; upright count reduces with available width. Window
-frames, infill and tracks use separate weights. Fan grilles and louvers reduce
-their line counts at small sizes. AC case proportions and feet remain bounded;
-tile-eave height is capped by its width. Only one crane appears per composition.
+There is no secondary room/court overlay and no masking across whole facade
+blocks. The catalog retains the tokens above, review numbers and direct links.
 
-The normal canvas has no visible UI text and supplies an accessible description.
-Click, tap, Enter or Space regenerates. Normal loads start with a random seed;
-`?seed=1907` fixes the opening composition at a given viewport. Resize preserves
-the seed, DPR caps at two, and keyboard focus uses an inset 3px black outline.
+## Interaction and verification
 
-`?debug=true` shows active blocks, Tokyo first, and one composed city.
-`?debug=true&all=true` shows all 56 blocks. Catalog links connect the city, active
-set and full archive. The links use the documented 0.875rem description size;
-all other catalog styling retains the token definitions above.
+Click, tap, Enter or Space regenerates. A query seed fixes the arrangement for a
+given viewport; resizing retains that seed. DPR is capped at two. The accessible
+canvas description and keyboard focus remain. No visible controls cover the art.
 
-## Evidence and limitations
-
-`.impeccable/review/city-photo-details/` contains before/current source and browser captures.
-The square seed-1907 renderer supplies `thumbnail.jpg`. Tests exercise 480 layouts,
-active vocabulary restrictions, all catalog drawings and regeneration/resize.
-The vertical bay organization and repeated service-court form remain apparent.
-This is a design attempt awaiting user response, not a Ship disposition or a
-claim of acceptance. Earlier visual passes are historical evidence.
+Evidence is in `.impeccable/review/city-ink-redraw/`. Earlier review folders
+record superseded versions, not approval of this direction. The new drawings
+are a reviewable implementation of the supplied reference direction.

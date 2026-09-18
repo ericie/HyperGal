@@ -1,0 +1,23 @@
+Passed 10560 collision samples, continuous traffic windows, pigment/terrain caching, visibility, normal/reduced-motion lifecycle, resize, and bounded stain history.
+[
+  {
+    "file": "/tmp/hypergal-frogs/before.html",
+    "mean": 7.6577371038888895,
+    "p95": 37.80104200000096,
+    "p99": 66.78929100000096,
+    "max": 143.1493329999994,
+    "live": 2,
+    "totalFrogs": 21,
+    "topFrogY": 95
+  },
+  {
+    "file": "file:///Users/eric-eckhardt/GitHub/HyperGal/pieces/038-many-frogs/index.html",
+    "mean": 1.1111774152777696,
+    "p95": 5.3804999999993015,
+    "p99": 9.493374999998196,
+    "max": 20.210832999997365,
+    "live": 2,
+    "totalFrogs": 21,
+    "topFrogY": 95
+  }
+]

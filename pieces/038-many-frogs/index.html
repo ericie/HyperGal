@@ -7,7 +7,7 @@
     <link rel="icon" href="data:," />
     <title>Many Frogs · HyperGal</title>
     <style>
-      :root { color-scheme: dark; --void: oklch(0.08 0 0); }
+      :root { color-scheme: dark; --void: #171b18; }
       * { box-sizing: border-box; }
       html, body {
         width: 100%; height: 100%; margin: 0; overflow: hidden;
@@ -48,40 +48,19 @@
         const ctx = canvas.getContext('2d', { alpha: false });
 
         const palette = {
-          void: 'oklch(0.08 0 0)',
-          verge: 'oklch(0.12 0 0)',
-          grassA: 'oklch(0.23 0 0)',
-          grassB: 'oklch(0.26 0 0)',
-          grassLine: 'oklch(0.42 0 0)',
-          road: 'oklch(0.16 0 0)',
-          roadEdge: 'oklch(0.36 0 0)',
-          roadMark: 'oklch(0.7 0 0)',
-          bikeLane: 'oklch(0.22 0.025 155)',
-          bikeEdge: 'oklch(0.42 0.035 155)',
-          bikeMark: 'oklch(0.72 0.035 155)',
-          bikeFrame: 'oklch(0.62 0.065 150)',
-          bikeRider: 'oklch(0.15 0.012 155)',
-          railBed: 'oklch(0.13 0 0)',
-          railTie: 'oklch(0.29 0 0)',
-          railSteel: 'oklch(0.58 0 0)',
-          railSignal: 'oklch(0.57 0.15 24)',
-          train: 'oklch(0.46 0 0)',
-          trainLight: 'oklch(0.76 0 0)',
-          water: 'oklch(0.29 0 0)',
-          waterLine: 'oklch(0.53 0 0)',
-          log: 'oklch(0.33 0 0)',
-          logLight: 'oklch(0.51 0 0)',
-          gator: 'oklch(0.21 0 0)',
-          gatorLight: 'oklch(0.44 0 0)',
-          gatorEye: 'oklch(0.86 0 0)',
-          rock: 'oklch(0.34 0 0)',
-          rockLight: 'oklch(0.52 0 0)',
-          mower: 'oklch(0.66 0 0)',
-          mowerLight: 'oklch(0.84 0 0)',
-          flyWing: 'oklch(0.86 0.025 85)',
-          flyBody: 'oklch(0.13 0.02 70)',
-          ink: 'oklch(0.97 0 0)',
-          tire: 'oklch(0.07 0 0)'
+          void: '#171b18', verge: '#292e28',
+          grassA: '#3b4038', grassB: '#3e4239', grassLine: '#747768',
+          road: '#53554a', roadEdge: '#92907d', roadMark: '#b5b09a',
+          bikeLane: '#414b40', bikeEdge: '#7d8770', bikeMark: '#929d80',
+          bikeFrame: '#b0b3a0', bikeRider: '#222b24',
+          railBed: '#30352e', railTie: '#565b4c', railSteel: '#999986',
+          railSignal: '#b65c40', train: '#a3a18e', trainLight: '#c0bca5',
+          water: '#686f62', waterLine: '#a3ab97',
+          log: '#303e32', logLight: '#7e8a72',
+          gator: '#25392d', gatorLight: '#71876b', gatorEye: '#a0a683',
+          rock: '#777968', rockLight: '#a1a18a',
+          mower: '#969986', mowerLight: '#b6b59c',
+          flyWing: '#cac4a8', flyBody: '#202a22', ink: '#d0c7aa', tire: '#242b25'
         };
 
         // A narrow natural-pigment palette: madder and oxide carry the field,
@@ -132,6 +111,9 @@
         let gameOverAt = -1;
         let gameOverCameraY = 0;
         const terrainTypes = new Map();
+        const laneCache = new Map();
+        const obstacleCache = new Map();
+        const surfacePrints = new Map();
         let terrainGeneratedThrough = 5;
         let terrainSegmentIndex = 0;
         let running = !document.hidden;
@@ -145,7 +127,10 @@
         document.addEventListener('visibilitychange', () => {
           running = !document.hidden;
           lastTime = performance.now();
-          if (running && !frame) frame = requestAnimationFrame(loop);
+          if (!running && frame) {
+            cancelAnimationFrame(frame);
+            frame = 0;
+          } else if (running && !frame) frame = requestAnimationFrame(loop);
         });
 
         function startRound() {
@@ -203,7 +188,9 @@
         function loop(now) {
           const dt = Math.min(0.035, Math.max(0, (now - lastTime) / 1000));
           lastTime = now;
-          if (running) update(dt);
+          frame = 0;
+          if (!running) return;
+          update(dt);
           draw();
           frame = requestAnimationFrame(loop);
         }
@@ -523,6 +510,9 @@
         function frogSpaceBlocked(frog, x, y, atTime = elapsed, fromX = frog.x, fromY = frog.y) {
           return frogs.some((other) => {
             if (!other.alive || other === frog) return false;
+            // A frog's reserved motion spans at most one row. River drift is horizontal.
+            if (y < Math.min(other.fromY, other.y, other.toY) - FROG_CLEARANCE ||
+                y > Math.max(other.fromY, other.y, other.toY) + FROG_CLEARANCE) return false;
             const predicted = predictedFrogPosition(other, atTime);
             if (frogsTooClose(x, y, predicted.x, predicted.y)) return true;
 
@@ -599,57 +589,14 @@
             return futureX < 0.3 || futureX > COLS - 0.3 ? 65 : 0.15;
           }
 
-          if (lane.type === 'rail') {
-            let clearance = Infinity;
-            const steps = Math.max(2, Math.ceil(duration / 0.02));
-            for (let step = 0; step <= steps; step += 1) {
-              const sampleTime = atTime + duration * (step / steps);
-              if (hitsTrainAt(lane, x, sampleTime)) return 100;
-              trainObjectsAt(lane, sampleTime).forEach((train) => {
-                const distance = x < train.x
-                  ? train.x - x
-                  : x > train.x + train.length
-                    ? x - train.x - train.length
-                    : 0;
-                clearance = Math.min(clearance, distance);
-              });
-            }
-            return clearance < 1.8 ? (1.8 - clearance) * 18 : 0;
-          }
-
-          if (lane.type === 'bike') {
-            let clearance = Infinity;
-            const steps = Math.max(1, Math.ceil(duration / 0.035));
-            for (let step = 0; step <= steps; step += 1) {
-              const sampleTime = atTime + duration * (step / steps);
-              if (hitsBikeAt(lane, x, sampleTime)) return 100;
-              bikeObjectsAt(lane, sampleTime).forEach((bike) => {
-                const distance = x < bike.x
-                  ? bike.x - x
-                  : x > bike.x + bike.length
-                    ? x - bike.x - bike.length
-                    : 0;
-                clearance = Math.min(clearance, distance);
-              });
-            }
-            return clearance < 0.55 ? (0.55 - clearance) * 9 : 0;
-          }
-
-          let clearance = Infinity;
-          const steps = Math.max(1, Math.ceil(duration / 0.035));
-          for (let step = 0; step <= steps; step += 1) {
-            const sampleTime = atTime + duration * (step / steps);
-            if (hitsVehicleAt(lane, x, sampleTime)) return 100;
-            laneObjectsAt(lane, sampleTime).forEach((vehicle) => {
-              const distance = x < vehicle.x
-                ? vehicle.x - x
-                : x > vehicle.x + vehicle.length
-                  ? x - vehicle.x - vehicle.length
-                  : 0;
-              clearance = Math.min(clearance, distance);
-            });
-          }
-          return clearance < 0.72 ? (0.72 - clearance) * 10 : 0;
+          // Traffic has constant velocity. Its swept interval gives exact clearance
+          // over the whole landing window, without allocating and sampling arrays.
+          const clearance = trafficClearance(lane, x, atTime, duration);
+          const radius = lane.type === 'bike' ? BIKE_HIT_RADIUS : FROG_HIT_RADIUS;
+          if (clearance < radius) return 100;
+          const caution = lane.type === 'rail' ? 1.8 : lane.type === 'bike' ? 0.55 : 0.72;
+          const weight = lane.type === 'rail' ? 18 : lane.type === 'bike' ? 9 : 10;
+          return clearance < caution ? (caution - clearance) * weight : 0;
         }
 
         function beginHop(frog, direction) {
@@ -907,6 +854,7 @@
             }
 
             if (stain.surfaceType !== 'road') return;
+            if (Math.abs(stain.y - cameraY) > visibleRows + 6) return;
             const lane = getLane(stain.surfaceRow);
             if (lane.type !== 'road' || stain.smearedBy.size >= 5) return;
             laneObjectsAt(lane, elapsed).forEach((vehicle) => {
@@ -922,6 +870,7 @@
             stain.surfaceType !== 'river' ||
             (stain.opacity > 0.025 && stain.x > -4 && stain.x < COLS + 4)
           );
+          if (bloodStains.length > 640) bloodStains.splice(0, bloodStains.length - 640);
         }
 
         function addVehicleSmear(stain, lane, vehicle) {
@@ -953,6 +902,15 @@
         }
 
         function getLane(row) {
+          let lane = laneCache.get(row);
+          if (!lane) {
+            lane = createLane(row);
+            laneCache.set(row, lane);
+          }
+          return lane;
+        }
+
+        function createLane(row) {
           if (row < 6) {
             const mower = row === 2 || row === 4;
             return {
@@ -1056,45 +1014,35 @@
         }
 
         function hitsBikeAt(lane, frogX, atTime) {
-          return bikeObjectsAt(lane, atTime).some((bike) =>
-            frogX > bike.x - BIKE_HIT_RADIUS &&
-            frogX < bike.x + bike.length + BIKE_HIT_RADIUS
-          );
+          return trafficClearance(lane, frogX, atTime, 0) < BIKE_HIT_RADIUS;
         }
 
         function hitsTrainAt(lane, frogX, atTime) {
-          return trainObjectsAt(lane, atTime).some((train) =>
-            frogX > train.x - FROG_HIT_RADIUS &&
-            frogX < train.x + train.length + FROG_HIT_RADIUS
-          );
+          return trafficClearance(lane, frogX, atTime, 0) < FROG_HIT_RADIUS;
+        }
+
+        function riverObjectUnder(lane, x, atTime) {
+          const travel = lane.offset + lane.speed * atTime;
+          const id = Math.floor((x - travel) / lane.spacing);
+          return { x: travel + id * lane.spacing, length: lane.length, id,
+            kind: mod(id + Math.abs(lane.row), 7) === 0 ? 'alligator' : 'log' };
         }
 
         function supportingRiverObjectAt(lane, frogX, atTime) {
-          return riverObjectsAt(lane, atTime).find((object) => {
-            if (object.kind === 'log') {
-              return frogX > object.x + FROG_HIT_RADIUS &&
-                frogX < object.x + object.length - FROG_HIT_RADIUS;
-            }
-
-            const headBoundary = lane.direction > 0
-              ? object.x + object.length * GATOR_HEAD_FRACTION
-              : object.x + object.length * (1 - GATOR_HEAD_FRACTION);
-            return lane.direction > 0
-              ? frogX > object.x + FROG_HIT_RADIUS && frogX < headBoundary
-              : frogX > headBoundary && frogX < object.x + object.length - FROG_HIT_RADIUS;
-          });
+          const object = riverObjectUnder(lane, frogX, atTime);
+          const low = object.kind === 'alligator' && lane.direction < 0
+            ? object.x + object.length * (1 - GATOR_HEAD_FRACTION) : object.x + FROG_HIT_RADIUS;
+          const high = object.kind === 'alligator' && lane.direction > 0
+            ? object.x + object.length * GATOR_HEAD_FRACTION : object.x + object.length - FROG_HIT_RADIUS;
+          return frogX > low && frogX < high ? object : undefined;
         }
 
         function alligatorHeadAt(lane, frogX, atTime) {
-          return riverObjectsAt(lane, atTime).some((gator) => {
-            if (gator.kind !== 'alligator') return false;
-            const headBoundary = lane.direction > 0
-              ? gator.x + gator.length * GATOR_HEAD_FRACTION
-              : gator.x + gator.length * (1 - GATOR_HEAD_FRACTION);
-            return lane.direction > 0
-              ? frogX >= headBoundary && frogX <= gator.x + gator.length
-              : frogX >= gator.x && frogX <= headBoundary;
-          });
+          const object = riverObjectUnder(lane, frogX, atTime);
+          if (object.kind !== 'alligator') return false;
+          return lane.direction > 0
+            ? frogX >= object.x + object.length * GATOR_HEAD_FRACTION && frogX <= object.x + object.length
+            : frogX >= object.x && frogX <= object.x + object.length * (1 - GATOR_HEAD_FRACTION);
         }
 
         function flyObjectsAt(row, atTime) {
@@ -1216,6 +1164,11 @@
         }
 
         function grassObstacles(row) {
+          if (!obstacleCache.has(row)) obstacleCache.set(row, createGrassObstacles(row));
+          return obstacleCache.get(row);
+        }
+
+        function createGrassObstacles(row) {
           if (row < 6 || getLane(row).mower) return [];
           const count = hash(COURSE_SEED + row * 421) < 0.58 ? 1 : 2;
           const obstacles = [];
@@ -1237,9 +1190,17 @@
         }
 
         function hitsVehicleAt(lane, frogX, atTime) {
-          return laneObjectsAt(lane, atTime).some((vehicle) =>
-            frogX > vehicle.x - FROG_HIT_RADIUS &&
-            frogX < vehicle.x + vehicle.length + FROG_HIT_RADIUS);
+          return trafficClearance(lane, frogX, atTime, 0) < FROG_HIT_RADIUS;
+        }
+
+        function trafficClearance(lane, x, atTime, duration) {
+          const travel = lane.offset + lane.speed * atTime;
+          const shift = lane.speed * duration;
+          const left = travel + Math.min(0, shift);
+          const length = lane.length + Math.abs(shift);
+          if (length >= lane.spacing) return 0;
+          const phase = mod(x - left, lane.spacing);
+          return phase <= length ? 0 : Math.min(phase - length, lane.spacing - phase);
         }
 
         function hazardAt(frogX, frogY, atTime) {
@@ -1266,12 +1227,12 @@
           const maxRow = Math.ceil(cameraY + visibleRows + 3);
           const rows = [];
           for (let row = minRow; row <= maxRow; row += 1) rows.push(row);
-          rows.forEach(drawLaneSurface);
-          drawBloodStains();
           ctx.save();
           ctx.beginPath();
           ctx.rect(boardLeft, 0, COLS * tile, height);
           ctx.clip();
+          rows.forEach(drawLaneSurface);
+          drawBloodStains();
           rows.forEach(drawLaneObjects);
           drawFlies(rows);
           ctx.restore();
@@ -1283,25 +1244,37 @@
         }
 
         function drawLaneSurface(row) {
-          const lane = getLane(row);
-          const top = worldToScreenY(row + 0.5);
-          const h = tile + 1;
-          if (top > height || top + h < 0) return;
-
-          ctx.fillStyle = lane.type === 'grass'
-            ? (lane.variant > 0.5 ? palette.grassA : palette.grassB)
-            : lane.type === 'road'
-              ? palette.road
-              : lane.type === 'bike'
-                ? palette.bikeLane
-                : lane.type === 'rail' ? palette.railBed : palette.water;
-          ctx.fillRect(boardLeft, top, COLS * tile, h);
-
-          if (lane.type === 'grass') drawGrass(row, top);
-          else if (lane.type === 'road') drawRoadSurface(top);
-          else if (lane.type === 'bike') drawBikeSurface(lane, top);
-          else if (lane.type === 'rail') drawRailSurface(lane, top);
-          else drawRiverSurface(lane, top);
+          const lane=getLane(row),top=worldToScreenY(row+.5);
+          if(top>height || top+tile+1<0)return;
+          let print=surfacePrints.get(row);
+          if(!print) {
+            print=document.createElement('canvas');print.width=Math.ceil(COLS*tile);print.height=Math.ceil(tile);
+            const ground=print.getContext('2d');
+            ground.fillStyle=lane.type==='grass'?(lane.variant>.5?palette.grassA:palette.grassB):lane.type==='road'?palette.road:lane.type==='bike'?palette.bikeLane:lane.type==='rail'?palette.railBed:palette.water;
+            ground.fillRect(0,0,print.width,print.height);
+            // Fine pits and short fibers are fixed to this terrain row, never screen noise.
+            for(let i=0;i<COLS*34;i++) {
+              const seed=row*1223+i*197+COURSE_SEED;
+              ground.globalAlpha=.04+hash(seed+43)*.09;
+              ground.fillStyle=i%3===0?palette.ink:palette.void;
+              ground.fillRect(hash(seed)*print.width,hash(seed+73)*print.height,.45+hash(seed+91)*1.2,.4+hash(seed+131)*.6);
+            }
+            if(lane.type==='grass') {
+              ground.globalAlpha=.23;ground.strokeStyle=palette.grassLine;ground.lineWidth=.65;ground.beginPath();
+              for(let i=0;i<100;i++) {
+                const seed=row*1789+i*97+COURSE_SEED,x=hash(seed)*COLS*tile,y=hash(seed+91)*tile;
+                ground.moveTo(x,y);ground.lineTo(x+(hash(seed+71)-.5)*tile*.24,y-tile*(.03+hash(seed+43)*.11));
+              }
+              ground.stroke();
+            }
+            surfacePrints.set(row,print);
+            if(surfacePrints.size>128)surfacePrints.delete(surfacePrints.keys().next().value);
+          }
+          ctx.drawImage(print,boardLeft,top,COLS*tile,tile+1);
+          if(lane.type==='road')drawRoadSurface(top);
+          else if(lane.type==='bike')drawBikeSurface(lane,top);
+          else if(lane.type==='rail')drawRailSurface(lane,top);
+          else if(lane.type==='river')drawRiverSurface(lane,top);
         }
 
         function drawLaneObjects(row) {
@@ -1318,90 +1291,53 @@
           else drawRiverObjects(lane, top);
         }
 
-        function drawGrass(row, top) {
-          ctx.strokeStyle = palette.grassLine;
-          ctx.lineWidth = Math.max(1, tile * 0.025);
-          ctx.globalAlpha = 0.38;
-          for (let i = 0; i < 16; i += 1) {
-            const x = boardLeft + hash(row * 53 + i * 97 + COURSE_SEED) * COLS * tile;
-            const y = top + hash(row * 71 + i * 41) * tile;
-            ctx.beginPath();
-            ctx.moveTo(x, y + tile * 0.1);
-            ctx.lineTo(x + (hash(i * 13 + row) - 0.5) * tile * 0.12, y - tile * 0.08);
-            ctx.stroke();
+        function printedShape(points, fill, edge = null) {
+          ctx.beginPath();
+          ctx.moveTo(points[0][0], points[0][1]);
+          for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
+          ctx.closePath();
+          ctx.fillStyle = fill;
+          ctx.fill();
+          if (edge) { ctx.strokeStyle = edge; ctx.lineWidth = 0.65; ctx.stroke(); }
+        }
+
+        function dryLines(x, y, w, h, seed, color, count = 7) {
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 0.55;
+          ctx.beginPath();
+          for (let i = 0; i < count; i++) {
+            const a = hash(seed + i * 197), b = hash(seed + i * 431);
+            const sx = x + a * w, sy = y + b * h;
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(Math.min(x + w, sx + w * (0.04 + hash(seed + i * 653) * 0.18)), sy + (a - 0.5) * h * 0.09);
           }
-          ctx.globalAlpha = 1;
+          ctx.stroke();
         }
 
         function drawGrassObstacles(row, top) {
-          grassObstacles(row).forEach((rock) => {
-            const x = worldToScreenX(rock.x);
-            const y = top + tile * 0.57;
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(rock.tilt);
-            ctx.scale(rock.scale, rock.scale);
-            ctx.fillStyle = 'oklch(0.04 0 0 / 0.24)';
-            ctx.beginPath();
-            ctx.ellipse(tile * 0.04, tile * 0.15, tile * 0.36, tile * 0.12, 0, 0, TAU);
-            ctx.fill();
-            ctx.fillStyle = palette.rock;
-            ctx.beginPath();
-            ctx.moveTo(-tile * 0.33, tile * 0.12);
-            ctx.quadraticCurveTo(-tile * 0.31, -tile * 0.24, -tile * 0.02, -tile * 0.29);
-            ctx.quadraticCurveTo(tile * 0.31, -tile * 0.19, tile * 0.35, tile * 0.12);
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = palette.rockLight;
-            ctx.lineWidth = Math.max(1, tile * 0.025);
-            ctx.beginPath();
-            ctx.moveTo(-tile * 0.18, -tile * 0.08);
-            ctx.quadraticCurveTo(0, -tile * 0.22, tile * 0.17, -tile * 0.08);
-            ctx.stroke();
+          grassObstacles(row).forEach((rock, index) => {
+            const x = worldToScreenX(rock.x), y = top + tile * 0.5, r = tile * 0.36 * rock.scale;
+            ctx.save(); ctx.translate(x, y); ctx.rotate(rock.tilt);
+            printedShape([[-r, r*.1],[-r*.62,-r*.67],[r*.12,-r*.81],[r*.79,-r*.35],[r*.91,r*.35],[r*.24,r*.69],[-r*.56,r*.57]], palette.rock);
+            ctx.strokeStyle = palette.rockLight; ctx.lineWidth = .7;
+            ctx.beginPath(); ctx.moveTo(-r*.61,-r*.43); ctx.lineTo(-r*.04,-r*.22); ctx.lineTo(r*.21,r*.42); ctx.moveTo(-r*.04,-r*.22); ctx.lineTo(r*.57,-r*.33); ctx.stroke();
+            dryLines(-r*.65,-r*.3,r*1.2,r*.75,row*613+index,palette.grassA,9);
             ctx.restore();
           });
         }
 
         function drawMower(lane, top) {
-          const mower = mowerObjectAt(lane, elapsed);
-          const x = boardLeft + mower.x * tile;
-          const w = mower.length * tile;
-          const y = top + tile * 0.22;
-          ctx.save();
-          if (mower.direction < 0) {
-            ctx.translate(x + w, 0);
-            ctx.scale(-1, 1);
-          } else {
-            ctx.translate(x, 0);
-          }
-
-          ctx.strokeStyle = palette.mowerLight;
-          ctx.lineWidth = Math.max(2, tile * 0.055);
-          ctx.lineCap = 'round';
-          ctx.beginPath();
-          ctx.moveTo(w * 0.22, y + tile * 0.3);
-          ctx.lineTo(w * 0.05, y - tile * 0.02);
-          ctx.lineTo(-w * 0.12, y - tile * 0.02);
-          ctx.stroke();
-
-          ctx.fillStyle = palette.mower;
-          roundedRect(w * 0.1, y + tile * 0.25, w * 0.82, tile * 0.25, tile * 0.07);
-          ctx.fill();
-          ctx.fillStyle = palette.mowerLight;
-          roundedRect(w * 0.47, y + tile * 0.08, w * 0.28, tile * 0.25, tile * 0.04);
-          ctx.fill();
-
+          const mower = mowerObjectAt(lane, elapsed), w = mower.length * tile;
+          ctx.save(); ctx.translate(boardLeft + mower.x * tile + w/2, top + tile/2);
+          if (mower.direction < 0) ctx.rotate(Math.PI);
+          const h = tile * .27;
+          printedShape([[-w*.42,-h*.8],[-w*.23,-h],[w*.35,-h*.94],[w*.47,-h*.53],[w*.45,h*.73],[w*.1,h],[-w*.41,h*.72]], palette.mower);
           ctx.fillStyle = palette.tire;
-          ctx.beginPath();
-          ctx.arc(w * 0.24, y + tile * 0.5, tile * 0.115, 0, TAU);
-          ctx.arc(w * 0.8, y + tile * 0.5, tile * 0.115, 0, TAU);
-          ctx.fill();
-          ctx.strokeStyle = palette.mowerLight;
-          ctx.lineWidth = Math.max(1, tile * 0.025);
-          ctx.beginPath();
-          ctx.moveTo(w * 0.02, y + tile * 0.55);
-          ctx.lineTo(w * 0.98, y + tile * 0.55);
-          ctx.stroke();
+          for (const side of [-1,1]) { ctx.fillRect(-w*.28,side*h-h*.2,w*.16,h*.4); ctx.fillRect(w*.22,side*h-h*.2,w*.13,h*.4); }
+          ctx.strokeStyle = palette.tire; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.arc(0,0,tile*.15,0,TAU); ctx.moveTo(-tile*.12,-tile*.03);ctx.lineTo(tile*.12,tile*.03); ctx.stroke();
+          ctx.lineWidth = .8; ctx.beginPath(); ctx.moveTo(-w*.27,-h*.65);ctx.lineTo(-w*.51,-h*.45);ctx.lineTo(-w*.51,h*.45);ctx.lineTo(-w*.27,h*.65);ctx.stroke();
+          dryLines(-w*.3,-h*.75,w*.6,h*1.5,lane.row,palette.verge,10);
           ctx.restore();
         }
 
@@ -1437,41 +1373,24 @@
 
         function drawRoadSurface(top) {
           ctx.fillStyle = palette.roadEdge;
-          ctx.fillRect(boardLeft, top, COLS * tile, Math.max(2, tile * 0.055));
-          ctx.fillRect(boardLeft, top + tile - Math.max(2, tile * 0.055), COLS * tile, Math.max(2, tile * 0.055));
-
-          ctx.fillStyle = palette.roadMark;
-          ctx.globalAlpha = 0.58;
-          for (let x = boardLeft + tile * 0.3; x < boardLeft + COLS * tile; x += tile * 1.15) {
-            ctx.fillRect(x, top + tile * 0.485, tile * 0.55, Math.max(1, tile * 0.03));
+          ctx.globalAlpha = .22;
+          ctx.fillRect(boardLeft, top, COLS * tile, .7);
+          ctx.fillRect(boardLeft, top + tile - .7, COLS * tile, .7);
+          ctx.fillStyle = palette.roadMark; ctx.globalAlpha = .45;
+          for (let x = boardLeft + tile*.4; x < boardLeft + COLS*tile; x += tile*2.4) {
+            ctx.fillRect(x,top+tile*.49,tile*.47,.9);
+            ctx.fillRect(x+tile*.52,top+tile*.49,tile*.1,.7);
           }
           ctx.globalAlpha = 1;
         }
 
         function drawBikeSurface(lane, top) {
-          const edge = Math.max(1, tile * 0.035);
-          ctx.fillStyle = palette.bikeEdge;
-          ctx.globalAlpha = 0.7;
-          ctx.fillRect(boardLeft, top, COLS * tile, edge);
-          ctx.fillRect(boardLeft, top + tile - edge, COLS * tile, edge);
-
-          ctx.fillStyle = palette.bikeMark;
-          ctx.globalAlpha = 0.44;
-          for (let x = boardLeft + tile * 0.25; x < boardLeft + COLS * tile; x += tile * 1.35) {
-            ctx.fillRect(x, top + tile * 0.49, tile * 0.62, Math.max(1, tile * 0.025));
-          }
-
-          ctx.strokeStyle = palette.bikeMark;
-          ctx.lineWidth = Math.max(1, tile * 0.035);
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          for (let x = boardLeft + tile * 2.1; x < boardLeft + COLS * tile; x += tile * 4.2) {
-            const direction = lane.direction > 0 ? 1 : -1;
-            ctx.beginPath();
-            ctx.moveTo(x - direction * tile * 0.18, top + tile * 0.33);
-            ctx.lineTo(x + direction * tile * 0.13, top + tile * 0.5);
-            ctx.lineTo(x - direction * tile * 0.18, top + tile * 0.67);
-            ctx.stroke();
+          ctx.strokeStyle = palette.bikeEdge; ctx.lineWidth = .6; ctx.globalAlpha = .35;
+          ctx.beginPath(); ctx.moveTo(boardLeft,top+tile*.1);ctx.lineTo(boardLeft+COLS*tile,top+tile*.1);ctx.stroke();
+          // Sparse directional notches leave the crossing open.
+          for (let x = boardLeft+tile; x < boardLeft+COLS*tile; x += tile*5) {
+            const d = lane.direction * tile*.18;
+            ctx.beginPath();ctx.moveTo(x-d,top+tile*.43);ctx.lineTo(x,top+tile*.5);ctx.lineTo(x-d,top+tile*.57);ctx.stroke();
           }
           ctx.globalAlpha = 1;
         }
@@ -1522,27 +1441,19 @@
         }
 
         function drawVehicle(lane, vehicle, top) {
-          const x = boardLeft + vehicle.x * tile;
-          const w = vehicle.length * tile;
-          const y = top + tile * 0.2;
-          const h = tile * 0.6;
-          const vehicleColors = [
-            'oklch(0.42 0 0)', 'oklch(0.5 0 0)',
-            'oklch(0.58 0 0)', 'oklch(0.66 0 0)',
-            'oklch(0.74 0 0)'
-          ];
-          const colorIndex = Math.floor(hash(COURSE_SEED + lane.row * 4567 + vehicle.id * 971) * vehicleColors.length);
-          ctx.fillStyle = vehicleColors[colorIndex];
-          roundedRect(x, y, w, h, tile * 0.08);
-          ctx.fill();
-
-          const front = lane.direction > 0 ? x + w * 0.6 : x + w * 0.13;
-          ctx.fillStyle = 'oklch(0.88 0 0)';
-          roundedRect(front, y + h * 0.13, w * 0.27, h * 0.42, tile * 0.04);
-          ctx.fill();
+          const w = vehicle.length * tile, h = tile*.27;
+          ctx.save();ctx.translate(boardLeft+(vehicle.x+vehicle.length/2)*tile,top+tile*.5);
+          if (lane.direction < 0) ctx.rotate(Math.PI);
+          const seed = lane.row*117+vehicle.id*431;
+          const shell = hash(seed) > .5 ? '#a4a18c' : '#929480';
+          printedShape([[-w*.49,-h*.74],[-w*.4,-h],[w*.32,-h*.95],[w*.48,-h*.6],[w*.49,h*.64],[w*.32,h*.97],[-w*.43,h*.92]],shell,palette.verge);
           ctx.fillStyle = palette.tire;
-          ctx.fillRect(x + w * 0.12, y + h * 0.82, Math.max(5, w * 0.18), h * 0.22);
-          ctx.fillRect(x + w * 0.7, y + h * 0.82, Math.max(5, w * 0.18), h * 0.22);
+          for (const side of [-1,1]) { ctx.fillRect(-w*.34,side*h-h*.13,w*.14,h*.26);ctx.fillRect(w*.23,side*h-h*.13,w*.13,h*.26); }
+          printedShape([[-w*.2,-h*.73],[w*.14,-h*.69],[w*.21,-h*.46],[w*.2,h*.54],[-w*.19,h*.66]],palette.road);
+          printedShape([[-w*.13,-h*.55],[w*.08,-h*.55],[w*.08,h*.48],[-w*.13,h*.48]],shell);
+          dryLines(-w*.4,-h*.7,w*.75,h*1.4,seed,palette.verge,10);
+          ctx.strokeStyle=palette.ink;ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(w*.4,-h*.5);ctx.lineTo(w*.4,-h*.25);ctx.moveTo(w*.4,h*.28);ctx.lineTo(w*.4,h*.53);ctx.stroke();
+          ctx.restore();
         }
 
         function drawBikes(lane, top) {
@@ -1550,69 +1461,18 @@
         }
 
         function drawBike(lane, bike, top) {
-          const x = boardLeft + bike.x * tile;
           const w = bike.length * tile;
-          if (x > boardLeft + COLS * tile || x + w < boardLeft) return;
-          const rearX = w * 0.18;
-          const frontX = w * 0.82;
-          const hubY = top + tile * 0.68;
-          const crankX = w * 0.48;
-          const crankY = top + tile * 0.55;
-          const seatX = w * 0.38;
-          const seatY = top + tile * 0.38;
-
-          ctx.save();
-          if (lane.direction < 0) {
-            ctx.translate(x + w, 0);
-            ctx.scale(-1, 1);
-          } else {
-            ctx.translate(x, 0);
-          }
-
-          ctx.strokeStyle = 'oklch(0.04 0 0 / 0.3)';
-          ctx.lineWidth = Math.max(2, tile * 0.055);
-          ctx.beginPath();
-          ctx.moveTo(rearX, hubY + tile * 0.08);
-          ctx.lineTo(frontX, hubY + tile * 0.08);
-          ctx.stroke();
-
-          ctx.strokeStyle = palette.bikeMark;
-          ctx.lineWidth = Math.max(1.5, tile * 0.045);
-          ctx.beginPath();
-          ctx.arc(rearX, hubY, tile * 0.13, 0, TAU);
-          ctx.arc(frontX, hubY, tile * 0.13, 0, TAU);
-          ctx.stroke();
-
-          ctx.strokeStyle = palette.bikeFrame;
-          ctx.lineWidth = Math.max(1.5, tile * 0.052);
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.beginPath();
-          ctx.moveTo(rearX, hubY);
-          ctx.lineTo(seatX, seatY);
-          ctx.lineTo(crankX, crankY);
-          ctx.lineTo(rearX, hubY);
-          ctx.moveTo(crankX, crankY);
-          ctx.lineTo(frontX, hubY);
-          ctx.lineTo(w * 0.69, top + tile * 0.34);
-          ctx.lineTo(frontX, hubY);
-          ctx.stroke();
-
-          ctx.strokeStyle = palette.bikeRider;
-          ctx.lineWidth = Math.max(2, tile * 0.065);
-          ctx.beginPath();
-          ctx.moveTo(w * 0.49, top + tile * 0.27);
-          ctx.lineTo(w * 0.58, top + tile * 0.43);
-          ctx.lineTo(w * 0.69, top + tile * 0.34);
-          ctx.moveTo(w * 0.56, top + tile * 0.42);
-          ctx.lineTo(crankX, crankY);
-          ctx.lineTo(seatX, seatY);
-          ctx.stroke();
-          ctx.fillStyle = palette.bikeRider;
-          ctx.beginPath();
-          ctx.arc(w * 0.46, top + tile * 0.2, tile * 0.075, 0, TAU);
-          ctx.fill();
-          ctx.restore();
+          ctx.save();ctx.translate(boardLeft+(bike.x+bike.length*.5)*tile,top+tile*.5);
+          if(lane.direction<0)ctx.rotate(Math.PI);
+          ctx.strokeStyle=palette.tire;ctx.lineWidth=1.8;
+          ctx.beginPath();ctx.moveTo(-w*.5,0);ctx.lineTo(w*.5,0);ctx.stroke();
+          ctx.strokeStyle=palette.bikeFrame;ctx.lineWidth=.85;
+          ctx.beginPath();ctx.moveTo(-w*.38,-.5);ctx.lineTo(w*.38,-.5);ctx.moveTo(w*.25,-tile*.14);ctx.lineTo(w*.32,0);ctx.lineTo(w*.25,tile*.14);ctx.stroke();
+          printedShape([[-w*.19,-tile*.11],[w*.12,-tile*.12],[w*.26,0],[w*.1,tile*.1],[-w*.24,tile*.09]],palette.bikeRider);
+          ctx.fillStyle=palette.bikeFrame;ctx.beginPath();ctx.ellipse(w*.15,0,tile*.064,tile*.075,0,0,TAU);ctx.fill();
+          ctx.strokeStyle=palette.bikeRider;ctx.lineWidth=1.7;
+          const pedal=Math.sin(elapsed*9+bike.id)*tile*.055;
+          ctx.beginPath();ctx.moveTo(-w*.08,0);ctx.lineTo(-w*.18+pedal,-tile*.16);ctx.moveTo(-w*.08,0);ctx.lineTo(-w*.18-pedal,tile*.16);ctx.stroke();ctx.restore();
         }
 
         function drawTrains(lane, top) {
@@ -1620,254 +1480,108 @@
         }
 
         function drawTrain(lane, train, top) {
-          const x = boardLeft + train.x * tile;
-          const w = train.length * tile;
-          if (x > boardLeft + COLS * tile || x + w < boardLeft) return;
-          const y = top + tile * 0.13;
-          const h = tile * 0.74;
-          const engineWidth = Math.min(w * 0.3, tile * 2.35);
-          const freightEnd = w - engineWidth - tile * 0.12;
-          ctx.save();
-          if (lane.direction < 0) {
-            ctx.translate(x + w, 0);
-            ctx.scale(-1, 1);
-          } else {
-            ctx.translate(x, 0);
+          const x=boardLeft+train.x*tile,w=train.length*tile,h=tile*.62,y=top+tile*.19;
+          const cars=Math.ceil(train.length/1.75), carW=w/cars;
+          for(let i=0;i<cars;i++) {
+            const left=x+i*carW;
+            printedShape([[left+2,y+2],[left+carW-4,y],[left+carW-1,y+4],[left+carW-2,y+h-1],[left+3,y+h]],palette.train,palette.verge);
+            ctx.fillStyle=palette.railBed;ctx.fillRect(left+carW*.17,y+h*.19,carW*.58,h*.6);
+            ctx.fillStyle=palette.train;ctx.fillRect(left+carW*.21,y+h*.27,carW*.49,h*.44);
+            dryLines(left+5,y+3,carW-10,h-6,lane.row*71+i,palette.verge,14);
+            ctx.strokeStyle=palette.trainLight;ctx.lineWidth=.6;ctx.beginPath();ctx.moveTo(left+carW*.3,y+h*.36);ctx.lineTo(left+carW*.3,y+h*.64);ctx.moveTo(left+carW*.59,y+h*.36);ctx.lineTo(left+carW*.59,y+h*.64);ctx.stroke();
           }
-
-          ctx.fillStyle = 'oklch(0.03 0 0 / 0.34)';
-          ctx.fillRect(0, y + h * 0.77, w, h * 0.25);
-
-          let carIndex = 0;
-          for (let carX = 0; carX < freightEnd - tile * 0.4; carX += tile * 2.25) {
-            const carWidth = Math.min(tile * 2.08, freightEnd - carX);
-            ctx.fillStyle = hash(train.id * 3571 + carIndex * 977 + lane.row) < 0.5
-              ? palette.train
-              : 'oklch(0.53 0 0)';
-            roundedRect(carX, y + h * 0.08, carWidth, h * 0.68, tile * 0.045);
-            ctx.fill();
-            ctx.strokeStyle = palette.trainLight;
-            ctx.globalAlpha = 0.48;
-            ctx.lineWidth = Math.max(1, tile * 0.025);
-            ctx.strokeRect(carX + tile * 0.16, y + h * 0.22, carWidth - tile * 0.32, h * 0.34);
-            ctx.globalAlpha = 1;
-            ctx.fillStyle = palette.tire;
-            ctx.beginPath();
-            ctx.arc(carX + carWidth * 0.22, y + h * 0.82, tile * 0.105, 0, TAU);
-            ctx.arc(carX + carWidth * 0.78, y + h * 0.82, tile * 0.105, 0, TAU);
-            ctx.fill();
-            carIndex += 1;
-          }
-
-          const engineX = w - engineWidth;
-          ctx.fillStyle = palette.train;
-          ctx.beginPath();
-          ctx.moveTo(engineX, y + h * 0.08);
-          ctx.lineTo(w - tile * 0.34, y + h * 0.08);
-          ctx.lineTo(w, y + h * 0.38);
-          ctx.lineTo(w, y + h * 0.76);
-          ctx.lineTo(engineX, y + h * 0.76);
-          ctx.closePath();
-          ctx.fill();
-          ctx.fillStyle = palette.trainLight;
-          roundedRect(engineX + tile * 0.24, y + h * 0.19, tile * 0.72, h * 0.29, tile * 0.035);
-          ctx.fill();
-          ctx.fillStyle = palette.ink;
-          ctx.globalAlpha = 0.82;
-          roundedRect(w - tile * 0.47, y + h * 0.37, tile * 0.25, h * 0.16, tile * 0.025);
-          ctx.fill();
-          ctx.globalAlpha = 1;
-          ctx.fillStyle = palette.tire;
-          ctx.beginPath();
-          ctx.arc(engineX + engineWidth * 0.28, y + h * 0.82, tile * 0.12, 0, TAU);
-          ctx.arc(engineX + engineWidth * 0.78, y + h * 0.82, tile * 0.12, 0, TAU);
-          ctx.fill();
-          ctx.restore();
         }
 
         function drawRiverSurface(lane, top) {
-          ctx.strokeStyle = palette.waterLine;
-          ctx.lineWidth = Math.max(1, tile * 0.026);
-          ctx.globalAlpha = 0.52;
-          const drift = mod(elapsed * lane.speed * tile * 0.35, tile * 1.7);
-          for (let x = boardLeft - tile * 1.7 + drift; x < boardLeft + COLS * tile; x += tile * 1.7) {
-            ctx.beginPath();
-            ctx.moveTo(x, top + tile * 0.18);
-            ctx.lineTo(x + tile * 0.72, top + tile * 0.18);
-            ctx.moveTo(x + tile * 0.45, top + tile * 0.78);
-            ctx.lineTo(x + tile * 1.18, top + tile * 0.78);
-            ctx.stroke();
+          const drift=mod(elapsed*lane.speed*tile*.18,tile*3);
+          ctx.strokeStyle=palette.waterLine;ctx.lineWidth=.65;ctx.globalAlpha=.28;ctx.beginPath();
+          for(let i=-1;i<COLS/3+1;i++) {
+            const x=boardLeft+i*tile*3+drift;
+            for(let j=0;j<3;j++) {
+              const y=top+tile*(.16+j*.29+hash(lane.row*81+i*33+j)*.1);
+              ctx.moveTo(x,y);ctx.bezierCurveTo(x+tile*.35,y-tile*.035,x+tile*.9,y+tile*.045,x+tile*1.4,y);
+            }
           }
-          ctx.globalAlpha = 1;
+          ctx.stroke();ctx.globalAlpha=1;
         }
 
         function drawRiverObjects(lane, top) {
-          riverObjectsAt(lane, elapsed).forEach((object) => {
-            if (object.kind === 'alligator') {
-              drawAlligator(lane, object, top);
-              return;
-            }
-            const log = object;
-            const x = boardLeft + log.x * tile;
-            const w = log.length * tile;
-            const y = top + tile * 0.2;
-            ctx.fillStyle = palette.log;
-            roundedRect(x, y, w, tile * 0.6, tile * 0.28);
-            ctx.fill();
-            ctx.strokeStyle = palette.logLight;
-            ctx.lineWidth = Math.max(1, tile * 0.035);
-            ctx.beginPath();
-            ctx.moveTo(x + tile * 0.35, y + tile * 0.22);
-            ctx.lineTo(x + w - tile * 0.25, y + tile * 0.22);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(x + tile * 0.2, y + tile * 0.3, tile * 0.1, 0, TAU);
-            ctx.stroke();
+          riverObjectsAt(lane,elapsed).forEach(object=>{
+            if(object.kind==='alligator'){drawAlligator(lane,object,top);return;}
+            const x=boardLeft+object.x*tile,w=object.length*tile,y=top+tile*.25,h=tile*.5;
+            const seed=lane.row*97+object.id*311;
+            printedShape([[x,y+h*.45],[x+tile*.12,y+h*.05],[x+w*.3,y-h*.035],[x+w*.72,y+h*.08],[x+w-tile*.05,y],[x+w,y+h*.61],[x+w-tile*.14,y+h],[x+w*.53,y+h*.94],[x+tile*.1,y+h*.9]],palette.log);
+            dryLines(x+tile*.12,y+h*.13,w-tile*.24,h*.74,seed,palette.logLight,24);
+            ctx.strokeStyle=palette.waterLine;ctx.globalAlpha=.26;ctx.lineWidth=.6;ctx.beginPath();ctx.moveTo(x+tile*.1,y+h+2);ctx.lineTo(x+w*.77,y+h+2);ctx.stroke();ctx.globalAlpha=1;
           });
         }
 
-        function drawAlligator(lane, gator, top) {
-          const x = boardLeft + gator.x * tile;
-          const w = gator.length * tile;
-          const y = top + tile * 0.25;
-          const h = tile * 0.5;
-          ctx.save();
-          if (lane.direction < 0) {
-            ctx.translate(x + w, 0);
-            ctx.scale(-1, 1);
-          } else {
-            ctx.translate(x, 0);
-          }
-          ctx.fillStyle = 'oklch(0.04 0 0 / 0.24)';
-          ctx.beginPath();
-          ctx.ellipse(w * 0.5, y + h * 0.76, w * 0.49, h * 0.24, 0, 0, TAU);
-          ctx.fill();
-          ctx.fillStyle = palette.gator;
-          ctx.beginPath();
-          ctx.moveTo(0, y + h * 0.52);
-          ctx.lineTo(w * 0.26, y + h * 0.12);
-          ctx.lineTo(w * 0.83, y + h * 0.08);
-          ctx.quadraticCurveTo(w, y + h * 0.15, w, y + h * 0.5);
-          ctx.quadraticCurveTo(w, y + h * 0.87, w * 0.82, y + h * 0.91);
-          ctx.lineTo(w * 0.26, y + h * 0.86);
-          ctx.closePath();
-          ctx.fill();
-          ctx.strokeStyle = palette.gatorLight;
-          ctx.lineWidth = Math.max(1, tile * 0.03);
-          for (let sx = w * 0.29; sx < w * 0.76; sx += tile * 0.36) {
-            ctx.beginPath();
-            ctx.moveTo(sx, y + h * 0.17);
-            ctx.lineTo(sx + tile * 0.12, y - tile * 0.02);
-            ctx.lineTo(sx + tile * 0.23, y + h * 0.17);
-            ctx.stroke();
-          }
-          ctx.fillStyle = palette.gatorEye;
-          ctx.beginPath();
-          ctx.arc(w * 0.86, y + h * 0.25, tile * 0.055, 0, TAU);
-          ctx.arc(w * 0.86, y + h * 0.73, tile * 0.055, 0, TAU);
-          ctx.fill();
-          ctx.fillStyle = palette.void;
-          ctx.beginPath();
-          ctx.arc(w * 0.875, y + h * 0.25, tile * 0.021, 0, TAU);
-          ctx.arc(w * 0.875, y + h * 0.73, tile * 0.021, 0, TAU);
-          ctx.fill();
+        function drawAlligator(lane,gator,top) {
+          const w=gator.length*tile,h=tile*.25;
+          ctx.save();ctx.translate(boardLeft+gator.x*tile,top+tile*.5);
+          if(lane.direction<0){ctx.translate(w,0);ctx.scale(-1,1);}
+          printedShape([[0,0],[w*.24,-h*.48],[w*.38,-h*.9],[w*.7,-h*.89],[w*.84,-h*.53],[w*.99,-h*.32],[w,h*.28],[w*.82,h*.55],[w*.64,h*.88],[w*.36,h*.73],[w*.2,h*.28]],palette.gator);
+          ctx.strokeStyle=palette.gator;ctx.lineWidth=tile*.055;ctx.lineJoin='miter';ctx.beginPath();
+          for(const side of [-1,1]){ctx.moveTo(w*.38,side*h*.6);ctx.lineTo(w*.3,side*h*1.18);ctx.lineTo(w*.42,side*h*1.13);ctx.moveTo(w*.68,side*h*.6);ctx.lineTo(w*.73,side*h*1.1);ctx.lineTo(w*.65,side*h*1.2);}ctx.stroke();
+          ctx.strokeStyle=palette.gatorLight;ctx.lineWidth=.7;ctx.beginPath();
+          for(let x=w*.28;x<w*.78;x+=tile*.16){ctx.moveTo(x,-h*.37);ctx.lineTo(x+tile*.07,0);ctx.lineTo(x,h*.3);}ctx.stroke();
+          ctx.fillStyle=palette.gatorEye;ctx.fillRect(w*.845,-h*.46,1,1);ctx.fillRect(w*.845,h*.38,1,1);
           ctx.restore();
         }
 
         function drawBloodStains() {
-          bloodStains.forEach((stain) => {
-            const x = worldToScreenX(stain.x);
-            const y = worldToScreenY(stain.y);
-            if (y < -tile || y > height + tile) return;
-            const opacity = stain.opacity;
-            const progress = reducedMotion.matches
-              ? 1
-              : easeOutQuart(clamp((elapsed - stain.born) / 1.65, 0, 1));
-            const visibleLayers = Math.max(1, Math.ceil(stain.layers.length * progress));
-
-            if (stain.vehicleSmears.length) drawVehicleSmears(stain, x, y, progress);
-
-            ctx.save();
-            ctx.translate(x, y);
-            if (stain.surfaceType === 'river') {
-              const blur = Math.min(tile * 0.14, stain.waterAge * tile * 0.012);
-              ctx.filter = `blur(${blur.toFixed(2)}px)`;
+          bloodStains.forEach(stain=>{
+            const x=worldToScreenX(stain.x),y=worldToScreenY(stain.y);
+            if(y < -tile*2 || y > height+tile*2)return;
+            const age=elapsed-stain.born;
+            const progress=reducedMotion.matches ? 1 : easeOutQuart(clamp(age/1.65,0,1));
+            if(stain.vehicleSmears.length)drawVehicleSmears(stain,x,y,progress);
+            const printStage=stain.surfaceType==='river' ? Math.min(4,Math.floor(stain.waterAge/4)) : 0;
+            if(!stain.print || stain.printStage!==printStage) {
+              stain.print=makePigmentPrint(stain,printStage);
+              stain.printStage=printStage;
             }
-            ctx.rotate(stain.rotation);
-            ctx.scale(
-              stain.scale * stain.stretchX * stain.roadStretch,
-              stain.scale * stain.stretchY
-            );
-
-            // Stacked, slightly mismatched washes let pigment collect in the
-            // centre and feather at the edge, echoing Hunt Prey Paint's blooms.
-            for (let index = 0; index < visibleLayers; index += 1) {
-              const layer = stain.layers[index];
-              const layerProgress = clamp(progress * stain.layers.length - index, 0, 1);
-              ctx.globalAlpha = layer.alpha * layerProgress * opacity;
-              ctx.fillStyle = index % 6 === 0 ? stain.pigment.frog : stain.pigment.wash;
-              ctx.beginPath();
-              ctx.moveTo(layer.points[0].x * tile, layer.points[0].y * tile);
-              for (let point = 1; point < layer.points.length; point += 1) {
-                ctx.lineTo(layer.points[point].x * tile, layer.points[point].y * tile);
-              }
-              ctx.closePath();
-              ctx.fill();
-            }
-
-            ctx.strokeStyle = stain.pigment.rim;
-            ctx.lineCap = 'square';
-            ctx.lineJoin = 'miter';
-            ctx.globalAlpha = 0.18 * progress * opacity;
-            ctx.lineWidth = Math.max(0.75, tile * 0.018);
-            stain.scaffold.forEach((line) => {
-              ctx.beginPath();
-              ctx.moveTo(line[0].x * tile, line[0].y * tile);
-              ctx.lineTo(line[1].x * tile, line[1].y * tile);
-              ctx.lineTo(line[2].x * tile, line[2].y * tile);
-              ctx.stroke();
-            });
-
-            if (progress > 0.72) {
-              const edge = stain.layers[stain.layers.length - 1].points;
-              ctx.globalAlpha = (progress - 0.72) / 0.28 * 0.42 * opacity;
-              ctx.lineWidth = Math.max(0.8, tile * 0.022);
-              ctx.beginPath();
-              ctx.moveTo(edge[0].x * tile, edge[0].y * tile);
-              for (let point = 1; point < edge.length; point += 1) {
-                ctx.lineTo(edge[point].x * tile, edge[point].y * tile);
-              }
-              ctx.closePath();
-              ctx.stroke();
-            }
-
-            ctx.fillStyle = stain.pigment.rim;
-            ctx.globalAlpha = Math.max(0, progress - 0.38) * 0.34 * opacity;
-            stain.stipple.forEach((dot) => {
-              ctx.fillRect(
-                (dot.x - dot.size * 0.5) * tile,
-                (dot.y - dot.size * 0.5) * tile,
-                Math.max(1, dot.size * tile),
-                Math.max(1, dot.size * tile)
-              );
-            });
-
-            ctx.fillStyle = stain.pigment.wash;
-            stain.droplets.forEach((drop) => {
-              if (progress < drop.bloomAt) return;
-              const dropProgress = easeOutQuart(clamp((progress - drop.bloomAt) / 0.22, 0, 1));
-              ctx.globalAlpha = 0.48 * dropProgress * opacity;
-              ctx.beginPath();
-              ctx.arc(
-                Math.cos(drop.angle) * drop.distance * tile,
-                Math.sin(drop.angle) * drop.distance * tile * 0.72,
-                drop.size * tile * dropProgress, 0, TAU
-              );
-              ctx.fill();
-            });
+            ctx.save();ctx.translate(x,y);ctx.rotate(stain.rotation);
+            const bloom=.4+.6*progress;
+            ctx.scale(stain.scale*stain.stretchX*stain.roadStretch*bloom,stain.scale*stain.stretchY*bloom);
+            ctx.globalAlpha=stain.opacity*progress;
+            ctx.drawImage(stain.print,-tile,-tile,tile*2,tile*2);
             ctx.restore();
           });
-          ctx.globalAlpha = 1;
+        }
+
+        function makePigmentPrint(stain,softness=0) {
+          const print=document.createElement('canvas');
+          print.width=print.height=128;
+          const ink=print.getContext('2d');
+          ink.translate(64,64);ink.scale(64,64);
+          // Feathering is embedded in this small impression and scales with current.
+          for(let index=stain.layers.length-1;index>=0;index--) {
+            const layer=stain.layers[index];
+            ink.globalAlpha=layer.alpha*1.4;
+            ink.fillStyle=index%6===0?stain.pigment.frog:stain.pigment.wash;
+            ink.beginPath();ink.moveTo(layer.points[0].x,layer.points[0].y);
+            for(let i=1;i<layer.points.length;i++)ink.lineTo(layer.points[i].x,layer.points[i].y);
+            ink.closePath();ink.fill();
+          }
+          const edge=stain.layers[stain.layers.length-1].points;
+          ink.strokeStyle=stain.pigment.rim;ink.globalAlpha=.52;ink.lineWidth=.014;
+          ink.beginPath();ink.moveTo(edge[0].x,edge[0].y);for(let i=1;i<edge.length;i++)ink.lineTo(edge[i].x,edge[i].y);ink.closePath();ink.stroke();
+          ink.globalAlpha=.3;ink.lineWidth=.009;
+          stain.scaffold.forEach(line=>{ink.beginPath();ink.moveTo(line[0].x,line[0].y);ink.lineTo(line[1].x,line[1].y);ink.lineTo(line[2].x,line[2].y);ink.stroke();});
+          ink.fillStyle=stain.pigment.rim;ink.globalAlpha=.4;
+          stain.stipple.forEach(dot=>ink.fillRect(dot.x,dot.y,Math.max(.008,dot.size),Math.max(.008,dot.size)));
+          ink.fillStyle=stain.pigment.wash;ink.globalAlpha=.45;
+          stain.droplets.forEach(drop=>{ink.beginPath();ink.arc(Math.cos(drop.angle)*drop.distance,Math.sin(drop.angle)*drop.distance*.72,drop.size,0,TAU);ink.fill();});
+          if(softness) {
+            const diffuse=document.createElement('canvas');
+            diffuse.width=diffuse.height=128;
+            const wash=diffuse.getContext('2d');
+            wash.filter=`blur(${softness*1.8}px)`;
+            wash.drawImage(print,0,0);
+            return diffuse;
+          }
+          return print;
         }
 
         function drawVehicleSmears(stain, x, y, stainProgress) {
@@ -1907,75 +1621,37 @@
         }
 
         function drawBoardEdges() {
-          if (boardLeft <= 0) return;
-          const edge = Math.min(boardLeft, 34);
-          ctx.fillStyle = palette.verge;
-          ctx.fillRect(boardLeft - edge, 0, edge, height);
-          ctx.fillRect(boardLeft + COLS * tile, 0, edge, height);
-          ctx.globalAlpha = 0.34;
-          ctx.fillStyle = palette.roadMark;
-          ctx.fillRect(boardLeft - Math.min(4, edge), 0, Math.min(4, edge), height);
-          ctx.fillRect(boardLeft + COLS * tile, 0, Math.min(4, edge), height);
-          ctx.globalAlpha = 1;
+          if(boardLeft<=0)return;
+          ctx.fillStyle=palette.verge;
+          ctx.fillRect(boardLeft-3,0,3,height);ctx.fillRect(boardLeft+COLS*tile,0,3,height);
         }
 
         function drawFrog(frog) {
-          if (!frog.alive) {
-            const age = elapsed - frog.deathAt;
-            if (age > 0.85 || frog.deathKind !== 'traffic') return;
-            ctx.globalAlpha = Math.max(0, 0.7 - age * 0.8);
-            ctx.fillStyle = frog.color;
-            ctx.beginPath();
-            ctx.ellipse(
-              worldToScreenX(frog.x), worldToScreenY(frog.y),
-              tile * (0.22 + age * 0.08), tile * 0.08, 0, 0, TAU
-            );
-            ctx.fill();
-            ctx.globalAlpha = 1;
-            return;
+          if(!frog.alive)return;
+          const x=worldToScreenX(frog.x),y=worldToScreenY(frog.y);
+          if(y < -tile || y > height+tile)return;
+          const extension=!reducedMotion.matches && frog.hop<1 ? Math.sin(frog.hop*Math.PI) : 0;
+          const size=tile*.39, asymmetry=(hash(frog.id*117+33)-.5)*.12;
+          ctx.save();ctx.translate(x,y);
+          ctx.rotate({up:0,right:Math.PI/2,down:Math.PI,left:-Math.PI/2}[frog.facing]);
+          ctx.scale(size,size);
+          // Folded hind limbs open along the hop, the body stays on its surface.
+          ctx.strokeStyle=frog.color;ctx.lineWidth=.13;ctx.lineCap='butt';ctx.lineJoin='miter';
+          ctx.beginPath();
+          for(const side of [-1,1]) {
+            const skew=side===1 ? asymmetry : 0;
+            ctx.moveTo(side*.18,.17);ctx.lineTo(side*(.5-extension*.12),.38+skew);
+            ctx.lineTo(side*(.34+extension*.1),-.03+extension*.87+skew);
+            ctx.lineTo(side*(.6-extension*.13),.24+extension*.7+skew);
+            ctx.moveTo(side*.2,-.26);ctx.lineTo(side*.39,-.12);ctx.lineTo(side*.51,-.39+extension*.14);
           }
-
-          const x = worldToScreenX(frog.x);
-          const baseY = worldToScreenY(frog.y);
-          const jump = frog.hop < 1 ? Math.sin(frog.hop * Math.PI) * tile * 0.18 : 0;
-          const y = baseY - jump;
-          const s = tile * 0.36;
-          const angle = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 }[frog.facing];
-
-          ctx.save();
-          ctx.translate(x, y);
-          ctx.rotate(angle);
-          ctx.fillStyle = 'oklch(0.03 0 0 / 0.28)';
-          ctx.beginPath();
-          ctx.ellipse(0, tile * 0.17 + jump, s * 0.58, s * 0.24, 0, 0, TAU);
-          ctx.fill();
-
-          ctx.fillStyle = frog.color;
-          ctx.beginPath();
-          ctx.ellipse(-s * 0.42, s * 0.26, s * 0.27, s * 0.18, -0.5, 0, TAU);
-          ctx.ellipse(s * 0.42, s * 0.26, s * 0.27, s * 0.18, 0.5, 0, TAU);
-          ctx.ellipse(-s * 0.47, -s * 0.23, s * 0.18, s * 0.23, -0.15, 0, TAU);
-          ctx.ellipse(s * 0.47, -s * 0.23, s * 0.18, s * 0.23, 0.15, 0, TAU);
-          ctx.ellipse(0, 0, s * 0.53, s * 0.58, 0, 0, TAU);
-          ctx.fill();
-
-          ctx.fillStyle = palette.ink;
-          ctx.beginPath();
-          ctx.arc(-s * 0.24, -s * 0.38, s * 0.12, 0, TAU);
-          ctx.arc(s * 0.24, -s * 0.38, s * 0.12, 0, TAU);
-          ctx.fill();
-          ctx.fillStyle = palette.void;
-          ctx.beginPath();
-          ctx.arc(-s * 0.24, -s * 0.41, s * 0.052, 0, TAU);
-          ctx.arc(s * 0.24, -s * 0.41, s * 0.052, 0, TAU);
-          ctx.fill();
-
-          ctx.strokeStyle = 'oklch(0.18 0 0 / 0.78)';
-          ctx.lineWidth = Math.max(1, tile * 0.024);
-          ctx.beginPath();
-          ctx.arc(0, -s * 0.02, s * 0.26, 0.2, Math.PI - 0.2);
           ctx.stroke();
-          ctx.restore();
+          printedShape([[-.18,.35],[-.29,.08],[-.25,-.35],[-.17,-.56],[.15,-.61],[.28,-.34],[.25,.09],[.13,.38]],frog.color);
+          ctx.strokeStyle=frog.pigment.rim;ctx.lineWidth=.045;ctx.beginPath();ctx.moveTo(-.06,.22);ctx.lineTo(.015,-.37);ctx.moveTo(-.15,-.09);ctx.lineTo(-.18,-.3);ctx.moveTo(.13,-.14);ctx.lineTo(.17,-.35);ctx.stroke();
+          ctx.fillStyle=palette.tire;ctx.fillRect(-.24,-.43,.065,.085);ctx.fillRect(.17,-.45,.06,.085);
+          ctx.strokeStyle=frog.color;ctx.lineWidth=.035;ctx.beginPath();
+          for(const side of [-1,1]) {const fx=side*(.6-extension*.13),fy=.24+extension*.7+(side===1?asymmetry:0);ctx.moveTo(fx,fy);ctx.lineTo(fx+side*.1,fy+.09);ctx.moveTo(fx,fy);ctx.lineTo(fx+side*.12,fy-.025);}
+          ctx.stroke();ctx.restore();
         }
 
         function drawParticles() {
@@ -2006,6 +1682,7 @@
           tile = clamp(Math.min(40, width / COLS), 14, 40);
           boardLeft = (width - COLS * tile) / 2;
           visibleRows = height / tile;
+          surfacePrints.clear();
         }
 
         function worldToScreenX(x) { return boardLeft + x * tile; }

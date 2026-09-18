@@ -1,81 +1,65 @@
 # City of Signs
 
-A procedural black-and-white Tokyo of stacked businesses, exposed stairs,
-projecting sign boxes and working rooftops. Click, tap, Enter or Space constructs
-another arrangement. `?seed=1907` fixes the opening seed; resize recomposes it.
+An architectural ink city: white plaster walls, solid black recesses, projecting
+balconies, fine railings, small windows and working rooftops. All 22 active blocks
+were redrawn from the user's two ink references on 2026-09-17, replacing the
+previous graphic cutout treatment. Drawing remains procedural, 2D and black/white.
 
-## Tokyo block vocabulary
+Click, tap, Enter or Space constructs another arrangement. `?seed=1907` fixes the
+seed; resize recomposes the city without changing it.
 
-The user selected **vertical Tokyo: stacked businesses, external stairs, and
-rooftop structures**. The active set now has twenty Tokyo blocks, guided by the user’s facade and street photographs:
+## Numbered review
 
-| Role | Blocks |
+`?debug=true` shows all active blocks and an assembled city. Numbers 01–19 and
+21–23 are stable; 20 (the rejected crane) remains absent. Anchors such as
+`?debug=true#block-16` go directly to a block. `?debug=true&all=true` also shows
+36 archived studies, prefixed A; these retain their historical drawings.
+
+| Number | Redrawn subject |
 |---|---|
-| Street level | Shopfront with upstairs entrance; roller shutter with side passage; basement stair with tenant directory; older shop with noren and tiled canopy; stepped marquee with shutter and side stair |
-| Occupied floors | Tenant floors with projecting signs; open switchback stair tower; shallow balconies and condensers; service wall with ducts; setback rooms and roof landing; paired round bays; tiled service wall with routed conduits; louvered alley front; glazed structural ribs |
-| Working rooftops | Elevated water tank; billboard gantry; lift overrun and equipment; antenna mast and maintenance roof; layered tile eaves; construction crane |
+| 01 | Glazed corner shop and recessed side entrance |
+| 02 | Steel shutter and dark alley doorway |
+| 03 | Tenant entrance and mail slots |
+| 04 | Tenant floors and projecting blade signs |
+| 05 | Connected switchback stair in a deep side court |
+| 06 | Projecting balconies and fine steel guards |
+| 07 | Sunlit plaster, offset windows and connected utilities |
+| 08 | Staggered apartment volumes and roof terrace |
+| 09 | White panelled tank on an anchored steel frame |
+| 10 | Rooftop billboard and exposed bracing |
+| 11 | Roof house and maintenance landing |
+| 12 | Antenna, aerial cables and parapet |
+| 13 | Timber shop and shallow tiled eave |
+| 14 | Projecting canopy and shaded stair entry |
+| 15 | Circular concrete openings and recessed glazing |
+| 16 | Connected service conduits and meter cabinets |
+| 17 | Alley galleries, AC clusters and shuttered bays |
+| 18 | Glazed passage with straight steel ribs |
+| 19 | Low tiled roof and timber gable |
+| 21 | Glazed commercial tenants and slim sign tower |
+| 22 | Staggered terraces and returning balcony guards |
+| 23 | Rooftop ventilation and steel service platform |
 
-The fan-shaped hall, swelling facade and striped sky vessel remain as three
-surreal exceptions. Their windows use the new rectangular vocabulary. The striped
-vessel occurs at most once per city. Sign faces remain wordless. Architectural
-character comes from mullions, floor slabs, separate upstairs entrances, wall
-thickness, exposed circulation, sign brackets and rooftop equipment.
+## Construction
 
-## Viewing the blocks
+Studies share an isotropically scaled drawing kit. Thin outlines describe
+construction; black is reserved for shadow planes and dark openings. Roof
+proportions are capped. Stair endpoints, slab supports, equipment feet and
+conduit outlets remain connected. The city uses unequal white building bays
+with continuous dark side returns; whole-facade palette inversion is removed.
+The retired nested court overlay is still excluded.
 
-`?debug=true` shows the 23 active blocks, with the 20 Tokyo blocks first, plus a
-complete composition. `?debug=true&all=true` shows the entire 56-block archive.
-The 33 older blocks remain inspectable as studies. Catalog navigation links back
-to the city and between the active set and full archive.
+The 21 earlier photographs inform the subjects. The two newer architectural ink
+references determine their drawing style. No reference images or raster textures
+are used at runtime. Fine edge antialiasing is provided by Canvas.
 
-## Composition
+## Verification
 
-The canvas uses 5–16 unequal bays, selected by
-`clamp(round(width / height * 7), 5, 16)`. Three variable-height chambers form each
-building. The three feature towers contain the fan, exposed stairs and swelling
-wall. Other buildings use sequences of tenant floors, balconies, service walls
-and setbacks, with additional round-bay, glazed-rib and louver-front sequences. Ground-only entrances occupy 10–14.5% of viewport height.
+`node scripts/check-city-of-signs.mjs` checks 480 seeded layouts, all 58 drawings,
+active-block reachability, stable review numbers, rejected-block exclusion,
+continuous stair endpoints, finite geometry, profile fit, absence of secondary
+room overlays, regeneration and resize. Browser review covers the active catalog,
+desktop city and phone city. The thumbnail is the actual square seed-1907 render.
 
-Shared rectangular service courts reserve space across adjacent buildings,
-combining a roof walk, rear doors, upper and lower landings and a connecting stair.
-These replace the earlier vaulted galleries. Whole-building profiles remain
-straight or stepped, with a curve on the swelling-wall tower. Rendering uses
-only black and white, with browser edge antialiasing, and DPR capped at two.
-
-## Checks and evidence
-
-`node scripts/check-city-of-signs.mjs` checks 480 seeded layouts: active block
-reachability, all 56 catalog drawings, finite geometry, shared-court bounds,
-fan clearance, Tokyo ground floors, archive exclusion, one rooftop accent,
-keyboard/click regeneration and resize. Browser checks include desktop, square,
-phone and alternate-seed renders, the active catalog and full archive.
-
-[Photo-detail pass evidence](../../.impeccable/review/city-photo-details/README.md) contains the
-before/current source and browser captures. The thumbnail is the actual square
-renderer at seed 1907. This is a reviewable direction, awaiting user feedback.
-The vertical bay framework and repeated service-court assembly remain visible.
-
-[Previous place pass](../../.impeccable/review/city-place/README.md) and
-[six-round history](../../.impeccable/review/city-six-rounds/2026-09-16/README.md)
-are retained. Earlier reviews do not imply acceptance of the current design.
-
-## Architectural reference
-
-The user supplied 21 photographs on 2026-09-16. These are the primary detail
-reference: stacked balcony slabs and layered rails; sliding windows with curtains,
-tracks and bars; round windows that expose stair landings; tiled service walls
-with meters, vents and parallel conduit runs; clustered AC housings; louvered
-shopfronts, noren, retro marquees, tile eaves, glazed ribs and construction cranes.
-
-The renderer translates their construction into flat binary geometry. Windows
-have nested frames and deterministic infill variation. AC fans are dark disks
-behind fine grilles with proportioned cases and mounting feet. Dense detail is
-concentrated in service and shutter blocks; ordinary party walls remain quieter.
-Grille and louver counts respond to available size. No photographs, photographic
-textures, shading or lettering are runtime assets.
-
-Earlier general architectural references:
-
-- [Azabu Wintel Building exterior](https://offisite.jp/office/7879): exposed stair circulation and a rooftop billboard.
-- [Daikosha building exterior](https://www.palccoat.com/en/case_study/company2019004/): a steel stair attached to a plain commercial facade.
-- [Rooftop equipment examples](https://dailyportalz.jp/kiji/shikumi-mieru-biru): supported water tanks, roof railings and utility systems.
+[Full ink redraw evidence](../../.impeccable/review/city-ink-redraw/README.md).
+Earlier versions are retained in the sibling review folders. User review pending.

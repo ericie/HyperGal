@@ -55,27 +55,28 @@
     @media (max-width:480px) { #slices { grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px 10px; } .slice canvas { height:210px; } .study { gap:24px; } aside { gap:14px; } h1 { font-size:18px; } .instructions { line-height:1.5; } .grid-heading { align-items:flex-start; flex-direction:column; gap:6px; } }
   </style>
   <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
+  <script defer src="growth-model.js"></script>
   <script defer src="log-slices.js"></script>
 </head>
 <body>
 <canvas id="presentation" tabindex="0" role="img" aria-label="A looping sequence of wood slices. Click or press Space to pause; use arrow keys to browse."></canvas>
 <main>
-  <header><h1>FOREST OF RINGS</h1><p>One log · 24 one-centimeter slices · bark to bark</p></header>
+  <header><h1>FOREST OF RINGS</h1><p>One log · 192 slices · 0.125 cm each · bark to bark</p></header>
   <div class="study">
     <aside aria-label="Log cross section and slicing controls">
       <div>
         <h2>END GRAIN</h2>
-        <canvas id="end-grain" width="560" height="560" role="img" aria-label="Top-down tree rings. The highlighted band shows the selected 1 cm cut."></canvas>
-        <div class="end-caption"><span>24 cm diameter</span><span>48 growth rings</span></div>
+        <canvas id="end-grain" width="560" height="560" role="img" aria-label="Top-down tree rings. The highlighted band shows the selected 0.125 cm cut."></canvas>
+        <div class="end-caption"><span>24 cm diameter</span><span>200 growth rings</span></div>
         <div class="environment" aria-label="Growth directions, north is up">
           <span><svg id="sun-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12H21M15 6L21 12L15 18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span id="sun-direction"></span></span>
           <span><svg id="wind-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12H21M15 6L21 12L15 18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span id="wind-direction"></span></span>
         </div>
       </div>
       <div>
-        <p class="instructions">Cut lengthwise, one centimeter deeper each time. Select a slice to locate it in the rings.</p>
-        <div class="depth-line"><label for="depth">Depth from first bark</label><output id="depth-value" for="depth">1 cm</output></div>
-        <input id="depth" type="range" min="1" max="24" step="1" value="1" />
+        <p class="instructions">Cut lengthwise, an eighth of a centimeter deeper each time. Select a slice to locate it in the rings.</p>
+        <div class="depth-line"><label for="depth">Depth from first bark</label><output id="depth-value" for="depth">0.125 cm</output></div>
+        <input id="depth" type="range" min="1" max="192" step="1" value="1" />
         <div class="actions">
           <button id="play" type="button">Pause cuts</button>
           <button id="show-all" type="button">Show all</button>

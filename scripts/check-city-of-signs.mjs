@@ -21,11 +21,25 @@ const env = {
   addEventListener: (name, callback) => events[name] = callback
 };
 vm.createContext(env);
-vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.test = { compose, drawCity, blocks, library, resize, profileAt, contentBox, drawBlock }; })();'), env);
-const { compose, drawCity, blocks, library, profileAt, contentBox, drawBlock } = env.test;
+vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.test = { compose, drawCity, blocks, library, resize, profileAt, contentBox, drawBlock, stairTowerLayout }; })();'), env);
+const { compose, drawCity, blocks, library, profileAt, contentBox, drawBlock, stairTowerLayout } = env.test;
 const roles = ['base', 'chamber', 'crown', 'connector'];
 assert.equal(new Set(blocks.map(b => b.id)).size, blocks.length);
 for (const role of roles) assert.ok(blocks.some(b => b.role === role), role);
+const rejected = new Set(['crane-roof', 'fan', 'swell', 'striped-orb', 'basement-entry', 'public-concourse']);
+const active = blocks.filter(b => !b.catalogOnly);
+assert.ok(active.every(b => !rejected.has(b.id)), 'rejected blocks are excluded');
+assert.ok(!library['crane-roof'], 'crane removed from the catalog');
+assert.equal(new Set(active.map(b => b.catalogNumber)).size, active.length, 'review numbers are unique');
+for (const [number, id] of [[3,'tenant-entry'],[5,'external-stair'],[9,'water-tank'],[11,'plant-room'],[15,'porthole-bays'],[16,'conduit-wall'],[21,'commercial-front'],[22,'stepped-terraces'],[23,'duct-deck']])
+  assert.equal(library[id].catalogNumber, number, 'review number survives replacements');
+for (const [w,h] of [[150,240],[40,170],[280,80]]) for(let variant=0;variant<12;variant++) {
+  const flights=stairTowerLayout(w,h,variant);
+  for(let i=0;i<flights.length-1;i++) {
+    assert.deepEqual(flights[i].to,flights[i+1].from,'adjacent stair flights share the same landing endpoint');
+    assert.ok(flights[i].to[1]>flights[i].from[1], 'stair route progresses between floors');
+  }
+}
 const used = new Set();
 let layouts = 0;
 for (const [w, h] of [[1254, 1254], [1440, 900], [390, 844], [320, 1800], [2560, 720], [1, 1]]) {
@@ -33,7 +47,8 @@ for (const [w, h] of [[1254, 1254], [1440, 900], [390, 844], [320, 1800], [2560,
     const city = compose(w, h, seed);
     assert.equal(JSON.stringify(city), JSON.stringify(compose(w, h, seed)), 'seed reproduces composition');
     assert.ok(city.towers.length >= 5 && city.towers.length <= 16);
-    assert.ok(city.towers.filter(t => t.crown === 'striped-orb').length <= 1, 'only one surreal rooftop accent');
+    assert.ok(city.towers.every(t => t.profile !== 'curve'), 'swelling silhouettes are retired');
+    assert.ok(city.towers.every(t => t.paper === '#fff' && t.ink === '#000'), 'sunlit walls keep a consistent palette across buildings');
     const features = new Set();
     let right = Math.min(w, h) * 0.009;
     for (const tower of city.towers) {
@@ -65,23 +80,13 @@ for (const [w, h] of [[1254, 1254], [1440, 900], [390, 844], [320, 1800], [2560,
       assert.ok(Math.abs(y - tower.baseTop) < 0.00001, 'stack stops at its dedicated base');
     }
     assert.ok(right <= w + 0.00001);
-    for (const feature of ['fan', 'external-stair', 'swell']) assert.ok(features.has(feature), `${feature} survives every aspect ratio`);
+    for (const feature of ['commercial-front', 'external-stair', 'stepped-terraces']) assert.ok(features.has(feature), `${feature} survives every aspect ratio`);
     for (const connector of city.connectors) {
       assert.equal(library[connector.id].role, 'connector'); used.add(connector.id);
       assert.ok(connector.x >= 0 && connector.x + connector.w <= w + 0.00001, 'connections stay within the canvas');
       assert.ok(connector.y >= 0 && connector.y + connector.h < city.towers[0].baseLine, 'connections stay above the ground');
     }
-    assert.ok(city.courts.length > 0, 'every composition has a shared architectural space');
-    for (const court of city.courts) {
-      const a = city.towers[court.leftTower], b = city.towers[court.rightTower];
-      assert.equal(court.rightTower, court.leftTower + 1, 'court joins neighboring buildings');
-      assert.ok(court.x < a.x + a.w && court.x + court.w > b.x, 'court crosses the building boundary');
-      assert.ok(court.x >= 0 && court.x + court.w <= w, 'court remains on canvas');
-      assert.ok(court.y >= Math.max(a.top, b.top) && court.h > 0, 'court lies within its supporting buildings');
-      assert.ok(court.y + court.h * 1.075 < Math.min(a.baseTop, b.baseTop), 'court clears entrances and ground floors');
-      const fan = [...a.modules, ...b.modules].find(m => m.id === 'fan');
-      if (fan) assert.ok(court.y >= fan.y + fan.h || court.y + court.h <= fan.y, 'shared court preserves fan hall');
-    }
+    assert.ok(!('courts' in city), 'secondary rooms cannot overlay and slice complete facade blocks');
     drawCity(city, w, h); layouts++;
   }
 }
@@ -103,4 +108,4 @@ const beforeResize = canvas.dataset.seed;
 env.innerWidth = 390; env.innerHeight = 844; events.resize();
 assert.equal(canvas.dataset.seed, beforeResize, 'resize preserves seed');
 assert.equal(canvas.width, 780); assert.equal(canvas.height, 1688);
-console.log(`Passed ${layouts} seeded layouts, ${blocks.length} catalog blocks, ${geometryCalls} finite drawing calls; Tokyo blocks, shared courts, ground-only bases, three feature chambers, deterministic layout, click/keyboard regeneration and DPR resize.`);
+console.log(`Passed ${layouts} seeded layouts, ${blocks.length} catalog blocks, ${geometryCalls} finite drawing calls; Tokyo blocks, whole facade blocks, ground-only bases, three feature chambers, deterministic layout, click/keyboard regeneration and DPR resize.`);

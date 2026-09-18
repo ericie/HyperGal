@@ -1,0 +1,359 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-17T02:23:29.502051+00:00",
+  "title": "Design System: Many Frogs",
+  "extensions": {
+    "colorMeta": {
+      "pigment-01-body": {
+        "role": "primary",
+        "displayName": "Pigment 01 Body"
+      },
+      "pigment-01-wash": {
+        "role": "primary",
+        "displayName": "Pigment 01 Wash"
+      },
+      "pigment-01-rim": {
+        "role": "primary",
+        "displayName": "Pigment 01 Rim"
+      },
+      "pigment-02-body": {
+        "role": "primary",
+        "displayName": "Pigment 02 Body"
+      },
+      "pigment-02-wash": {
+        "role": "primary",
+        "displayName": "Pigment 02 Wash"
+      },
+      "pigment-02-rim": {
+        "role": "primary",
+        "displayName": "Pigment 02 Rim"
+      },
+      "pigment-03-body": {
+        "role": "primary",
+        "displayName": "Pigment 03 Body"
+      },
+      "pigment-03-wash": {
+        "role": "primary",
+        "displayName": "Pigment 03 Wash"
+      },
+      "pigment-03-rim": {
+        "role": "primary",
+        "displayName": "Pigment 03 Rim"
+      },
+      "pigment-04-body": {
+        "role": "primary",
+        "displayName": "Pigment 04 Body"
+      },
+      "pigment-04-wash": {
+        "role": "primary",
+        "displayName": "Pigment 04 Wash"
+      },
+      "pigment-04-rim": {
+        "role": "primary",
+        "displayName": "Pigment 04 Rim"
+      },
+      "pigment-05-body": {
+        "role": "primary",
+        "displayName": "Pigment 05 Body"
+      },
+      "pigment-05-wash": {
+        "role": "primary",
+        "displayName": "Pigment 05 Wash"
+      },
+      "pigment-05-rim": {
+        "role": "primary",
+        "displayName": "Pigment 05 Rim"
+      },
+      "pigment-06-body": {
+        "role": "primary",
+        "displayName": "Pigment 06 Body"
+      },
+      "pigment-06-wash": {
+        "role": "primary",
+        "displayName": "Pigment 06 Wash"
+      },
+      "pigment-06-rim": {
+        "role": "primary",
+        "displayName": "Pigment 06 Rim"
+      },
+      "pigment-07-body": {
+        "role": "primary",
+        "displayName": "Pigment 07 Body"
+      },
+      "pigment-07-wash": {
+        "role": "primary",
+        "displayName": "Pigment 07 Wash"
+      },
+      "pigment-07-rim": {
+        "role": "primary",
+        "displayName": "Pigment 07 Rim"
+      },
+      "pigment-08-body": {
+        "role": "primary",
+        "displayName": "Pigment 08 Body"
+      },
+      "pigment-08-wash": {
+        "role": "primary",
+        "displayName": "Pigment 08 Wash"
+      },
+      "pigment-08-rim": {
+        "role": "primary",
+        "displayName": "Pigment 08 Rim"
+      },
+      "pigment-09-body": {
+        "role": "primary",
+        "displayName": "Pigment 09 Body"
+      },
+      "pigment-09-wash": {
+        "role": "primary",
+        "displayName": "Pigment 09 Wash"
+      },
+      "pigment-09-rim": {
+        "role": "primary",
+        "displayName": "Pigment 09 Rim"
+      },
+      "pigment-10-body": {
+        "role": "primary",
+        "displayName": "Pigment 10 Body"
+      },
+      "pigment-10-wash": {
+        "role": "primary",
+        "displayName": "Pigment 10 Wash"
+      },
+      "pigment-10-rim": {
+        "role": "primary",
+        "displayName": "Pigment 10 Rim"
+      },
+      "pigment-11-body": {
+        "role": "primary",
+        "displayName": "Pigment 11 Body"
+      },
+      "pigment-11-wash": {
+        "role": "primary",
+        "displayName": "Pigment 11 Wash"
+      },
+      "pigment-11-rim": {
+        "role": "primary",
+        "displayName": "Pigment 11 Rim"
+      },
+      "pigment-12-body": {
+        "role": "primary",
+        "displayName": "Pigment 12 Body"
+      },
+      "pigment-12-wash": {
+        "role": "primary",
+        "displayName": "Pigment 12 Wash"
+      },
+      "pigment-12-rim": {
+        "role": "primary",
+        "displayName": "Pigment 12 Rim"
+      },
+      "void": {
+        "role": "neutral",
+        "displayName": "Void"
+      },
+      "verge": {
+        "role": "neutral",
+        "displayName": "Verge"
+      },
+      "grass-a": {
+        "role": "neutral",
+        "displayName": "Grass A"
+      },
+      "grass-b": {
+        "role": "neutral",
+        "displayName": "Grass B"
+      },
+      "grass-line": {
+        "role": "neutral",
+        "displayName": "Grass Line"
+      },
+      "road": {
+        "role": "neutral",
+        "displayName": "Road"
+      },
+      "road-edge": {
+        "role": "neutral",
+        "displayName": "Road Edge"
+      },
+      "road-mark": {
+        "role": "neutral",
+        "displayName": "Road Mark"
+      },
+      "bike-lane": {
+        "role": "neutral",
+        "displayName": "Bike Lane"
+      },
+      "bike-edge": {
+        "role": "neutral",
+        "displayName": "Bike Edge"
+      },
+      "bike-frame": {
+        "role": "secondary",
+        "displayName": "Bike Frame"
+      },
+      "bike-rider": {
+        "role": "neutral",
+        "displayName": "Bike Rider"
+      },
+      "rail-bed": {
+        "role": "neutral",
+        "displayName": "Rail Bed"
+      },
+      "rail-tie": {
+        "role": "neutral",
+        "displayName": "Rail Tie"
+      },
+      "rail-steel": {
+        "role": "neutral",
+        "displayName": "Rail Steel"
+      },
+      "rail-signal": {
+        "role": "secondary",
+        "displayName": "Rail Signal"
+      },
+      "train": {
+        "role": "secondary",
+        "displayName": "Train"
+      },
+      "train-light": {
+        "role": "secondary",
+        "displayName": "Train Light"
+      },
+      "water": {
+        "role": "neutral",
+        "displayName": "Water"
+      },
+      "water-line": {
+        "role": "neutral",
+        "displayName": "Water Line"
+      },
+      "log": {
+        "role": "neutral",
+        "displayName": "Log"
+      },
+      "log-light": {
+        "role": "neutral",
+        "displayName": "Log Light"
+      },
+      "gator": {
+        "role": "neutral",
+        "displayName": "Gator"
+      },
+      "gator-light": {
+        "role": "neutral",
+        "displayName": "Gator Light"
+      },
+      "gator-eye": {
+        "role": "neutral",
+        "displayName": "Gator Eye"
+      },
+      "rock": {
+        "role": "neutral",
+        "displayName": "Rock"
+      },
+      "rock-light": {
+        "role": "neutral",
+        "displayName": "Rock Light"
+      },
+      "mower": {
+        "role": "secondary",
+        "displayName": "Mower"
+      },
+      "fly-wing": {
+        "role": "neutral",
+        "displayName": "Fly Wing"
+      },
+      "fly-body": {
+        "role": "neutral",
+        "displayName": "Fly Body"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink"
+      },
+      "tire": {
+        "role": "neutral",
+        "displayName": "Tire"
+      },
+      "vehicle-shell-ash": {
+        "role": "secondary",
+        "displayName": "Vehicle Shell Ash"
+      },
+      "vehicle-shell-olive": {
+        "role": "secondary",
+        "displayName": "Vehicle Shell Olive"
+      }
+    },
+    "typographyMeta": {},
+    "shadows": [],
+    "motion": [
+      {
+        "name": "hop",
+        "value": "0.18s; easeOutQuart",
+        "purpose": "Autonomous frog hop duration and trajectory."
+      },
+      {
+        "name": "pigment-bloom",
+        "value": "1.65s; easeOutQuart",
+        "purpose": "Initial death-impression bloom; immediate under reduced motion."
+      },
+      {
+        "name": "return-hold",
+        "value": "1.15s",
+        "purpose": "Hold on the aftermath after the last death."
+      },
+      {
+        "name": "camera-return",
+        "value": "2.8s; easeInOutCubic",
+        "purpose": "Return toward the waiting cohort; camera snaps under reduced motion."
+      },
+      {
+        "name": "water-print-stage",
+        "value": "4s; four additional stages",
+        "purpose": "Cached diffusion advances from the initial impression."
+      }
+    ],
+    "breakpoints": []
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "Bodies Become Pigment",
+    "overview": "Scope: pieces/038-many-frogs/ only. A rough, physical, slightly unsettling printed world replaces the former childish sprites. Small living bodies become pigment while an indifferent moving landscape continues to work on their marks. Charcoal and mineral gray with an olive cast support muted madder, oxide, umber, oxblood, and plum bodies.\n\nThis is an autonomous, wordless Canvas 2D artwork. Its identity comes from vulnerable anatomical silhouettes, strict overhead machinery, worn contours, fixed substrate pits, and absorbing impressions. The procedural drawing remains in one HTML file; there is no generated raster asset or framework required for rendering.",
+    "keyCharacteristics": [
+      "A twenty-one-column endless course of readable crossing bands.",
+      "Twelve initial frogs with individual pigment identities; flies add three matching offspring.",
+      "Articulated folded legs and overhead machinery share one printed material language.",
+      "Persistent land impressions, broken tire transfers, and current-driven water diffusion.",
+      "No visible controls, scores, labels, or typography."
+    ],
+    "rules": [
+      {
+        "name": "The Pigment Continuity Rule",
+        "body": "A frog, its offspring, and its death impression share the same authored pigment family.",
+        "section": "colors"
+      },
+      {
+        "name": "The World-Fixed Texture Rule",
+        "body": "Attach pits and dry lines to terrain and objects; do not introduce flickering screen noise.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Overhead Bodies Rule",
+        "body": "Keep machinery and animals in the same overhead view, with narrow frog anatomy and articulated limbs.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do preserve the close natural-pigment family and the charcoal, olive, and ash environment.",
+      "Do retain route decisions, reproduction, surface-driven stains, and the camera return as part of the artwork.",
+      "Do keep terrain and pigment impressions cached, with bounded retained history.",
+      "Do keep this visual system scoped to Many Frogs."
+    ],
+    "donts": [
+      "Don't restore smiles, white frog eye discs, toy side elevations, gloss, or a spectral rainbow.",
+      "Don't replace the procedural moving field with a static illustration.",
+      "Don't invent buttons, navigation, type scales, or score overlays for this wordless surface."
+    ]
+  }
+}

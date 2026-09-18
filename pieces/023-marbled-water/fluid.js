@@ -48,14 +48,17 @@
       v+=vec2(-a.y,a.x)*exp(-dot(a,a)/.15)*.052;
       v-=vec2(-b.y,b.x)*exp(-dot(b,b)/.09)*.074;
       v+=vec2(-c.y,c.x)*exp(-dot(c,c)/.052)*.060;
+      // The bath should feel nearly still between deposits. Keep a faint
+      // background drift; incoming pigment supplies the visible displacement.
+      v*=.20;
       for(int i=0;i<6;i++) {
         vec4 stir=u_stirs[i];
         float co=cos(stir.w),si=sin(stir.w);
         mat2 turn=mat2(co,-si,si,co);
         vec2 d=turn*(p-stir.xy*metric());
         float falloff=exp(-dot(d,d)/.020);
-        // A compact stream-function strain stretches a deposit into a ribbon
-        // while folding the neighboring pigment, with zero divergence.
+        // A brief, gentle strain lets the edge relax without pulling the
+        // whole deposit into a long ribbon. The field stays divergence-free.
         vec2 strain=vec2(d.x*(1.-2.*d.y*d.y/.020),-d.y*(1.-2.*d.x*d.x/.020));
         v+=mat2(co,si,-si,co)*strain*falloff*stir.z;
       }
@@ -212,7 +215,7 @@
       gl.uniform3fv(u['palette[0]'],palette);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,targets[front].texture); gl.uniform1i(u.ink,0);
       const currents=new Float32Array(24);
-      stirs.forEach((stir,index)=>currents.set([stir.x,stir.y,stir.strength*Math.exp(-(elapsed-stir.time)/14),stir.angle],index*4));
+      stirs.forEach((stir,index)=>currents.set([stir.x,stir.y,stir.strength*Math.exp(-(elapsed-stir.time)/5),stir.angle],index*4));
       gl.uniform4fv(u['stirs[0]'],currents);
       gl.uniform4f(u.drop,drop?.x||0,1-(drop?.y||0),drop?.area||0,drop?.progress||0);
       gl.uniform3fv(u.color,drop?.color||[0,0,0]); gl.uniform1f(u.variation,drop?.variation||0);
@@ -230,7 +233,7 @@
         elapsed+=dt;
         if(drop && drop.id!==lastDrop) {
           lastDrop=drop.id;
-          stirs.push({x:drop.x,y:1-drop.y,strength:.54,angle:seed+drop.id*2.4,time:elapsed});
+          stirs.push({x:drop.x,y:1-drop.y,strength:.10,angle:seed+drop.id*2.4,time:elapsed});
           if(stirs.length>6) stirs.shift();
         }
         draw('transport',targets[1-front],dt,drop);
@@ -263,7 +266,7 @@
       step(dt,drop) {
         elapsed+=dt;const next=fctx.createImageData(w,h),m=Math.min(w,h);
         for(let y=0;y<h;y++)for(let x=0;x<w;x++) {
-          let sx=x-Math.sin(y/h*7+elapsed*.05)*dt*2, sy=y-Math.sin(x/w*6)*dt*2;
+          let sx=x-Math.sin(y/h*7+elapsed*.05)*dt*.4, sy=y-Math.sin(x/w*6)*dt*.4;
           let inside=false;
           if(drop) {const dx=x-drop.x*w,dy=y-drop.y*h,r2=dx*dx+dy*dy,a=drop.area*m*m*Math.exp(-r2/(m*m*.19));inside=r2<a;const scale=Math.sqrt(Math.max(0,r2-a)/Math.max(1,r2));sx=drop.x*w+dx*scale;sy=drop.y*h+dy*scale;}
           sx=Math.max(0,Math.min(w-1,sx));sy=Math.max(0,Math.min(h-1,sy));
