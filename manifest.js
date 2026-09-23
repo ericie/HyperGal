@@ -73,7 +73,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
       "description": "Autonomous snakes hunt one mouse on a field that remembers its dead — eight to start, up to twenty as the winner's body is divided. Flat integer cells with a hard offset shadow, one of eight palettes per round, one swatch per snake. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Death travels from head to tail, and every segment it passes is painted into the memory beneath the living. Click to reseed.",
-      "updated": "2026-09-14"
+      "updated": "2026-09-15"
     },
     {
       "slug": "008-vectrex-asteroids",
@@ -185,7 +185,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
       "description": "Fat, hooded Marios bound sideways through a painted summer sky while the camera follows whichever runner is highest, even through a fall.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-15"
     },
     {
       "slug": "017-knot-work",
@@ -224,7 +224,7 @@ window.HYPERGAL_MANIFEST = {
       "rejected": true,
       "thumbnail": "thumbnail.jpg",
       "description": "An architectural ink city of sunlit white walls, deep black recesses, projecting balconies and fine steel railings. Stacked tenants, connected service lines and working rooftops form a different Tokyo with every arrangement.",
-      "updated": "2026-08-19"
+      "updated": "2026-09-18"
     },
     {
       "slug": "020-soft-collapse",
@@ -274,7 +274,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
       "description": "Mineral ink spreads through a shared water surface, folding blue currents and muted color into drifting Suminagashi veins.",
-      "updated": "2026-09-11"
+      "updated": "2026-09-18"
     },
     {
       "slug": "024-fuel-seekers",
@@ -387,7 +387,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 9,
       "thumbnail": "thumbnail.jpg",
       "description": "Black waves split at stone-to-stone junctions, rebound from the frame, and intensify where their nested, non-crossing samon overlap.",
-      "updated": "2026-09-07"
+      "updated": "2026-09-15"
     },
     {
       "slug": "033-the-greater-whole",
@@ -412,7 +412,7 @@ window.HYPERGAL_MANIFEST = {
       "rejected": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A loop of 192 eighth-centimeter wood slices shares the 200-ring growth model of Growth Rings. One proportional scale preserves the trunk’s shape, with the widest slice filling 90% of the screen width. Debug mode reveals the end grain and slice grid.",
-      "updated": "2026-08-20"
+      "updated": "2026-09-18"
     },
     {
       "slug": "035-hypermedia-title-01",
@@ -464,7 +464,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 30,
       "thumbnail": "thumbnail.png",
       "description": "An endless field print: anatomical pigment frogs cross overhead traffic and mineral-gray terrain, leaving stains worked by tires and water; catching a fly adds three matching frogs.",
-      "updated": "2026-09-11"
+      "updated": "2026-09-18"
     },
     {
       "slug": "039-drips",
@@ -607,7 +607,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 60,
       "thumbnail": "thumbnail.jpg",
       "description": "Communication and progress are a cycle of building, entropy and repair. A simple positive four-letter word — HOPE, LOVE, GIVE, MAKE, GROW or LIVE — struggles for legibility under a barrage of four hundred textured shapes that grow, die and pile up. Some of them seek the word until it surfaces; then they stop being replaced, the field grows over it, and it returns in a new layout. Fifteen palettes, two large-letter layouts, Space Mono. Click to reseed; S saves the picture.",
-      "updated": "2026-09-14"
+      "updated": "2026-09-15"
     },
     {
       "slug": "050-strega-nona",
@@ -618,7 +618,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": false,
       "thumbnail": "thumbnail.png",
-      "description": "An overflowing drawing of olive-ink spirals, curling tendrils and nested arcs. Several drawing points work together, each tracing one continuous line at a time, until the pattern grows beyond every edge of the window. Click to regrow, Space to pause, S to save."
+      "description": "An overflowing drawing of olive-ink spirals, curling tendrils and nested arcs. Several drawing points work together, each tracing one continuous line at a time, until the pattern grows beyond every edge of the window. Click to regrow, Space to pause, S to save.",
+      "updated": "2026-09-15"
     },
     {
       "slug": "051-agate",
@@ -629,7 +630,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": false,
       "thumbnail": "thumbnail.png",
-      "description": "A field of tightly fitted, irregular ink spirals grows from several places at once across warm paper. Each drawing point traces one little stone at a time, winding inward as the clusters spread and meet. Click to regrow, Space to pause, F to finish, S to save."
+      "description": "A field of tightly fitted, irregular ink spirals grows from several places at once across warm paper. Each drawing point traces one little stone at a time, winding inward as the clusters spread and meet. Click to regrow, Space to pause, F to finish, S to save.",
+      "updated": "2026-09-15"
     },
     {
       "slug": "052-negative-fill",
@@ -640,7 +642,30 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": false,
       "thumbnail": "thumbnail.png",
-      "description": "Silver arcs, curled tendrils, stippled fields and bright patches grow across charcoal paper. Several drawing points work at once, fitting marks around one another and leaving irregular islands of negative space. Click to regrow, Space to pause, F to finish, S to save."
+      "description": "Silver arcs, curled tendrils, stippled fields and bright patches grow across charcoal paper. Several drawing points work at once, fitting marks around one another and leaving irregular islands of negative space. Click to regrow, Space to pause, F to finish, S to save.",
+      "updated": "2026-09-15"
+    },
+    {
+      "slug": "053-loaded-brush",
+      "title": "Loaded Brush",
+      "year": 2026,
+      "date": "2026-09-21",
+      "category": "generative",
+      "type": "interactive",
+      "wip": false,
+      "thumbnail": "thumbnail.png",
+      "description": "One thick oil stroke, pulled left to right across primed linen by a flat brush loaded with a gradient of paint, ultramarine on one edge to titanium white on the other. Every hair drags its own colour and cuts its own groove; paint lips at the edges, runs dry hair by hair, and lifts away in trailing streaks. A floating palette sets the colours and how the brush is loaded, and the path takes as many points as you like."
+    },
+    {
+      "slug": "054-tideline",
+      "title": "Tideline",
+      "year": 2026,
+      "date": "2026-09-21",
+      "category": "nature",
+      "type": "interactive",
+      "wip": false,
+      "thumbnail": "thumbnail.png",
+      "description": "Seen from above, waves of dye run up a pale shore and drain back, each leaving a stain along the line it reached. Colours blend, the freshly wet sand dries, and the shore becomes strata of every wave that came before. Click to send a wave to that spot, Space to pause, F to skip ahead, S to save."
     }
   ]
 };

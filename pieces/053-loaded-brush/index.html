@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="One thick oil stroke from a brush loaded with a gradient of paint, pulled left to right across primed linen and lit as a relief.">
+  <title>Loaded Brush · HyperGal</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --panel: #26272a;
+      --panel-ink: #ecebe6;
+      --panel-muted: #9a9a94;
+      --panel-rule: #3d3e42;
+      --accent: #7f9ce6;
+      background: #ebe6da;
+      color: #1c1c1c;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    canvas.editing { cursor: crosshair; }
+    noscript, .fallback { position: fixed; inset: 2rem; font: 1rem/1.5 Georgia, serif; }
+    ::selection { background: #1d3d9b; color: #fff; }
+
+    /* Path handles sit over the painting only while the palette is open. */
+    .handles { position: fixed; inset: 0; pointer-events: none; }
+    .handle {
+      position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; padding: 0;
+      border: 2px solid rgba(20, 20, 24, 0.85); border-radius: 50%;
+      background: rgba(255, 255, 255, 0.55); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6);
+      cursor: grab; pointer-events: auto; touch-action: none;
+    }
+    .handle:hover, .handle.selected { background: var(--accent); }
+    .handle.selected { border-color: #fff; box-shadow: 0 0 0 1px rgba(20, 20, 24, 0.8); }
+    .handle.dragging { cursor: grabbing; }
+    .handle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+    .palette {
+      position: fixed; z-index: 10; left: 18px; bottom: 18px;
+      width: min(292px, calc(100vw - 36px)); max-height: calc(100vh - 36px); overflow: auto;
+      padding: 0 12px 12px; border-radius: 6px;
+      background: var(--panel); color: var(--panel-ink);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+      font: 11.5px/1.35 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      user-select: none;
+    }
+    .palette.collapsed { width: auto; padding-bottom: 0; overflow: hidden; }
+    .palette.collapsed .palette-body { display: none; }
+    .palette-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      min-height: 38px; cursor: grab; touch-action: none;
+    }
+    .palette.dragging .palette-header { cursor: grabbing; }
+    .palette-header h1 { margin: 0; font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
+    .palette-actions { display: flex; gap: 4px; }
+    .palette button {
+      font: inherit; color: var(--panel-ink); background: #35363b; border: 1px solid #45464c;
+      border-radius: 4px; padding: 4px 8px; cursor: pointer; line-height: 1.2;
+    }
+    .palette button:hover { background: #45464c; }
+    .palette button:focus-visible, .palette input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .icon-button { width: 26px; height: 26px; padding: 0 !important; display: grid; place-items: center; font-size: 14px !important; }
+    section { padding: 8px 0 4px; border-top: 1px solid var(--panel-rule); }
+    section h2 { margin: 0 0 6px; font: inherit; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--panel-muted); }
+    .gradient-bar { height: 16px; border-radius: 3px; margin-bottom: 8px; box-shadow: 0 0 0 1px rgba(255,255,255,0.12) inset; }
+    .stops { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+    .stop { display: grid; grid-template-columns: 26px 1fr 34px 22px; align-items: center; gap: 6px; }
+    .stop input[type="color"] {
+      width: 26px; height: 22px; padding: 0; border: 1px solid #45464c; border-radius: 4px; background: none; cursor: pointer;
+    }
+    .stop input[type="color"]::-webkit-color-swatch-wrapper { padding: 1px; }
+    .stop input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 2px; }
+    .stop input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
+    .stop .remove { width: 22px; height: 22px; padding: 0; font-size: 13px; }
+    .stop .remove:disabled { opacity: 0.3; cursor: default; }
+    input[type="range"] { width: 100%; margin: 0; accent-color: var(--accent); }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+    .segmented { display: inline-flex; border: 1px solid #45464c; border-radius: 4px; overflow: hidden; margin-left: auto; }
+    .segmented label { padding: 4px 8px; cursor: pointer; color: var(--panel-muted); }
+    .segmented label:has(input:checked) { background: #45464c; color: var(--panel-ink); }
+    .segmented input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .slider { display: grid; grid-template-columns: 58px 1fr 44px; align-items: center; gap: 8px; margin: 5px 0; }
+    .slider output { text-align: right; color: var(--panel-muted); font-variant-numeric: tabular-nums; }
+    .hint { margin: 8px 0 0; color: var(--panel-muted); }
+    @media (max-width: 480px) { .palette { left: 10px; right: 10px; bottom: 10px; width: auto; } }
+  </style>
+  <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
+</head>
+<body>
+  <canvas id="painting" role="img" aria-label="Loaded Brush. A single thick oil brush stroke, blue at one edge and white at the other, pulled left to right across primed linen." aria-describedby="instructions"></canvas>
+  <div class="handles" id="handles" hidden></div>
+  <p class="fallback" id="fallback" hidden>Loaded Brush needs WebGL 2 with floating-point render targets to paint.</p>
+  <noscript>Loaded Brush needs JavaScript to paint.</noscript>
+
+  <aside class="palette" id="palette" aria-label="Palette">
+    <div class="palette-header" id="palette-grip">
+      <h1>Loaded Brush</h1>
+      <div class="palette-actions">
+        <button class="icon-button" id="replay" type="button" title="Replay the stroke (R)" aria-label="Replay the stroke">&#8635;</button>
+        <button class="icon-button" id="collapse" type="button" title="Collapse palette (E)" aria-expanded="true" aria-controls="palette-body" aria-label="Collapse palette">&#8211;</button>
+      </div>
+    </div>
+    <div class="palette-body" id="palette-body">
+      <section aria-labelledby="paint-title">
+        <h2 id="paint-title">Paint</h2>
+        <div class="gradient-bar" id="gradient-bar" aria-hidden="true"></div>
+        <ul class="stops" id="stops"></ul>
+        <div class="row">
+          <button id="add-stop" type="button">+ Colour</button>
+          <div class="segmented" role="radiogroup" aria-label="How the brush is loaded">
+            <label><input type="radio" name="mode" value="across" checked> Across</label>
+            <label><input type="radio" name="mode" value="along"> Along</label>
+          </div>
+        </div>
+      </section>
+      <section aria-labelledby="brush-title">
+        <h2 id="brush-title">Brush</h2>
+        <label class="slider"><span>Width</span><input type="range" id="width" min="100" max="320" value="150"><output id="width-out">150px</output></label>
+        <label class="slider"><span>Paint</span><input type="range" id="thickness" min="30" max="220" value="100"><output id="thickness-out">1.00</output></label>
+        <label class="slider"><span>Load</span><input type="range" id="load" min="60" max="220" value="120"><output id="load-out">1.20</output></label>
+        <label class="slider" id="pressure-row" hidden><span>Pressure</span><input type="range" id="pressure" min="40" max="160" value="100"><output id="pressure-out">1.00</output></label>
+      </section>
+      <section aria-labelledby="light-title">
+        <h2 id="light-title">Light</h2>
+        <label class="slider"><span>Angle</span><input type="range" id="light" min="0" max="360" value="225"><output id="light-out">225°</output></label>
+      </section>
+      <section aria-labelledby="path-title">
+        <h2 id="path-title">Path</h2>
+        <div class="row">
+          <button id="add-point" type="button">+ Point</button>
+          <button id="reset-points" type="button">Reset</button>
+          <button id="shuffle" type="button" title="New bristles">Shuffle</button>
+          <button id="save" type="button" title="Save PNG (S)">Save</button>
+        </div>
+        <p class="hint" id="instructions">Click the linen to add a point. Drag points to move them; double-click one to remove it. R replays, S saves, E hides the palette.</p>
+      </section>
+    </div>
+  </aside>
+  <script src="loaded-brush.js"></script>
+</body>
+</html>

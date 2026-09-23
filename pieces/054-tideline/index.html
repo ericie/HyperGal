@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Waves of fresh dye run up a pale shore, seen from above, and each leaves its colour behind to blend with the last.">
+  <title>Tideline · HyperGal</title>
+  <style>
+    :root { color-scheme: light; background: #ece3d0; color: #3a3630; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; cursor: pointer; touch-action: manipulation; }
+    canvas:focus-visible { outline: 2px solid #3a3630; outline-offset: -6px; }
+    .instructions { position: fixed; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    noscript { position: fixed; inset: 2rem; font: 1rem/1.5 Georgia, serif; }
+    ::selection { background: #3a3630; color: #ece3d0; }
+  </style>
+  <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
+</head>
+<body>
+  <canvas id="shore" tabindex="0" role="button" aria-label="Tideline. Click or tap to send a wave up to that spot; press Enter to send one." aria-describedby="instructions"></canvas>
+  <p class="instructions" id="instructions">Seen from above, waves of dye wash up a pale sandy shore and drain back, each leaving a stain that blends with the ones before. Click or tap sends a wave up to that spot. Enter sends a wave. R starts a fresh shore. Space pauses or resumes. F skips ahead a dozen waves. S saves a PNG.</p>
+  <noscript>Tideline needs JavaScript to draw.</noscript>
+  <script src="tideline.js"></script>
+</body>
+</html>
