@@ -4,7 +4,7 @@
   "date": "2026-06-24",
   "category": "games",
   "type": "interactive",
-  "wip": true,
+  "wip": false,
   "rating": 50,
   "thumbnail": "thumbnail.jpg",
   "description": "Space Invaders after the invaders have vanished. Four inset cannons burn through forty-three rounds in volleys and sudden spasms. Each rail ends in an unstoppable circular boss round that grows under defensive fire, reaches the opposite cannon, and detonates to wipe the field blank."

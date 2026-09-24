@@ -44,7 +44,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-06-24",
       "category": "games",
       "type": "interactive",
-      "wip": true,
+      "wip": false,
       "rating": 50,
       "thumbnail": "thumbnail.jpg",
       "description": "Space Invaders after the invaders have vanished. Four inset cannons burn through forty-three rounds in volleys and sudden spasms. Each rail ends in an unstoppable circular boss round that grows under defensive fire, reaches the opposite cannon, and detonates to wipe the field blank.",
@@ -654,7 +654,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": false,
       "thumbnail": "thumbnail.png",
-      "description": "One thick oil stroke, pulled left to right across primed linen by a flat brush loaded with a gradient of paint, ultramarine on one edge to titanium white on the other. Every hair drags its own colour and cuts its own groove; paint lips at the edges, runs dry hair by hair, and lifts away in trailing streaks. A floating palette sets the colours and how the brush is loaded, and the path takes as many points as you like."
+      "description": "One thick oil stroke, pulled left to right across primed linen by a flat brush loaded with a gradient of paint, ultramarine on one edge to titanium white on the other. Every hair drags its own colour and cuts its own groove; paint lips at the edges, runs dry hair by hair, and lifts away in trailing streaks. A floating palette sets the colours and how the brush is loaded, and the path takes as many points as you like.",
+      "updated": "2026-09-23"
     },
     {
       "slug": "054-tideline",
@@ -665,7 +666,8 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": false,
       "thumbnail": "thumbnail.png",
-      "description": "Seen from above, waves of dye run up a pale shore and drain back, each leaving a stain along the line it reached. Colours blend, the freshly wet sand dries, and the shore becomes strata of every wave that came before. Click to send a wave to that spot, Space to pause, F to skip ahead, S to save."
+      "description": "Seen from above, waves of dye run up a pale shore and drain back, each leaving a stain along the line it reached. Colours blend, the freshly wet sand dries, and the shore becomes strata of every wave that came before. Click to send a wave to that spot, Space to pause, F to skip ahead, S to save.",
+      "updated": "2026-09-23"
     }
   ]
 };
