@@ -26,11 +26,14 @@ Some regions receive dots or closely spaced silver hatching. Small dots finish
 the gaps between regions. Marks accumulate without erasing or painting over
 previous marks.
 
-Six to sixteen pens, scaled to viewport area, each draw at 190 CSS pixels per
-second. Dots have a short dwell. Pens work outward from distributed starting
-points, completing nearby marks before moving on. A seeded grain tile gives
-the charcoal paper a fine texture. Completed compositions retain dark pockets;
-they hold until restarted.
+Twenty-four to a hundred and twelve pens, scaled to viewport area, each draw at
+190 CSS pixels per second. Dots have a short dwell. Pens work outward from
+distributed starting points, completing nearby marks before moving on; a pen
+that runs out takes the nearest waiting mark from whichever pen has the most
+left, so the drawing never ends up waiting on a single front. A desktop
+composition finishes in about fifteen seconds. A seeded grain tile gives the
+charcoal paper a fine texture. Completed compositions retain dark pockets; they
+hold until restarted.
 
 The thumbnail is a completed canvas capture at 1440 × 900 using seed
 `negative-fill`, generated from this piece's code.

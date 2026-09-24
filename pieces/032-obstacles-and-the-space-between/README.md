@@ -3,34 +3,47 @@
 A dry-garden companion to **Obstacles and How to Avoid Them** and
 **Obstacles and How to Go Around Them**.
 
-Three stones and the sand between them are drawn as one contour field. Each
-stone keeps its irregular plan-view footprint, but its fill, flecks, and specimen
-number have dissolved into evenly spaced ink lines. The contours continue inward
-to the stone centers and outward into the garden. Where expanding rings meet,
-they join into larger contours instead of crossing.
+Three obstacles sit on pale paper: a wall, a square, and a circle, drawn as flat
+geometric plans in the Hokusai palette of plan 010 — prussian, tyrian, wheat,
+burlywood, pale yellow, and ink. The sand around them is raked into one
+continuous contour field. The furrows use signed distance to the obstacle
+outlines: negative inside each plan, zero at its edge, positive out in the sand.
+Taking the minimum across the three fields makes the interior and exterior one
+drawing, and where expanding rings meet they join into larger contours instead
+of crossing.
 
-The field uses signed distance to the original stone outlines: negative values
-inside each stone, zero at its edge, and positive values in the sand. Taking the
-minimum across the three fields and tracing a single sequence of contour levels
-makes the interior and exterior one drawing. The sand-and-ink palette remains.
+Each obstacle sends out a train of waves, and a wave shows as colour filling the
+spaces between the furrows rather than as a darkened line. The colour is read at
+the centre of whichever band a point falls in, so every space between two rake
+lines takes a single flat tone, and a passing wave lands as a run of solidly
+filled bands radiating out from the plan that sent it.
 
-Black waves repeatedly travel outward along those nested furrows. Their
-intensity is governed by two variables: distance traveled steadily fades the
-wave, while joining another stone's wave boosts it. Each rock-to-rock meeting
-now splits the front, sending a tighter echo back toward the stones and a faster
-refracted front into the shared field. Waves strike the surrounding frame and
-return inward in staggered bands; overlapping fronts constructively darken and
-thicken the samon. Reduced-motion preferences hold one fully connected,
-wall-reflected arrangement instead of animating it.
+Waves blend rather than merge. Every source runs on one shared train, so two
+waves that arrive together are genuinely in step, and where they overlap their
+colours add the way ink washes do — prussian across tyrian sinks toward ink.
+Nothing is joined into a single front.
+
+Waves reflect twice over. Each of the four frame walls returns a true specular
+wave: the distance to a point mirrored in that wall is the distance to the
+mirrored obstacle, so a reflection arrives curved as it should be. And a wave
+that reaches another obstacle is thrown back out from it, still carrying the
+colour of the obstacle that sent it, so the tyrian wall re-radiates prussian
+rings. A short threshold keeps faint tails off the paper, so the sand between
+waves stays bare.
+
+The whole field is one fragment shader over the obstacle distance functions, so
+the rake interval retunes the drawing instantly. Reduced-motion preferences hold
+one frozen arrangement instead of animating it.
 
 The floating panel currently exposes only the interval between rake furrows.
-The other garden principles and additional stones remain outside this base case.
+The other garden principles and additional obstacles remain outside this base
+case.
 
 This is a construction stage, not the final garden composition.
 
-Click or tap the gravel, or press `R`, Space, or Enter, to generate a new garden.
+Click or tap the sand, or press `R`, Space, or Enter, to generate a new garden.
 The panel can be dragged by its header or collapsed. Add `?seed=<value>` to the
 URL for a repeatable starting composition.
 
 Open `index.html` directly in any modern browser. The artwork has no runtime
-dependencies.
+dependencies beyond WebGL.

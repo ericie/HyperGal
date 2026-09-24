@@ -180,74 +180,6 @@
         "role": "neutral",
         "displayName": "Road Mark"
       },
-      "bike-lane": {
-        "role": "neutral",
-        "displayName": "Bike Lane"
-      },
-      "bike-edge": {
-        "role": "neutral",
-        "displayName": "Bike Edge"
-      },
-      "bike-frame": {
-        "role": "secondary",
-        "displayName": "Bike Frame"
-      },
-      "bike-rider": {
-        "role": "neutral",
-        "displayName": "Bike Rider"
-      },
-      "rail-bed": {
-        "role": "neutral",
-        "displayName": "Rail Bed"
-      },
-      "rail-tie": {
-        "role": "neutral",
-        "displayName": "Rail Tie"
-      },
-      "rail-steel": {
-        "role": "neutral",
-        "displayName": "Rail Steel"
-      },
-      "rail-signal": {
-        "role": "secondary",
-        "displayName": "Rail Signal"
-      },
-      "train": {
-        "role": "secondary",
-        "displayName": "Train"
-      },
-      "train-light": {
-        "role": "secondary",
-        "displayName": "Train Light"
-      },
-      "water": {
-        "role": "neutral",
-        "displayName": "Water"
-      },
-      "water-line": {
-        "role": "neutral",
-        "displayName": "Water Line"
-      },
-      "log": {
-        "role": "neutral",
-        "displayName": "Log"
-      },
-      "log-light": {
-        "role": "neutral",
-        "displayName": "Log Light"
-      },
-      "gator": {
-        "role": "neutral",
-        "displayName": "Gator"
-      },
-      "gator-light": {
-        "role": "neutral",
-        "displayName": "Gator Light"
-      },
-      "gator-eye": {
-        "role": "neutral",
-        "displayName": "Gator Eye"
-      },
       "rock": {
         "role": "neutral",
         "displayName": "Rock"
@@ -255,10 +187,6 @@
       "rock-light": {
         "role": "neutral",
         "displayName": "Rock Light"
-      },
-      "mower": {
-        "role": "secondary",
-        "displayName": "Mower"
       },
       "fly-wing": {
         "role": "neutral",
@@ -276,13 +204,33 @@
         "role": "neutral",
         "displayName": "Tire"
       },
-      "vehicle-shell-ash": {
+      "vehicle-shell-a": {
         "role": "secondary",
-        "displayName": "Vehicle Shell Ash"
+        "displayName": "Vehicle Shell A"
       },
-      "vehicle-shell-olive": {
+      "vehicle-shell-b": {
         "role": "secondary",
-        "displayName": "Vehicle Shell Olive"
+        "displayName": "Vehicle Shell B"
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper"
+      },
+      "shade": {
+        "role": "neutral",
+        "displayName": "Shade"
+      },
+      "shade-deep": {
+        "role": "neutral",
+        "displayName": "Shade Deep"
+      },
+      "shadow": {
+        "role": "neutral",
+        "displayName": "Shadow"
+      },
+      "glass": {
+        "role": "secondary",
+        "displayName": "Glass"
       }
     },
     "typographyMeta": {},

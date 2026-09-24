@@ -3,7 +3,7 @@
 Dozens of particles got together and decided to draw. They drew nothing but
 flowers.
 
-Fifty to eighty lines share one square field. Each picks a target, flies to it,
+Fifty to eighty lines share one field. Each picks a target, flies to it,
 and once it arrives it settles into a jittery loop around that point — a radius
 of fifty to a hundred pixels, shaken by up to a hundred more on every frame.
 While it loops, its short trail is stamped onto a painting layer that is never
@@ -25,7 +25,10 @@ The targets are a small solar system or a scattered field, chosen by the hash:
   thirty to eighty pixels from it. For Circle the first three bodies sit far
   out (400 to 820 pixels), the next three mid-way (300 to 720), the rest
   anywhere from 120 to 540. For Ring every body sits far out, so the flowers
-  gather into a wreath. Ring is dealt three times as often as Circle.
+  gather into a wreath. Ring is dealt three times as often as Circle. These two
+  keep their shape whatever the window is: the orbits are round, at the radii
+  above, centred on the field. The scattered layouts below are the ones that
+  spread into a wider window.
 - **Square** — five hundred targets scattered inside a 400-pixel margin.
 - **Fill** — five hundred targets scattered edge to edge.
 - **Sides** — five hundred targets in the top and bottom 600-pixel bands.
@@ -59,12 +62,10 @@ six shapes and eight palettes. Both counts are in the record now.
 - `?hash=oo…` reproduces a specific iteration; `?debug` logs the feature
   record to the console
 
-The piece is a fixed 1920 × 1920 square, letterboxed into the window, with the
-bars in the ground colour — as it shipped.
-
 The slow first build is prebaked: on load and after every reseed, the system
-runs its first 4500 updates on the hidden working layers before showing the
-field. The animation then carries on from that state.
+runs its first updates on the hidden working layers before showing the field.
+The animation then carries on from that state. 4500 updates fill a square; a
+wider field gets proportionally more, to a ceiling of 8000.
 
 ## Notes on the port
 
@@ -120,7 +121,32 @@ Quirks kept because they shape the output:
   frames to fill out.
 
 The original CSS hid layers one to four and, by a typo, left the fifth
-visible; it was always empty. All five working layers are hidden here.
+visible; it was always empty. All five working layers are hidden here, and
+layers two and five — which nothing has ever drawn to, every call that would
+have being commented out in the shipped source — are left at 1×1 rather than
+given a full-size backing store.
 
-Reduced motion uses the same 4500-update prebake, then holds the picture instead
-of continuing the animation.
+Reduced motion uses the same prebake, then holds the picture instead of
+continuing the animation.
+
+## The field
+
+It shipped as a fixed 1920 × 1920 square letterboxed into the window. It now
+fills the window edge to edge: the short side of the field stays 1920, so line
+weights, wander radii and the margins the scattered layouts keep are all the
+size they were drawn, and the long side follows the window's aspect ratio, to a
+cap of three to one. Beyond that the field stops stretching and the canvas is
+cropped instead.
+
+The canvases carry a device scale rather than growing without limit, so a tall
+phone rasterises what its screen can show — around 780 × 1690 — while the
+sketch goes on drawing in the 1920-based coordinates it was written in.
+
+A resize grows the field around the picture instead of starting over: the
+painting is copied out, the canvases are sized, and it goes back at the size it
+was drawn, centred, with new ground opening around it. The swarm spreads into
+that ground on its own, and the scattered layouts re-scatter across it at once.
+Nothing is re-dealt, so the iteration is the one it was.
+
+One fix came with it: the Sun was placed at `{x: centerX, y: centerX}`, which
+was the centre of a square field and is not the centre of this one.

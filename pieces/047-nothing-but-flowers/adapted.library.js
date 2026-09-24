@@ -20,6 +20,16 @@ var fullWindowMode = false;
 var maxW = 1920;
 var maxH = 1920;
 
+// The size of the field, in the 1920-based coordinates the sketch draws in.
+// The entry script calls this whenever it lays out the stage, including on a
+// resize, so everything that measures the field follows the window.
+function setFieldSize(w, h) {
+	maxW = w;
+	maxH = h;
+	WIDTH = w;
+	HEIGHT = h;
+}
+
 
 function init() {
   	//ctx = $('#canvas')[0].getContext('2d');
@@ -45,21 +55,10 @@ function init() {
 
 	ctCanvas = document.getElementById("canvas");
 
-	// ctCanvas = document.getElementById("canvas");
-	HEIGHT =  window.innerHeight;
- 	WIDTH =  window.innerWidth;
-	// ctCanvas = document.getElementById("canvas");
-
-	// initCanvasSize();
-	// ctCanvas.setProperty('width',  2000);
-
-	if (fullWindowMode == false){
-		if (HEIGHT > WIDTH){
-			WIDTH = HEIGHT;
-		} else {
-			HEIGHT = WIDTH;
-		}
-	}
+	// The original squared the window off here and letterboxed the result. The
+	// field is now the window's shape: the entry script lays out the stage and
+	// calls setFieldSize() before init(), so the size is already in hand.
+	fullWindowMode = true;
 
 	// intervalId = setInterval(draw, 1000 / fps);
 	// return intervalId;

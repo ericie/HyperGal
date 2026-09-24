@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="Dozens of particles got together and decided to draw. They drew nothing but flowers. Lines settle around drifting targets and scribble shadowed petals onto a square field that is never wiped."
+      content="Dozens of particles got together and decided to draw. They drew nothing but flowers. Lines settle around drifting targets and scribble shadowed petals onto a field, the shape of your window, that is never wiped."
     />
     <title>Nothing but Flowers · HyperGal</title>
     <style>
@@ -16,22 +16,21 @@
         overflow: hidden;
       }
 
-      /* The piece is a fixed 1920×1920 square, letterboxed into whatever shape
-         the browser is — exactly as it shipped. The container takes the ground
-         colour once the hash has picked a palette, so the bars match the field. */
-      main { height: 100vh; height: 100dvh; }
+      /* The field fills the window edge to edge. The stage is sized to the
+         viewport's aspect ratio (see the entry script), so nothing stretches;
+         object-fit: cover only absorbs the small drift between a resize and
+         the next layout. The container and the page take the ground colour
+         once the hash has picked a palette. */
+      main { position: fixed; inset: 0; }
 
       #canvas, #layer01, #layer02, #layer03, #layer04, #layer05 {
-        max-width: 100%;
-        max-height: 100%;
-        margin: auto;
-        overflow: auto;
         position: fixed;
-        object-fit: contain;
         top: 0;
-        bottom: 0;
         left: 0;
-        right: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
       }
 
       /* Working layers stay hidden; only the composite is shown. */
@@ -113,41 +112,148 @@
 
     <script>
       // Stands in for the webpack entry: builds the container and the six
-      // 1920×1920 canvases the sketch expects, then starts it.
+      // canvases the sketch expects, sizes them to the window, then starts it.
       (() => {
         'use strict';
+
+        // The sketch was drawn against a 1920 square: line weights, wander
+        // radii, target radii and the pads that lay out the square layouts are
+        // all in those pixels. The stage holds its short side at 1920 and lets
+        // the long side follow the window's aspect ratio, so the scribbling
+        // keeps the scale it was drawn at while the field runs edge to edge.
+        // The aspect is capped at three to one — past that the canvases would
+        // get unreasonably large, and cover crops instead.
+        const BASE = 1920;
+        const MAX_ASPECT = 3;
+        const MAX_DPR = 2;
+
+        // 4500 updates fill a 1920 square; a wider field needs proportionally
+        // more to open on an equally mature picture, up to a ceiling that keeps
+        // the blocking prebake to a sensible length on a very long window.
+        const PREBAKE_FRAMES = 4500;
+        const MAX_PREBAKE_FRAMES = 8000;
+
+        const stage = { w: BASE, h: BASE, scale: 1 };
 
         const container = document.createElement('main');
         container.id = 'HMCmain';
 
+        // layer02 and layer05 exist because init() takes a context for each,
+        // but nothing draws to them — every call that did is commented out in
+        // the shipped source. They stay 1×1 so a window-sized stage does not
+        // pay for two more full-size backing stores.
+        const UNUSED_LAYERS = ['layer02', 'layer05'];
+
         for (const id of ['layer01', 'layer02', 'layer03', 'layer04', 'layer05', 'canvas']) {
           const c = document.createElement('canvas');
           c.id = id;
-          c.width = 1920;
-          c.height = 1920;
+          c.width = 1;
+          c.height = 1;
           container.appendChild(c);
         }
         document.body.prepend(container);
+
+        function viewportAspect() {
+          const w = Math.max(1, window.innerWidth);
+          const h = Math.max(1, window.innerHeight);
+          return Math.min(MAX_ASPECT, Math.max(1 / MAX_ASPECT, w / h));
+        }
+
+        // Sizing a canvas clears it and drops its transform, so this empties
+        // every layer, the accumulated painting included.
+        function sizeStage() {
+          const aspect = viewportAspect();
+          stage.w = aspect >= 1 ? Math.round(BASE * aspect) : BASE;
+          stage.h = aspect >= 1 ? BASE : Math.round(BASE / aspect);
+
+          // Never rasterise more pixels than the screen can show: a tall phone
+          // asks for a 1920 × 4100 field, several times its own screen. The
+          // sketch keeps drawing in 1920-based coordinates and the contexts
+          // carry the difference.
+          const screenLongSide = Math.max(window.innerWidth, window.innerHeight) *
+            Math.min(window.devicePixelRatio || 1, MAX_DPR);
+          stage.scale = Math.min(1, screenLongSide / Math.max(stage.w, stage.h));
+
+          for (const c of container.querySelectorAll('canvas')) {
+            if (UNUSED_LAYERS.includes(c.id)) continue;
+            c.width = Math.max(1, Math.round(stage.w * stage.scale));
+            c.height = Math.max(1, Math.round(stage.h * stage.scale));
+          }
+
+          // What the sketch reads for the size and centre of the field.
+          setFieldSize(stage.w, stage.h);
+          layoutField();
+        }
+
+        function applyDeviceScale() {
+          for (const name of ['ctx', 'layer01', 'layer02', 'layer03', 'layer04', 'layer05']) {
+            const c = window[name];
+            if (c) c.setTransform(stage.scale, 0, 0, stage.scale, 0, 0);
+          }
+        }
 
         const composite = document.getElementById('canvas');
         composite.setAttribute('tabindex', '0');
         composite.setAttribute('aria-describedby', 'instructions');
 
         const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-        const PREBAKE_FRAMES = 4500;
 
+        sizeStage();
         init();
+        applyDeviceScale();
         initParticleSystem();
         prebake();
         describe();
+
+        // A resize that changes the window's shape grows the field around the
+        // picture rather than starting over: the painting is kept at the size
+        // it was drawn and the new ground opens up around it, and the swarm
+        // spreads into it on its own. Anything smaller than a few percent is
+        // left to cover.
+        let resizeTimer = 0;
+        window.addEventListener('resize', () => {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => {
+            const drift = viewportAspect() / (stage.w / stage.h);
+            if (Math.abs(drift - 1) > 0.03) relayout();
+          }, 180);
+        }, { passive: true });
+
+        function relayout() {
+          // layer04 is the painting, and sizing a canvas clears it, so it is
+          // copied out first and drawn back afterwards.
+          const keep = document.createElement('canvas');
+          keep.width = layer04Elem.width;
+          keep.height = layer04Elem.height;
+          keep.getContext('2d').drawImage(layer04Elem, 0, 0);
+          const wasW = maxW;
+          const wasH = maxH;
+
+          sizeStage();
+          applyDeviceScale();
+
+          // The field's short side is always 1920, so the flowers go back at
+          // the size they were drawn, centred in whatever shape the window is
+          // now.
+          layer04.drawImage(keep, (maxW - wasW) / 2, (maxH - wasH) / 2, wasW, wasH);
+
+          // Let the square layouts re-scatter across the new field at once
+          // instead of waiting out the rest of their cycle.
+          resetSquare = true;
+          resetSquareCount = 0;
+        }
 
         // Skip the slow opening build and begin with a mature field. Working
         // layers are still hidden here, so none of these frames are displayed.
         // Reduced motion opens on the same field and holds it; otherwise the
         // regular frame loop carries on from this exact state.
         function prebake() {
-          for (let i = 0; i < PREBAKE_FRAMES; i++) {
-            layer01.clearRect(0, 0, 1920, 1920);
+          const frames = Math.min(
+            MAX_PREBAKE_FRAMES,
+            Math.round(PREBAKE_FRAMES * (stage.w * stage.h) / (BASE * BASE))
+          );
+          for (let i = 0; i < frames; i++) {
+            layer01.clearRect(0, 0, maxW, maxH);
             system.update();
           }
           paused = reduced.matches;
@@ -171,7 +277,7 @@
         function newIteration() {
           // layer04 is the accumulated painting — never cleared during play.
           // A new iteration starts on a clean field.
-          layer04.clearRect(0, 0, 1920, 1920);
+          layer04.clearRect(0, 0, maxW, maxH);
 
           window.reseed();
           selectIteration();

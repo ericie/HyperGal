@@ -71,7 +71,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Many Mario: black two-eyed silhouettes climb through a different anime-painted cloudscape on every run."
+      aria-label="Many Mario: a flock of floppy navy bags climbs through a different anime-painted cloudscape on every run, dodging barrels and spinning saw blades."
     ></canvas>
     <pre id="debug" class="debug" hidden></pre>
 
@@ -123,6 +123,13 @@
         const MARIO_ENTRY_TIMEOUT = 4.8;
         const MARIO_CONTACT_DISTANCE = 26;
         const BARREL_RADIUS = 17;
+        const SAW_RADIUS = 15;
+        const SAW_INSET = 18;
+        const HAZARD_NOTICE = 46;
+        const HAZARD_HOP_GAP = 24;
+        const HAZARD_HOP_SPEED = 420;
+        const HEAD_BOUNCE_SPEED = 585;
+        let sawChance = 0.26;
         const BARREL_WARNING_SECONDS = 0.85;
         const BARREL_LIMIT = 3;
         const SCENE_SCALE = 0.9;
@@ -416,6 +423,7 @@
           updateMarioBuddies(dt);
           resolveMarioShoves(dt);
           updateBarrels(dt);
+          updateSaws();
           updateParticles(dt);
           updateCamera(dt);
           maintainMarioPopulation();
@@ -487,7 +495,7 @@
           hero.y += hero.vy * dt;
           if (hero.grounded) hero.stride += Math.abs(hero.vx) * dt;
           keepHeroInShaft();
-          collidePlatforms();
+          if (!headBounce(hero)) collidePlatforms();
         }
 
         /* Eye blinks run on their own little clock so the face never feels
@@ -513,7 +521,7 @@
             hero.autoTargetId = target.id;
             hero.noRouteSince = 0;
             hero.autoLandingX = safeLandingX(target, hero.autoLandingX ?? hero.x);
-            hero.autoVx = landingVelocity(hero, airLandingPlan(hero, target));
+            hero.autoVx = landingVelocity(hero, airLandingPlan(hero, target)) + barrelSwerve(hero);
             return;
           }
 
@@ -521,6 +529,17 @@
           if (!current) {
             targetPlatformId = null;
             hero.autoVx = clamp((worldWidth * 0.5 - hero.x) * 2.8, -runSpeed, runSpeed);
+            return;
+          }
+
+          const dodge = hazardPlan(current, hero.x);
+          if (dodge) {
+            targetPlatformId = null;
+            if (dodge.hop && simTime >= hero.jumpCooldownUntil) {
+              hopHero(current, dodge.away);
+              return;
+            }
+            hero.autoVx = dodge.away * runSpeed;
             return;
           }
 
@@ -550,7 +569,7 @@
             ? clamp(landingDx * (leading ? 2.8 : 3.6), -runSpeed, runSpeed)
             : clamp(launchDx * (leading ? 3.6 : 4.8), -runSpeed, runSpeed);
 
-          if (atLaunch && simTime >= hero.jumpCooldownUntil) {
+          if (atLaunch && simTime >= hero.jumpCooldownUntil && !barrelBlocksLaunch(hero, route.landingX)) {
             jump(route);
           }
         }
@@ -703,8 +722,19 @@
           if (platform.type === 'crumble') return crumbleLandingBounds(platform);
           const platformEdge = platformLeft(platform);
           const heroInset = HERO_W * 0.5 + 4;
-          const hardLeft = Math.max(heroInset, platformEdge + HERO_W * 0.42);
-          const hardRight = Math.min(worldWidth - heroInset, platformEdge + platform.w - HERO_W * 0.42);
+          let hardLeft = Math.max(heroInset, platformEdge + HERO_W * 0.42);
+          let hardRight = Math.min(worldWidth - heroInset, platformEdge + platform.w - HERO_W * 0.42);
+          if (platform.saw) {
+            // Aim for whichever side of the blade has more room right now.
+            // The blade keeps moving during the flight, which is exactly
+            // where the near misses come from.
+            const [cx] = sawCenter(platform);
+            const guard = platform.saw.radius + HERO_W * 0.5;
+            const roomLeft = (cx - guard) - hardLeft;
+            const roomRight = hardRight - (cx + guard);
+            if (roomRight >= roomLeft) { if (roomRight > 0) hardLeft = Math.max(hardLeft, cx + guard); }
+            else if (roomLeft > 0) hardRight = Math.min(hardRight, cx - guard);
+          }
           if (hardRight < hardLeft) return null;
           const margin = landingMargin(platform);
           const softLeft = Math.max(hardLeft, platformEdge + margin);
@@ -1328,9 +1358,24 @@
         function marioWalkInSide(platform) {
           const left = platformLeft(platform);
           const right = left + platform.w;
-          if (sceneScreenX(left) < -30) return 1;
-          if (sceneScreenX(right) > width + 30) return -1;
-          return 0;
+          let dir = 0;
+          if (sceneScreenX(left) < -30) dir = 1;
+          else if (sceneScreenX(right) > width + 30) dir = -1;
+          if (!dir) return 0;
+          /* A shelf that only clips the frame edge cannot hide an entrant:
+             the clamp in marioWalkInStart would pull it into view. Ask that
+             function directly rather than guessing at an overhang. */
+          const sx = sceneScreenX(marioWalkInStart(platform, dir));
+          return (dir > 0 ? sx <= -30 : sx >= width + 30) ? dir : 0;
+        }
+
+        /* Where a runner stands at the start of its walk-in. Shared, so the
+           eligibility test and the placement can never disagree. */
+        function marioWalkInStart(platform, dir) {
+          const left = platformLeft(platform);
+          const right = left + platform.w;
+          const offscreen = offscreenWorldX(dir > 0 ? -1 : 1) - dir * 62;
+          return clamp(offscreen, left + 12, right - 12);
         }
 
         /* Runners only ever arrive on foot, along a shelf that runs off the
@@ -1372,11 +1417,9 @@
         function startMarioWalkIn(buddy, platform, dir) {
           recentMarioEntries.push({ platformId: platform.id, y: platform.y, dir, at: simTime });
           const left = platformLeft(platform);
-          const right = left + platform.w;
           /* Start well clear of the frame so nobody pops into the visible
              scene -- they have to walk the last stretch in. */
-          const offscreen = offscreenWorldX(dir > 0 ? -1 : 1) - dir * 62;
-          const x = clamp(offscreen, left + 12, right - 12);
+          const x = marioWalkInStart(platform, dir);
           buddy.dead = false;
           buddy.deadAt = 0;
           buddy.platformId = platform.id;
@@ -1492,7 +1535,7 @@
               buddy.y += buddy.vy * dt;
               steerMarioBuddy(buddy, dt);
               if (buddy.falling) buddy.spin += buddy.vx * dt * 0.003;
-              collideMarioBuddy(buddy);
+              if (!headBounce(buddy)) collideMarioBuddy(buddy);
             }
             if (buddy.entryPending && marioIsOnStage(buddy)) buddy.entryPending = false;
           }
@@ -1612,11 +1655,18 @@
           }
           const route = committedMarioRoute(platform, buddy);
           const launchDx = route ? route.launchX - buddy.x : 0;
-          const desired = clamp(launchDx * 7, -BUDDY_RUN_SPEED, BUDDY_RUN_SPEED);
+          const dodge = hazardPlan(platform, buddy.x);
+          if (dodge && dodge.hop && simTime >= (buddy.hopCooldownUntil || 0)) {
+            hopMarioBuddy(buddy, platform, dodge.away);
+            return;
+          }
+          const desired = dodge ? dodge.away * BUDDY_RUN_SPEED
+            : clamp(launchDx * 7, -BUDDY_RUN_SPEED, BUDDY_RUN_SPEED);
           buddy.vx += (desired - buddy.vx) * (1 - Math.exp(-14 * dt));
           if (Math.abs(launchDx) > 7) buddy.facing = Math.sign(launchDx);
           const readyAt = buddy.landedAt + marioLandingPause(buddy, platform);
-          if (route && Math.abs(launchDx) < 7 && simTime >= readyAt) {
+          if (route && Math.abs(launchDx) < 7 && simTime >= readyAt &&
+            !barrelBlocksLaunch(buddy, route.landingX)) {
             launchMarioBuddy(buddy, platform, route);
             return;
           }
@@ -1726,7 +1776,7 @@
               next.y <= platform.y + 134 && routeToPlatform(platform, next, jumpSpeed));
             route.score = Math.abs(route.launchX - buddy.x) * 0.5 + route.dx * 0.12 -
               route.gap * (0.4 + drive * 0.35) - Math.min(90, room) * 0.12 +
-              crowd * 24 + (onward ? 0 : 100) +
+              crowd * 24 + (onward ? 0 : 100) + (platform.saw ? 22 : 0) +
               (hash01(buddy.id * 2017 + platform.id * 101) - 0.5) * 24;
             if (route.gap >= MIN_TARGET_GAP) {
               if (!best || route.score < best.score) best = route;
@@ -1766,9 +1816,36 @@
             if (plan) buddy.landingX = safeLandingX(target, plan.x);
           }
           buddy.falling = !plan;
-          const desired = plan ? landingVelocity(buddy, plan) : 0;
+          const desired = (plan ? landingVelocity(buddy, plan) : 0) + barrelSwerve(buddy);
           buddy.vx += (desired - buddy.vx) * (1 - Math.exp(-12 * dt));
           if (Math.abs(buddy.vx) > 8) buddy.facing = Math.sign(buddy.vx);
+        }
+
+        /* A runner coming down on another's head takes the step. Only a
+           falling runner can take one, and only from above, so a crowd
+           sharing a ledge never sets it off. The bounce clears the rider's
+           route so it re-plans from its new height -- which is the whole
+           point: heads are a way onto a ledge that was out of reach. */
+        function headBounce(runner) {
+          if (runner.dead || runner.entryPending || runner.grounded || runner.vy > 0) return false;
+          for (const other of [hero, ...buddies]) {
+            if (other === runner || other.dead || other.entryPending || other.walkInDir) continue;
+            if (Math.abs(other.x - runner.x) > HERO_W * 0.6) continue;
+            const head = other.y + HERO_H * 0.82;
+            if (runner.previousY < head || runner.y > head + 2) continue;
+            runner.y = head;
+            runner.vy = HEAD_BOUNCE_SPEED;
+            runner.falling = false;
+            runner.targetId = null;
+            runner.landingX = null;
+            runner.autoTargetId = null;
+            runner.autoLandingX = null;
+            runner.groundRoute = null;
+            other.pressedUntil = simTime + 0.22;
+            spawnDust(runner.x, head, 6, C.mint);
+            return true;
+          }
+          return false;
         }
 
         function collideMarioBuddy(buddy) {
@@ -1850,7 +1927,7 @@
 
         function addPlatform() {
           const previous = lastPlatform;
-          const gap = rand(height < 620 ? 86 : 92, height < 620 ? 116 : 126);
+          const gap = rand(height < 620 ? 72 : 76, height < 620 ? 100 : 108);
           const y = previous.y + gap;
           const minW = clamp(worldWidth * 0.2, 82, 118);
           const maxW = clamp(worldWidth * 0.34, 144, 248);
@@ -1884,8 +1961,9 @@
             if (!foundReachable) center = clamp(platformCenter(previous), centerBounds.min, centerBounds.max);
           }
           const type = nextPlatformType();
-          const moving = type === 'ink' && y > 800 && w > 136 && rng() < 0.06;
+          const moving = type === 'ink' && y > 420 && w > 120 && rng() < 0.26;
           const platform = makePlatform(center, y, w, type, moving);
+          if (type === 'ink' && !moving && y > 620 && w > 170 && rng() < sawChance) attachSaw(platform, rng);
           // Validate the final geometry, including motion added after planning.
           if (!canPlacePlatform(platform) && platform.moving) {
             platform.moving = false;
@@ -1954,11 +2032,13 @@
 
         function addBranchPlatforms(previous, trunk) {
           const roll = rng();
-          const branchCount = roll < 0.54 ? 1 : 0;
+          const branchCount = roll < 0.32 ? 2 : roll < 0.86 ? 1 : 0;
           for (let i = 0; i < branchCount; i += 1) {
             const base = trunk;
             const baseCenter = platformCenter(base);
-            const side = baseCenter < worldWidth * 0.5 ? -1 : 1;
+            // A second branch takes the opposite side, so a pair opens two
+            // routes off one step instead of crowding the same flank.
+            const side = (baseCenter < worldWidth * 0.5 ? -1 : 1) * (i === 0 ? 1 : -1);
             let chosen = null;
             for (let attempt = 0; attempt < 14; attempt += 1) {
               const gap = rand(78, 124);
@@ -1983,7 +2063,7 @@
         }
 
         function makePlatform(center, y, w, type, moving) {
-          const travel = moving ? rand(18, Math.min(42, worldWidth * 0.08)) : 0;
+          const travel = moving ? rand(52, Math.min(124, worldWidth * 0.17)) : 0;
           return {
             id: ++platformCount,
             x: center - w * 0.5,
@@ -1993,6 +2073,7 @@
             baseW: w,
             h: 38,
             type,
+            saw: null,
             crumbleBricks: null,
             cloudChunks: null,
             shrinkLevel: 0,
@@ -2002,17 +2083,190 @@
             moving,
             travel,
             phase: rand(0, TAU),
-            speed: rand(0.55, 0.92),
+            speed: rand(0.34, 0.58),
             visited: false,
             pulseUntil: 0,
           };
+        }
+
+        /* A blade bolted to a ledge, sliding along a fixed span. Its
+           position is a pure function of simTime, like the drifting
+           platforms, so a seed always replays the same near miss. */
+        function attachSaw(platform, rng) {
+          // The blade crosses most of the ledge, so it sits in the path a
+          // runner actually walks rather than guarding a corner nobody uses.
+          const span = Math.min(platform.w - SAW_INSET * 2 - HERO_W, rand(76, 150));
+          if (span < 60) return;
+          platform.saw = {
+            span,
+            radius: SAW_RADIUS,
+            phase: rand(0, TAU),
+            speed: rand(0.5, 0.85),
+            dir: rng() < 0.5 ? -1 : 1,
+          };
+        }
+
+        /* The nearest thing bearing down on a runner standing here: the
+           ledge's own blade, a barrel rolling along it, a barrel still falling
+           toward it, or the warning marker for one about to drop. Anything
+           moving away is ignored, which is what lets a runner fall in behind a
+           hazard instead of fleeing something already past. */
+        function nearestHazard(platform, runnerX) {
+          if (!platform) return null;
+          let nearest = null;
+          const consider = (x, ahead, reach, canHop) => {
+            const gap = runnerX - x;
+            const side = Math.sign(gap) || 1;
+            const distance = Math.abs(gap) - reach;
+            if (distance > HAZARD_NOTICE) return;
+            // Skip only what is genuinely moving away. Something sitting
+            // still -- a stalled barrel, a blade at its turnaround, one
+            // dropping straight down -- is still very much a problem.
+            if ((ahead - x) * side < 0 && distance > 4) return;
+            if (!nearest || distance < nearest.distance) nearest = { distance, away: side, canHop };
+          };
+
+          if (platform.saw) {
+            const [cx] = sawCenter(platform);
+            const [ahead] = sawCenter(platform, simTime + 0.3);
+            consider(cx, ahead, platform.saw.radius + HERO_W * 0.3, true);
+          }
+          for (const barrel of barrels) {
+            if (barrel.platformId === platform.id) {
+              consider(barrel.x, barrel.x + barrel.vx * 0.3, barrel.radius + HERO_W * 0.3, true);
+            } else if (!barrel.platformId && barrel.y > platform.y &&
+              barrel.y - platform.y < 230 && Math.abs(barrel.x - runnerX) < 66) {
+              // Still in the air: step out from under it rather than hop.
+              consider(barrel.x, barrel.x + barrel.vx * 0.3, HERO_W * 0.3, false);
+            }
+          }
+          // The amber arrow is a free half second of warning. Use it.
+          if (barrelWarning && Math.abs(barrelWarning.x - runnerX) < 38) {
+            consider(barrelWarning.x, barrelWarning.x, HERO_W * 0.3, false);
+          }
+          return nearest;
+        }
+
+        /* Back away while there is ledge to back onto; go over the top once
+           there is not, or once the thing is too close to outrun. Reading it
+           that finely is also what leaves room to read it wrong. */
+        function hazardPlan(platform, runnerX) {
+          const threat = nearestHazard(platform, runnerX);
+          if (!threat) return null;
+          const limits = marioFootingLimits(platform);
+          if (!limits) return null;
+          const room = threat.away > 0 ? limits.right - runnerX : runnerX - limits.left;
+          const cornered = room < 30;
+          if (threat.canHop && (threat.distance <= HAZARD_HOP_GAP || cornered)) {
+            return { hop: true, away: threat.away };
+          }
+          // Nothing to hop and nowhere to back to: cut past it and hope.
+          return { hop: false, away: cornered ? -threat.away : threat.away };
+        }
+
+        function sawFleeDirection(platform, runnerX) {
+          if (!platform || !platform.saw) return 0;
+          const plan = hazardPlan(platform, runnerX);
+          return plan && !plan.hop ? plan.away : 0;
+        }
+
+        /* A hop in place. The runner keeps this platform as its target, so the
+           ordinary air steering brings it back down where it took off from,
+           and the hazard passes underneath. */
+        function hopMarioBuddy(buddy, platform, away) {
+          buddy.previousPlatformId = null;
+          buddy.groundRoute = null;
+          buddy.platformId = null;
+          buddy.targetId = platform.id;
+          buddy.grounded = false;
+          buddy.falling = false;
+          buddy.vy = HAZARD_HOP_SPEED;
+          buddy.landingX = safeLandingX(platform, buddy.x + away * 14);
+          buddy.vx = clamp((buddy.landingX - buddy.x) * 1.4, -BUDDY_RUN_SPEED, BUDDY_RUN_SPEED);
+          buddy.hopCooldownUntil = simTime + 0.4;
+          spawnDust(buddy.x, buddy.y, 5, C.lemon);
+        }
+
+        /* A runner about to leave the ground looks up first. Jumping into a
+           falling barrel is far and away the commonest way to die here, so a
+           jump waits rather than commits while one is over the run. */
+        function barrelBlocksLaunch(runner, landingX) {
+          const left = Math.min(runner.x, landingX) - 34;
+          const right = Math.max(runner.x, landingX) + 34;
+          for (const barrel of barrels) {
+            if (barrel.x < left || barrel.x > right) continue;
+            const rise = barrel.y - runner.y;
+            if (rise > -30 && rise < 210) return true;
+          }
+          return false;
+        }
+
+        /* Mid-flight, lean away from a barrel sharing the air. It rarely saves
+           a runner outright, but it turns direct hits into near misses. */
+        function barrelSwerve(runner) {
+          let push = 0;
+          for (const barrel of barrels) {
+            const dx = runner.x - barrel.x;
+            const dy = runner.y + HERO_H * 0.5 - barrel.y;
+            if (Math.abs(dx) > 78 || Math.abs(dy) > 70) continue;
+            push += (Math.sign(dx) || 1) * (1 - Math.abs(dx) / 78) * 165;
+          }
+          return clamp(push, -200, 200);
+        }
+
+        function hopHero(platform, away) {
+          hero.vy = HAZARD_HOP_SPEED;
+          hero.vx = away * RUN_SPEED * 0.3;
+          hero.autoVx = hero.vx;
+          hero.groundRoute = null;
+          hero.previousPlatformId = null;
+          hero.grounded = false;
+          hero.groundId = null;
+          hero.autoTargetId = platform.id;
+          hero.autoLaunchX = null;
+          hero.autoLandingX = safeLandingX(platform, hero.x + away * 14);
+          hero.routeAttemptTargetId = null;
+          hero.routeAttemptFromId = null;
+          hero.routeAttemptStartedAt = 0;
+          hero.jumpCooldownUntil = simTime + 0.4;
+          spawnDust(hero.x, hero.y, 9, COLORS.smoke);
+        }
+
+        function sawCenter(platform, atTime = simTime) {
+          const saw = platform.saw;
+          const slide = Math.sin(atTime * saw.speed + saw.phase) * saw.span * 0.5;
+          return [platformLeft(platform, atTime) + platform.w * 0.5 + slide,
+            platform.y + saw.radius * 0.82];
+        }
+
+        /* A slow blade does not need the swept test the barrels use; a circle
+           against the body box is honest at this speed. */
+        function sawHitsMario(platform, runner) {
+          if (runner.dead || runner.entryPending) return false;
+          const [cx, cy] = sawCenter(platform);
+          const dx = Math.max(0, Math.abs(cx - runner.x) - HERO_W * 0.3);
+          const dy = cy - clamp(cy, runner.y, runner.y + HERO_H);
+          const r = platform.saw.radius;
+          return dx * dx + dy * dy < r * r;
+        }
+
+        function updateSaws() {
+          for (const platform of platforms) {
+            if (!platform.saw || platform.collapsed) continue;
+            if (screenY(platform.y) < -120 || screenY(platform.y) > height + 120) continue;
+            const [cx] = sawCenter(platform);
+            for (const runner of [hero, ...buddies]) {
+              if (!sawHitsMario(platform, runner)) continue;
+              defeatMario(runner, { x: cx, y: platform.y, vx: Math.sign(runner.x - cx) * 60 });
+            }
+          }
         }
 
         function nextPlatformType() {
           // Deal a shuffled mix throughout the climb. Small bags keep all three
           // materials nearby without creating a predictable alternating ladder.
           if (!platformTypeBag.length) {
-            platformTypeBag = ['ink', 'ink', 'ink', 'ink', 'ink', 'crumble', 'crumble', 'crumble', 'cloud', 'cloud'];
+            platformTypeBag = ['ink', 'ink', 'ink', 'ink', 'ink', 'ink', 'crumble', 'crumble', 'crumble', 'crumble'];
             for (let i = platformTypeBag.length - 1; i > 0; i--) {
               const j = Math.floor(rng() * (i + 1));
               [platformTypeBag[i], platformTypeBag[j]] = [platformTypeBag[j], platformTypeBag[i]];
@@ -2034,7 +2288,7 @@
           const relaxed = mode === 'relaxed';
           const horizontalGap = Math.max(other.left - rect.right, rect.left - other.right, 0);
           const verticalGap = Math.abs(candidate.y - platform.y);
-          return (verticalGap < (relaxed ? 42 : 74) && horizontalGap < (relaxed ? 18 : 30)) ||
+          return (verticalGap < (relaxed ? 38 : 62) && horizontalGap < (relaxed ? 18 : 26)) ||
             rectsOverlap(rect, platformVisualRect(platform, 10));
         }
 
@@ -2391,10 +2645,48 @@
             if (sy < -90 || sy > height + 90) continue;
             const sx = worldLeft + platformLeft(platform);
             const pulse = clamp(1 - (simTime - platform.pulseUntil + 0.24) / 0.24, 0, 1);
-            if (platform.type === 'ink') drawSolidPlatform(platform, sx, sy, pulse);
+            if (platform.moving) drawMovingPlatform(platform, sx, sy, pulse);
+            else if (platform.type === 'ink') drawSolidPlatform(platform, sx, sy, pulse);
             else if (platform.type === 'crumble') drawCrumblePlatform(platform, sx, sy, pulse);
             else if (platform.type === 'cloud') drawCloudPlatform(platform, sx, sy, pulse);
+            if (platform.saw) drawSaw(platform);
           }
+        }
+
+        /* The blade is built from the world's own palette rather than a
+           foreign steel grey, so it reads as part of the same picture. The
+           hub is drawn unspun so the eye has something still to hold. */
+        function drawSaw(platform) {
+          const saw = platform.saw;
+          const [worldX, worldY] = sawCenter(platform);
+          const cx = worldLeft + worldX;
+          const cy = screenY(worldY);
+          const r = saw.radius;
+          const teeth = 10;
+
+          fillOval(cx, screenY(platform.y) + 7, r * 0.8, 2.6, SHADOW);
+
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(simTime * (prefersReducedMotion ? 0.7 : 4.2) * saw.dir);
+          ctx.beginPath();
+          for (let i = 0; i < teeth; i += 1) {
+            const outer = (i / teeth) * TAU;
+            const inner = ((i + 0.5) / teeth) * TAU;
+            ctx.lineTo(Math.cos(outer) * r, Math.sin(outer) * r);
+            ctx.lineTo(Math.cos(inner) * r * 0.72, Math.sin(inner) * r * 0.72);
+          }
+          ctx.closePath();
+          ctx.fillStyle = '#CFDCEA';
+          ctx.fill();
+          ctx.strokeStyle = C.ink;
+          ctx.lineWidth = 2;
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+          ctx.restore();
+
+          fillCircle(cx, cy, r * 0.32, C.ink);
+          fillCircle(cx, cy, r * 0.15, C.blush);
         }
 
         function applyPlatformPulse(cx, sy, pulse) {
@@ -2450,6 +2742,32 @@
           ctx.restore();
         }
 
+        /* A drifting ledge has to be told apart from a still one at a glance,
+           so it gets its own material: pastel purple, corners rounded much
+           harder than the mint ledges, and a triangle at each end pointing the
+           way it travels. */
+        function drawMovingPlatform(platform, sx, sy, pulse) {
+          const w = platform.w;
+          ctx.save();
+          applyPlatformPulse(sx + w * 0.5, sy, pulse);
+          fillRound(sx, sy - 5, w, 15, 7, C.ink);
+          fillRound(sx + 4, sy - 3, w - 8, 8, 5, C.pale);
+
+          const midY = sy + 1;
+          ctx.fillStyle = C.ink;
+          ctx.beginPath();
+          ctx.moveTo(sx + 7, midY);
+          ctx.lineTo(sx + 13.5, midY - 3.6);
+          ctx.lineTo(sx + 13.5, midY + 3.6);
+          ctx.closePath();
+          ctx.moveTo(sx + w - 7, midY);
+          ctx.lineTo(sx + w - 13.5, midY - 3.6);
+          ctx.lineTo(sx + w - 13.5, midY + 3.6);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+
         function drawCrumblePlatform(platform, sx, sy, pulse) {
           const w = platform.w;
           const cx = sx + w * 0.5;
@@ -2484,7 +2802,7 @@
               ctx.lineTo(left + size * 0.58, top + 7);
               ctx.lineTo(left + size * 0.42, top + 12);
               ctx.lineTo(left + size * 0.68, top + 18);
-              ctx.strokeStyle = SKIN.outline;
+              ctx.strokeStyle = '#6C4555';
               ctx.stroke();
             }
             ctx.restore();
@@ -2554,54 +2872,79 @@
         const SHOULDER_Y = -29;
         const HEAD_Y = -38;
 
-        /* Existing pose calls retain their depth-role names, but every body
-           part now resolves to a single charcoal silhouette. */
+        /* Only the eyes sit outside the figure's own color. */
         const SKIN = {
-          outline: '#272D30',
-          deepest: '#272D30',
-          back: '#272D30',
-          mid: '#272D30',
-          bright: '#FFFDFC',
-          face: '#FFFDFC',
-          shirt: '#272D30',
-          arm: '#272D30',
-          leg: '#272D30',
-          boot: '#272D30',
-          cap: '#272D30',
+          eye: '#FFFDFC',
+          pupil: '#141A2E',
         };
 
-        function armorCapsule(ax, ay, bx, by, thickness) {
-          capsule(ax, ay, bx, by, Math.max(2.8, thickness * 0.56), SKIN.outline);
+        /* Each bag is one flat color -- body, legs and feet alike -- and every
+           runner draws its own navy off a stable hash of its id. The crowd
+           reads as a family of shades rather than one repeated sprite, and a
+           runner keeps its shade through a fall, a knockout and its return.
+           Hashed rather than drawn from the world rng, so adding runners
+           cannot shift a seeded course. */
+        const NAVY_DEEP = [26, 35, 68];
+        const NAVY_LIGHT = [78, 106, 168];
+        let runnerTint = 'rgb(26, 35, 68)';
+
+        /* Three bodies, hashed per runner like the tint. All three fill the
+           same box so the physics footprint does not change with the shape;
+           only the outline does. Each keeps soft, bowed edges -- floppy, not
+           geometric. The arm anchors and eye positions move with the shape,
+           since a triangle is narrow where a square is wide. */
+        const RUNNER_SHAPES = ['square', 'circle', 'triangle'];
+        const ARM_ANCHOR = { square: 15.5, circle: 15.0, triangle: 10.0 };
+        const EYE_LAYOUT = {
+          square: { xs: [1.0, 6.8], y: 1.0 },
+          circle: { xs: [1.0, 6.6], y: 1.6 },
+          triangle: { xs: [-0.8, 4.4], y: 5.2 },
+        };
+        let runnerShape = 'square';
+
+        function marioShape(runner) {
+          if (!runner.shape) {
+            const pick = Math.floor(hash01((runner.id + 1) * 3389) * RUNNER_SHAPES.length);
+            runner.shape = RUNNER_SHAPES[Math.min(pick, RUNNER_SHAPES.length - 1)];
+          }
+          return runner.shape;
         }
 
-        /* A loose, handless arm. Both control points sag below the shoulder,
-           so the limb trails the pose instead of reading as a rigid bar. */
-        function drawFloppyArm(ax, ay, bx, by, thickness) {
-          const dx = bx - ax;
-          const dy = by - ay;
-          const length = Math.hypot(dx, dy);
-          const sag = 3.2 + length * 0.13;
-          ctx.strokeStyle = SKIN.outline;
-          ctx.lineWidth = Math.max(2.6, thickness * 0.54);
-          ctx.lineCap = 'round';
-          ctx.beginPath();
-          ctx.moveTo(ax, ay);
-          ctx.bezierCurveTo(ax + dx * 0.28, ay + sag, ax + dx * 0.72, by + sag * 0.72, bx, by);
-          ctx.stroke();
+        function marioTint(runner) {
+          if (!runner.tint) {
+            const t = hash01((runner.id + 1) * 9173);
+            const rgb = NAVY_DEEP.map((deep, i) => Math.round(deep + (NAVY_LIGHT[i] - deep) * t));
+            runner.tint = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+          }
+          return runner.tint;
         }
 
+        /* A leg, kept stubby. Same color as the bag, so the whole figure is
+           one silhouette and the legs read as the bottom of it. */
+        function armorCapsule(ax, ay, bx, by, thickness, color = runnerTint) {
+          capsule(ax, ay, bx, by, Math.max(3.2, thickness * 0.62), color);
+        }
+
+        /* A tiny arm: a stub anchored at the bag's side, angled so only its
+           last few pixels clear the silhouette. Same color as everything
+           else, so it reads as part of the bag rather than a limb stuck on. */
+        function drawStubArm(x, y, angle, length) {
+          capsule(x, y, x + Math.cos(angle) * length, y + Math.sin(angle) * length, 4.2, runnerTint);
+        }
+
+        /* Two toes and a heel. Any more detail than this fights the bag. */
         function armorBoot(x, y, direction = 1) {
           ctx.save();
           ctx.translate(x, y);
           ctx.scale(direction, 1);
-          ctx.fillStyle = SKIN.outline;
+          ctx.strokeStyle = runnerTint;
+          ctx.lineWidth = 2.2;
+          ctx.lineCap = 'round';
           ctx.beginPath();
-          ctx.moveTo(-2.4, -5.5);
-          ctx.lineTo(2.2, -5.2);
-          ctx.quadraticCurveTo(2.8, -2.2, 6.8, 0.4);
-          ctx.lineTo(-5.6, 2.2);
-          ctx.lineTo(-0.4, -1.4);
-          ctx.fill();
+          ctx.moveTo(-1.2, -0.4); ctx.lineTo(5.6, 1.6);
+          ctx.moveTo(-1.2, -0.4); ctx.lineTo(4.4, -1.2);
+          ctx.moveTo(-1.2, -0.4); ctx.lineTo(-4.4, 1.6);
+          ctx.stroke();
           ctx.restore();
         }
 
@@ -2647,6 +2990,8 @@
           ctx.rotate(runner.spin);
           ctx.translate(0, 22);
           ctx.scale(runner.facing * 0.9, 0.9);
+          runnerTint = marioTint(runner);
+          runnerShape = marioShape(runner);
           drawBuddyRunner(runner, 0, 0, true);
           ctx.restore();
         }
@@ -2675,7 +3020,11 @@
                   ? clamp(buddy.vx / LEADER_AIR_SPEED, -1, 1) * 0.09
                   : 0
             );
-            ctx.scale(buddy.facing * 0.9 * (1 + bounce * 0.08), 0.9 * (1 - bounce * 0.09));
+            const press = clamp(((buddy.pressedUntil || 0) - simTime) / 0.22, 0, 1);
+            ctx.scale(buddy.facing * 0.9 * (1 + bounce * 0.08 + press * 0.2),
+              0.9 * (1 - bounce * 0.09 - press * 0.24));
+            runnerTint = marioTint(buddy);
+            runnerShape = marioShape(buddy);
             drawBuddyRunner(buddy, phase, gait, panic);
             ctx.restore();
           }
@@ -2685,46 +3034,52 @@
           const rising = !buddy.grounded && buddy.vy > -80;
           let footBack;
           let footFront;
-          let armBackEnd;
-          let armFrontEnd;
 
           if (panic) {
             footBack = [-10, -5];
             footFront = [10, -7];
-            armBackEnd = [-14, -18];
-            armFrontEnd = [13, -20];
           } else if (!buddy.grounded && rising) {
-            /* Split knees carry the jump while both soft arms lag beneath the
-               shoulders, preserving the floppy silhouette in the air. */
+            /* Split knees carry the jump under a bag that holds its shape. */
             footBack = [-8, -9];
             footFront = [8, -5];
-            armBackEnd = [-12, -17];
-            armFrontEnd = [7, -15];
           } else if (!buddy.grounded) {
             footBack = [-10, -4];
             footFront = [7, -10];
-            armBackEnd = [-14, -18];
-            armFrontEnd = [12, -16];
           } else {
             const stride = 9 * gait;
             const liftA = Math.max(0, Math.sin(phase)) * 5.5 * gait;
             const liftB = Math.max(0, Math.sin(phase + Math.PI)) * 5.5 * gait;
             footBack = [-Math.cos(phase) * stride - 1, -1 - liftA];
             footFront = [-Math.cos(phase + Math.PI) * stride + 1, -1 - liftB];
-            armBackEnd = [-8 - Math.cos(phase + Math.PI) * 7 * gait, -17 - liftB * 0.22];
-            armFrontEnd = [8 - Math.cos(phase) * 7 * gait, -18 - liftA * 0.22];
           }
 
-          armorCapsule(-5, -16, footBack[0], footBack[1] - 2, 6.2, SKIN.back);
-          armorBoot(footBack[0], footBack[1], 1, true);
-          drawFloppyArm(-9, -28, armBackEnd[0], armBackEnd[1], 4.8);
+          /* Arms counter-swing on the ground, trail when airborne, and fly
+             up in a panic. A slow idle sway keeps them alive when standing. */
+          const armReach = ARM_ANCHOR[runnerShape] || ARM_ANCHOR.square;
+          let armBack;
+          let armFront;
+          if (panic) {
+            armBack = 3.55;
+            armFront = -0.4;
+          } else if (!buddy.grounded) {
+            armBack = 2.85;
+            armFront = 0.3;
+          } else {
+            const swing = Math.sin(phase) * 0.38 * gait + Math.sin(phase * 0.35) * 0.06 * (1 - gait);
+            armBack = 2.62 + swing;
+            armFront = 0.52 - swing;
+          }
+
+          armorCapsule(-5, -16, footBack[0], footBack[1] - 2, 6.2);
+          armorBoot(footBack[0], footBack[1], 1);
+          drawStubArm(-armReach, -30, armBack, 10);
 
           drawRunnerTorso(-1.2, gait * 1.8);
 
-          armorCapsule(5, -16, footFront[0], footFront[1] - 2, 6.5, SKIN.leg);
-          armorBoot(footFront[0], footFront[1], 1, false);
-          drawFloppyArm(9, -28, armFrontEnd[0], armFrontEnd[1], 5.1);
-          drawRunnerHead(2.2, -38, panic, false, buddy.dead);
+          armorCapsule(5, -16, footFront[0], footFront[1] - 2, 6.5);
+          armorBoot(footFront[0], footFront[1], 1);
+          drawStubArm(armReach, -30.5, armFront, 10);
+          drawRunnerHead(2.2, -38, panic, false, buddy.dead, buddy.phase);
         }
 
         function drawHero() {
@@ -2746,7 +3101,8 @@
           const idleBounce = hero.grounded ? (0.5 + Math.sin(simTime * 3.2) * 0.5) * (1 - speed) * 0.22 : 0;
           const bounce = stepBounce + idleBounce;
           ctx.translate(sx, sy - bounce * 2.8);
-          const land = Math.max(0, 1 - (simTime - hero.landedAt) / 0.28);
+          const land = Math.max(0, Math.max(1 - (simTime - hero.landedAt) / 0.28,
+            ((hero.pressedUntil || 0) - simTime) / 0.22));
           const air = hero.grounded ? 0 : clamp(hero.vy / JUMP_SPEED, -0.9, 1);
           ctx.scale(
             1 + 0.3 * land + bounce * 0.08 - Math.max(0, air) * 0.1,
@@ -2756,6 +3112,8 @@
           if (hurt) ctx.rotate(Math.sin(simTime * 40) * 0.08);
 
           ctx.scale(hero.facing, 1);
+          runnerTint = marioTint(hero);
+          runnerShape = marioShape(hero);
           drawHeroRun(air);
 
           ctx.restore();
@@ -2798,35 +3156,30 @@
             footB = [8, FOOT_Y - 9 + fall * 2];
           }
 
-          /* Handless arms counter-swing loosely on the ground, then trail
-             beneath the shoulders through both authored air poses. */
-          let armEndA;
-          let armEndB;
-          if (grounded) {
-            const swing = 8 * gait;
-            const droop = SHOULDER_Y + 12 + breathe * 0.4;
-            armEndA = [-8 - Math.cos(phase + Math.PI) * swing, droop - Math.max(0, Math.sin(phase + Math.PI)) * 2.2 * gait];
-            armEndB = [9 - Math.cos(phase) * swing, droop - 1 - Math.max(0, Math.sin(phase)) * 2.2 * gait];
-          } else if (air > 0.1) {
-            armEndA = [-12, SHOULDER_Y + 12];
-            armEndB = [7, SHOULDER_Y + 15];
-          } else {
+          /* Legs straddle the bag and the arms are stubs at its sides; the
+             squash and stretch on the body still carries most of the weight. */
+          const armReach = ARM_ANCHOR[runnerShape] || ARM_ANCHOR.square;
+          let armBack;
+          let armFront;
+          if (!grounded) {
             const fall = clamp(-air, 0, 1);
-            armEndA = [-14, SHOULDER_Y + 10 + fall * 3];
-            armEndB = [13, SHOULDER_Y + 13 + fall * 2];
+            armBack = 2.85 + fall * 0.5;
+            armFront = 0.3 - fall * 0.5;
+          } else {
+            const swing = Math.sin(phase) * 0.38 * gait + breathe * 0.06;
+            armBack = 2.62 + swing;
+            armFront = 0.52 - swing;
           }
 
-          /* The sprite-sheet pose supplies the separation now; every limb is
-             intentionally cut from the same flat silhouette. */
-          armorCapsule(hipX - 5, HIP_Y, footA[0], footA[1] - 2, 6.4, SKIN.back);
-          armorBoot(footA[0], footA[1], 1, true);
-          drawFloppyArm(shoulderX - 9, SHOULDER_Y + 1, armEndA[0], armEndA[1], 4.8);
+          armorCapsule(hipX - 5, HIP_Y, footA[0], footA[1] - 2, 6.4);
+          armorBoot(footA[0], footA[1], 1);
+          drawStubArm(shoulderX - armReach, -30, armBack, 10);
 
           drawRunnerTorso(hipX, shoulderX);
 
-          armorCapsule(hipX + 5, HIP_Y, footB[0], footB[1] - 2, 6.8, SKIN.leg);
-          armorBoot(footB[0], footB[1], 1, false);
-          drawFloppyArm(shoulderX + 9, SHOULDER_Y + 1, armEndB[0], armEndB[1], 5.1);
+          armorCapsule(hipX + 5, HIP_Y, footB[0], footB[1] - 2, 6.8);
+          armorBoot(footB[0], footB[1], 1);
+          drawStubArm(shoulderX + armReach, -30.5, armFront, 10);
 
           drawRunnerHeroHead(shoulderX, air, gait, false);
           ctx.restore();
@@ -2837,15 +3190,41 @@
           ctx.translate((hipX + shoulderX) * 0.5, 0);
           ctx.rotate((shoulderX - hipX) * 0.018);
 
-          /* A pinched neck opens into a broad, weighted belly. The low center
-             of mass makes every squash and stretch read as soft and bouncy. */
-          ctx.fillStyle = SKIN.outline;
+          ctx.fillStyle = runnerTint;
           ctx.beginPath();
-          ctx.moveTo(-6.2, SHOULDER_Y - 2);
-          ctx.bezierCurveTo(-11.6, SHOULDER_Y, -15.5, -25, -14.2, -19);
-          ctx.bezierCurveTo(-17, -12.2, -11.2, -7.4, 0, -7.4);
-          ctx.bezierCurveTo(11.2, -7.4, 17, -12.2, 14.2, -19);
-          ctx.bezierCurveTo(15.5, -25, 11.6, SHOULDER_Y, 6.2, SHOULDER_Y - 2);
+          if (runnerShape === 'circle') {
+            /* A floppy round: heavier below the middle, with the bottom
+               sagging off center the way a bag of something soft would. */
+            ctx.moveTo(-1.0, -46.0);
+            ctx.bezierCurveTo(-11.5, -46.0, -19.2, -38.5, -19.2, -29.0);
+            ctx.bezierCurveTo(-19.2, -19.4, -12.0, -11.8, -1.5, -11.8);
+            ctx.bezierCurveTo(8.8, -11.8, 17.8, -19.6, 17.8, -29.5);
+            ctx.bezierCurveTo(17.8, -39.2, 9.0, -46.0, -1.0, -46.0);
+          } else if (runnerShape === 'triangle') {
+            /* A floppy wedge: rounded apex, wide sagging base, both flanks
+               bowed outward so it never reads as a hard triangle. */
+            ctx.moveTo(-3.5, -39.8);
+            ctx.quadraticCurveTo(-12.4, -29.0, -15.0, -17.6);
+            ctx.quadraticCurveTo(-19.2, -13.4, -11.5, -12.8);
+            ctx.quadraticCurveTo(-0.5, -9.0, 10.5, -12.8);
+            ctx.quadraticCurveTo(18.2, -13.4, 14.0, -18.0);
+            ctx.quadraticCurveTo(13.0, -29.0, 6.5, -39.4);
+            ctx.quadraticCurveTo(2.0, -45.6, -3.5, -39.8);
+          } else {
+            /* An overstuffed square: four soft corners with every edge bowed
+               outward, the way a full sack pushes against its own seams. The
+               corners stop it reading as a blob; the bulges stop it reading
+               as a box. */
+            ctx.moveTo(-10.0, -44.6);
+            ctx.quadraticCurveTo(0.0, -49.0, 9.0, -45.6);
+            ctx.quadraticCurveTo(16.0, -45.5, 16.9, -38.5);
+            ctx.quadraticCurveTo(21.5, -31.0, 17.7, -23.0);
+            ctx.quadraticCurveTo(18.0, -16.0, 11.0, -15.4);
+            ctx.quadraticCurveTo(-0.5, -11.3, -12.0, -14.8);
+            ctx.quadraticCurveTo(-19.0, -15.0, -18.4, -22.0);
+            ctx.quadraticCurveTo(-22.0, -30.0, -17.6, -37.5);
+            ctx.quadraticCurveTo(-17.0, -44.0, -10.0, -44.6);
+          }
           ctx.closePath();
           ctx.fill();
 
@@ -2857,45 +3236,38 @@
           drawRunnerHead(offsetX * 0.55, HEAD_Y + nod, hero.stumbleUntil > simTime, frontOn);
         }
 
-        function drawRunnerHead(x, y, hurt, frontOn, dead = false) {
+        /* There is no head to draw -- only where the eyes sit on the bag. The
+           signature is kept from the original figure: two whites with dark
+           pupils, high and forward, carrying the whole expression. */
+        function drawRunnerHead(x, y, hurt, frontOn, dead = false, blinkSeed = null) {
           ctx.save();
           ctx.translate(x, y);
 
-          /* One continuous hood: a soft crown sweeps back into a long point,
-             then pinches into the neck just beneath the eyes. */
-          ctx.fillStyle = SKIN.outline;
-          ctx.beginPath();
-          ctx.moveTo(8.2, 5.2);
-          ctx.bezierCurveTo(9.2, -2.8, 6.2, -9.4, -1.8, -11.2);
-          ctx.bezierCurveTo(-8.4, -12.5, -13.1, -8.1, -15.2, -2.5);
-          ctx.lineTo(frontOn ? -16.2 : -20.5, 7.4);
-          ctx.lineTo(-3.4, 3.6);
-          ctx.bezierCurveTo(-3.5, 8.1, 0.8, 10.5, 5.2, 8.7);
-          ctx.bezierCurveTo(7.2, 7.9, 8, 6.7, 8.2, 5.2);
-          ctx.closePath();
-          ctx.fill();
-
-          const eyeXs = frontOn ? [-2.6, 2.6] : [0.2, 5.2];
-          const blinking = simTime < hero.blinkEndsAt;
+          const layout = EYE_LAYOUT[runnerShape] || EYE_LAYOUT.square;
+          const eyeY = layout.y;
+          const eyeXs = frontOn ? [-3.4, 3.4] : layout.xs;
+          const blinking = blinkSeed === null
+            ? simTime < hero.blinkEndsAt
+            : ((simTime * 0.31 + blinkSeed) % 3.4) < 0.13;
           if (dead) {
-            ctx.strokeStyle = SKIN.face;
+            ctx.strokeStyle = SKIN.eye;
             ctx.lineWidth = 1.6;
             ctx.lineCap = 'round';
             for (const eyeX of eyeXs) {
               ctx.beginPath();
-              ctx.moveTo(eyeX - 1.5, -1.8); ctx.lineTo(eyeX + 1.5, 1.8);
-              ctx.moveTo(eyeX + 1.5, -1.8); ctx.lineTo(eyeX - 1.5, 1.8);
+              ctx.moveTo(eyeX - 1.5, eyeY - 1.6); ctx.lineTo(eyeX + 1.5, eyeY + 1.6);
+              ctx.moveTo(eyeX + 1.5, eyeY - 1.6); ctx.lineTo(eyeX - 1.5, eyeY + 1.6);
               ctx.stroke();
             }
           } else if (blinking && !hurt) {
-            for (const eyeX of eyeXs) fillOval(eyeX, 0.2, 2.25, 0.8, SKIN.face);
+            for (const eyeX of eyeXs) fillOval(eyeX, eyeY, 2.1, 0.7, SKIN.eye);
           } else {
             for (const eyeX of eyeXs) {
-              fillOval(eyeX, 0.2, 2.55, 3.25, SKIN.face);
+              fillOval(eyeX, eyeY, 2.35, 2.95, SKIN.eye);
               ctx.save();
-              ctx.translate(hurt ? eyeX - 0.25 : eyeX + 0.65, hurt ? 0.8 : 0.45);
+              ctx.translate(hurt ? eyeX - 0.3 : eyeX + 0.55, eyeY + (hurt ? 0.5 : 0.25));
               if (hurt) ctx.rotate(-0.42);
-              fillOval(0, 0, 1.05, 1.7, SKIN.outline);
+              fillOval(0, 0, 1.05, 1.55, SKIN.pupil);
               ctx.restore();
             }
           }

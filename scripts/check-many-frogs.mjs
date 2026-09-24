@@ -26,9 +26,9 @@ function simulation(file = target, reduced = false) {
   };
   vm.createContext(env);
   vm.runInContext(source.replace('window.__manyFrogs = {', `window.__test = {
-    update, draw, getLane, laneObjectsAt, laneDanger, hitsVehicleAt, hitsBikeAt,
-    hitsTrainAt, supportingRiverObjectAt, alligatorHeadAt, addBloodStain,
-    get frogs() { return frogs; }, get stains() { return bloodStains; }
+    update, draw, getLane, laneObjectsAt, laneDanger, hitsVehicleAt, addBloodStain,
+    get frogs() { return frogs; }, get stains() { return bloodStains; },
+    get rows() { return ROWS; }, get cols() { return COLS; }
   }; window.__manyFrogs = {`), env);
   return { env, events, frames, api: env.window.__manyFrogs, test: env.window.__test,
     get surfaces() { return surfaces; },
@@ -40,36 +40,32 @@ function simulation(file = target, reduced = false) {
 }
 
 const sim = simulation();
+const COLS = sim.test.cols, ROWS = sim.test.rows;
+const state0 = sim.api.getState();
+
+// The board is one fixed screen: field, road band, field.
+assert.equal(state0.fieldRows * 2 + state0.roadRows, ROWS, 'the three bands fill the board');
+assert.ok(Math.abs(state0.roadRows / ROWS - .6) < .06, 'the road band holds about 60% of the height');
+for (let row = 0; row < ROWS; row++) {
+  const expected = row >= state0.fieldRows && row < state0.fieldRows + state0.roadRows ? 'road' : 'grass';
+  assert.equal(sim.test.getLane(row).type, expected, `row ${row} is ${expected}`);
+}
+
 let samples = 0;
-for (let row = 6; row < 240; row++) {
+for (let row = 0; row < ROWS; row++) {
   const lane = sim.test.getLane(row);
   if (lane.type === 'grass') continue;
   for (let i = 0; i < 120; i++) {
-    const x = (i * 1.71371) % 21, at = i * .91331;
+    const x = (i * 1.71371) % COLS, at = i * .91331;
     const objects = sim.test.laneObjectsAt(lane, at);
-    if (lane.type === 'river') {
-      const kind = o => ((o.id + Math.abs(row)) % 7 + 7) % 7 === 0;
-      const supported = objects.find(o => {
-        const lo = kind(o) && lane.direction < 0 ? o.x + o.length * .18 : o.x + .24;
-        const hi = kind(o) && lane.direction > 0 ? o.x + o.length * .82 : o.x + o.length - .24;
-        return x > lo && x < hi;
-      });
-      const head = objects.some(o => kind(o) && (lane.direction > 0
-        ? x >= o.x + o.length * .82 && x <= o.x + o.length
-        : x >= o.x && x <= o.x + o.length * .18));
-      assert.equal(sim.test.supportingRiverObjectAt(lane, x, at)?.id, supported?.id);
-      assert.equal(sim.test.alligatorHeadAt(lane, x, at), head);
-    } else {
-      const radius = lane.type === 'bike' ? .16 : .24;
-      const expected = objects.some(o => x > o.x - radius && x < o.x + o.length + radius);
-      const hit = lane.type === 'bike' ? sim.test.hitsBikeAt : lane.type === 'rail' ? sim.test.hitsTrainAt : sim.test.hitsVehicleAt;
-      assert.equal(hit(lane, x, at), expected);
-      // Dense temporal oracle: a new analytic landing window must never miss a hit.
-      const duration = .19;
-      const dangerous = Array.from({ length: 25 }, (_, n) => at + n * duration / 24).some(t =>
-        sim.test.laneObjectsAt(lane, t).some(o => x > o.x - radius && x < o.x + o.length + radius));
-      if (dangerous) assert.equal(sim.test.laneDanger(lane, x, at, duration), 100);
-    }
+    const radius = .24;
+    const expected = objects.some(o => x > o.x - radius && x < o.x + o.length + radius);
+    assert.equal(sim.test.hitsVehicleAt(lane, x, at), expected);
+    // Dense temporal oracle: the analytic landing window must never miss a hit.
+    const duration = .19;
+    const dangerous = Array.from({ length: 25 }, (_, n) => at + n * duration / 24).some(t =>
+      sim.test.laneObjectsAt(lane, t).some(o => x > o.x - radius && x < o.x + o.length + radius));
+    if (dangerous) assert.equal(sim.test.laneDanger(lane, x, at, duration), 100);
     samples++;
   }
 }
@@ -79,7 +75,7 @@ sim.test.draw();
 const terrainSurfaces = sim.surfaces;
 sim.test.draw();
 assert.equal(sim.surfaces, terrainSurfaces);
-sim.test.addBloodStain(sim.test.frogs[0], 'mower');
+sim.test.addBloodStain(sim.test.frogs[0], 'traffic');
 sim.test.draw();
 const stainSurfaces = sim.surfaces;
 sim.test.draw();
@@ -98,25 +94,40 @@ assert.equal(sim.frames.size, 1, 'no duplicate RAF loop');
 
 for (const reduced of [false, true]) {
   const run = simulation(target, reduced);
-  for (let i = 0; i < 1200; i++) run.test.update(1 / 60);
+  const rows = run.test.rows;
+  let reachedTop = false, turnedBack = false, mostCrossings = 0, offBoard = false;
+  for (let i = 0; i < 6000; i++) {
+    run.test.update(1 / 60);
+    const live = run.api.getState().frogs.filter(f => f.alive);
+    if (live.some(f => f.y >= rows - 1)) reachedTop = true;
+    if (reachedTop && live.some(f => f.heading < 0)) turnedBack = true;
+    if (live.some(f => f.y < 0 || f.y > rows - 1)) offBoard = true;
+    mostCrossings = Math.max(mostCrossings, ...live.map(f => f.crossings));
+  }
   const state = run.api.getState();
-  assert.ok(state.topFrogY > 10, 'frogs autonomously progress');
+  assert.ok(reachedTop, 'a frog reaches the top field');
+  assert.ok(turnedBack, 'reaching the top field turns a frog around');
   assert.ok(state.frogs.every(f => Number.isFinite(f.x) && Number.isFinite(f.y)));
+  assert.ok(!offBoard, 'frogs stay on the board');
+  assert.ok(mostCrossings >= 2, `a frog completes a round trip (saw ${mostCrossings} turns)`);
   run.api.eliminateAll();
   assert.equal(run.api.getState().live, 0);
   for (let i = 0; i < 250; i++) run.test.update(1 / 60);
   assert.equal(run.api.getState().round, state.round + 1, 'aftermath returns to a new cohort');
-  assert.equal(run.api.getState().live, 12);
+  assert.ok(run.api.getState().live > 0, 'a new cohort enters');
   run.env.window.innerWidth = 390; run.env.window.innerHeight = 844; run.events.resize();
+  assert.ok(run.api.getState().frogs.every(f => f.x <= run.api.getState().columns - 0.25),
+    'a resize keeps every frog on the narrower board');
   run.test.draw();
+  for (let i = 0; i < 120; i++) run.test.update(1 / 60);
 }
 
 // Long-running accumulation has a finite memory budget.
 const accumulation = simulation();
-for (let i = 0; i < 660; i++) accumulation.test.addBloodStain(accumulation.test.frogs[0], 'mower');
+for (let i = 0; i < 660; i++) accumulation.test.addBloodStain(accumulation.test.frogs[0], 'traffic');
 accumulation.test.update(1 / 60);
 assert.equal(accumulation.test.stains.length, 640);
-console.log(`Passed ${samples} collision samples, continuous traffic windows, pigment/terrain caching, visibility, normal/reduced-motion lifecycle, resize, and bounded stain history.`);
+console.log(`Passed ${samples} collision samples, fixed field/road/field layout, shuttle turnaround, continuous traffic windows, pigment/terrain caching, visibility, normal/reduced-motion lifecycle, resize, and bounded stain history.`);
 
 if (process.argv.includes('--benchmark')) {
   const files = [target];

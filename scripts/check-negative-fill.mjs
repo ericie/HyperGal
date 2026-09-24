@@ -52,7 +52,7 @@ const sim = simulation(390, 844);
 assert.equal(JSON.stringify(sim.sketch.strokes), JSON.stringify(simulation(390, 844).sketch.strokes), 'seed reproduces geometry');
 const snapshot = () => JSON.stringify(sim.sketch.pens.map(p => [p.current, p.distance]));
 sim.advance(1000); sim.advance(1050);
-assert.equal(sim.sketch.pens.length, 6);
+assert.equal(sim.sketch.pens.length, 24);
 assert.ok(sim.sketch.pens.every(p => p.distance > 0 || p.current > 0), 'all pens start drawing');
 sim.key(' '); const pausedAt = snapshot();
 assert.equal(sim.canvas.dataset.state, 'paused'); assert.equal(sim.frames.size, 0);
@@ -69,7 +69,16 @@ assert.equal(sim.canvas.dataset.state, 'complete');
 sim.key('r'); assert.equal(sim.canvas.dataset.state, 'growing'); assert.notEqual(sim.canvas.dataset.seed, 'negative-fill');
 const beforeTap = sim.canvas.dataset.seed; sim.events.click(); assert.notEqual(sim.canvas.dataset.seed, beforeTap);
 const tiny = simulation(150, 150);
+const planned = new Set(tiny.sketch.strokes);
 let time = 0;
 while (tiny.frames.size && time < 1000000) { tiny.advance(time); time += 50; }
 assert.equal(tiny.canvas.dataset.state, 'complete'); assert.equal(tiny.frames.size, 0);
+// Idle pens take work from whoever has most left. Marks move between queues,
+// so the set must still be every mark exactly once, each drawn exactly once.
+const drawn = tiny.sketch.pens.flatMap(p => p.queue);
+assert.equal(drawn.length, tiny.sketch.strokes.length, 'stealing neither loses nor duplicates a mark');
+assert.equal(new Set(drawn).size, planned.size, 'every planned mark ends in exactly one queue');
+assert.ok(drawn.every(s => planned.has(s)), 'no mark is invented while stealing');
+assert.equal(tiny.sketch.completed, planned.size, 'every mark is drawn once');
+assert.ok(tiny.sketch.pens.every(p => p.current === p.queue.length), 'no pen is left holding work');
 console.log(`Passed: ${samples} path points across 15 seeded layouts; motif coverage, reserved negative space, determinism, concurrent growth, pause, visibility, finish, resize, restart, tap, natural completion.`);

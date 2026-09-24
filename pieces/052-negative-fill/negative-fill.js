@@ -189,23 +189,32 @@
     ctx.fillRect(0, 0, width, height);
   }
   function makePens() {
-    const count = Math.min(strokes.length, Math.max(6, Math.min(16, Math.round(width * height / 110000))));
+    // Many pens at once. The page fills from dozens of fronts rather than a
+    // handful, which is what makes the drawing arrive quickly; each pen still
+    // draws its own line at its own pace, so nothing is rushed on the page.
+    const count = Math.min(strokes.length, Math.max(24, Math.min(112, Math.round(width * height / 16000))));
     const candidates = strokes.filter(s => s.points[0][0] > width * 0.06 && s.points[0][0] < width * 0.94 &&
       s.points[0][1] > height * 0.06 && s.points[0][1] < height * 0.94);
     const pool = candidates.length >= count ? candidates : strokes;
     const origins = [];
     // Farthest-point placement makes activity visible across the whole page
     // immediately, including narrow screens, without an underlying row pattern.
+    // Each stroke carries its distance to the nearest origin so far rather than
+    // rescanning them all, which keeps placing a hundred pens off the load.
+    const nearest = new Map(pool.map(stroke => [stroke, Infinity]));
     for (let i = 0; i < count; i++) {
       let best, bestScore = -Infinity;
       for (const stroke of pool) {
-        if (origins.includes(stroke)) continue;
         const [x, y] = stroke.center;
-        const score = origins.length ? Math.min(...origins.map(o => Math.hypot(x - o.center[0], y - o.center[1])))
-          : -Math.hypot(x - width * 0.43, y - height * 0.53);
+        const score = origins.length ? nearest.get(stroke) : -Math.hypot(x - width * 0.43, y - height * 0.53);
         if (score > bestScore) { best = stroke; bestScore = score; }
       }
       origins.push(best);
+      nearest.set(best, -Infinity);
+      for (const stroke of pool) {
+        const d = Math.hypot(stroke.center[0] - best.center[0], stroke.center[1] - best.center[1]);
+        if (d < nearest.get(stroke)) nearest.set(stroke, d);
+      }
     }
     pens = origins.map(origin => ({ origin, queue: [], current: 0, distance: 0, segment: 1, dwell: 0 }));
     for (const stroke of strokes) {
@@ -221,6 +230,29 @@
       pen.queue.sort((a, b) => distance(a) - distance(b));
     }
     completed = 0;
+  }
+  // A pen that has drawn out its own neighbourhood takes work from whichever
+  // pen has the most left rather than standing idle. Without it the drawing
+  // ends up waiting on whoever was dealt the densest corner, with a single
+  // front still crawling long after the rest of the page is finished.
+  function steal(pen) {
+    let from = null, most = 0;
+    for (const other of pens) {
+      const left = other.queue.length - other.current - 1;
+      if (left > most) { most = left; from = other; }
+    }
+    if (!from) return false;
+    // Take the one nearest where this pen left off, so it carries on drawing
+    // in one place instead of jumping across the page.
+    const at = (pen.queue[pen.current - 1] || pen.origin).center;
+    let index = -1, best = Infinity;
+    for (let i = from.current + 1; i < from.queue.length; i++) {
+      const d = Math.hypot(from.queue[i].center[0] - at[0], from.queue[i].center[1] - at[1]);
+      if (d < best) { best = d; index = i; }
+    }
+    if (index < 0) return false;
+    pen.queue.push(from.queue.splice(index, 1)[0]);
+    return true;
   }
   function pointAt(stroke, pen, at) {
     const p = stroke.points;
@@ -257,7 +289,8 @@
     const dt = lastTime === null ? 0 : Math.min(0.05, (time - lastTime) / 1000);
     lastTime = time;
     if (dt) for (const pen of pens) {
-      const stroke = pen.queue[pen.current];
+      let stroke = pen.queue[pen.current];
+      if (!stroke && steal(pen)) stroke = pen.queue[pen.current];
       if (!stroke) continue;
       drawTo(pen, Math.min(stroke.length, pen.distance + dt * speed));
       if (pen.distance >= stroke.length) {

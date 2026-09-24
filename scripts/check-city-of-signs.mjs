@@ -21,41 +21,53 @@ const env = {
   addEventListener: (name, callback) => events[name] = callback
 };
 vm.createContext(env);
-vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.test = { compose, drawCity, blocks, library, resize, profileAt, contentBox, drawBlock, stairTowerLayout }; })();'), env);
-const { compose, drawCity, blocks, library, profileAt, contentBox, drawBlock, stairTowerLayout } = env.test;
+vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.test = { compose, drawCity, blocks, library, resize, profileAt, contentBox, drawBlock, scaffoldLifts }; })();'), env);
+const { compose, drawCity, blocks, library, profileAt, contentBox, drawBlock, scaffoldLifts } = env.test;
 const roles = ['base', 'chamber', 'crown', 'connector'];
 assert.equal(new Set(blocks.map(b => b.id)).size, blocks.length);
 for (const role of roles) assert.ok(blocks.some(b => b.role === role), role);
-const rejected = new Set(['crane-roof', 'fan', 'swell', 'striped-orb', 'basement-entry', 'public-concourse']);
+const rejected = new Set(['crane-roof', 'external-stair', 'fan', 'swell', 'striped-orb', 'basement-entry', 'public-concourse']);
 const active = blocks.filter(b => !b.catalogOnly);
 assert.ok(active.every(b => !rejected.has(b.id)), 'rejected blocks are excluded');
 assert.ok(!library['crane-roof'], 'crane removed from the catalog');
+assert.ok(!library['external-stair'], 'switchback stair removed from the catalog');
 assert.equal(new Set(active.map(b => b.catalogNumber)).size, active.length, 'review numbers are unique');
-for (const [number, id] of [[3,'tenant-entry'],[5,'external-stair'],[9,'water-tank'],[11,'plant-room'],[15,'porthole-bays'],[16,'conduit-wall'],[21,'commercial-front'],[22,'stepped-terraces'],[23,'duct-deck']])
+for (const [number, id] of [[3,'tenant-entry'],[5,'scaffold-lifts'],[9,'water-tank'],[11,'plant-room'],[15,'porthole-bays'],[16,'conduit-wall'],[21,'commercial-front'],[22,'stepped-terraces'],[23,'duct-deck']])
   assert.equal(library[id].catalogNumber, number, 'review number survives replacements');
-for (const [w,h] of [[150,240],[40,170],[280,80]]) for(let variant=0;variant<12;variant++) {
-  const flights=stairTowerLayout(w,h,variant);
-  for(let i=0;i<flights.length-1;i++) {
-    assert.deepEqual(flights[i].to,flights[i+1].from,'adjacent stair flights share the same landing endpoint');
-    assert.ok(flights[i].to[1]>flights[i].from[1], 'stair route progresses between floors');
-  }
+for (const h of [28, 60, 100, 240, 425, 900]) {
+  const decks = scaffoldLifts(h);
+  assert.ok(decks.length >= 3, 'a scaffold carries at least two lifts');
+  assert.equal(decks[0], 0);
+  assert.ok(Math.abs(decks[decks.length - 1] - h) < 0.00001, 'the frame reaches both edges, so stacked blocks meet');
+  for (let i = 0; i < decks.length - 1; i++)
+    assert.ok(decks[i + 1] > decks[i], 'deck levels rise in order');
 }
-const used = new Set();
+const used = new Set(), featuresSeen = new Set();
 let layouts = 0;
 for (const [w, h] of [[1254, 1254], [1440, 900], [390, 844], [320, 1800], [2560, 720], [1, 1]]) {
   for (let seed = 0; seed < 80; seed++) {
     const city = compose(w, h, seed);
     assert.equal(JSON.stringify(city), JSON.stringify(compose(w, h, seed)), 'seed reproduces composition');
-    assert.ok(city.towers.length >= 5 && city.towers.length <= 16);
+    assert.ok(city.towers.length >= 2 && city.towers.length <= 24, 'building count follows from the bay size');
     assert.ok(city.towers.every(t => t.profile !== 'curve'), 'swelling silhouettes are retired');
     assert.ok(city.towers.every(t => t.paper === '#fff' && t.ink === '#000'), 'sunlit walls keep a consistent palette across buildings');
     const features = new Set();
     let right = Math.min(w, h) * 0.009;
+    // One bay is the same width for every building in a composition, so a
+    // window is drawn at one size whether its building is narrow or broad.
+    const bayWidths = city.towers.map(t => t.w / t.bays);
+    for (const bw of bayWidths) {
+      assert.ok(Math.abs(bw - bayWidths[0]) < 0.00001, 'every building uses the same bay width');
+      assert.ok(bw > 0 && Number.isFinite(bw), 'bay width is positive and finite');
+    }
     for (const tower of city.towers) {
+      assert.ok(Number.isInteger(tower.bays) && tower.bays >= 1 && tower.bays <= 4, 'buildings are a whole number of bays');
+      assert.ok(Math.abs(tower.w - bayWidths[0] * tower.bays) < 0.00001, 'building width is its bay count');
       assert.ok(Math.abs(tower.x - right) < 0.00001, 'bays meet without gaps or overlap');
       right += tower.w;
       assert.ok(tower.w > 0 && tower.top > tower.crownTop && tower.baseTop > tower.top);
       assert.ok(tower.baseLine <= h && tower.crownTop >= 0);
+      if (tower.bays === 1) assert.ok(library[tower.base].narrow && library[tower.crown].narrow, 'single-bay buildings only take blocks that fit one bay');
       assert.equal(library[tower.base].role, 'base');
       assert.equal(library[tower.base].collection, 'tokyo', 'street level uses the Tokyo block vocabulary');
       assert.ok(!library[tower.crown].catalogOnly, 'legacy roof ornaments remain in the archive');
@@ -80,7 +92,12 @@ for (const [w, h] of [[1254, 1254], [1440, 900], [390, 844], [320, 1800], [2560,
       assert.ok(Math.abs(y - tower.baseTop) < 0.00001, 'stack stops at its dedicated base');
     }
     assert.ok(right <= w + 0.00001);
-    for (const feature of ['commercial-front', 'external-stair', 'stepped-terraces']) assert.ok(features.has(feature), `${feature} survives every aspect ratio`);
+    // A small canvas holds fewer broad buildings than there are feature
+    // facades, so each composition carries at least one and the sweep as a
+    // whole must reach all three.
+    const present = ['commercial-front', 'scaffold-lifts', 'stepped-terraces'].filter(f => features.has(f));
+    assert.ok(present.length >= 1, 'every composition carries a feature facade');
+    for (const f of present) featuresSeen.add(f);
     for (const connector of city.connectors) {
       assert.equal(library[connector.id].role, 'connector'); used.add(connector.id);
       assert.ok(connector.x >= 0 && connector.x + connector.w <= w + 0.00001, 'connections stay within the canvas');
@@ -90,6 +107,8 @@ for (const [w, h] of [[1254, 1254], [1440, 900], [390, 844], [320, 1800], [2560,
     drawCity(city, w, h); layouts++;
   }
 }
+for (const feature of ['commercial-front', 'scaffold-lifts', 'stepped-terraces'])
+  assert.ok(featuresSeen.has(feature), `${feature} appears across the sweep`);
 for (const block of blocks) {
   if (!block.catalogOnly) assert.ok(used.has(block.id), `${block.id} is reachable by the composer`);
   // Studies remain renderable in the catalog, even when not used in a city.

@@ -6,6 +6,9 @@
   const params = new URLSearchParams(location.search);
   const debug = params.get('debug') === 'true';
   const BLACK = '#000', WHITE = '#fff', TAU = Math.PI * 2;
+  // Bay width as a share of the smaller canvas edge, and the fewest bays a
+  // composition may use. Together they set how large everything is drawn.
+  const BAY_SPAN = Number(params.get('bay')) || 0.24, MIN_BAYS = Number(params.get('bays')) || 3;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const pick = (random, list) => list[Math.floor(random() * list.length)];
   const inverse = color => color === BLACK ? WHITE : BLACK;
@@ -567,12 +570,16 @@
   function inkRect(x,y,w,h,fill=WHITE,weight=0.45) {
     inkFace([[x,y],[x+w,y],[x+w,y+h],[x,y+h]],fill,weight);
   }
-  function wall(h) {
+  function wall(h,first=true,last=true) {
     rect(0,0,100,h,WHITE);
-    rect(84,0,16,h,BLACK);
-    inkLine(1,0,1,h,0.65); inkLine(84,0,84,h,0.7);
-    // A fine return edge survives inside the dark party-wall gap.
-    inkLine(96,0,96,h,0.3,WHITE);
+    if(last) {
+      rect(84,0,16,h,BLACK);
+      // A fine return edge survives inside the dark party-wall gap.
+      inkLine(96,0,96,h,0.3,WHITE);
+    }
+    if(first) inkLine(1,0,1,h,0.65);
+    // Every bay is closed by a pier; on the last one it is the party wall.
+    inkLine(84,0,84,h,0.7);
   }
   function sill(x,y,w,depth=4,thickness=1.6) {
     inkFace([[x,y],[x+depth,y-depth*.42],[x+w+depth,y-depth*.42],[x+w,y]]);
@@ -650,6 +657,14 @@
     inkRect(x,y,w,h);
     for(let i=1;i<=5;i++) inkLine(x+1,y+h*i/6,x+w-1,y+h*i/6,.4);
   }
+  function inkPort(cx,cy,r,dark) {
+    ellipse(cx,cy,r,r,BLACK);
+    ellipse(cx-.8,cy-.4,r-1.2,r-1.2,WHITE,BLACK,.3);
+    ctx.save(); ctx.beginPath(); ctx.ellipse(cx-.8,cy-.4,Math.max(0,r-1.4),Math.max(0,r-1.4),0,0,TAU); ctx.clip();
+    rect(cx-r,cy-r,r*2,r*(dark?.7:1.15),BLACK);
+    inkLine(cx,cy-r,cx,cy+r,.5); inkLine(cx-r,cy+r*.35,cx+r,cy+r*.35,.4);
+    ctx.restore();
+  }
   function inkSign(x,y,w,h) {
     inkFace([[x+w,y],[x+w+2,y-1],[x+w+2,y+h-1],[x+w,y+h]],BLACK);
     inkRect(x,y,w,h);
@@ -675,19 +690,36 @@
       for(let j=-2;j<=2;j++) inkLine(x+j*span/3-1.4,yy+j*.55-2,x+j*span/3+1.4,yy+j*.55+2,.32);
     }
   }
-  function roofDeck(h) { sill(0,h-3,94,5,3); }
+  // A bay is 100 units wide everywhere in the city, so a window is drawn at one
+  // size whether its building is one bay or four. Broad buildings repeat the
+  // bay; only the outer bays carry the left edge and the dark party return.
   function tokyo(id,name,role,draw,options={}) {
     define(id,name,role,(block)=>{
-      const scale=block.w/100;
+      const bays=Math.max(1,Math.round(block.bays||1));
+      const scale=block.w/(bays*100);
+      const variant=block.variant||0;
       ctx.save(); ctx.scale(scale,scale);
       let h=block.h/scale;
       if(role==='crown') {
-        const limits={'water-tank':98,'sign-gantry':75,'plant-room':57,'antenna-roof':105,'tile-eaves':32,'duct-deck':76};
+        const limits={'water-tank':98,'sign-gantry':75,'plant-room':57,'antenna-roof':105,'tile-eaves':32,'duct-deck':76,'roof-garden':70,'sign-pylon':112,'roof-shrine':58,'cooling-towers':60};
         const fitted=Math.min(h,limits[id]);
         ctx.translate(0,h-fitted); h=fitted;
+        // Roof furniture repeats at bay scale, so a broad building carries
+        // several ordinary tanks rather than one giant one. The parapet then
+        // runs the whole roof and closes their feet.
+        const step=options.tiles?1:2;
+        for(let i=0;i<bays;i+=step) {
+          ctx.save(); ctx.translate(i*100,0); draw({h,variant:variant+i*7,bay:i,bays}); ctx.restore();
+        }
+        sill(0,h-3,bays*100-6,5,3);
+        ctx.restore(); return;
       }
-      if(role==='chamber'||role==='base') wall(h);
-      draw({h,variant:block.variant||0});
+      for(let i=0;i<bays;i++) {
+        ctx.save(); ctx.translate(i*100,0);
+        if(role==='chamber'||role==='base') wall(h,i===0,i===bays-1);
+        draw({h,variant:variant+i*7,bay:i,bays});
+        ctx.restore();
+      }
       ctx.restore();
     },{collection:'tokyo',...options});
   }
@@ -729,7 +761,7 @@
     inkRect(13,h-2,57,2);
   });
   tokyo('tenant-floors','Narrow tenant floors + blade signs','chamber',({h,variant})=>{
-    const n=clamp(Math.round(h/43),1,7), fh=h/n;
+    const n=clamp(Math.round(h/78),1,40), fh=h/n;
     for(let i=0;i<n;i++) {
       const y=i*fh;
       inkWindow(10,y+fh*.19,48,fh*.42,i+variant,3);
@@ -740,32 +772,52 @@
     }
     inkPipe([[66,0],[66,h]],.85);
   });
-  function stairTowerLayout(w,h,variant) {
-    const count=clamp(Math.round(h/w*1.5),2,5),top=h*.1,rise=h*.85/count;
-    return Array.from({length:count},(_,i)=>({from:[w*((i+variant)%2?.16:.65),top+i*rise],to:[w*((i+variant)%2?.65:.16),top+(i+1)*rise]}));
+  function scaffoldLifts(h) {
+    // Equal lifts, with a deck level on both edges so the frame of one block
+    // meets the frame of the block above and below it.
+    const count=clamp(Math.round(h/40),2,48);
+    return Array.from({length:count+1},(_,i)=>h*i/count);
   }
-  tokyo('external-stair','Steel switchback stair in a deep side court','chamber',({h,variant})=>{
-    const flights=stairTowerLayout(100,h,variant),rh=Math.min(9,(flights[0].to[1]-flights[0].from[1])*.2);
-    rect(9,0,62,h,BLACK);
-    for(const {from,to} of flights) {
-      const [x,y]=from,dx=to[0]-x,dy=to[1]-y,n=clamp(Math.round(dy/3),7,18);
-      const pts=[[x,y]];
-      for(let j=0;j<n;j++) {pts.push([x+dx*(j+1)/n,y+dy*j/n],[x+dx*(j+1)/n,y+dy*(j+1)/n]);}
-      pts.push([to[0],to[1]+1.2],[x,y+1.2]);
-      inkFace(pts,WHITE,.35);
-      inkLine(x,y-rh,to[0],to[1]-rh,.55,WHITE);
-      for(let j=0;j<=6;j++) inkLine(x+dx*j/6,y+dy*j/6,x+dx*j/6,y+dy*j/6-rh,.4,WHITE);
+  tokyo('scaffold-lifts','Tube scaffold lifts over a facade under repair','chamber',({h,variant})=>{
+    const decks=scaffoldLifts(h),lifts=decks.length-1,lh=decks[1];
+    // Two scaffold bays to a building bay keeps the braces near 45 degrees.
+    const frames=2,posts=Array.from({length:frames+1},(_,i)=>4+75*i/frames);
+    const rh=Math.min(6.5,lh*.36),plank=Math.min(1.5,lh*.08);
+    // The facade under repair keeps working behind the frame. Its openings sit
+    // inside a lift, clear of the decks and rails that cross in front of them.
+    for(let i=0;i<lifts;i++) {
+      if((i+variant)%2) continue;
+      const top=decks[i]+lh*.2,hh=Math.min(15,decks[i+1]-rh-4.5-top);
+      if(hh<4.5) continue;
+      inkWindow(8,top,25,hh,i+variant,2,false);
+      inkWindow(45,top,21,hh,i+variant+1,2,false);
+      if((i+variant)%4===0) inkVent(69,top+.5,10,Math.min(8,hh*.6));
+      inkLine(1,top+hh+3.4,84,top+hh+3.4,.22);
     }
-    for(const [x,y] of [flights[0].from,...flights.map(f=>f.to)]) {
-      const left=x<40;
-      if(!left) inkDoor(72,y-Math.min(25,h*.14),9,Math.min(25,h*.14));
-      sill(left?9:63,y,left?10:21,3,1);
-      inkRail(left?9:63,y,left?10:21,rh,3,WHITE,2);
+    // Standards: paired tube lines running the whole height, carried on white
+    // through the dark party-wall return.
+    for(const px of posts) { inkLine(px-.55,0,px-.55,h,.5); inkLine(px+.55,0,px+.55,h,.5); }
+    inkLine(88,0,88,h,.4,WHITE); inkLine(90.2,0,90.2,h,.4,WHITE);
+    for(const y of decks) {
+      const inner=y>.5&&y<h-.5;
+      inkLine(4,y,79,y,.5);
+      inkLine(84,y,96,y,.4,WHITE);
+      if(!inner) continue;
+      // A shallow boarded deck, then guard and mid rail on the tube uprights.
+      sill(4,y,75,plank*1.6,plank*.62);
+      inkLine(4,y-rh,79,y-rh,.45); inkLine(4,y-rh*.55,79,y-rh*.55,.32);
+      inkLine(84,y-rh,96,y-rh,.3,WHITE);
     }
-    inkLine(7,0,7,h,.8);inkLine(69,0,69,h,.7,WHITE);
+    // One brace per lift, stepping along the bays and squaring the frame.
+    for(let i=0;i<lifts;i++) {
+      const b=(i+variant)%frames,up=(i+variant)%2;
+      inkLine(posts[b],decks[up?i:i+1],posts[b+1],decks[up?i+1:i],.32);
+    }
+    // Couplers where each standard meets a ledger.
+    for(const y of decks) for(const px of posts) rect(px-1,y-1,2,2,BLACK);
   },{narrow:false,hero:true});
   tokyo('balcony-stack','Cantilevered balconies + fine steel guards','chamber',({h,variant})=>{
-    const n=clamp(Math.round(h/48),1,6),fh=h/n;
+    const n=clamp(Math.round(h/86),1,36),fh=h/n;
     for(let i=0;i<n;i++) {
       const y=(i+1)*fh-5,rh=Math.min(11,fh*.22);
       inkBalcony(4,y,79,rh,i+variant);
@@ -773,32 +825,42 @@
     }
   });
   tokyo('service-wall','Sunlit plaster + small offset windows','chamber',({h,variant})=>{
-    const n=clamp(Math.round(h/57),1,6),fh=h/n;
+    const n=clamp(Math.round(h/84),1,34),fh=h/n;
     inkPipe([[74,0],[74,h]],1.1);
     for(let i=0;i<n;i++) {
       const y=i*fh, wx=(i+variant)%2?36:12;
-      inkWindow(wx,y+fh*.18,26,Math.min(19,fh*.32),variant+i,2);
+      inkWindow(wx,y+fh*.16,26,Math.min(19,fh*.3),variant+i,2);
+      // The floors without a condenser still carry an opening and a vent, so
+      // the wall reads as quiet rather than as unfinished.
       if(i%2===0) {
-        const ground=y+fh*.8,port=inkAC(16,y+fh*.5,21,ground);
+        const ground=y+fh*.82,port=inkAC(16,y+fh*.52,21,ground);
         inkPipe([port,[48,port[1]],[51,ground+2],[74,ground+2]],.8);
-        inkVent(57,y+fh*.17,9,6);
+        inkVent(57,y+fh*.15,9,6);
+      } else {
+        inkWindow(wx>20?11:40,y+fh*.55,20,Math.min(15,fh*.24),variant+i+2,2);
+        inkVent(wx>20?64:64,y+fh*.55,9,6);
       }
       inkLine(1,y+fh-.5,72,y+fh-.5,.23);
       inkLine(72,y+fh*.54,76,y+fh*.54,.7);
     }
   });
   tokyo('setback-rooms','Roof terrace + staggered apartment volumes','chamber',({h,variant})=>{
-    const deck=h*.55;
-    rect(1,0,83,deck,WHITE);
-    inkFace([[12,0],[57,0],[57,deck],[12,deck]]);
-    polygon([[57,0],[67,0],[67,deck],[57,deck]],BLACK);
-    inkWindow(23,deck*.2,24,Math.min(22,deck*.36),variant,2);
-    const port=inkAC(67,deck*.65,13,deck-1);
-    inkPipe([port,[82,port[1]],[82,deck]],.65);
-    sill(5,deck,79,6,2);
-    inkRail(62,deck,21,Math.min(10,deck*.23),5,BLACK,2);
-    inkWindow(14,deck+(h-deck)*.3,43,Math.min(23,(h-deck)*.4),variant+1,3);
-    inkPipe([[74,deck+3],[74,h]],.9);
+    // A set-back volume over a terrace is a two-storey unit that repeats, so a
+    // tall building stacks terraces instead of stretching one.
+    const n=clamp(Math.round(h/140),1,24),fh=h/n;
+    for(let i=0;i<n;i++) {
+      const y=i*fh,deck=y+fh*.55,room=deck-y,below=fh-room;
+      inkFace([[12,y],[57,y],[57,deck],[12,deck]]);
+      polygon([[57,y],[67,y],[67,deck],[57,deck]],BLACK);
+      inkWindow(23,y+room*.16,24,Math.min(21,room*.3),variant+i,2);
+      inkWindow(23,y+room*.56,24,Math.min(18,room*.26),variant+i+3,2);
+      const port=inkAC(67,y+room*.65,13,deck-1);
+      inkPipe([port,[82,port[1]],[82,deck]],.65);
+      sill(5,deck,79,6,2);
+      inkRail(62,deck,21,Math.min(10,room*.23),5,BLACK,2);
+      inkWindow(14,deck+below*.3,43,Math.min(23,below*.4),variant+i+1,3);
+      inkPipe([[74,deck+3],[74,y+fh]],.9);
+    }
   },{narrow:false});
   tokyo('water-tank','Sunlit rooftop tank + anchored steel frame','crown',({h})=>{
     const deck=h-3,top=h*.19,bottom=h*.62,tx=25,tw=43;
@@ -813,7 +875,6 @@
     for(const x of [15,21]) inkLine(x,top,x,deck,.65);
     for(let y=top+2;y<deck;y+=Math.max(3,h*.065)) inkLine(15,y,21,y,.5);
     inkPipe([[68,bottom-4],[78,bottom-4],[81,bottom-1],[81,deck]],1.3);
-    roofDeck(h);
   });
   tokyo('sign-gantry','Rooftop billboard + exposed rear bracing','crown',({h})=>{
     const bottom=h*.66;
@@ -822,7 +883,6 @@
     inkSign(8,h*.12,75,bottom-h*.12);
     for(const x of [16,41,69]) {inkLine(x,h*.12,x+3,h*.03,.5);inkRect(x+1,h*.025,5,1.5,BLACK);}
     inkLine(12,bottom-2,80,bottom-2,.3);
-    roofDeck(h);
   },{narrow:false});
   tokyo('plant-room','White roof house + maintenance landing','crown',({h})=>{
     const deck=h-3,top=h*.23;
@@ -832,7 +892,6 @@
     inkDoor(54,top+(deck-top)*.24,17,(deck-top)*.76);
     inkAC(10,deck-Math.min(20,h*.35),25,deck);
     inkRail(3,deck,35,Math.min(10,h*.22),4,BLACK,3);
-    roofDeck(h);
   });
   tokyo('antenna-roof','Antenna, aerial cables + roof parapet','crown',({h})=>{
     const deck=h-3,house=h*.68;
@@ -842,7 +901,6 @@
     inkAntenna(39,house,h*.62);
     inkWindow(18,house+4,19,Math.max(3,(deck-house)*.49),1,2,false);
     inkRail(66,deck,24,Math.min(10,h*.2),4,BLACK,3);
-    roofDeck(h);
   });
   tokyo('noren-shop','Old timber shop + shallow tiled eave','base',({h,variant})=>{
     const top=h*.36,bottom=h-2;
@@ -871,43 +929,41 @@
     inkRect(2,h-2,82,2);
   },{narrow:false});
   tokyo('porthole-bays','Concrete circular openings + recessed glazing','chamber',({h,variant})=>{
-    const n=clamp(Math.round(h/43),1,6),fh=h/n,r=Math.min(11,fh*.28);
+    const n=clamp(Math.round(h/50),1,60),fh=h/n,r=Math.min(16,fh*.33);
     for(let i=0;i<n;i++) {
       const cy=(i+.46)*fh;
-      for(let j=0;j<2;j++) {
-        const cx=24+j*37;
-        ellipse(cx,cy,r,r,BLACK);
-        ellipse(cx-.8,cy-.4,r-1.2,r-1.2,WHITE,BLACK,.3);
-        ctx.save();ctx.beginPath();ctx.ellipse(cx-.8,cy-.4,r-1.4,r-1.4,0,0,TAU);ctx.clip();
-        rect(cx-r,cy-r,r*2,r*((i+j+variant)%2?.7:1.15),BLACK);
-        inkLine(cx,cy-r,cx,cy+r,.5);inkLine(cx-r,cy+r*.35,cx+r,cy+r*.35,.4);
-        ctx.restore();
-      }
+      for(let j=0;j<2;j++) inkPort(24+j*37,cy,r,(i+j+variant)%2===1);
       inkLine(1,(i+1)*fh-.5,84,(i+1)*fh-.5,.22);
     }
     inkPipe([[78,0],[78,h]],.75);
   },{narrow:false});
   tokyo('conduit-wall','Service conduits + connected meter cabinets','chamber',({h,variant})=>{
-    inkWindow(10,h*.12,33,h*.19,variant,2);
-    inkRect(53,h*.04,16,h*.07);
-    const boxes=Array.from({length:3},(_,i)=>({x:8+i*15,y:h*(i===1?.43:.4),w:11,hh:h*.115}));
-    // Draw complete routes before cabinets; no clearance masks can sever them.
-    boxes.forEach((b,i)=>{
-      const x=56+i*4,yy=h*(.65+i*.035),mx=b.x+b.w*.6,bottom=b.y+b.hh;
-      inkPipe([[x,h*.11],[x,h*.48],[x+3,h*.5],[x+3,yy-2],[x+1,yy],[mx+2,yy],[mx,yy-2],[mx,bottom]],.85);
-      inkRect(b.x,b.y,b.w,b.hh);
-      inkLine(b.x+b.w-2,b.y+b.hh*.4,b.x+b.w-2,b.y+b.hh*.62,.6);
-      inkRect(mx-1,bottom,2,1.4,BLACK);
-    });
-    for(const y of [.18,.48,.79]) inkVent(72,h*y,9,h*.055);
-    const ground=h*.92,port=inkAC(12,h*.78,27,ground);
-    inkPipe([port,[49,port[1]],[52,h*.93],[71,h*.93]],1.3);
-    inkRect(71,h*.9,10,h*.06);
-    // Sparse material seams stay subordinate to utility routing.
-    for(const f of [.35,.76,.98]) inkLine(1,h*f,83,h*f,.18);
+    // The riser, its cabinets and their outlets are one repeating run, so the
+    // routing keeps its size instead of stretching over a tall building.
+    const n=clamp(Math.round(h/195),1,18),fh=h/n;
+    for(let k=0;k<n;k++) {
+      const t=k*fh;
+      inkWindow(10,t+fh*.12,33,fh*.19,variant+k,2);
+      inkRect(53,t+fh*.04,16,fh*.07);
+      const boxes=Array.from({length:3},(_,i)=>({x:8+i*15,y:t+fh*(i===1?.43:.4),w:11,hh:fh*.115}));
+      // Draw complete routes before cabinets; no clearance masks can sever them.
+      boxes.forEach((b,i)=>{
+        const x=56+i*4,yy=t+fh*(.65+i*.035),mx=b.x+b.w*.6,bottom=b.y+b.hh;
+        inkPipe([[x,t+fh*.11],[x,t+fh*.48],[x+3,t+fh*.5],[x+3,yy-2],[x+1,yy],[mx+2,yy],[mx,yy-2],[mx,bottom]],.85);
+        inkRect(b.x,b.y,b.w,b.hh);
+        inkLine(b.x+b.w-2,b.y+b.hh*.4,b.x+b.w-2,b.y+b.hh*.62,.6);
+        inkRect(mx-1,bottom,2,1.4,BLACK);
+      });
+      for(const f of [.18,.48,.79]) inkVent(72,t+fh*f,9,fh*.055);
+      const ground=t+fh*.92,port=inkAC(12,t+fh*.78,27,ground);
+      inkPipe([port,[49,port[1]],[52,t+fh*.93],[71,t+fh*.93]],1.3);
+      inkRect(71,t+fh*.9,10,fh*.06);
+      // Sparse material seams stay subordinate to utility routing.
+      for(const f of [.35,.76,.98]) inkLine(1,t+fh*f,83,t+fh*f,.18);
+    }
   },{narrow:false});
   tokyo('louver-front','Alley galleries + shuttered window bays','chamber',({h,variant})=>{
-    const n=clamp(Math.round(h/57),1,5),fh=h/n;
+    const n=clamp(Math.round(h/95),1,30),fh=h/n;
     for(let i=0;i<n;i++) {
       const y=i*fh,ground=y+fh*.28;
       rect(6,y,76,fh*.32,BLACK);
@@ -924,7 +980,7 @@
   },{narrow:false});
   tokyo('glass-ribs','Glazed passage + exposed straight steel ribs','chamber',({h})=>{
     rect(8,0,69,h,BLACK);
-    const cols=5,rows=clamp(Math.round(h/18),2,16),rh=h/rows;
+    const cols=5,rows=clamp(Math.round(h/33),2,80),rh=h/rows;
     for(let i=0;i<cols;i++) for(let j=0;j<rows;j++) {
       const x=11+i*12.7,y=j*rh+1;
       inkRect(x,y,11,rh-2,WHITE,.28);
@@ -932,8 +988,12 @@
       else {rect(x,y,1.3,rh-2,BLACK);inkLine(x,y+rh*.72,x+11,y+rh*.72,.25);}
     }
     for(const x of [8,33.4,58.8,77]) {inkLine(x,0,x,h,1.1);inkLine(x+1,0,x+1,h,.3,WHITE);}
-    const deck=h*.69;
-    sill(5,deck,78,5,2.2);inkRail(7,deck,74,Math.min(10,h*.11),4,BLACK,7);
+    // A maintenance walkway every few storeys, not one stretched across the lot.
+    const decks=Math.max(1,Math.round(h/260));
+    for(let d=0;d<decks;d++) {
+      const deck=h*(d+.7)/decks;
+      sill(5,deck,78,5,2.2);inkRail(7,deck,74,10,4,BLACK,7);
+    }
   },{narrow:false});
   tokyo('tile-eaves','Low tiled roof + timber gable','crown',({h})=>{
     const base=h-3,peak=Math.max(2,h*.3);
@@ -946,10 +1006,9 @@
       inkLine(48-(48*i/4),y,48,y-2,.28,WHITE);inkLine(48,y-2,48+(47*i/4),y,.28,WHITE);
     }
     inkLine(46,peak-2,50,peak-2,1.7);
-    roofDeck(h);
-  });
+  },{tiles:true});
   tokyo('commercial-front','Stacked glazed tenants + slim sign tower','chamber',({h,variant})=>{
-    const n=clamp(Math.round(h/39),2,7),fh=h/n;
+    const n=clamp(Math.round(h/70),2,44),fh=h/n;
     for(let i=0;i<n;i++) {
       const y=i*fh;
       rect(7,y+fh*.13,62,fh*.56,BLACK);
@@ -962,7 +1021,7 @@
     for(let i=0;i<n;i++) inkLine(69,(i+.5)*fh,74,(i+.5)*fh,.75);
   },{narrow:false,hero:true});
   tokyo('stepped-terraces','Staggered terraces + slender balcony returns','chamber',({h,variant})=>{
-    const n=clamp(Math.round(h/48),2,5),fh=h/n;
+    const n=clamp(Math.round(h/86),2,36),fh=h/n;
     for(let i=0;i<n;i++) {
       const x=26-i*20/(n-1),y=(i+1)*fh-4,rh=Math.min(10,fh*.2);
       inkBalcony(x,y,83-x,rh,i+variant);
@@ -987,16 +1046,291 @@
     for(const x of [7,12]) inkLine(x,h*.52,x,deck,.5);
     for(let y=h*.55;y<deck;y+=Math.max(3,h*.07)) inkLine(7,y,12,y,.4);
     inkRail(3,deck,89,Math.min(10,h*.2),4,BLACK,8);
-    roofDeck(h);
+  },{narrow:false});
+
+  tokyo('bay-windows','Projecting box windows + shallow hoods','chamber',({h,variant})=>{
+    const n=clamp(Math.round(h/78),1,40),fh=h/n;
+    for(let i=0;i<n;i++) {
+      const y=i*fh,bx=(i+variant)%2?38:6,bw=40,top=y+fh*.22,bh=Math.min(26,fh*.36);
+      // A hood over the projecting box, its glazing, then the brackets under it.
+      sill(bx-3,top,bw+6,5,1.5);
+      inkWindow(bx,top+4,bw,bh,i+variant,3,false);
+      for(const f of [.14,.86]) inkFace([[bx+bw*f-2.6,top+6+bh],[bx+bw*f+2.6,top+6+bh],[bx+bw*f,top+6+bh+5.5]],BLACK);
+      inkWindow(bx<20?58:6,top+7,18,Math.min(15,bh*.58),i+variant+2,2,false);
+      inkLine(1,y+fh-.6,84,y+fh-.6,.24);
+    }
+    inkPipe([[80,0],[80,h]],.9);
+  });
+  tokyo('laundry-decks','Open drying decks + airing poles','chamber',({h,variant})=>{
+    const n=clamp(Math.round(h/82),1,36),fh=h/n;
+    for(let i=0;i<n;i++) {
+      const y=(i+1)*fh-5,rh=Math.min(16,fh*.27),wh=Math.min(22,fh*.28);
+      inkWindow(9,y-rh-wh-3,34,wh,i+variant,2,false);
+      inkVent(70,y-rh-13,10,9);
+      sill(4,y,76,5,2);
+      // One pole over the deck; bedding and washing hang from it past the rail.
+      inkLine(6,y-rh*.94,78,y-rh*.94,.5);
+      for(let j=0;j<3;j++) {
+        if((i+j*2+variant)%4===0) continue;
+        const x=10+j*23,ww=(i+j+variant)%3?16:20,bedding=(i+j+variant)%3===1;
+        inkRect(x,y-rh*.94,ww,rh*.82,bedding?BLACK:WHITE,.4);
+        if(bedding) inkLine(x+1.6,y-rh*.86,x+ww-1.6,y-rh*.86,.3,WHITE);
+        else inkLine(x+ww*.5,y-rh*.9,x+ww*.5,y-rh*.14,.22);
+      }
+      inkRail(4,y-.4,76,rh,5,BLACK,5);
+    }
+  });
+  tokyo('glass-block','Glass block panel + ventilation louvres','chamber',({h,variant})=>{
+    const n=clamp(Math.round(h/82),1,36),fh=h/n;
+    for(let i=0;i<n;i++) {
+      const y=i*fh,px=7,pw=51,top=y+fh*.17,ph=Math.min(48,fh*.6);
+      inkRect(px,top,pw,ph,BLACK,.55);
+      const cols=Math.max(2,Math.round(pw/9)),rows=Math.max(2,Math.round(ph/9));
+      const gw=(pw-3)/cols,gh=(ph-3)/rows;
+      for(let a=0;a<cols;a++) for(let b=0;b<rows;b++)
+        inkRect(px+1.5+a*gw,top+1.5+b*gh,gw-.9,gh-.9,(a*3+b*5+variant)%7?WHITE:BLACK,.22);
+      inkVent(64,top+1,15,Math.min(13,ph*.28));
+      inkWindow(64,top+ph*.45,15,Math.min(19,ph*.44),i+variant,1,false);
+      inkLine(1,y+fh-.6,84,y+fh-.6,.24);
+    }
+  });
+  tokyo('vending-row','Vending machines + covered bicycle stand','base',({h,variant})=>{
+    const ground=h-2,top=h*.36,face=ground-top;
+    rect(5,top,52,face,BLACK);
+    for(let i=0;i<3;i++) {
+      const x=8+i*16.5,mw=14;
+      inkRect(x,top+3,mw,face-4);
+      rect(x+1.6,top+5,mw-3.2,face*.4,BLACK);
+      inkRect(x+2.8,top+6.2,mw-5.6,face*.27,(i+variant)%2?WHITE:BLACK,.25);
+      rect(x+2.2,top+face*.6,mw-4.4,2.2,BLACK);
+      inkLine(x+mw-4,top+face*.72,x+mw-4,top+face*.82,.6);
+    }
+    // A lean-to roof over the bicycle stand, and the bicycles under it.
+    inkFace([[59,top+7],[83,top+2],[83,top+5.4],[59,top+10.4]]);
+    inkLine(61,top+10,61,ground,.7); inkLine(80,top+5.2,80,ground,.7);
+    for(let i=0;i<2;i++) {
+      const x=62+i*10,wy=ground-4.2,r=3.5;
+      ellipse(x,wy,r,r,WHITE,BLACK,.42); ellipse(x+7.4,wy,r,r,WHITE,BLACK,.42);
+      inkLine(x,wy,x+3.9,wy-5.4,.42); inkLine(x+3.9,wy-5.4,x+7.4,wy,.42);
+      inkLine(x+3.9,wy-5.4,x+3.9,wy,.34); inkLine(x+7.4,wy,x+7.6,wy-6.4,.42);
+      inkLine(x+1.9,wy-7.8,x+5,wy-7.8,.45); inkLine(x+6.1,wy-6.4,x+9,wy-6.4,.4);
+    }
+    inkSign(6,h*.08,50,h*.17);
+    sill(3,ground,79,4,1.4);
+  });
+  tokyo('lantern-bar','Lantern bar front + hanging noren','base',({h,variant})=>{
+    const ground=h-2,top=h*.34,face=ground-top;
+    inkSign(6,Math.max(1,top-face*.3),67,Math.min(14,face*.24));
+    rect(6,top,67,face,BLACK);
+    // Paper lanterns hung in front of the dark front, clear of the noren.
+    for(let i=0;i<3;i++) {
+      const cx=15+i*21,ly=top+2,r=Math.min(6,face*.11);
+      inkLine(cx,top-1,cx,ly,.4);
+      ellipse(cx,ly+r,r*.85,r,WHITE,BLACK,.5);
+      for(let j=1;j<4;j++) inkLine(cx-r*.82,ly+j*r*.5,cx+r*.82,ly+j*r*.5,.24);
+      rect(cx-1.6,ly-.4,3.2,1.4,BLACK);
+    }
+    const ny=top+face*.34,nh=Math.min(12,face*.17);
+    inkLine(42,ny,72,ny,.7);
+    for(let i=0;i<2;i++) inkRect(43+i*15,ny,14,nh,WHITE,.35);
+    inkWindow(10,ny-2,28,face*.5,variant,2,false);
+    inkDoor(46,ny+nh+2,20,Math.max(6,ground-ny-nh-3),true);
+    sill(3,ground,79,4,1.4);
+  });
+  tokyo('roof-garden','Roof planters + glazed growing frame','crown',({h})=>{
+    const deck=h-3,top=h*.28;
+    inkRect(11,top,41,deck-top);
+    for(let i=1;i<4;i++) inkLine(11+i*10.25,top,11+i*10.25,deck,.32);
+    inkLine(11,top+(deck-top)*.48,52,top+(deck-top)*.48,.32);
+    polygon([[52,top],[59,top-3],[59,deck],[52,deck]],BLACK);
+    sill(9,top,45,5,1.3);
+    // Planters ranged along the parapet, with clipped foliage over the rim.
+    for(let i=0;i<3;i++) {
+      const x=61+i*10;
+      inkRect(x,deck-8,9,8);
+      for(let j=0;j<3;j++) ellipse(x+2+j*2.4,deck-9.4,2.3,2.7,WHITE,BLACK,.34);
+    }
+    inkRail(3,deck,86,Math.min(9,h*.2),4,BLACK,6);
+  },{narrow:false});
+
+  tokyo('capsule-stack','Bolted capsule rooms + single round lights','chamber',({h,variant})=>{
+    const n=clamp(Math.round(h/62),1,44),fh=h/n;
+    rect(66,0,16,h,BLACK);
+    for(let i=1;i<n;i++) inkLine(67,i*fh,81,i*fh,.4,WHITE);
+    for(let i=0;i<n;i++) {
+      // Each capsule bolts onto the core and shifts along it floor by floor.
+      const y=i*fh+2.5,ch=fh-6,cx=(i+variant)%2?3:14,cw=52;
+      if(ch<8) continue;
+      inkRect(cx,y,cw,ch);
+      polygon([[cx+cw,y],[cx+cw+5,y-2.6],[cx+cw+5,y+ch-2.6],[cx+cw,y+ch]],BLACK);
+      inkLine(cx+cw,y,66,y+1.4,.5); inkLine(cx+cw,y+ch,66,y+ch+1.4,.5);
+      inkPort(cx+cw*.33,y+ch*.46,Math.min(ch*.31,13),(i+variant)%2===0);
+      for(const f of [.66,.8]) inkLine(cx+cw*f,y+3,cx+cw*f,y+ch-3,.28);
+      inkLine(cx+2,y+ch-2.4,cx+cw-2,y+ch-2.4,.25);
+    }
+  });
+  tokyo('pachinko-front','Stacked lightbox signs + service slot','chamber',({h,variant})=>{
+    const n=clamp(Math.round(h/29),2,80),fh=h/n;
+    rect(3,0,64,h,BLACK);
+    for(let i=0;i<n;i++) {
+      // Every tenant takes a board; the unlit ones read as dark reverses, and
+      // the boards are mounted proud of the wall on short brackets.
+      const y=i*fh+1.6,bh=fh-3.2,dark=(i*3+variant)%4===0;
+      if(bh<3) continue;
+      inkRect(5,y,60,bh,dark?BLACK:WHITE,.45);
+      const cuts=(i+variant)%3+1;
+      for(let j=1;j<=cuts;j++) inkLine(5+60*j/(cuts+1),y+1,5+60*j/(cuts+1),y+bh-1,.26,dark?WHITE:BLACK);
+      inkLine(7,y+bh*.5,63,y+bh*.5,.24,dark?WHITE:BLACK);
+      polygon([[65,y],[69,y-1.6],[69,y+bh-1.6],[65,y+bh]],BLACK);
+      inkLine(3,y+bh*.5,5,y+bh*.5,.5,WHITE);
+    }
+    for(let i=0;i<n;i+=2) inkWindow(72,i*fh+3,11,Math.min(15,fh*.62),i+variant,1,false);
+    inkPipe([[70,0],[70,h]],.75);
+  },{narrow:false});
+  tokyo('brace-frame','Exposed seismic bracing + glazed bays','chamber',({h,variant})=>{
+    const n=clamp(Math.round(h/86),1,30),fh=h/n;
+    rect(6,0,74,h,BLACK);
+    for(let i=0;i<n;i++) {
+      const y=i*fh;
+      for(let j=0;j<2;j++) inkWindow(9+j*36,y+fh*.1,31,fh*.74,i+j+variant,2,false);
+      // Sunlit steel crosses the glass: a beam each floor, one braced bay.
+      inkLine(6,y,80,y,1.1,WHITE);
+      const b=(i+variant)%2;
+      inkLine(8+b*36,y,43+b*36,y+fh,.9,WHITE);
+      inkLine(43+b*36,y,8+b*36,y+fh,.9,WHITE);
+      rect(24+b*36,y+fh*.5-1.8,3.6,3.6,WHITE);
+    }
+    for(const x of [7,43,79]) { inkLine(x,0,x,h,1.3,WHITE); inkLine(x+1.4,0,x+1.4,h,.35); }
+  },{narrow:false});
+  tokyo('tile-spandrel','Tiled spandrels + horizontal window bands','chamber',({h,variant})=>{
+    const n=clamp(Math.round(h/74),1,42),fh=h/n;
+    for(let i=0;i<n;i++) {
+      const y=i*fh,band=Math.min(23,fh*.36),ty=y+fh*.12+band+2,th=Math.max(3,fh*.4);
+      inkWindow(5,y+fh*.12,74,band,i+variant,5,false);
+      // Small tile coursing: fine, regular, and kept to the spandrel.
+      rect(5,ty,74,th,BLACK);
+      const cols=Math.max(4,Math.round(74/7)),rows=Math.max(1,Math.round(th/7));
+      for(let a=1;a<cols;a++) inkLine(5+a*74/cols,ty,5+a*74/cols,ty+th,.2,WHITE);
+      for(let b=1;b<rows;b++) inkLine(5,ty+b*th/rows,79,ty+b*th/rows,.2,WHITE);
+      inkLine(1,y+fh-.5,84,y+fh-.5,.24);
+    }
+  });
+  tokyo('planted-balconies','Planted balconies + trailing greenery','chamber',({h,variant})=>{
+    const n=clamp(Math.round(h/84),1,34),fh=h/n;
+    for(let i=0;i<n;i++) {
+      const y=(i+1)*fh-5,rh=Math.min(12,fh*.2),wh=Math.min(26,fh*.3);
+      inkWindow(9,y-rh-wh-4,40,wh,i+variant,2,false);
+      sill(4,y,76,6,2.2);
+      // Planters on the rail, with growth trailing over the slab edge.
+      for(let j=0;j<4;j++) {
+        if((i+j+variant)%4===0) continue;
+        const x=8+j*18;
+        inkRect(x,y-rh*.5,13,rh*.45);
+        // A lobed clump over the planter rim, and a mass of growth hanging
+        // below the slab: overlapping lobes rather than a chain of beads.
+        for(let k=0;k<5;k++) ellipse(x+1.4+k*2.8,y-rh*(.6+(k%2)*.16),4.4,3.7,WHITE,BLACK,.34);
+        for(let k=0;k<6;k++) {
+          const lx=x+1.6+((k*5+j)%12),ly=y+3.4+((i+j+k)%4)*3.2;
+          ellipse(lx,ly,4-(k%3)*.7,3.2-(k%3)*.5,WHITE,BLACK,.3);
+        }
+        inkLine(x+4.5,y+2.2,x+3.4,y+13,.26); inkLine(x+9,y+2.2,x+10.2,y+10.5,.26);
+      }
+      inkRail(4,y-.4,76,rh,6,BLACK,5);
+    }
+  });
+
+  tokyo('sento-front','Bathhouse gable + split noren','base',({h,variant})=>{
+    const ground=h-2,eave=h*.44,peak=h*.05,face=ground-eave;
+    // A deep temple gable over the entrance, dark beneath its eaves.
+    inkFace([[1,eave],[42,peak],[83,eave]]);
+    for(const x of [22,42,62]) inkLine(x,eave-1,x,peak+Math.abs(x-42)*.93+2,.4);
+    inkFace([[0,eave],[7,eave-3.4],[77,eave-3.4],[84,eave],[80,eave+3],[4,eave+3]],BLACK);
+    inkLine(42,peak+2,42,eave-2,.7);
+    rect(9,eave+3,66,face-3,BLACK);
+    const nh=Math.min(13,face*.26);
+    inkLine(11,eave+7,73,eave+7,.7);
+    for(let i=0;i<3;i++) inkRect(12+i*20.5,eave+7,19,nh,WHITE,.35);
+    inkDoor(22,eave+9+nh,19,Math.max(6,ground-eave-11-nh),true);
+    inkWindow(46,eave+9+nh,22,Math.max(5,ground-eave-12-nh),variant,2,false);
+    sill(3,ground,79,4,1.4);
+  },{narrow:false});
+  tokyo('ramen-counter','Counter shop + extract duct and stools','base',({h,variant})=>{
+    const ground=h-2,top=h*.28,face=ground-top;
+    rect(6,top,68,face,BLACK);
+    const nh=Math.min(12,face*.2);
+    inkLine(8,top+2.5,72,top+2.5,.7,WHITE);
+    for(let i=0;i<4;i++) inkRect(9+i*16.4,top+2.5,15,nh,WHITE,.35);
+    // The counter is the lit element; the stools stand under it on the pavement.
+    const cy=top+face*.5,ch=Math.max(3.4,face*.1);
+    rect(8,cy,64,ch,WHITE); inkLine(8,cy+ch,72,cy+ch,.7);
+    polygon([[8,cy+ch],[72,cy+ch],[70,cy+ch+2.6],[10,cy+ch+2.6]],BLACK);
+    for(let i=0;i<4;i++) {
+      const x=16+i*14.6,sy=cy+ch+Math.max(5.5,face*.15);
+      ellipse(x,sy,5.2,2,WHITE,BLACK,.4);
+      inkLine(x,sy+1.4,x,ground-2,.8,WHITE);
+      inkLine(x-3,ground-2,x+3,ground-2,.6,WHITE);
+    }
+    inkPipe([[77,h*.02],[77,top+8],[72,top+11]],1.5);
+    inkSign(7,h*.04,58,Math.min(13,h*.16));
+    sill(3,ground,79,4,1.4);
+  });
+  tokyo('sign-pylon','Rooftop sign pylon + open steel frame','crown',({h})=>{
+    const deck=h-3,base=h*.05,run=deck-base,bays=4;
+    // An open braced frame, with blank boards mounted proud of its face.
+    for(const x of [10,74]) { inkLine(x,base,x,deck,1.15); inkLine(x+1.4,base,x+1.4,deck,.3,WHITE); }
+    for(let i=0;i<=bays;i++) inkLine(10,base+run*i/bays,74,base+run*i/bays,.5);
+    for(let i=0;i<bays;i++) {
+      const y0=base+run*i/bays,y1=base+run*(i+1)/bays;
+      inkLine(10,i%2?y0:y1,74,i%2?y1:y0,.34);
+    }
+    for(let i=0;i<3;i++) inkSign(26,base+3+i*(run-6)/3,32,Math.max(3,(run-6)/3-4));
+    // A climbing ladder up the near column.
+    for(const x of [2,7]) inkLine(x,base+4,x,deck,.55);
+    for(let y=base+7;y<deck;y+=6) inkLine(2,y,7,y,.45);
+    inkLine(6,base,78,base,.45);
+  },{narrow:false});
+  tokyo('roof-shrine','Roof shrine + fenced gravel platform','crown',({h})=>{
+    const deck=h-3,base=deck-5,hall=Math.min(25,h*.46);
+    rect(8,base,68,5,WHITE); inkLine(8,base,76,base,.4);
+    // A small hall with a pitched roof, and a torii on the approach.
+    inkRect(48,base-hall,22,hall);
+    inkFace([[43,base-hall],[59,base-hall-7],[75,base-hall]]);
+    polygon([[70,base-hall],[75,base-hall],[75,base],[70,base]],BLACK);
+    inkLine(59,base-hall-5,59,base-hall,.5);
+    inkWindow(53,base-hall*.72,12,Math.max(4,hall*.34),1,1,false);
+    const th=Math.min(21,h*.4);
+    for(const x of [16,34]) { inkLine(x,base,x,base-th,1); inkLine(x+1.2,base,x+1.2,base-th,.3,WHITE); }
+    inkLine(11,base-th,39,base-th,1.2); inkLine(13,base-th+4.5,37,base-th+4.5,.75);
+    inkRail(6,deck,78,Math.min(8,h*.16),4,BLACK,7);
+  },{narrow:false});
+  tokyo('cooling-towers','Cooling towers + fan decks','crown',({h})=>{
+    const deck=h-3;
+    for(let i=0;i<2;i++) {
+      const x=12+i*34,w=28,top=deck-Math.min(33,h*.62),r=w*.29;
+      inkRect(x,top,w,deck-top);
+      polygon([[x+w,top],[x+w+5,top-2.6],[x+w+5,deck-2.6],[x+w,deck]],BLACK);
+      ellipse(x+w*.5,top,w*.5,Math.min(3.2,h*.05),WHITE,BLACK,.5);
+      ellipse(x+w*.5,top,r,r*.33,WHITE,BLACK,.35);
+      for(let j=0;j<6;j++) {
+        const a=j*Math.PI/6;
+        inkLine(x+w*.5-Math.cos(a)*r,top-Math.sin(a)*r*.33,x+w*.5+Math.cos(a)*r,top+Math.sin(a)*r*.33,.24);
+      }
+      for(let j=1;j<4;j++) inkLine(x,top+(deck-top)*j/4,x+w,top+(deck-top)*j/4,.26);
+      for(const f of [.14,.8]) inkLine(x+w*f,deck,x+w*f,deck+3,.7);
+    }
+    inkPipe([[6,deck-Math.min(20,h*.38)],[6,deck]],1.2);
   },{narrow:false});
 
   const library = Object.fromEntries(blocks.map(block => [block.id, block]));
   // Review numbers stay stable across revisions; 20 (crane) is retired.
   const catalogSlots = ['shop-lobby','roller-shop','tenant-entry','tenant-floors',
-    'external-stair','balcony-stack','service-wall','setback-rooms','water-tank',
+    'scaffold-lifts','balcony-stack','service-wall','setback-rooms','water-tank',
     'sign-gantry','plant-room','antenna-roof','noren-shop','marquee-shop',
     'porthole-bays','conduit-wall','louver-front','glass-ribs','tile-eaves',null,
-    'commercial-front','stepped-terraces','duct-deck'];
+    'commercial-front','stepped-terraces','duct-deck','bay-windows','laundry-decks',
+    'glass-block','vending-row','lantern-bar','roof-garden','capsule-stack',
+    'pachinko-front','brace-frame','tile-spandrel','planted-balconies','sento-front',
+    'ramen-counter','sign-pylon','roof-shrine','cooling-towers'];
   for (const block of blocks) {
     block.catalogOnly = block.collection !== 'tokyo';
     block.catalogNumber = catalogSlots.indexOf(block.id) + 1;
@@ -1005,30 +1339,47 @@
 
   function compose(w, h, value) {
     const random = randomFactory(value);
-    const count = clamp(Math.round(w / h * 7), 5, 16);
-    const widths = Array.from({ length: count }, (_, i) => (i % 3 === 1 ? pick(random, [0.36, 0.44, 0.55]) : pick(random, [0.85, 1.2, 1.7])));
-    const total = widths.reduce((a, b) => a + b, 0), margin = Math.min(w, h) * 0.009;
+    // One bay is the same width right across the city, so a window keeps its
+    // size on a narrow building and on a broad one. The bay is sized for the
+    // canvas first and the buildings follow from it, so the drawing holds its
+    // grain instead of getting finer as buildings multiply. Buildings alternate
+    // broad and single-bay; BAY_SPAN sets how coarse the whole drawing reads.
+    const margin = Math.min(w, h) * 0.009, span = w - 2 * margin;
+    const totalBays = Math.max(MIN_BAYS, Math.round(span / clamp(Math.min(w, h) * BAY_SPAN, 58, 340)));
+    const bayCounts = [];
+    for (let leftBays = totalBays; leftBays > 0;) {
+      // The first building leaves a bay behind, so even the coarsest setting
+      // still draws a row rather than a single facade.
+      const cap = bayCounts.length ? leftBays : Math.max(1, leftBays - 1);
+      const n = Math.min(cap, bayCounts.length % 2 ? 1 : pick(random, [2, 2, 3]));
+      bayCounts.push(n); leftBays -= n;
+    }
+    const bay = span / totalBays;
     let x = margin;
     const baseLine = h - margin;
-    const broad = widths.map((v, i) => v > 0.7 ? i : -1).filter(i => i >= 0);
-    const facadePosition = Math.floor(broad.length / 2);
-    const featureBlocks = new Map([
-      [broad[facadePosition], 'commercial-front'],
-      [broad[broad.length > 3 ? 1 : 0], 'external-stair'],
-      [broad[broad.length > 3 ? broad.length - 2 : broad.length - 1], 'stepped-terraces']
-    ]);
+    const broad = bayCounts.map((n, i) => n > 1 ? i : -1).filter(i => i >= 0);
+    // Feature facades spread evenly over the broad buildings, one each and never
+    // twice on the same one. A small canvas holds fewer broad buildings than
+    // there are features, so which ones appear rotates with the seed.
+    const features = ['scaffold-lifts', 'commercial-front', 'stepped-terraces'];
+    const slots = Math.min(features.length, broad.length), offset = Math.floor(random() * features.length);
+    const featureBlocks = new Map();
+    for (let i = 0; i < slots; i++)
+      featureBlocks.set(broad[clamp(Math.round((i + 0.5) * broad.length / slots - 0.5), 0, broad.length - 1)],
+        features[(i + offset) % features.length]);
+    const slimChambers = family('chamber').filter(b => b.narrow && !b.hero);
     let previousCrown = '', previousBase = '';
     const crownUsage = new Map();
-    const towers = widths.map((ratio, index) => {
-      const bw = (w - 2 * margin) * ratio / total;
+    const towers = bayCounts.map((bays, index) => {
+      const bw = bay * bays;
       const top = h * (featureBlocks.get(index) === 'commercial-front' ? 0.19 : 0.17 + random() * 0.24);
       const baseTop = baseLine - h * (0.10 + random() * 0.045);
       const paper = WHITE, ink = BLACK;
-      const narrow = ratio < 0.7;
+      const narrow = bays === 1;
       let crownOptions = family('crown').filter(b => (!narrow || b.narrow) && b.id !== previousCrown);
       const leastUsed = Math.min(...crownOptions.map(b => crownUsage.get(b.id) || 0));
       crownOptions = crownOptions.filter(b => (crownUsage.get(b.id) || 0) === leastUsed);
-      const tower = { x, w: bw, top, baseTop, baseLine, paper, ink, index, modules: [],
+      const tower = { x, w: bw, bays, top, baseTop, baseLine, paper, ink, index, modules: [],
         base: pick(random, family('base').filter(b => b.id !== previousBase && (!narrow || b.narrow))).id,
         crown: pick(random, crownOptions).id,
         crownTop: Math.max(h * 0.015, top - h * (0.075 + random() * 0.16)), variant: Math.floor(random() * 12),
@@ -1038,39 +1389,57 @@
       previousCrown = tower.crown; previousBase = tower.base;
       crownUsage.set(tower.crown,(crownUsage.get(tower.crown)||0)+1);
       const crownRatio = tower.crown === 'plant-room' ? 0.65 : tower.crown === 'duct-deck' ? 0.72 : 1.25;
-      tower.crownTop = Math.max(h * 0.018, top - Math.min(top - tower.crownTop, bw * crownRatio, tower.crown === 'plant-room' ? h * 0.1 : h * 0.18));
+      tower.crownTop = Math.max(h * 0.018, top - Math.min(top - tower.crownTop, bay * crownRatio, tower.crown === 'plant-room' ? h * 0.1 : h * 0.18));
       x += bw;
       const available = baseTop - top;
       const hero = featureBlocks.has(index);
       let ids;
       if (hero) {
-        ids = [pick(random, ['tenant-floors', 'setback-rooms', 'porthole-bays', 'glass-ribs']), featureBlocks.get(index), pick(random, ['tenant-floors', 'balcony-stack', 'louver-front', 'conduit-wall'])];
+        ids = [pick(random, ['tenant-floors', 'setback-rooms', 'porthole-bays', 'glass-ribs', 'bay-windows', 'glass-block', 'capsule-stack', 'brace-frame', 'tile-spandrel']), featureBlocks.get(index), pick(random, ['tenant-floors', 'balcony-stack', 'louver-front', 'conduit-wall', 'laundry-decks', 'bay-windows', 'planted-balconies', 'pachinko-front', 'tile-spandrel'])];
       } else if (narrow) {
-        ids = ['service-wall', 'tenant-floors', 'service-wall'];
+        // A single-bay building draws from every chamber that fits one bay,
+        // rather than from one fixed stack, so slim buildings differ.
+        ids = [];
+        for (let i = 0; i < 3; i++)
+          ids.push(pick(random, slimChambers.filter(b => b.id !== ids[i - 1])).id);
       } else {
         ids = pick(random, [
           ['tenant-floors', 'balcony-stack', 'tenant-floors'],
-          ['setback-rooms', 'external-stair', 'tenant-floors'],
+          ['setback-rooms', 'scaffold-lifts', 'tenant-floors'],
           ['balcony-stack', 'service-wall', 'setback-rooms'],
           ['porthole-bays', 'porthole-bays', 'louver-front'],
           ['glass-ribs', 'tenant-floors', 'conduit-wall'],
-          ['balcony-stack', 'balcony-stack', 'conduit-wall']
+          ['balcony-stack', 'balcony-stack', 'conduit-wall'],
+          ['bay-windows', 'laundry-decks', 'bay-windows'],
+          ['glass-block', 'tenant-floors', 'laundry-decks'],
+          ['laundry-decks', 'conduit-wall', 'bay-windows'],
+          ['setback-rooms', 'glass-block', 'louver-front'],
+          ['bay-windows', 'balcony-stack', 'glass-ribs'],
+          ['tenant-floors', 'glass-block', 'service-wall'],
+          ['capsule-stack', 'capsule-stack', 'tenant-floors'],
+          ['pachinko-front', 'tenant-floors', 'pachinko-front'],
+          ['brace-frame', 'tile-spandrel', 'brace-frame'],
+          ['tile-spandrel', 'planted-balconies', 'tile-spandrel'],
+          ['planted-balconies', 'capsule-stack', 'laundry-decks'],
+          ['glass-ribs', 'pachinko-front', 'conduit-wall'],
+          ['brace-frame', 'balcony-stack', 'capsule-stack'],
+          ['tile-spandrel', 'bay-windows', 'planted-balconies']
         ]);
       }
       const fractions = ids.map(id => library[id].hero ? 2.3 : 0.85 + random() * 0.5);
       const facadeAt = ids.indexOf('commercial-front');
-      const facadeHeight = facadeAt < 0 ? 0 : Math.min(available * 0.54, bw * 1.5);
+      const facadeHeight = facadeAt < 0 ? 0 : Math.min(available * 0.54, bay * 2.4);
       const sum = fractions.reduce((a, b, i) => a + (i === facadeAt ? 0 : b), 0);
       let y = top;
       ids.forEach((id, i) => {
         const hh = i === ids.length - 1 ? baseTop - y : i === facadeAt ? facadeHeight : (available - facadeHeight) * fractions[i] / sum;
-        tower.modules.push({ id, x: tower.x, y, w: bw, h: hh, paper, ink, variant: Math.floor(random() * 12) });
+        tower.modules.push({ id, x: tower.x, y, w: bw, h: hh, bays, paper, ink, variant: Math.floor(random() * 12) });
         y += hh;
       });
       return tower;
     });
     // The city is assembled from whole facade blocks. No secondary room is
-    // overlaid across them: circulation belongs to its own stair/balcony block.
+    // overlaid across them: circulation belongs to its own balcony block.
     return { towers, connectors: [], seed: value };
   }
 
@@ -1126,10 +1495,10 @@
       ctx.restore();
       if (tower.paper === WHITE) { towerOutline(tower); ctx.strokeStyle = BLACK; ctx.lineWidth = Math.max(0.45, Math.min(0.85, w / 1800)); ctx.stroke(); }
     }
-    for (const tower of layout.towers) drawBlock({ id: tower.crown, x: tower.x, y: tower.crownTop, w: tower.w, h: tower.top - tower.crownTop, ink: BLACK, paper: WHITE, variant: tower.variant }, false);
+    for (const tower of layout.towers) drawBlock({ id: tower.crown, x: tower.x, y: tower.crownTop, w: tower.w, h: tower.top - tower.crownTop, bays: tower.bays, ink: BLACK, paper: WHITE, variant: tower.variant }, false);
     for (const block of layout.connectors) drawBlock(block);
     for (const tower of layout.towers) {
-      drawBlock({ id: tower.base, x: tower.x, y: tower.baseTop, w: tower.w, h: tower.baseLine - tower.baseTop, ink: tower.ink, paper: tower.paper, variant: tower.variant });
+      drawBlock({ id: tower.base, x: tower.x, y: tower.baseTop, w: tower.w, h: tower.baseLine - tower.baseTop, bays: tower.bays, ink: tower.ink, paper: tower.paper, variant: tower.variant });
       line(tower.x, tower.baseTop, tower.x, tower.baseLine, tower.ink, Math.max(0.7, w / 1500));
     }
     line(w * 0.009, h - Math.min(w, h) * 0.009, w * 0.991, h - Math.min(w, h) * 0.009, BLACK, 1);
@@ -1180,9 +1549,16 @@
         rect(0, 0, box.width, box.height, WHITE);
         if (block.role === 'composition') drawCity(compose(box.width, box.height, 1907), box.width, box.height);
         else {
+          // Since the unit is absolute, a specimen is sized in units, not as a
+          // share of its cell: drawing a one-storey entrance as tall as a whole
+          // facade would stretch it out of proportion. Facades show two bays at
+          // the city's bay width; a ground floor or a roof shows one, because at
+          // city scale either is too small to review.
           const bw = box.width * 0.58;
-          const bh = block.role === 'base' ? box.height * 0.5 : block.role === 'connector' ? box.height * 0.25 : box.height * 0.8;
-          drawBlock({ id: block.id, x: (box.width - bw) / 2, y: (box.height - bh) / 2, w: bw, h: bh, ink: BLACK, paper: WHITE, variant: 0 }, block.role !== 'crown');
+          const bays = block.role === 'chamber' ? clamp(Math.round(bw / 66), 1, 3) : 1;
+          const tall = { base: 95, crown: 95, connector: 45 }[block.role] || 330;
+          const bh = Math.min(box.height * 0.86, tall * bw / (bays * 100));
+          drawBlock({ id: block.id, x: (box.width - bw) / 2, y: (box.height - bh) / 2, w: bw, h: bh, bays, ink: BLACK, paper: WHITE, variant: 0 }, block.role !== 'crown');
         }
       }
       ctx = previous;

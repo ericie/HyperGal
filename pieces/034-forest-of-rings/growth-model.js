@@ -221,7 +221,8 @@ const GrowthRingsModel = (() => {
       const base = rgbFromEntry(activePalette.colors[ring.colorIndex]);
       return mixRgb(base, ring.tone < 0 ? COLORS.inkRgb : COLORS.paperRgb, Math.abs(ring.tone));
     });
-    return { ...model, colors, palette: activePalette.name, scene: COLORS };
+    return { ...model, colors, palette: activePalette.name, scene: COLORS,
+      swatches: activePalette.colors.map(rgbFromEntry) };
       function makeModel(random, salt) {
         const colorRandom = mulberry32((salt ^ 0x9e3779b9) >>> 0);
         const forces = makeForces(random);

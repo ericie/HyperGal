@@ -3,6 +3,7 @@
 let cellSize;
 let gridWidth;
 let gridHeight;
+let gridOffsetY = 0;
 let gridList = [];
 
 function preSetUpGrid(){
@@ -201,7 +202,7 @@ function updateGrid(offset, canv){
         }
 
         fill(255, 255, 255, 0);
-        rect(i * cellSize, j * cellSize, cellSize, cellSize);
+        rect(i * cellSize, j * cellSize + gridOffsetY, cellSize, cellSize);
         drawShape(cellSize, i, j, offset, canv);
         // canv.triangle(0,0,50,0,150,50);
         // randomShape.path();
@@ -286,7 +287,7 @@ let newShapeList = [
 
     canv.push();
     
-    canv.translate(cellX * cellWidth + offsetX, cellY * cellWidth + offsetY);
+    canv.translate(cellX * cellWidth + offsetX, cellY * cellWidth + gridOffsetY + offsetY);
     if (flipH) canv.translate(cellWidth, 0);
     if (flipV) canv.translate(0, cellWidth);
     canv.scale(cellWidth / 100);

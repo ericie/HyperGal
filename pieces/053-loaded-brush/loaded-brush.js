@@ -18,6 +18,7 @@
   const params = new URLSearchParams(location.search);
   const $ = id => document.getElementById(id);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const STRIDE = 28; // x, y, s, t, half width, turn, curvature
 
   // ---------------------------------------------------------------- state
   let seed = params.get('seed') || Math.random().toString(36).slice(2, 8);
@@ -140,11 +141,13 @@
     in vec2 a_position;   // CSS px
     in vec2 a_st;         // arc length, signed offset across (px)
     in float a_hw;        // local half width (px)
+    in vec2 a_frame;      // cumulative turn (rad), curvature (1/px)
     uniform vec2 u_size;  // CSS px
     out vec2 v_st;
+    out vec2 v_frame;
     out float v_hw;
     void main() {
-      v_st = a_st; v_hw = a_hw;
+      v_st = a_st; v_hw = a_hw; v_frame = a_frame;
       gl_Position = vec4(a_position.x / u_size.x * 2.0 - 1.0, 1.0 - a_position.y / u_size.y * 2.0, 0.0, 1.0);
     }`;
 
@@ -153,6 +156,7 @@
   // landing bulge, the hair-by-hair run-out and the lift at the end.
   const depositFragment = `${glslPrelude}
     in vec2 v_st;
+    in vec2 v_frame;
     in float v_hw;
     uniform float u_length, u_reveal, u_seed, u_thickness, u_load;
     uniform int u_mode;
@@ -166,38 +170,66 @@
       vec2 sd = vec2(u_seed * 13.7, u_seed * 5.3);
       float tn = t / hw, side = tn < 0.0 ? -1.0 : 1.0;
 
+      // Around a bend every hair runs its own distance. For a hair offset t
+      // from the path, that distance grows by (1 - t * curvature) per step,
+      // so its travel is s - t * (total turn). Hairs on the inside of the
+      // bend crawl and pile paint up; hairs on the outside race and stretch
+      // theirs thin. Where the turn is tighter than the offset the brush is
+      // pivoting, and those hairs scrub back over paint already laid down.
+      float turn = v_frame.x, curve = v_frame.y;
+      float stretch = 1.0 - t * curve;
+      float pivot = 1.0 - smoothstep(0.06, 0.55, stretch);
+      float crowd = 1.0 - smoothstep(0.1, 1.05, stretch);   // how bunched the hairs are here
+      float pace = max(abs(stretch), 0.12);
+      float pile = clamp(pow(1.0 / pace, 0.55), 0.5, 2.0) * mix(1.0, 0.7, pivot);
+      // Paint wicks sideways between the hairs, so the difference in what
+      // they hold saturates instead of growing with every degree of the turn;
+      // without that a hairpin leaves one half of the brush soaking wet.
+      float carried = 1.3 * tanh(turn / 1.3);
+      float travelled = max(s - t * carried, 0.0);
+      // The ridges a hair leaves belong to the hair, so they shift with it
+      // around a bend — but only partly: the paint is standing on the canvas,
+      // not riding the brush, so a hard turn skews the grain, it does not
+      // shear it into a lattice.
+      float grain = s - t * turn * 0.3;
+
       // the brush lifts over the last half width: narrower, thinner
       float lifting = smoothstep(L - hw * 1.3, L + hw * 0.2, s);
       float lift = 1.0 - lifting;
       float at = abs(tn) / mix(0.8, 1.0, lift);
 
       // hairs wander a little as the stroke travels
-      float drift = 1.6 * noise(vec2(s * 0.003, 1.7) + sd) + 0.8 * noise(vec2(s * 0.009, t * 0.012) + sd * 1.1);
+      float drift = 1.6 * noise(vec2(grain * 0.003, 1.7) + sd) + 0.8 * noise(vec2(grain * 0.009, t * 0.012) + sd * 1.1);
       float b = t + drift;
-      float clump = noise(vec2(b * 0.022, s * 0.0012) + sd * 1.3);
-      float n1 = noise(vec2(b * 0.06, s * 0.0012) + sd * 2.1);
-      float n2 = noise(vec2(b * 0.14, s * 0.0025) + sd * 3.3);
-      float n2b = noise(vec2(b * 0.11, s * 0.002) + sd * 5.7);
-      float n3 = noise(vec2(b * 0.32, s * 0.005) + sd * 4.7);
-      float n4 = noise(vec2(b * 0.07, s * 0.004) + sd * 9.1);
+      float clump = noise(vec2(b * 0.022, grain * 0.0012) + sd * 1.3);
+      float n1 = noise(vec2(b * 0.06, grain * 0.0012) + sd * 2.1);
+      float n2 = noise(vec2(b * 0.14, grain * 0.0025) + sd * 3.3);
+      float n2b = noise(vec2(b * 0.11, grain * 0.002) + sd * 5.7);
+      float n3 = noise(vec2(b * 0.32, grain * 0.005) + sd * 4.7);
+      float n4 = noise(vec2(b * 0.07, grain * 0.004) + sd * 9.1);
       // grooves come in families: broad, two sets of hairs, fine; strong in
       // some bands of the brush and nearly absent where the paint stayed
       // smooth, and each groove fades in and out along its run
       float mask = smoothstep(-0.7, 0.7, clump + 0.6 * n4);
-      float run = 0.5 + 0.5 * noise(vec2(b * 0.1 + 40.0, s * 0.008) + sd);
-      float runB = 0.5 + 0.5 * noise(vec2(b * 0.09 + 80.0, s * 0.007) + sd * 1.7);
+      float run = 0.5 + 0.5 * noise(vec2(b * 0.1 + 40.0, grain * 0.008) + sd);
+      float runB = 0.5 + 0.5 * noise(vec2(b * 0.09 + 80.0, grain * 0.007) + sd * 1.7);
       float kA = mix(4.0, 11.0, 0.5 + 0.5 * noise(vec2(b * 0.14 + 120.0, 0.7) + sd));
       float kB = mix(4.0, 11.0, 0.5 + 0.5 * noise(vec2(b * 0.11 + 160.0, 0.3) + sd));
       float grooves = 0.3 * groove(n1, 3.0) * run + 0.55 * groove(n2, kA) * run * mix(0.3, 1.0, mask)
         + 0.45 * groove(n2b, kB) * runB * mix(1.0, 0.4, mask) + 0.15 * groove(n3, 7.0) * mask;
-      float undulate = 0.14 * clump + 0.05 * n1 + 0.03 * n2 + 0.015 * noise(vec2(b * 0.5, s * 0.3) + sd * 2.9);
+      float undulate = 0.14 * clump + 0.05 * n1 + 0.03 * n2 + 0.015 * noise(vec2(b * 0.5, grain * 0.3) + sd * 2.9);
+      // scrubbed ground: the pivoting hairs churn their own grooves away and
+      // leave short curved smears instead
+      float churn = groove(noise(vec2(b * 0.16, grain * 0.06) + sd * 11.3), 4.0);
+      grooves = mix(grooves, 0.35 * churn, pivot);
+      undulate = mix(undulate, 0.22 * noise(vec2(b * 0.08, grain * 0.03) + sd * 12.7), pivot * 0.8);
 
       // irregular edges with stray hairs and a lip of paint pushed aside
-      float wander = 0.05 * noise(vec2(s * 0.012, side * 7.0) + sd) + 0.025 * noise(vec2(s * 0.04, side * 3.0) + sd);
-      float edge = 1.0 + wander;
+      float wander = 0.05 * noise(vec2(grain * 0.012, side * 7.0) + sd) + 0.025 * noise(vec2(grain * 0.04, side * 3.0) + sd);
+      float edge = (1.0 + wander) * (1.0 - 0.42 * crowd * crowd);
       float stray = max(0.0, n2) * 0.05 + max(0.0, n3) * 0.03;
-      float inside = 1.0 - smoothstep(edge + stray - 0.035, edge + stray + 0.01, at);
-      float lip = exp(-pow((at - (edge - 0.08)) / 0.09, 2.0)) * (0.6 + 0.4 * noise(vec2(s * 0.025, side * 11.0) + sd));
+      float inside = 1.0 - smoothstep(edge + stray - 0.035 - 0.3 * pivot, edge + stray + 0.01, at);
+      float lip = exp(-pow((at - (edge - 0.08)) / 0.09, 2.0)) * (0.6 + 0.4 * noise(vec2(grain * 0.025, side * 11.0) + sd));
 
       // the landing: a rounded front and a bulge of fresh paint with its own lip
       float bevel = sqrt(max(0.0, 1.0 - at * at * at));
@@ -208,10 +240,11 @@
 
       // paint runs out hair by hair; a dry hair only catches the weave's crests
       float loadB = 0.9 + 0.1 * noise(vec2(b * 0.2, 2.2) + sd * 5.1) - 0.08 * at * at;
-      float remaining = loadB * u_load - s / L;
+      float remaining = loadB * u_load - travelled / L;
       float weave = texelFetch(u_ground, ivec2(gl_FragCoord.xy), 0).a;
-      float streak = noise(vec2(b * 0.45, s * 0.02) + sd * 6.3);
-      float deposit = remaining - 0.45 * lifting * lifting + 0.1 * (weave - 0.6) + (0.12 + 0.2 * lifting) * streak + 0.04 * n3 - 0.06 * grooves;
+      float streak = noise(vec2(b * 0.45, grain * 0.02) + sd * 6.3);
+      float deposit = remaining - 0.45 * lifting * lifting - 0.3 * pivot * (0.55 + 0.9 * abs(streak))
+        + 0.1 * (weave - 0.6) + (0.12 + 0.2 * lifting) * streak + 0.04 * n3 - 0.06 * grooves;
       float alive = smoothstep(0.0, 0.05, deposit);
       float thin = clamp(remaining * 2.5 + 0.25, 0.15, 1.0) * mix(1.0, 0.35, lifting);
 
@@ -221,21 +254,27 @@
       float revealEdge = u_reveal - hw * (0.05 + 0.2 * bevel) + hw * 0.035 * noise(vec2(t * 0.06, 5.1) + sd);
       float revealCov = 1.0 - smoothstep(revealEdge - 1.5, revealEdge + 1.0, s);
 
+      // A hair that is pivoting rather than travelling drags as much paint
+      // away as it leaves, whatever it still holds, so the ground it covers
+      // comes out in skids with the canvas between them.
       float cov = inside * startCov * endCov * revealCov * alive;
+      cov *= mix(1.0, 0.28 + 0.72 * smoothstep(-0.45, 0.45, streak), pivot);
       if (cov < 0.002) discard;
 
       float unit = u_thickness * (4.0 + hw * 0.08);
       float ridgeAmp = mix(0.6, 1.0, smoothstep(0.0, hw * 0.9, s));
       float slab = 0.8 + undulate - 0.55 * grooves * ridgeAmp;
-      float h = max(0.0, unit * thin * (slab * landing + 0.9 * lip + frontLip));
+      float h = max(0.0, unit * thin * pile * (slab * landing + 0.9 * lip + frontLip));
 
       // each hair drags its own sample of the loaded gradient; streaks of the
-      // neighbouring colour cross over and the mixing grows along the stroke
-      float gpos = u_mode == 0 ? (tn * 0.5 + 0.5) : (s / L);
-      float mixing = 0.07 * noise(vec2(b * 0.25, s * 0.003) + sd * 6.1) + 0.06 * noise(vec2(b * 0.08, s * 0.002) + sd * 7.3) * (0.3 + 0.7 * s / L);
+      // neighbouring colour cross over, the mixing grows along the stroke, and
+      // a pivoting brush smears its load together
+      float gpos = u_mode == 0 ? (tn * 0.5 + 0.5) : clamp(travelled / L, 0.0, 1.0);
+      float mixing = 0.07 * noise(vec2(b * 0.25, grain * 0.003) + sd * 6.1) + 0.06 * noise(vec2(b * 0.08, grain * 0.002) + sd * 7.3) * (0.3 + 0.7 * travelled / L);
+      mixing += 0.22 * pivot * noise(vec2(b * 0.06, grain * 0.02) + sd * 13.1);
       gpos = clamp(gpos + mixing, 0.0, 1.0);
       vec3 pigment = toLinear(texture(u_gradient, vec2(gpos, 0.5)).rgb) * (0.97 + 0.04 * n2);
-      float gloss = 0.75 + 0.25 * noise(vec2(b * 0.05, s * 0.01) + sd * 8.7);
+      float gloss = 0.75 + 0.25 * noise(vec2(b * 0.05, grain * 0.01) + sd * 8.7);
 
       o_paint = vec4(pigment, cov);
       o_relief = vec4(h, gloss, 0.0, cov);
@@ -371,10 +410,10 @@
     ribbonBuffer = gl.createBuffer();
     gl.bindVertexArray(ribbonVao);
     gl.bindBuffer(gl.ARRAY_BUFFER, ribbonBuffer);
-    for (const [name, size, offset] of [['a_position', 2, 0], ['a_st', 2, 8], ['a_hw', 1, 16]]) {
+    for (const [name, size, offset] of [['a_position', 2, 0], ['a_st', 2, 8], ['a_hw', 1, 16], ['a_frame', 2, 20]]) {
       const loc = gl.getAttribLocation(depositProgram.p, name);
       gl.enableVertexAttribArray(loc);
-      gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 20, offset);
+      gl.vertexAttribPointer(loc, size, gl.FLOAT, false, STRIDE, offset);
     }
     gl.bindVertexArray(null);
     groundTex = paintTex = reliefTex = groundFbo = depositFbo = null;
@@ -495,25 +534,66 @@
       tx /= len; ty /= len;
       out[i].tx = tx; out[i].ty = ty; out[i].nx = -ty; out[i].ny = tx;
     }
+    // Cumulative turn, unwrapped, and the curvature that goes with it. The
+    // shader needs both: the turn tells each hair how far it has run, the
+    // curvature how fast it is running just here.
+    out[0].turn = 0;
+    for (let i = 1; i < out.length; i++) {
+      const p = out[i - 1], q = out[i];
+      let d = Math.atan2(p.tx * q.ty - p.ty * q.tx, p.tx * q.tx + p.ty * q.ty);
+      q.turn = p.turn + d;
+    }
+    // Curvature over a short span, so the hand tremor does not read as one.
+    const span = 3;
+    for (let i = 0; i < out.length; i++) {
+      const a = out[Math.max(0, i - span)], b = out[Math.min(out.length - 1, i + span)];
+      out[i].curve = (b.turn - a.turn) / Math.max(b.s - a.s, 1e-3);
+    }
   }
+  // The paint surface is a ribbon of the brush's offsets. Around a bend no
+  // offset may reach past the centre of curvature: beyond it the ribbon folds
+  // through itself and the stroke frame turns inside out. Rather than cut the
+  // ribbon there, the inside of it is squeezed — the offsets crowd toward the
+  // pivot and never reach it, which is what the inner hairs of a turning brush
+  // actually do. The shader is told the true offset, so it knows those hairs
+  // are bunched and piles their paint up accordingly. The ribbon is drawn in
+  // columns across its width so this squeeze stays accurate between its edges.
+  const FOLD = 0.8, COLUMNS = 28;
   function buildRibbon() {
     samples = samplePath();
     length = samples[samples.length - 1].s;
     const first = samples[0], last = samples[samples.length - 1];
-    const hw = q => state.width / 2 * q.pressure;
+    const halfWidth = q => state.width / 2 * q.pressure;
     const rows = [];
+    const row = (q, x, y, s, curve) => ({ x, y, s, curve, tx: q.tx, ty: q.ty, nx: q.nx, ny: q.ny, hw: halfWidth(q), turn: q.turn });
     // room before the landing and after the lift, along the end tangents
-    for (let d = Math.ceil(0.5 * hw(first)); d > 0; d -= 2) rows.push({ x: first.x - first.tx * d, y: first.y - first.ty * d, nx: first.nx, ny: first.ny, s: -d, hw: hw(first) });
-    for (const q of samples) rows.push({ x: q.x, y: q.y, nx: q.nx, ny: q.ny, s: q.s, hw: hw(q) });
-    for (let d = 2; d <= 0.4 * hw(last) + 2; d += 2) rows.push({ x: last.x + last.tx * d, y: last.y + last.ty * d, nx: last.nx, ny: last.ny, s: last.s + d, hw: hw(last) });
-    const data = new Float32Array(rows.length * 10);
-    rows.forEach((r, i) => {
-      const ext = r.hw * 1.45 + 6;
-      data.set([r.x + r.nx * ext, r.y + r.ny * ext, r.s, ext, r.hw, r.x - r.nx * ext, r.y - r.ny * ext, r.s, -ext, r.hw], i * 10);
-    });
+    for (let d = Math.ceil(0.5 * halfWidth(first)); d > 0; d -= 2) rows.push(row(first, first.x - first.tx * d, first.y - first.ty * d, -d, 0));
+    for (const q of samples) rows.push(row(q, q.x, q.y, q.s, q.curve));
+    for (let d = 2; d <= 0.4 * halfWidth(last) + 2; d += 2) rows.push(row(last, last.x + last.tx * d, last.y + last.ty * d, last.s + d, 0));
+
+    // Where the offset would cross the centre of curvature it is eased onto
+    // it instead; the far side of the brush is left alone.
+    const squeeze = (r, t) => {
+      if (!r.curve) return t;
+      const limit = FOLD / r.curve;
+      if (limit > 0 ? t <= 0 : t >= 0) return t;
+      return limit * Math.tanh(t / limit);
+    };
+    const data = new Float32Array(COLUMNS * rows.length * 2 * (STRIDE / 4));
+    let at = 0;
+    for (let c = 0; c < COLUMNS; c++) {
+      for (const r of rows) {
+        const ext = r.hw * 1.45 + 6;
+        for (const edge of [c, c + 1]) {
+          const t = ext * (2 * edge / COLUMNS - 1), g = squeeze(r, t);
+          data.set([r.x + r.nx * g, r.y + r.ny * g, r.s, t, r.hw, r.turn, r.curve], at);
+          at += STRIDE / 4;
+        }
+      }
+    }
     gl.bindBuffer(gl.ARRAY_BUFFER, ribbonBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
-    ribbon = { count: rows.length * 2 };
+    ribbon = { columns: COLUMNS, stride: rows.length * 2 };
   }
 
   // ---------------------------------------------------------------- render
@@ -536,7 +616,7 @@
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, gradientTex); gl.uniform1i(depositProgram.u.u_gradient, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, groundTex); gl.uniform1i(depositProgram.u.u_ground, 1);
     gl.bindVertexArray(ribbonVao);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, ribbon.count);
+    for (let c = 0; c < ribbon.columns; c++) gl.drawArrays(gl.TRIANGLE_STRIP, c * ribbon.stride, ribbon.stride);
     gl.disable(gl.BLEND);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);

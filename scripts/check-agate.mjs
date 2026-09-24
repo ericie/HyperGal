@@ -14,7 +14,7 @@ function simulation(width, height, seed = 'agate', reduced = false) {
     addEventListener: (k, fn) => events[k] = fn, matchMedia: () => ({ matches: reduced, addEventListener: noop }),
     requestAnimationFrame: fn => { frames.set(++id, fn); return id; }, cancelAnimationFrame: i => frames.delete(i), setTimeout: noop, clearTimeout: noop };
   vm.createContext(env);
-  vm.runInContext(source.replace(/\}\)\(\);\s*$/, `globalThis.test = { fit, finish, get cells() { return cells; }, get strokes() { return strokes; }, get pens() { return pens; }, get completed() { return completed; } }; })();`), env);
+  vm.runInContext(source.replace(/\}\)\(\);\s*$/, `globalThis.test = { fit, finish, get cells() { return cells; }, get strokes() { return strokes; }, get pens() { return pens; }, get completed() { return completed; }, get pass() { return pass; }, get maxPlates() { return MAX_PLATES; }, plate }; })();`), env);
   return { env, events, canvas, frames, sketch: env.test,
     advance(time) { const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(fn => fn(time)); },
     key(key) { events.keydown({ key, preventDefault: noop }); } };
@@ -28,16 +28,41 @@ for (const [w, h] of [[390, 844], [1440, 900], [2560, 720], [320, 1800]]) {
     const sim = simulation(w, h, seed, true);
     assert.equal(sim.canvas.dataset.state, 'complete');
     assert.equal(sim.frames.size, 0);
+    // Plates keep coming until one comes back empty or the cap is reached.
+    assert.ok(sim.sketch.pass > 0, 'reduced motion prints the overprints too, not just the base');
+    assert.ok(sim.sketch.pass < sim.sketch.maxPlates, 'the stack stops at the cap');
+    assert.equal(Number(sim.canvas.dataset.pass), sim.sketch.pass + 1, 'the plate in hand is reported');
     const assigned = sim.sketch.pens.flatMap(p => p.queue);
     assert.equal(new Set(assigned).size, sim.sketch.strokes.length, 'each spiral belongs to exactly one pen');
     assert.equal(assigned.length, sim.sketch.strokes.length, 'all spirals are scheduled');
+    // No overprint blankets the page. One at the base's coverage buries the
+    // plate beneath it and the two flatten into a single texture, and each
+    // plate's channels cut the lines under it, so they have to keep thinning
+    // or the base field is sawn into dashes by the fourth colour.
+    let over = 0, overOf = 0;
     for (let y = 0; y <= h; y += 23) for (let x = 0; x <= w; x += 23) {
-      assert.ok(sim.sketch.cells.some(p => contains(p, x, y)), `uncovered cell at ${x},${y}`); samples++;
+      overOf++; if (sim.sketch.cells.some(p => contains(p, x, y))) over++;
     }
-    for (const x of [0, w]) for (const y of [0, h]) assert.ok(sim.sketch.cells.some(p => contains(p, x, y)));
-    for (const stroke of sim.sketch.strokes) {
+    assert.ok(over / overOf < 0.7,
+      `last plate covers ${(over / overOf * 100) | 0}% of ${w}x${h}/${seed}, leaving what is under it readable`);
+    assert.equal(sim.sketch.plate(0).coverage, 1, 'the base plate tiles the page');
+    for (let i = 1; i <= sim.sketch.pass; i++) {
+      assert.ok(sim.sketch.plate(i).coverage < 0.5, 'every overprint takes only some of its cells');
+      assert.ok(sim.sketch.plate(i).coverage < sim.sketch.plate(i - 1).coverage,
+        'each plate lands lighter than the one before it');
+    }
+
+    // Geometry is checked on the base plate, which is the one that has to tile
+    // the page; a drawing still on its first pass is holding exactly that.
+    const base = simulation(w, h, seed);
+    assert.equal(base.sketch.pass, 0, 'a fresh drawing starts on the base plate');
+    for (let y = 0; y <= h; y += 23) for (let x = 0; x <= w; x += 23) {
+      assert.ok(base.sketch.cells.some(p => contains(p, x, y)), `uncovered cell at ${x},${y}`); samples++;
+    }
+    for (const x of [0, w]) for (const y of [0, h]) assert.ok(base.sketch.cells.some(p => contains(p, x, y)));
+    for (const stroke of base.sketch.strokes) {
       assert.ok(stroke.length > 0 && Number.isFinite(stroke.length));
-      const parent = sim.sketch.cells.find(poly => contains(poly, ...stroke.points[0]));
+      const parent = base.sketch.cells.find(poly => contains(poly, ...stroke.points[0]));
       assert.ok(parent);
       for (let i = 0; i < stroke.points.length; i++) {
         const p = stroke.points[i];
@@ -52,7 +77,7 @@ const sim = simulation(390, 844);
 const duplicate = simulation(390, 844);
 assert.equal(JSON.stringify(sim.sketch.strokes), JSON.stringify(duplicate.sketch.strokes), 'seed reproduces geometry');
 sim.advance(1000); sim.advance(1050);
-assert.equal(sim.sketch.pens.length, 6, 'six simultaneous drawing points on mobile');
+assert.equal(sim.sketch.pens.length, 24, 'two dozen simultaneous drawing points on mobile');
 assert.ok(sim.sketch.pens.every(p => p.distance === 14 && p.current === 0), 'every pen starts immediately at 280 CSS pixels per second');
 assert.equal(sim.sketch.completed, 0, 'each pen draws its own continuous spiral');
 const starts = sim.sketch.pens.map(p => p.queue[0].points[0]);
@@ -68,7 +93,7 @@ assert.ok(sim.sketch.pens.every(p => p.distance === 42), 'hidden time does not f
 const fraction = sim.sketch.pens.reduce((sum, p) => sum + p.distance / p.queue[0].length, 0) / sim.sketch.strokes.length;
 sim.key(' '); sim.env.innerWidth = 1440; sim.env.innerHeight = 900; sim.sketch.fit(true);
 assert.equal(sim.canvas.dataset.state, 'paused', 'resize preserves pause');
-assert.equal(sim.sketch.pens.length, 12, 'desktop uses twelve pens');
+assert.equal(sim.sketch.pens.length, 81, 'desktop scales up to dozens of pens');
 const resizedFraction = sim.sketch.pens.reduce((sum, p) => sum + p.current + p.distance / p.queue[p.current].length, 0) / sim.sketch.strokes.length;
 assert.ok(Math.abs(fraction - resizedFraction) < 1e-8, 'resize restores all growth fronts at the existing fraction');
 sim.key('f'); assert.equal(sim.canvas.dataset.state, 'complete'); assert.equal(sim.frames.size, 0);
@@ -77,7 +102,19 @@ assert.equal(sim.canvas.dataset.state, 'complete'); assert.equal(sim.canvas.widt
 sim.key('r'); assert.equal(sim.canvas.dataset.state, 'growing'); assert.notEqual(sim.canvas.dataset.seed, 'agate');
 // A small real timeline reaches completion without requesting a further frame.
 const tiny = simulation(150, 150);
+const firstInk = tiny.sketch.strokes[0].ink;
 let time = 0;
 while (tiny.frames.size && time < 1000000) { tiny.advance(time); time += 50; }
 assert.equal(tiny.canvas.dataset.state, 'complete'); assert.equal(tiny.frames.size, 0);
-console.log(`Passed: ${samples} coverage samples across 12 layouts; contained spirals, deterministic seeds, concurrent pen speed and spatial distribution, pause, visibility, finish, resize, restart, natural completion.`);
+assert.ok(tiny.sketch.pass > 0, 'natural growth carries on to the next plate');
+assert.notEqual(tiny.sketch.strokes[0].ink, firstInk, 'the second plate is a different ink');
+const planned = new Set(tiny.sketch.strokes);
+// Idle pens take work from whoever has most left. Strokes move between queues,
+// so the set must still be every stroke exactly once, each drawn exactly once.
+const drawn = tiny.sketch.pens.flatMap(p => p.queue);
+assert.equal(drawn.length, tiny.sketch.strokes.length, 'stealing neither loses nor duplicates a spiral');
+assert.equal(new Set(drawn).size, planned.size, 'every planned spiral ends in exactly one queue');
+assert.ok(drawn.every(s => planned.has(s)), 'no spiral is invented while stealing');
+assert.equal(tiny.sketch.completed, planned.size, 'every spiral is drawn once');
+assert.ok(tiny.sketch.pens.every(p => p.current === p.queue.length), 'no pen is left holding work');
+console.log(`Passed: ${samples} coverage samples across 12 layouts; contained spirals, deterministic seeds, concurrent pen speed and spatial distribution, stacked overprints, pause, visibility, finish, resize, restart, natural completion.`);

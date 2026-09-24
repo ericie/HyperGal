@@ -60,22 +60,32 @@ The artwork remains a procedural 2D Canvas drawing.
 
 ## Drawing grammar
 
-Each study uses a 100-unit-wide local coordinate system with isotropic scaling.
-This preserves the proportions of fans, narrow railings and window hardware.
+Each study draws one bay in a 100-unit-wide local coordinate system with
+isotropic scaling. A bay is the same width for every building in a composition,
+so the unit is absolute: a window drawn at 25 units is the same size everywhere
+in the city, not a fraction of whatever building it happens to sit on. The bay is
+sized from the canvas and the building count follows, so the drawing is coarse
+and legible rather than a fine screen of many small buildings. Buildings
+repeat the bay, one to four times. This preserves the proportions of fans,
+narrow railings and window hardware.
 Structural lines are about 0.5–0.8 units; secondary lines about 0.2–0.45. Windows
 have thin metal frames, offset reveals, unequal lit panes and shallow sills.
 Balconies have deep black openings, white slab fronts, black undersides and fine
 returning guard rails. Roof studies have maximum height-to-width ratios so the
 catalog and narrow buildings cannot stretch roof houses or gables into towers.
 
-Stair flights still share exact landing endpoints. Tank supports and equipment
+Blocks lay out in absolute units and repeat: storeys, scaffold lifts, terrace
+units and service runs divide the available height rather than taking fractions
+of it, so nothing stretches as a building grows. Scaffold decks land on both
+block edges, so a wrapped facade meets the frame of the block above and below
+it. Tank supports and equipment
 feet meet their decks. AC routes begin at the outlet returned by the fitted case.
 Meter routes meet each cabinet's actual bottom edge; no later background masks
 can erase the connections. Material seams remain sparse and subordinate.
 
 ## Composition and catalog
 
-There are 22 active studies, numbered 01–19 and 21–23. Number 20 remains retired;
+There are 38 active studies, numbered 01–19 and 21–39. Number 20 remains retired;
 all other numbers retain their subject and review anchor. The 36 old archive
 studies remain accessible only through the full archive. The rejected crane,
 large fan, swelling facade and striped vessel do not enter generated cities.

@@ -265,8 +265,13 @@
   function schedulePens() {
     // Each pen completes one local fan or tendril, one line at a time.
     // Other pens work on neighboring shapes along the expanding front.
-    penCount = width < 600 ? 5 : 8;
-    const pens = Array.from({ length: penCount }, (_, id) => ({ id, free: id * 0.12 }));
+    // Many pens at once, scaled to the paper rather than fixed, so a large
+    // screen is not left drawing one shape at a time across ten times the
+    // area. Each pen still crosses its own fan at a hand's pace.
+    penCount = Math.max(16, Math.min(128, Math.round(width * height / 12000)));
+    // The whole set is on the paper within the first second however many there
+    // are, instead of a stagger that grows with the count.
+    const pens = Array.from({ length: penCount }, (_, id) => ({ id, free: id * (0.96 / penCount) }));
     const groups = new Map();
     const finishTimes = new Map();
     for (const stroke of strokes) {

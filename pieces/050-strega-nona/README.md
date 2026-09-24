@@ -22,12 +22,17 @@ visible curves are split into continuous pen strokes. Each drawing point
 completes a local fan or tendril before moving to another shape along the
 growing edge. Starts are staggered, with slightly different drawing speeds. There are no painted circle fills, paper wipes, or erased marks.
 
-Each pen advances by distance at roughly 175–205 CSS pixels per second. Every stroke takes
-at least 0.22 seconds, so even a short arc is visibly drawn. Completed strokes
-are cached; each frame draws only the active lines over that cached ink. A leading S-curve curls
-into a spiral, and later tendrils wait until neighboring fans at their bases
-have been drawn, including when other pens are drawing those fans. Fan
-spacing extends the pattern beyond all four edges.
+Sixteen to a hundred and twenty-eight pens draw at once, scaled to the paper
+rather than fixed, so a large screen is not left inking one shape at a time
+across ten times the area. Each advances by distance at roughly 175–205 CSS
+pixels per second. Every stroke takes at least 0.22 seconds, so even a short arc
+is visibly drawn, and the whole set is on the paper within the first second
+however many there are. A desktop drawing finishes in under thirty seconds.
+
+Completed strokes are cached; each frame draws only the active lines over that
+cached ink. A leading S-curve curls into a spiral, and later tendrils wait until
+neighboring fans at their bases have been drawn, including when other pens are
+drawing those fans. Fan spacing extends the pattern beyond all four edges.
 
 The animation stops when finished and suspends while the tab is hidden.
 The thumbnail is a capture of this piece using the seed `olive`.

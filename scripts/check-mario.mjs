@@ -25,11 +25,15 @@ function simulation(seed = 'competence', width = 1280, height = 720, reduced = f
     marioEntryCeiling, highestMario, marioIsOnStage, canPlacePlatform,
     updateHero, updateCamera, updateBarrels, defeatMario, barrelHitsMario, sceneScreenY,
     disableBarrels() { nextBarrelAt = Infinity; barrelWarning = null; barrels = []; },
+    disableSaws() { sawChance = 0; for (const p of platforms) p.saw = null; },
+    sawFleeDirection, sawHitsMario, attachSaw, sawCenter, hazardPlan, nearestHazard,
+    barrelBlocksLaunch, barrelSwerve, headBounce,
+    get sawLedges() { return platforms.filter(p => p.saw).length; },
     advanceClock(seconds) { simTime += seconds; },
     get state() { return { hero, buddies, platforms, simTime, bestHeight, barrels, barrelWarning, cameraY }; },
     get visible() { return [hero, ...buddies].filter(r => !r.dead && !r.entryPending && marioIsOnStage(r)).length; }
   }; })();`), sandbox);
-  if (!hazards) sandbox.sim.disableBarrels();
+  if (!hazards) { sandbox.sim.disableBarrels(); sandbox.sim.disableSaws(); }
   return sandbox.sim;
 }
 const platform = (id, x, y, w) => ({ id, x, y, w, type: 'ink', moving: false });
@@ -327,9 +331,9 @@ for (const width of [1280, 390]) {
       }
     }
     const types = [...generatedTypes].sort((a, b) => a[0] - b[0]).map(([, type]) => type);
-    assert.ok(types.every(type => type === 'ink' || type === 'crumble' || type === 'cloud'), 'only solid, crumbly, and cloud platforms generate');
+    assert.ok(types.every(type => type === 'ink' || type === 'crumble'), 'only solid and crumbly platforms generate');
     for (let i = 0; i + 20 <= types.length; i += 20) {
-      assert.equal(new Set(types.slice(i, i + 20)).size, 3, 'all three materials appear throughout the climb');
+      assert.equal(new Set(types.slice(i, i + 20)).size, 2, 'both materials appear throughout the climb');
     }
     const rate = successes / attempts;
     assert.ok(rate > 0.8, `${seed}/${width}: most jumps should gain a ledge (${rate})`);
@@ -378,6 +382,103 @@ for (const width of [1280, 390]) {
     hazardResults.push({ seed, width, deaths, returns, height: Math.round(sim.state.bestHeight) });
   }
 }
+{
+  const sim = simulation('saws');
+  const ledge = { ...platform(101, 200, 400, 240), saw: null };
+  sim.attachSaw(ledge, () => 0.2);
+  assert.ok(ledge.saw, 'a wide solid ledge takes a blade');
+  const narrow = { ...platform(102, 200, 400, 120), saw: null };
+  sim.attachSaw(narrow, () => 0.2);
+  assert.ok(!narrow.saw, 'a narrow ledge has no room for one');
+
+  sim.state.platforms.splice(0, sim.state.platforms.length, ledge);
+  const [bladeX] = sim.sawCenter(ledge);
+  assert.ok(sim.sawHitsMario(ledge, { x: bladeX, y: ledge.y }), 'the blade cuts a runner standing in it');
+  assert.ok(!sim.sawHitsMario(ledge, { x: bladeX + 90, y: ledge.y }), 'and spares one standing clear');
+  assert.ok(!sim.sawHitsMario(ledge, { x: bladeX, y: ledge.y, dead: true }), 'a body already falling is not cut again');
+
+  // Landings aim off the blade, so nobody arrives underneath it.
+  const bounds = sim.landingBounds(ledge);
+  assert.ok(bounds, 'a bladed ledge is still landable');
+  assert.ok(!sim.sawHitsMario(ledge, { x: bounds.left, y: ledge.y }) &&
+    !sim.sawHitsMario(ledge, { x: bounds.right, y: ledge.y }), 'both landing limits clear the blade');
+
+  // A runner reads a closing blade at two ranges: back away while there is
+  // still room, go over the top once there is not.
+  const [soon] = sim.sawCenter(ledge, sim.state.simTime + 0.3);
+  const side = Math.sign(soon - bladeX) || 1;
+  const far = sim.hazardPlan(ledge, bladeX + side * 60);
+  assert.ok(far && !far.hop && far.away === side, 'a blade still at range is outrun, not jumped');
+  const near = sim.hazardPlan(ledge, bladeX + side * 20);
+  assert.ok(near && near.hop, 'a blade too close to outrun is hopped');
+  assert.equal(sim.hazardPlan(ledge, bladeX + side * 140), null, 'a distant blade is ignored');
+  assert.equal(sim.hazardPlan({ ...ledge, saw: null }, bladeX), null, 'a clean ledge needs no evasion');
+
+  // Barrels rolling along a ledge are read the same way as the blade.
+  const clean = { ...platform(103, 200, 400, 240), saw: null };
+  sim.state.platforms.splice(0, sim.state.platforms.length, clean);
+  sim.state.barrels.splice(0, sim.state.barrels.length, {
+    id: 1, x: 300, y: clean.y + 17, previousX: 298, previousY: clean.y + 17,
+    vx: 120, vy: 0, radius: 17, rotation: 0, bornAt: 0, platformId: clean.id,
+  });
+  const rolling = sim.hazardPlan(clean, 326);
+  assert.ok(rolling && rolling.hop && rolling.away === 1, 'a barrel bearing down is hopped');
+  const early = sim.hazardPlan(clean, 370);
+  assert.ok(early && !early.hop && early.away === 1, 'a barrel still at range is walked away from');
+  assert.equal(sim.hazardPlan(clean, 250), null, 'a barrel rolling away is not a threat');
+
+  // A barrel still falling is stepped out from under, never hopped.
+  sim.state.barrels[0].platformId = null;
+  sim.state.barrels[0].y = clean.y + 150;
+  sim.state.barrels[0].vx = 0;
+  const falling = sim.hazardPlan(clean, 318);
+  assert.ok(falling && !falling.hop, 'an airborne barrel is dodged on the ground, not jumped');
+  sim.state.barrels.splice(0, sim.state.barrels.length);
+
+  // Most deaths used to come from launching into a falling barrel, so a jump
+  // waits while one is anywhere over the run.
+  const runner = { x: 300, y: clean.y };
+  const overhead = { id: 2, x: 360, y: clean.y + 120, previousX: 360, previousY: clean.y + 130,
+    vx: 0, vy: -200, radius: 17, rotation: 0, bornAt: 0, platformId: null };
+  sim.state.barrels.splice(0, sim.state.barrels.length, overhead);
+  assert.ok(sim.barrelBlocksLaunch(runner, 420), 'a barrel over the run holds the jump');
+  assert.ok(!sim.barrelBlocksLaunch(runner, 200), 'a jump the other way is not held');
+  overhead.y = clean.y + 400;
+  assert.ok(!sim.barrelBlocksLaunch(runner, 420), 'a barrel far overhead does not hold it');
+
+  // And in the air, a runner leans away from one sharing the flight.
+  overhead.y = clean.y + 20;
+  overhead.x = 330;
+  const swerve = sim.barrelSwerve({ x: 300, y: clean.y });
+  assert.ok(swerve < -20, 'a runner leans away from a barrel beside it');
+  overhead.x = 700;
+  assert.equal(sim.barrelSwerve({ x: 300, y: clean.y }), 0, 'a distant barrel needs no lean');
+  sim.state.barrels.splice(0, sim.state.barrels.length);
+}
+
+{
+  const sim = simulation('heads');
+  sim.state.hero.entryPending = true;          // keep the hero out of the test
+  sim.state.buddies.splice(0, sim.state.buddies.length,
+    { id: 9, x: 300, y: 500, grounded: true, dead: false, entryPending: false, walkInDir: 0 });
+  const head = 500 + 46 * 0.82;
+  const falling = extra => ({ id: 10, x: 302, y: head, previousY: head + 24, vy: -300,
+    grounded: false, dead: false, entryPending: false, ...extra });
+
+  const rider = falling();
+  assert.ok(sim.headBounce(rider), 'a falling runner lands on a head');
+  assert.ok(rider.vy > 400, 'and is thrown upward by it');
+  assert.equal(rider.targetId, null, 'the bounce clears the route so it replans from up there');
+  assert.ok(sim.state.buddies[0].pressedUntil > 0, 'the one underneath gets squashed');
+
+  assert.ok(!sim.headBounce(falling({ x: 362 })), 'a runner passing beside one is not bounced');
+  assert.ok(!sim.headBounce(falling({ vy: 200 })), 'a rising runner does not bounce off a head');
+  assert.ok(!sim.headBounce(falling({ grounded: true })), 'a runner already on footing does not bounce');
+  assert.ok(!sim.headBounce(falling({ previousY: head - 20 })), 'coming up from below is not a bounce');
+  sim.state.buddies[0].dead = true;
+  assert.ok(!sim.headBounce(falling()), 'a knocked-out runner is not a step');
+}
+
 const slowHazards = simulation('summer', 390, 844, false, true);
 for (let i = 0; i < 1800; i++) slowHazards.update(1 / 30);
 assert.ok(slowHazards.state.bestHeight > 2500, 'barrel collisions also work at 30 fps');

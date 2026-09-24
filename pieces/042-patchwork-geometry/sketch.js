@@ -143,7 +143,6 @@ function buildQuilt() {
   if (window.debugMode) console.log(window.fxhash, window.$fxhashFeatures);
 }
 
-// New function to randomly set hSym and vSym
 // The canvas keeps its painted ground until a resize clears it, and cells only
 // ever cover part of it. Painting the page behind the canvas the same colour
 // means an uncovered pixel still reads as the ground rather than as the
@@ -155,9 +154,16 @@ function applyGroundColour() {
   if (cnv) cnv.style.backgroundColor = css;
 }
 
+// Symmetry is no longer dealt by the hash: every quilt folds on both axes, so
+// every iteration reads as a medallion. The two draws the shipped build made
+// here are kept and discarded rather than removed, which leaves the rest of the
+// random sequence — transition style, cycle speed, palette, shapes — identical
+// to the original for any given hash.
 function setSymmetry() {
-  hSym = EeRandom([true, false]);
-  vSym = EeRandom([true, false]);
+  EeRandom([true, false]);
+  EeRandom([true, false]);
+  hSym = true;
+  vSym = true;
 }
 
 // New function to randomly set the transition type
@@ -265,6 +271,12 @@ function calculateGrid() {
   cellSize = width / gridWidth;
   // gridHeight = ceil(height / cellSize);
   gridHeight = ceil(height / cellSize / 2) * 2;
+
+  // The grid fills the viewport in whole cells, so its last row usually
+  // overruns the bottom edge. Half the overrun is taken off the top, which
+  // puts the quilt's fold on the centre of the canvas; without it a quilt
+  // symmetrical on both axes sits visibly low in the frame.
+  gridOffsetY = (height - gridHeight * cellSize) / 2;
 }
 
 function windowResized() {

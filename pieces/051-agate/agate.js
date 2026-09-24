@@ -8,8 +8,65 @@
   let width, height, dpr, random, cells = [], strokes = [];
   let seed = new URLSearchParams(location.search).get('seed') || freshSeed();
   let frame = 0, lastTime = null, pens = [], completed = 0;
-  let paused = false, resizeTimer;
+  let paused = false, resizeTimer, pass = 0;
   const speed = 280;
+  const PAPER = '#f4f0e7';
+  // Every line is drawn twice: a stroke three times the width in the paper
+  // colour, clearing a channel through whatever is already down, then the ink
+  // along the middle of it, leaving a clear margin of paper either side. Without the channel a plate's lines cross everything beneath them and
+  // the colours knit into one flat weave; with it each plate reads as a layer
+  // lying over the last.
+  //
+  // The channel runs ahead of the ink rather than under it. Laying it from
+  // where the ink stopped would bite back into the ink already down — a round
+  // cap of the wider stroke covers the narrower one's end — and nick the line
+  // at every frame boundary.
+  const CHANNEL = 3;
+  const LEAD = 9;
+  // When a field of stones is finished the pens start again on a fresh packing
+  // and lay it over the last in another ink, the way one colour is printed over
+  // another. Earlier ink is never covered or wiped, and the page keeps taking
+  // plates until it has nothing left to take.
+  //
+  // Every plate after the base takes only some of its cells, because a plate at
+  // the base's density fills every channel and the two collapse into one flat
+  // texture with neither field readable.
+  //
+  // Coverage falls away steeply as the plates stack — roughly two cells in
+  // five, then one in four, then one in six. Each plate's channels cut the
+  // lines under it, so plates that all arrived at the first overprint's weight
+  // would saw the base field into dashes and the structure it drew would be
+  // gone by the fourth colour. Thinning them means the later plates land as
+  // accents on a field that still reads.
+  //
+  // The scale is varied but stays near the base's. A stone's spiral is one
+  // continuous stroke that one pen has to draw end to end, so its length sets
+  // how long its whole plate takes however many pens are on the page: stones
+  // that keep growing leave a single pen crawling through an enormous coil
+  // while the rest of the page stands finished. Wider-spaced turns keep the
+  // overprints' coils short enough to stay in step with each other.
+  const MAX_PLATES = 6;
+  const STEPS = [1.4, 1.1, 1.6, 1.25, 1.5];
+  // The inks are held close to the base field's weight. Lighter colours read
+  // as pale confetti once several plates are down: at arm's length the eye
+  // averages them and the structure the first plate drew goes with it.
+  const INKS = [
+    [[44, 61], [41, 55], [38, 49]],       // near-black, the base field
+    [[136, 158], [46, 62], [38, 50]],     // iron oxide
+    [[32, 50], [50, 70], [104, 130]],     // indigo
+    [[146, 166], [108, 122], [42, 56]],   // dark gold
+    [[38, 56], [92, 108], [88, 102]],     // verdigris
+    [[92, 112], [44, 60], [84, 102]],     // plum
+  ];
+  function plate(index) {
+    const n = index - 1;
+    return {
+      step: index ? STEPS[n % STEPS.length] : 1,
+      gap: index ? 2.4 : 1,
+      coverage: index ? 0.42 * Math.pow(0.64, n) : 1,
+      ink: INKS[index % INKS.length],
+    };
+  }
   const between = (a, b) => a + random() * (b - a);
   function freshSeed() { return Math.random().toString(36).slice(2, 10); }
   function generator(value) {
@@ -45,7 +102,7 @@
     }, 0)) / 2;
   }
   function plan() {
-    const step = Math.max(49, Math.min(79, Math.sqrt(width * height / 230)));
+    const step = Math.max(49, Math.min(79, Math.sqrt(width * height / 230))) * plate(pass).step;
     const margin = step;
     const sites = [];
     const count = Math.ceil((width + margin * 2) * (height + margin * 2) / (step * step));
@@ -78,6 +135,11 @@
       }
       cells.push(poly);
     }
+    // An overprint takes only some of its stones, so the plate underneath stays
+    // readable between them. A plate that covers every cell buries the one
+    // below it and the two read as a single flat texture.
+    const { coverage } = plate(pass);
+    if (coverage < 1) cells = cells.filter(() => random() < coverage);
     strokes = cells.map(spiral).filter(Boolean);
     // Keep the seeded geometry order stable before distributing it to pens.
     strokes.sort((a, b) => a.order - b.order);
@@ -105,7 +167,7 @@
         if (!improved) break;
       }
     }
-    const gap = between(3.7, 4.7), inset = gap * 0.48;
+    const gap = between(3.7, 4.7) * plate(pass).gap, inset = gap * 0.48;
     if (radius < inset + 1) return null;
     const turns = (radius - inset - 0.45) / gap;
     const phase = between(0, TAU), direction = random() < 0.5 ? -1 : 1;
@@ -124,11 +186,13 @@
       if (points.length) length += Math.hypot(p[0] - points.at(-1)[0], p[1] - points.at(-1)[1]);
       points.push([...p, length]);
     }
-    return { points, length, center, weight: between(0.9, 1.16), ink: `rgb(${between(44, 61) | 0}, ${between(41, 55) | 0}, ${between(38, 49) | 0})`,
+    const [r, g, b] = plate(pass).ink;
+    return { points, length, center, weight: between(0.9, 1.16),
+      ink: `rgb(${between(...r) | 0}, ${between(...g) | 0}, ${between(...b) | 0})`,
       order: Math.hypot(center[0] * 0.8, height - center[1]) + Math.sin(center[0] / 110) * 24 + between(-18, 18) };
   }
   function paper() {
-    ctx.fillStyle = '#f4f0e7';
+    ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, width, height);
     const tile = document.createElement('canvas');
     tile.width = tile.height = 128;
@@ -143,25 +207,35 @@
     ctx.fillRect(0, 0, width, height);
   }
   function makePens() {
-    const count = Math.min(strokes.length, Math.max(6, Math.min(16, Math.round(width * height / 110000))));
+    // Many pens at once. The page fills from dozens of fronts rather than a
+    // handful, which is what makes the drawing arrive quickly; each pen still
+    // draws its own line at its own pace, so nothing is rushed on the page.
+    const count = Math.min(strokes.length, Math.max(24, Math.min(112, Math.round(width * height / 16000))));
     const candidates = strokes.filter(s => s.points[0][0] > width * 0.06 && s.points[0][0] < width * 0.94 &&
       s.points[0][1] > height * 0.06 && s.points[0][1] < height * 0.94);
     const pool = candidates.length >= count ? candidates : strokes;
     const origins = [];
     // Farthest-point placement makes activity visible across the whole page
     // immediately, including narrow screens, without an underlying row pattern.
+    // Each stroke carries its distance to the nearest origin so far rather than
+    // rescanning them all, which keeps placing a hundred pens off the load.
+    const nearest = new Map(pool.map(stroke => [stroke, Infinity]));
     for (let i = 0; i < count; i++) {
       let best, bestScore = -Infinity;
       for (const stroke of pool) {
-        if (origins.includes(stroke)) continue;
         const [x, y] = stroke.center;
-        const score = origins.length ? Math.min(...origins.map(o => Math.hypot(x - o.center[0], y - o.center[1])))
-          : -Math.hypot(x - width * 0.43, y - height * 0.53);
+        const score = origins.length ? nearest.get(stroke) : -Math.hypot(x - width * 0.43, y - height * 0.53);
         if (score > bestScore) { best = stroke; bestScore = score; }
       }
       origins.push(best);
+      nearest.set(best, -Infinity);
+      for (const stroke of pool) {
+        const d = Math.hypot(stroke.center[0] - best.center[0], stroke.center[1] - best.center[1]);
+        if (d < nearest.get(stroke)) nearest.set(stroke, d);
+      }
     }
-    pens = origins.map(origin => ({ origin, queue: [], current: 0, distance: 0, segment: 1 }));
+    pens = origins.map(origin => ({ origin, queue: [], current: 0, distance: 0, segment: 1,
+      cleared: 0, channel: { segment: 1 } }));
     for (const stroke of strokes) {
       let nearest = pens[0], distance = Infinity;
       for (const pen of pens) {
@@ -176,33 +250,105 @@
     }
     completed = 0;
   }
-  function pointAt(stroke, pen, at) {
+  // A pen that has drawn out its own neighbourhood takes work from whichever
+  // pen has the most left rather than standing idle. Without it the drawing
+  // ends up waiting on whoever was dealt the densest corner, with a single
+  // front still crawling long after the rest of the page is finished.
+  function steal(pen) {
+    let from = null, most = 0;
+    for (const other of pens) {
+      const left = other.queue.length - other.current - 1;
+      if (left > most) { most = left; from = other; }
+    }
+    if (!from) return false;
+    // Take the one nearest where this pen left off, so it carries on drawing
+    // in one place instead of jumping across the page.
+    const at = (pen.queue[pen.current - 1] || pen.origin).center;
+    let index = -1, best = Infinity;
+    for (let i = from.current + 1; i < from.queue.length; i++) {
+      const d = Math.hypot(from.queue[i].center[0] - at[0], from.queue[i].center[1] - at[1]);
+      if (d < best) { best = d; index = i; }
+    }
+    if (index < 0) return false;
+    pen.queue.push(from.queue.splice(index, 1)[0]);
+    return true;
+  }
+  // `cursor` carries its own place in the point list, so the ink and the
+  // channel ahead of it walk the same stroke independently.
+  function pointAt(stroke, cursor, at) {
     const p = stroke.points;
-    while (pen.segment < p.length - 1 && p[pen.segment][2] < at) pen.segment++;
-    const a = p[pen.segment - 1], b = p[pen.segment];
+    while (cursor.segment < p.length - 1 && p[cursor.segment][2] < at) cursor.segment++;
+    const a = p[cursor.segment - 1], b = p[cursor.segment];
     const t = Math.max(0, Math.min(1, (at - a[2]) / (b[2] - a[2] || 1)));
     return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
   }
-  function drawTo(pen, end) {
-    const stroke = pen.queue[pen.current], start = pointAt(stroke, pen, pen.distance);
-    ctx.beginPath(); ctx.moveTo(...start);
-    while (pen.segment < stroke.points.length && stroke.points[pen.segment][2] <= end) {
-      const p = stroke.points[pen.segment]; ctx.lineTo(p[0], p[1]); pen.segment++;
+  function trace(stroke, cursor, from, to) {
+    ctx.beginPath(); ctx.moveTo(...pointAt(stroke, cursor, from));
+    while (cursor.segment < stroke.points.length && stroke.points[cursor.segment][2] <= to) {
+      const p = stroke.points[cursor.segment]; ctx.lineTo(p[0], p[1]); cursor.segment++;
     }
-    pen.segment = Math.min(pen.segment, stroke.points.length - 1);
-    ctx.lineTo(...pointAt(stroke, pen, end));
-    ctx.strokeStyle = stroke.ink; ctx.lineWidth = stroke.weight;
-    ctx.lineJoin = ctx.lineCap = 'round'; ctx.stroke();
+    cursor.segment = Math.min(cursor.segment, stroke.points.length - 1);
+    ctx.lineTo(...pointAt(stroke, cursor, to));
+  }
+  function drawTo(pen, end) {
+    const stroke = pen.queue[pen.current];
+    ctx.lineJoin = ctx.lineCap = 'round';
+    const clearTo = Math.min(stroke.length, end + LEAD);
+    if (clearTo > pen.cleared) {
+      trace(stroke, pen.channel, pen.cleared, clearTo);
+      ctx.strokeStyle = PAPER; ctx.lineWidth = stroke.weight * CHANNEL; ctx.stroke();
+      pen.cleared = clearTo;
+    }
+    trace(stroke, pen, pen.distance, end);
+    ctx.strokeStyle = stroke.ink; ctx.lineWidth = stroke.weight; ctx.stroke();
     pen.distance = end;
   }
-  function next(pen) { completed++; pen.current++; pen.distance = 0; pen.segment = 1; }
+  function next(pen) {
+    completed++; pen.current++; pen.distance = 0; pen.segment = 1;
+    pen.cleared = 0; pen.channel.segment = 1;
+  }
+  // Each pass packs the page again from its own seed, so the two fields of
+  // stones fall differently and neither traces the other.
+  function startPass(index) {
+    pass = index;
+    random = generator(index ? `${seed}:pass${index}` : seed);
+    plan();
+  }
+  // Plates keep coming until one has nothing left to draw, or the page has
+  // taken as many as it is going to. A plate that comes back empty is the
+  // signal that the coverage has thinned out to nothing.
+  function nextPass() {
+    const settled = pass;
+    while (pass + 1 < MAX_PLATES) {
+      startPass(pass + 1);
+      if (strokes.length) return true;
+    }
+    // Nothing left to print — on a small page the thinnest plates can come
+    // back with no stones at all. Put the last plate that did have some back
+    // in hand, marked finished, so the drawing ends holding what is on the
+    // paper rather than an empty plan. Its geometry replans from the same
+    // seed, and nothing is drawn again.
+    if (pass !== settled) {
+      startPass(settled);
+      for (const pen of pens) pen.current = pen.queue.length;
+      completed = strokes.length;
+    }
+    return false;
+  }
+  function drainPass() {
+    for (const pen of pens) while (pen.current < pen.queue.length) {
+      drawTo(pen, pen.queue[pen.current].length); next(pen);
+    }
+  }
   function state() {
     canvas.dataset.state = completed >= strokes.length ? 'complete' : paused ? 'paused' : 'growing';
     canvas.dataset.seed = seed;
     canvas.dataset.pens = pens.length;
+    canvas.dataset.pass = pass + 1;
   }
   function stop() { cancelAnimationFrame(frame); frame = 0; lastTime = null; }
   function schedule() {
+    if (completed >= strokes.length) nextPass();
     state();
     if (!frame && !paused && !document.hidden && completed < strokes.length) frame = requestAnimationFrame(tick);
   }
@@ -211,7 +357,8 @@
     const dt = lastTime === null ? 0 : Math.min(0.05, (time - lastTime) / 1000);
     lastTime = time;
     if (dt) for (const pen of pens) {
-      const stroke = pen.queue[pen.current];
+      let stroke = pen.queue[pen.current];
+      if (!stroke && steal(pen)) stroke = pen.queue[pen.current];
       if (!stroke) continue;
       drawTo(pen, Math.min(stroke.length, pen.distance + dt * speed));
       if (pen.distance >= stroke.length) next(pen);
@@ -220,19 +367,22 @@
   }
   function finish() {
     stop();
-    for (const pen of pens) while (pen.current < pen.queue.length) {
-      drawTo(pen, pen.queue[pen.current].length); next(pen);
-    }
+    do drainPass(); while (nextPass());
     state();
   }
   function fit(preserve = false) {
+    const resumePass = preserve ? pass : 0;
     const progress = preserve && strokes.length ? pens.reduce((sum, pen) => sum + pen.current +
       (pen.queue[pen.current] ? pen.distance / pen.queue[pen.current].length : 0), 0) / strokes.length : 0;
     stop();
     width = Math.max(1, innerWidth); height = Math.max(1, innerHeight); dpr = Math.min(devicePixelRatio || 1, 2);
     canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    random = generator(seed); plan(); paper();
+    paper();
+    // Passes already finished are settled ink: lay each down again in full
+    // before the pass in hand is restored to its own fraction.
+    for (let i = 0; i < resumePass; i++) { startPass(i); drainPass(); }
+    startPass(resumePass);
     for (const pen of pens) {
       const restore = Math.floor(progress * pen.queue.length);
       while (pen.current < restore) { drawTo(pen, pen.queue[pen.current].length); next(pen); }

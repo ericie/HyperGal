@@ -12,7 +12,8 @@ cast shadows, occlusion in the grooves and a wet two-lobe specular.
   face or **along** the stroke. Brush width (100–320 px), paint thickness, how
   much paint the brush holds, and the light angle.
 - Click the linen to add a path point; it is spliced into the path where the
-  stroke passes nearby, otherwise added to the nearer end. Drag points to move
+  stroke passes nearby, otherwise added to the nearer end. Sharp turns are
+  modelled rather than approximated — see **Turns** below. Drag points to move
   them, double-click (or Delete) to remove one, arrow keys nudge. A selected
   point gets a **Pressure** slider that widens or narrows the stroke there.
 - **R** / Enter replays the stroke, **S** saves a PNG, **E** hides or shows the
@@ -33,13 +34,41 @@ stroke is a ribbon along a centripetal Catmull-Rom spline through the points
 shader evaluates the paint in stroke space: signed offset across the brush and
 arc length along it. Gradient noise stretched along the stroke places three
 families of hairs; each cuts a narrow V groove whose depth comes and goes along
-its run, stronger in some bands of the brush than others. Every hair samples
+its run, stronger in some bands of the brush than others. The grain travels
+with the hair that left it, but only partly: the paint stands on the canvas
+rather than riding the brush, so a hard turn skews the grain instead of
+shearing it into a lattice. Every hair samples
 the loaded gradient at its own offset, so streaks of the neighbouring colour
 cross over and the mixing grows along the stroke. Each hair holds its own
 amount of paint; when it runs out it stops depositing except on the crests of
 the weave. The brush lifts over the last width and a bit, so the trails end one
 by one. Colour and height are composited in painter's order into half-float
 targets.
+
+## Turns
+
+A wide brush going round a bend does not sweep a uniform band, and the whole
+stroke frame is built on that. Every hair runs its own distance: for a hair
+offset `t` from the path, that distance grows by `1 - t * curvature` per step,
+so its travel is `s - t * (total turn)`. Hairs on the inside of a bend crawl
+and pile their paint up; hairs on the outside race, stretch theirs thin and run
+dry sooner, which is why the outside of a turn goes streaky first. Paint wicks
+sideways between hairs, so that difference saturates rather than growing with
+every degree — without it a hairpin leaves half the brush soaking wet.
+
+No offset may reach past the centre of curvature: beyond it the ribbon folds
+through itself and the stroke frame turns inside out — the crease, the fold and
+the chip of paint that used to appear at any corner past about eighty degrees.
+Instead the inside of the ribbon is squeezed, easing onto the centre of
+curvature and never crossing it, which is what the inner hairs of a turning
+brush actually do. The ribbon is drawn in columns across its width so the
+squeeze stays accurate between its edges, and the shader is told each hair's
+true offset, so it knows those hairs are bunched. Where they are bunched past
+travelling at all the brush is pivoting: those hairs skid, giving up ground at
+the inner corner and dragging away as much paint as they lay down, so the
+corner pinches to a point and the pivot leaves skids rather than a clean
+stamped edge. A straight stroke has no turn and no curvature, so none of this
+changes it.
 
 The lighting pass builds the combined height field (paint filling the weave as
 it thickens), takes normals by central differences, marches toward the light

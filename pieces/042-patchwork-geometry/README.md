@@ -3,9 +3,7 @@
 A generative quilt. A square grid — between four and fifty-two cells across —
 is filled with half-square triangles, bars, notched blocks, and solids drawn
 from one of a set of named palettes. The grid is then folded through mirror
-symmetry chosen per iteration: horizontal, vertical, both, or none. When both
-axes fold, the quilt reads as a single medallion; when neither does, it reads
-as scatter.
+symmetry on both axes, so every quilt reads as a single medallion.
 
 The quilt is never finished. Cells retire and return continuously in one of
 several transition styles — all fading at once, or in stacking layers — on a
@@ -40,8 +38,8 @@ tinted the whole offscreen quilt one colour on its way to the canvas, which is
 why a many-coloured result only emerged where a transition happened to leave
 most cells blank: change the tint and every cell changes at once, which reads as
 a blink rather than a fade. Each cell now carries its own ink index, mirrored
-along with its shape wherever the quilt is symmetrical, so the grid is
-many-coloured at any instant and a refresh only alters the cells it touches.
+along with its shape across both folds, so the grid is many-coloured at any
+instant and a refresh only alters the cells it touches.
 Measured across frames, a refresh moves under three percent of the picture.
 
 One related fix: a resize clears the canvas, and cells only ever cover part of
@@ -81,16 +79,21 @@ fxhash's base58 hash format and sfc32 generator are kept verbatim in
 quilt. Verified: rebuilding twice from one hash produces a byte-identical
 canvas, and a different hash produces a different one.
 
-Two changes to the sketch. `setup()` is split so that a new hash rebuilds the
+Three changes to the sketch. `setup()` is split so that a new hash rebuilds the
 quilt without tearing down the canvas — `preSetUpGrid()` stays the first
 `fxrand()` consumer, which keeps the random sequence identical to the shipped
-build. And the original's double-tap-to-save gesture is gone, because tapping
-now asks for a new quilt; **S** still saves.
+build. The original's double-tap-to-save gesture is gone, because tapping now
+asks for a new quilt; **S** still saves. And symmetry is no longer dealt by the
+hash: `setSymmetry()` still makes the shipped build's two draws, then discards
+them and folds on both axes, so the rest of the sequence — transition style,
+cycle speed, palette, shapes — is unchanged for any given hash while the
+quilt is always a medallion.
 
-The grid fills the viewport in whole cells, so a partial row can be left
-uncovered along the bottom edge depending on the window's aspect ratio. That
-is original behavior and has not been touched. The thumbnail is framed from a
-taller render so the partial row falls outside the crop.
+The grid fills the viewport in whole cells, so its last row usually overruns
+the bottom edge. Half that overrun is now taken off the top, which puts the
+quilt's fold on the centre of the canvas; the original let the whole of it fall
+off the bottom, which leaves a quilt symmetrical on both axes sitting visibly
+low in the frame. Both edges are now trimmed by the same amount instead.
 
 Note also that the piece is sized to the window, so the same hash composes
 differently at different viewport sizes. That was true on fxhash too — each

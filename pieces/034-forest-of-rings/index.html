@@ -50,6 +50,20 @@
     .slice-caption { display:flex; justify-content:space-between; gap:4px; font-size:11px; font-variant-numeric:tabular-nums; }
     .slice.pending .slice-caption { color:var(--muted); }
     .legend { margin:20px 0 0; font-size:11px; line-height:1.6; color:var(--muted); }
+    /* Cut-angle panel. Presentation view only: re-cutting one full-size face
+       is cheap, but the debug grid would have to re-raster all 192 slices. */
+    #grain-controls { position:fixed; left:18px; bottom:18px; z-index:2; width:min(272px,calc(100vw - 36px));
+      display:grid; grid-template-columns:1fr auto; gap:2px 12px; align-items:baseline;
+      padding:12px 14px; background:var(--paper); color:var(--ink);
+      border:1px solid var(--ink); font-size:11px; line-height:1.5;
+      transition:opacity .35s ease, visibility .35s ease; }
+    #grain-controls[data-idle="true"] { opacity:0; visibility:hidden; }
+    #grain-controls label { letter-spacing:.06em; }
+    #grain-controls output { font-variant-numeric:tabular-nums; }
+    #grain-controls input { grid-column:1 / -1; height:28px; margin:4px 0 2px; accent-color:var(--ink); }
+    #grain-controls p { grid-column:1 / -1; margin:0; font-size:10px; opacity:.62; }
+    #grain-controls kbd { font:inherit; opacity:.8; }
+    html.debug #grain-controls { display:none; }
     @media (max-width:1150px) { #slices { grid-template-columns:repeat(4,minmax(0,1fr)); } .study { gap:24px; grid-template-columns:230px minmax(0,1fr); } }
     @media (max-width:800px) { main { padding:16px; } header { align-items:flex-start; flex-direction:column; gap:8px; margin-bottom:20px; } .study { grid-template-columns:1fr; gap:28px; } aside { position:static; display:grid; grid-template-columns:minmax(130px,1fr) minmax(160px,1fr); gap:20px; } .end-caption { font-size:11px; gap:8px; margin-bottom:0; } .environment { margin:12px 0 0; } .instructions { margin-top:26px; font-size:11px; } #slices { grid-template-columns:repeat(4,minmax(0,1fr)); } }
     @media (max-width:480px) { #slices { grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px 10px; } .slice canvas { height:210px; } .study { gap:24px; } aside { gap:14px; } h1 { font-size:18px; } .instructions { line-height:1.5; } .grid-heading { align-items:flex-start; flex-direction:column; gap:6px; } }
@@ -60,6 +74,12 @@
 </head>
 <body>
 <canvas id="presentation" tabindex="0" role="img" aria-label="A looping sequence of wood slices. Click or press Space to pause; use arrow keys to browse."></canvas>
+<div id="grain-controls" data-idle="false">
+  <label for="tilt">CUT ANGLE</label>
+  <output id="tilt-value" for="tilt"></output>
+  <input id="tilt" type="range" min="0" max="12" step="0.1" value="1.1" />
+  <p>Flat reads as straight stripes; steep closes the arches into ovals. <kbd>H</kbd> hides this panel.</p>
+</div>
 <main>
   <header><h1>FOREST OF RINGS</h1><p>One log · 192 slices · 0.125 cm each · bark to bark</p></header>
   <div class="study">

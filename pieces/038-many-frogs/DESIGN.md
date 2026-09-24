@@ -38,40 +38,27 @@ colors:
   pigment-12-body: "oklch(0.55 0.14 18)"
   pigment-12-wash: "oklch(0.52 0.13 16)"
   pigment-12-rim: "oklch(0.32 0.10 14)"
-  void: "#171b18"
-  verge: "#292e28"
-  grass-a: "#3b4038"
-  grass-b: "#3e4239"
-  grass-line: "#747768"
-  road: "#53554a"
-  road-edge: "#92907d"
-  road-mark: "#b5b09a"
-  bike-lane: "#414b40"
-  bike-edge: "#7d8770"
-  bike-frame: "#b0b3a0"
-  bike-rider: "#222b24"
-  rail-bed: "#30352e"
-  rail-tie: "#565b4c"
-  rail-steel: "#999986"
-  rail-signal: "#b65c40"
-  train: "#a3a18e"
-  train-light: "#c0bca5"
-  water: "#686f62"
-  water-line: "#a3ab97"
-  log: "#303e32"
-  log-light: "#7e8a72"
-  gator: "#25392d"
-  gator-light: "#71876b"
-  gator-eye: "#a0a683"
-  rock: "#777968"
-  rock-light: "#a1a18a"
-  mower: "#969986"
-  fly-wing: "#cac4a8"
-  fly-body: "#202a22"
-  ink: "#d0c7aa"
-  tire: "#242b25"
-  vehicle-shell-ash: "#a4a18c"
-  vehicle-shell-olive: "#929480"
+  void: "#dadbd4"
+  verge: "#c6c7bf"
+  paper: "#fdfdfb"
+  shade: "#d9dad2"
+  shade-deep: "#c8c9c0"
+  shadow: "#c2c3b9"
+  grass-a: "#f1f2ec"
+  grass-b: "#ecede6"
+  grass-line: "#dadbd2"
+  road: "#e0e1dd"
+  road-edge: "#cbccc4"
+  road-mark: "#fbfbf7"
+  rock: "#f5f5f1"
+  rock-light: "#fcfcf9"
+  glass: "#dadddb"
+  fly-wing: "#fbfbf8"
+  fly-body: "#c7c8c0"
+  ink: "#b2b3aa"
+  tire: "#c0c1b8"
+  vehicle-shell-a: "#f7f7f4"
+  vehicle-shell-b: "#eff0ea"
 ---
 
 # Design System: Many Frogs
@@ -80,15 +67,15 @@ colors:
 
 **Creative North Star: "Bodies Become Pigment"**
 
-Scope: pieces/038-many-frogs/ only. A rough, physical, slightly unsettling printed world replaces the former childish sprites. Small living bodies become pigment while an indifferent moving landscape continues to work on their marks. Charcoal and mineral gray with an olive cast support muted madder, oxide, umber, oxblood, and plum bodies.
+Scope: pieces/038-many-frogs/ only. A rough, physical, slightly unsettling printed world replaces the former childish sprites. Small living bodies become pigment while an indifferent moving landscape continues to work on their marks. One fixed screen — field, road band, field — printed as a ghost: whites and light grays at low contrast, lit by one shallow isometric camera, so muted madder, oxide, umber, oxblood, and plum bodies are the only color on the board.
 
-This is an autonomous, wordless Canvas 2D artwork. Its identity comes from vulnerable anatomical silhouettes, strict overhead machinery, worn contours, fixed substrate pits, and absorbing impressions. The procedural drawing remains in one HTML file; there is no generated raster asset or framework required for rendering.
+This is an autonomous, wordless Canvas 2D artwork. Its identity comes from vulnerable anatomical silhouettes, near-white machinery raised off the ground on a shared camera angle, worn contours, fixed substrate pits, and absorbing impressions. The procedural drawing remains in one HTML file; there is no generated raster asset or framework required for rendering.
 
 **Key Characteristics:**
 
-- A twenty-one-column endless course of readable crossing bands.
-- Twelve initial frogs with individual pigment identities; flies add three matching offspring.
-- Articulated folded legs and overhead machinery share one printed material language.
+- A fixed board sized from the viewport at a 22px tile: a field, a road band holding 60% of the height, and a field.
+- A cohort scaled to the board width shuttles bottom to top to bottom; flies add three matching offspring.
+- Articulated folded legs and risen pale machinery share one printed material language.
 - Persistent land impressions, broken tire transfers, and current-driven water diffusion.
 - No visible controls, scores, labels, or typography.
 
@@ -98,17 +85,17 @@ The user approved this direction. Independent review returned Ship with no mater
 
 ### Primary
 
-The twelve pigment triples in the frontmatter preserve `frogPigments` order. Each has a body color, a layered wash, and a darker rim for tide lines and incisions. The family is dominated by madder and oxide, with umber, oxblood, and quieter plum variations; individual identity does not depend on a rainbow sequence. Authored OKLCH values remain normative rather than being approximated as hex.
+The twelve pigment triples in the frontmatter preserve `frogPigments` order and repeat in that order once a cohort is larger than twelve. Each has a body color, a layered wash, and a darker rim for tide lines and incisions. The family is dominated by madder and oxide, with umber, oxblood, and quieter plum variations; individual identity does not depend on a rainbow sequence. Authored OKLCH values remain normative rather than being approximated as hex.
 
 **The Pigment Continuity Rule.** A frog, its offspring, and its death impression share the same authored pigment family.
 
 ### Secondary
 
-Ash and olive vehicle shells, train surfaces, bicycle frames, and mower bodies contrast softly against the darker lanes. Rail Signal is the localized warning accent. Water Line, Log Light, Gator Light, and Rock Light supply sparse incisions and material variation.
+Vehicle shells are the lightest values on the board and read against the lanes by rising off them. Shade, Shade Deep, and Shadow are the only modeling tones: side walls and ground prints. Glass is the one cool note, on cabin windows. Rock Light and Paper supply sparse incisions and material variation.
 
 ### Neutral
 
-Void and Verge frame the course. Grass A/B, Road, Bike Lane, Rail Bed, and Water establish crossing types by restrained tonal differences. Ink supplies pale substrate pits and small marks; Tire supplies the darkest structural details. The frontmatter contains active source palette entries and both vehicle-shell literals; unused legacy palette entries are omitted.
+Void and Verge frame the course and are the only values darker than the lanes. Grass A/B and Road separate field from crossing by a restrained tonal difference inside a narrow light band. Ink supplies substrate pits and small marks; Tire supplies the darkest structural details, still a light gray. The frontmatter contains active source palette entries and both vehicle-shell literals; unused legacy palette entries are omitted.
 
 ## Typography
 
@@ -116,21 +103,23 @@ There is no visible typography and no font, size, weight, or spacing scale to ex
 
 ## Layout
 
-The fixed canvas fills the viewport. The board has 21 columns. Tile size is `clamp(min(40, viewportWidth / 21), 14, 40)` in CSS pixels, so the course reaches a maximum width of 840 pixels and stays centered in quiet margins on wider displays. No CSS responsive breakpoints exist. Visible row count is viewport height divided by tile size; narrow screens show more rows at a smaller scale.
+The fixed canvas fills the viewport and the whole course is on it at once; nothing scrolls. Tile size is a constant 22 CSS pixels. Columns are `floor(viewportWidth / 22)` and rows `floor(viewportHeight / 22)`, both with a floor of 9, so the board fills the screen with less than one tile of margin. Each field is `round(rows * 0.2)` and the road band takes the remainder, which is about 60% of the height. Cohort size is `clamp(round(columns * 0.35), 10, 24)`. A resize rebuilds the layout and clears the lane, obstacle, and impression caches, and clamps every frog back onto the board. No CSS responsive breakpoints exist.
 
-The drawing viewport is clamped to at least 300 × 420 CSS pixels and device pixel ratio is capped at 2. The canvas may exceed a smaller viewport. World row zero sits 0.72 tiles above the bottom edge; the camera follows the highest living frog once it reaches 72% of the visible row count. Terrain and lane objects are clipped to the course, with narrow verge strips outside its edges.
+The drawing viewport is clamped to at least 300 × 420 CSS pixels and device pixel ratio is capped at 2. The canvas may exceed a smaller viewport. World row zero is the bottom row of the lower field and row `rows - 1` the top row of the upper field; reaching either turns a frog around. Terrain and lane objects are clipped to the course, with narrow verge strips around its edges.
 
 ## Elevation & Depth
 
-Depth comes from overlapping impressions, irregular silhouettes, sparse incised marks, and tonal separation. Terrain draws first, stains above it, then lane objects and flies; particles and frogs follow. There are no drop-shadow tokens, simulated floating frog shadows, or glossy highlights. Water blur belongs inside each pigment impression and communicates diffusion rather than interface elevation.
+Depth comes from a shallow isometric rise shared by every solid on the field. An object keeps its simulated footprint on the ground, sweeps walls up to a lit face offset by ISO_SKEW of its rise, and casts one soft print away from the light. Rises are small: 0.17 tiles for a car body, 0.13 more for its cabin, 0.19 for a boulder. Terrain draws first, stains above it, then lane objects and flies; particles and frogs follow. Water blur belongs inside each pigment impression and communicates diffusion rather than interface elevation.
 
-**The World-Fixed Texture Rule.** Attach pits and dry lines to terrain and objects; do not introduce flickering screen noise.
+**The World-Fixed Texture Rule.** Attach pits, mown bands, wheel tracks, seams, clover, and dry lines to terrain and objects; do not introduce flickering screen noise.
+
+**The One Camera Rule.** Every solid rises toward the same corner and prints its shadow the same way. A mirrored object flips `isoFlip` so its rise and its shadow stay put on screen.
 
 ## Shapes
 
-Frogs have narrow irregular bodies, tiny dark eye marks, mitered articulated limbs, and short toe incisions. The body drawing scales with 0.39 of a tile. Folded hind limbs extend through a hop while the body stays visually attached to the ground. Cars, mowers, trains, and bicycles use overhead profiles. Rocks, logs, and alligators use irregular polygons and dry internal cuts. Sparse worn lane paint preserves the readability of crossing bands without enclosing each row in a heavy outline.
+Frogs have narrow irregular bodies, tiny dark eye marks, mitered articulated limbs, and short toe incisions. The body drawing scales with 0.39 of a tile. Folded hind limbs extend through a hop while the body stays visually attached to the ground. Cars are drawn from above and raised, carrying a cabin rising off the hood with glass facing the camera and lamps at the nose; their finest marks drop away below 40 drawn pixels of length. Rocks are tapered boulders with facets on the lit cap. Sparse worn lane paint preserves the readability of crossing bands without enclosing each row in a heavy outline.
 
-**The Overhead Bodies Rule.** Keep machinery and animals in the same overhead view, with narrow frog anatomy and articulated limbs.
+**The Overhead Bodies Rule.** Keep machinery and animals in the same raised overhead view, with narrow frog anatomy and articulated limbs.
 
 There is no reusable interface radius or spacing scale. Geometry belongs to the procedural drawing functions in `index.html`.
 
@@ -140,21 +129,21 @@ These are Canvas drawing systems, not DOM interface components. The sidecar ther
 
 ### Terrain impressions
 
-Deterministic pits and fibers are rasterized per terrain row and reused. At most 128 row impressions remain in the print cache; resize clears that cache. Lane markings and moving water lines draw over the cached substrate.
+Deterministic pits, fibers, mown bands, clover, wheel tracks, seams, ballast, and banks are rasterized per terrain row and reused. At most 128 row impressions remain in the print cache; resize clears that cache. Lane markings and moving water lines draw over the cached substrate.
 
 ### Frogs and autonomous movement
 
-Twelve frogs start each cohort after an opening hold (0.68 seconds) with individual stagger. Hops take 0.18 seconds and use an ease-out quartic trajectory. Decisions retain a three-move look-ahead with beam width 7. The traffic-clearance calculation solves periodic swept intervals directly; distant frog reservations are rejected before predicting positions. These optimizations retain the simulation's behavior.
+A cohort starts along the bottom edge after an opening hold (0.68 seconds) with individual stagger, each frog heading up. Hops take 0.18 seconds and use an ease-out quartic trajectory. Decisions retain a three-move look-ahead with beam width 7. The traffic-clearance calculation solves periodic swept intervals directly; distant frog reservations are rejected before predicting positions. These optimizations retain the simulation's behavior.
 
 ### Pigment impressions
 
-Each death makes a layered impression with wash, dried rim, stipple, droplets, and angular event marks. The initial impression raster is 128 × 128 pixels, displayed relative to tile size. Bloom takes 1.65 seconds. Land stains remain across cohorts; retained history is capped at 640 stains. Road traffic adds broken directional transfers from at most five distinct vehicles per stain. Water carries, stretches, and fades the impression, selecting four additional diffusion stages at four-second intervals after its original sharp stage. Each stage is rasterized only when needed; it is not a live blur on every frame.
+Each death makes a layered impression with wash, dried rim, stipple, droplets, and angular event marks. The initial impression raster is 128 × 128 pixels, displayed relative to tile size. Bloom takes 1.65 seconds. Stains remain across cohorts; retained history is capped at 640 stains. Road traffic adds broken directional transfers from at most five distinct vehicles per stain, and each pass flattens the pool a little further.
 
 ### Camera and motion preferences
 
-After the last death, the camera holds for 1.15 seconds and returns over 2.8 seconds using cubic ease-in-out. Reduced motion makes hops immediate after checking their hazard path, removes limb extension, death particles, and camera interpolation, makes stain bloom and tire transfer reveal immediate, and holds an active rail warning steady. It preserves the autonomous simulation and some environmental motion; it is not an animation-off mode. Hidden tabs cancel requestAnimationFrame and resume without time catch-up.
+After the last death the piece holds on the aftermath for 1.9 seconds, then a new cohort enters at the bottom. Reduced motion makes hops immediate after checking their hazard path, removes limb extension and death particles, and makes stain bloom and tire transfer reveal immediate. It preserves the autonomous simulation and some environmental motion; it is not an animation-off mode. Hidden tabs cancel requestAnimationFrame and resume without time catch-up.
 
-Validation: `node scripts/check-many-frogs.mjs` passed collision windows, cached impressions, visibility, normal/reduced-motion lifecycle, resize, and bounded history checks. The seeded 60-second simulation-only comparison preserved exact final state: mean update time fell from 7.66 to 1.11 ms and p99 from 66.79 to 9.49 ms. It does not measure rasterization. A separate live browser sample recorded a 16.7 ms median interval, 17.6 ms p95, and 1 of 90 intervals over 33.4 ms; these are observed samples, not a device-independent frame-rate guarantee.
+Validation: `node scripts/check-many-frogs.mjs` passed the field/road/field layout, collision windows, shuttle turnaround, cached impressions, visibility, normal/reduced-motion lifecycle, resize, and bounded history checks. The seeded 60-second simulation-only run reports a 2.80 ms mean update on the wider board, up from 1.11 ms on the old 21-column course, which is what roughly double the frogs and triple the board costs. It does not measure rasterization. A live browser sample of update plus draw at 1440 × 900 recorded a 2.6 ms median, 3.4 ms p95, and 6.3 ms worst frame over 1940 frames. These are observed samples on one machine, not a device-independent frame-rate guarantee.
 
 Rendering has no external asset dependency. The source also contains an external Bakalytics analytics script; portability claims describe the artwork renderer, not the absence of all network requests.
 
@@ -162,13 +151,15 @@ Rendering has no external asset dependency. The source also contains an external
 
 ### Do:
 
-- Do preserve the close natural-pigment family and the charcoal, olive, and ash environment.
-- Do retain route decisions, reproduction, surface-driven stains, and the camera return as part of the artwork.
+- Do preserve the close natural-pigment family and the ghost-white environment it sits on.
+- Do retain route decisions, reproduction, surface-driven stains, and the shuttle turnaround as part of the artwork.
 - Do keep terrain and pigment impressions cached, with bounded retained history.
 - Do keep this visual system scoped to Many Frogs.
 
 ### Don't:
 
-- Don't restore smiles, white frog eye discs, toy side elevations, gloss, or a spectral rainbow.
+- Don't restore smiles, white frog eye discs, full side elevations, gloss, or a spectral rainbow.
+- Don't scroll the board or add a finish line; the crossing is a shuttle with no end.
+- Don't add color to the environment; the only color on the board belongs to the frogs and their marks.
 - Don't replace the procedural moving field with a static illustration.
 - Don't invent buttons, navigation, type scales, or score overlays for this wordless surface.

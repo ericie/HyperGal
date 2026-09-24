@@ -131,7 +131,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-15",
       "category": "games",
       "type": "interactive",
-      "wip": true,
+      "wip": false,
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
       "description": "One yellow arcade car hunts for the fastest lane through compact gray traffic, buses, and semi trucks, signaling, speeding up, surging, or backing off to make openings, but never exits. Other gray vehicles have wider speed personalities, from aggressive squeezers to conservative gap-waiters, and try to pass too. Slow traffic packs tighter while fast traffic leaves more room. The highway widens and narrows between five-lane stretches and two-lane bottlenecks. Gray vehicles can take diagonal ramps offscreen and leave the highway. Every vehicle claims a whole lane, animates across only when a clear opening exists, and stops instead of hitting obstacles. The yellow car scores +1 for every pass, loses 1 when most vehicles pass it, and loses 5 when a semi passes it.",
@@ -184,7 +184,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
-      "description": "Fat, hooded Marios bound sideways through a painted summer sky while the camera follows whichever runner is highest, even through a fall.",
+      "description": "Floppy navy bags climb a dense platform course, dodging barrels and saw blades and springing off each other's heads, while the camera follows whichever one is highest.",
       "updated": "2026-09-15"
     },
     {
@@ -194,7 +194,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-25",
       "category": "generative",
       "type": "generative",
-      "wip": true,
+      "wip": false,
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
       "description": "An edge-to-edge field of loose Celtic interlace printed in dark brown on worn paper. Continuous rounded cords pass through a Truchet-like knot grid, alternating over and under at crossings and running beyond every side of the browser. Click or press Enter/Space to reseed.",
@@ -207,7 +207,7 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-07-30",
       "category": "generative",
       "type": "generative",
-      "wip": true,
+      "wip": false,
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
       "description": "Conway's Game of Life played across a shifting four-color checkerboard. At reset, the dead checkerboard changes from top to bottom before the new live cells fade in through ten quick batches.",
@@ -386,7 +386,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 9,
       "thumbnail": "thumbnail.jpg",
-      "description": "Black waves split at stone-to-stone junctions, rebound from the frame, and intensify where their nested, non-crossing samon overlap.",
+      "description": "Geometric obstacles in the plan-010 palette rake the sand into nested contours, and coloured waves fill the bands between furrows, reflect off the frame and off each other, and blend like ink washes where they cross.",
       "updated": "2026-09-15"
     },
     {
@@ -463,7 +463,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": true,
       "rating": 30,
       "thumbnail": "thumbnail.png",
-      "description": "An endless field print: anatomical pigment frogs cross overhead traffic and mineral-gray terrain, leaving stains worked by tires and water; catching a fly adds three matching frogs.",
+      "description": "A fixed ghost-white screen: anatomical pigment frogs shuttle from the bottom field across two dozen lanes of traffic to the top field and back again, leaving stains the passing cars drag into the asphalt.",
       "updated": "2026-09-18"
     },
     {
@@ -515,7 +515,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": false,
       "rating": 38,
       "thumbnail": "thumbnail.png",
-      "description": "A quilt that keeps re-piecing itself. A grid of half-square triangles, bars and notched blocks is folded through mirror symmetry, then cells retire and return in slow waves, each cycle laying a new colour over the last. Ground and inks are built from a colour scheme rather than drawn at random.",
+      "description": "A quilt that keeps re-piecing itself. A grid of half-square triangles, bars and notched blocks is folded through mirror symmetry on both axes into a medallion, then cells retire and return in slow waves, each cycle laying a new colour over the last. Ground and inks are built from a colour scheme rather than drawn at random.",
       "updated": "2026-09-09"
     },
     {
@@ -580,7 +580,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": false,
       "rating": 60,
       "thumbnail": "thumbnail.jpg",
-      "description": "Dozens of particles got together and decided to draw. They drew nothing but flowers. Fifty to eighty lines fly to drifting targets, then scribble shadowed loops around them onto a square field that is never wiped, until the field fills with blossoms. Six layouts, eight palettes, and a few lines in every swarm that erase instead of paint. Click to reseed; S saves the picture.",
+      "description": "Dozens of particles got together and decided to draw. They drew nothing but flowers. Fifty to eighty lines fly to drifting targets, then scribble shadowed loops around them onto a field, the shape of your window, that is never wiped, until it fills with blossoms. Six layouts, eight palettes, and a few lines in every swarm that erase instead of paint. Click to reseed; S saves the picture.",
       "updated": "2026-09-14"
     },
     {
@@ -630,7 +630,7 @@ window.HYPERGAL_MANIFEST = {
       "type": "interactive",
       "wip": false,
       "thumbnail": "thumbnail.png",
-      "description": "A field of tightly fitted, irregular ink spirals grows from several places at once across warm paper. Each drawing point traces one little stone at a time, winding inward as the clusters spread and meet. Click to regrow, Space to pause, F to finish, S to save.",
+      "description": "A field of tightly fitted, irregular ink spirals grows from several places at once across warm paper. Each drawing point traces one little stone at a time, winding inward as the clusters spread and meet. When the page is full it keeps going, printing plate over plate — iron oxide, indigo, dark gold, verdigris, plum — each a sparser packing than the last. Every line clears a channel of bare paper ahead of itself, so each colour reads as a layer over the one beneath. Click to regrow, Space to pause, F to finish, S to save.",
       "updated": "2026-09-15"
     },
     {
@@ -652,7 +652,8 @@ window.HYPERGAL_MANIFEST = {
       "date": "2026-09-21",
       "category": "generative",
       "type": "interactive",
-      "wip": false,
+      "wip": true,
+      "rating": 10,
       "thumbnail": "thumbnail.png",
       "description": "One thick oil stroke, pulled left to right across primed linen by a flat brush loaded with a gradient of paint, ultramarine on one edge to titanium white on the other. Every hair drags its own colour and cuts its own groove; paint lips at the edges, runs dry hair by hair, and lifts away in trailing streaks. A floating palette sets the colours and how the brush is loaded, and the path takes as many points as you like.",
       "updated": "2026-09-23"
@@ -661,12 +662,13 @@ window.HYPERGAL_MANIFEST = {
       "slug": "054-tideline",
       "title": "Tideline",
       "year": 2026,
-      "date": "2026-09-21",
+      "date": "2026-09-24",
       "category": "nature",
       "type": "interactive",
-      "wip": false,
+      "wip": true,
+      "rating": 10,
       "thumbnail": "thumbnail.png",
-      "description": "Seen from above, waves of dye run up a pale shore and drain back, each leaving a stain along the line it reached. Colours blend, the freshly wet sand dries, and the shore becomes strata of every wave that came before. Click to send a wave to that spot, Space to pause, F to skip ahead, S to save.",
+      "description": "Two shores face each other from the top and bottom edges, seen from above, and send waves of dye across the sand between them. Each wave leaves its colour along the line it reached; the fields interleave, blend and weather, with bare sand at the seam. Click to send a wave from the nearer shore, Space to pause, F to skip ahead, S to save.",
       "updated": "2026-09-23"
     }
   ]

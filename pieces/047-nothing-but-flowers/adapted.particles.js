@@ -23,8 +23,20 @@ var paused = false;
 var targLoc, systemTarg;
 var lineW = 3.5;
 
-const centerX = 1920/2;
-const centerY = 1920/2;
+// The field is the window's shape with its short side held at 1920, so every
+// distance the sketch draws with — line weights, wander radii, orbit radii,
+// the margins the scattered layouts keep — is the size it was drawn at. The
+// orbits stay round: only the centre moves, to the centre of the field. The
+// scattered layouts already lay themselves out across maxW/maxH, so they are
+// the ones that spread into a wider window. layoutField() is called by the
+// entry script whenever the stage is sized.
+var centerX = 1920/2;
+var centerY = 1920/2;
+
+function layoutField() {
+	centerX = maxW / 2;
+	centerY = maxH / 2;
+}
 
 var gridUnit = 512;
 var gridMargin = 384/2;
@@ -326,8 +338,8 @@ function capitalizeFirstLetter(string) {
 
 function draw() {
 
-	ctx.clearRect(0, 0, 1920, 1920);
-	layer01.clearRect(0, 0, 1920, 1920);
+	ctx.clearRect(0, 0, maxW, maxH);
+	layer01.clearRect(0, 0, maxW, maxH);
 	ctx.fillStyle = myBG;
 	ctx.fillRect(0, 0, maxW, maxH);
 
@@ -338,24 +350,24 @@ function draw() {
 
 	// Composite Layers
 	// ctx.drawImage(layer05Elem, 0, 0, 1920,1920);
-	ctx.drawImage(layer04Elem, 0, 0, 1920,1920);
+	ctx.drawImage(layer04Elem, 0, 0, maxW, maxH);
 	// ctx.drawImage(layer02Elem, 0, 0, 1920,1920);
 	// layer01.globalCompositeOperation = 'source-in';
 	// layer01.drawImage(layer05Elem, 0, 0, 1920, 1920);
 	// layer01.globalCompositeOperation = "source-over";
-	ctx.drawImage(layer01Elem, 0, 0, 1920,1920);
+	ctx.drawImage(layer01Elem, 0, 0, maxW, maxH);
 	
 	// Targets to show
 	if (showSolarSystem == true){
 		layer03.globalCompositeOperation = "source-over";
-		layer03.clearRect(0, 0, 1920, 1920);
+		layer03.clearRect(0, 0, maxW, maxH);
 		layer03.fillStyle = 'rgba(255,0,0,1)';
 		var tList = Object.entries(targetList);
 		for (let sb = 0; sb < tList.length; sb++) {
 			const sbObj = tList[sb];
 			circle(sbObj[1].x, sbObj[1].y, sbObj[1].r, layer03);
 		}
-		ctx.drawImage(layer03Elem, 0, 0, 1920,1920);
+		ctx.drawImage(layer03Elem, 0, 0, maxW, maxH);
 	}
 }
 
@@ -366,6 +378,7 @@ function initParticleSystem(){
 	system.init(systemSize);
 	// document.getElementById("canvas").style.setProperty('background-color',  myBG);
 	document.getElementById("HMCmain").style.setProperty('background-color',  myBG);
+	document.body.style.setProperty('background-color', myBG);
 }
 
 function ParticleSystem(){
@@ -377,7 +390,7 @@ ParticleSystem.prototype.initTargets = function() {
 			name:"Sun",
 			parent:false,
 			x:centerX,
-			y:centerX,
+			y:centerY,
 			r:50,
 			v:.1,
 			a:0,
@@ -544,7 +557,7 @@ ParticleSystem.prototype.moveTargets = function(){
 		var targObj = targetList[t.parent];
 		
 		
-		var hardCenter = {x:1920/2,y:1920/2}; // Used for the sun
+		var hardCenter = {x:centerX,y:centerY}; // Used for the sun
 		if (targObj){
 			hardCenter = {x:targObj.x, y:targObj.y};
 		}
