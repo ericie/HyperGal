@@ -185,7 +185,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
       "description": "Floppy navy bags climb a dense platform course, dodging barrels and saw blades and springing off each other's heads, while the camera follows whichever one is highest.",
-      "updated": "2026-09-15"
+      "updated": "2026-09-24"
     },
     {
       "slug": "017-knot-work",
@@ -224,7 +224,7 @@ window.HYPERGAL_MANIFEST = {
       "rejected": true,
       "thumbnail": "thumbnail.jpg",
       "description": "An architectural ink city of sunlit white walls, deep black recesses, projecting balconies and fine steel railings. Stacked tenants, connected service lines and working rooftops form a different Tokyo with every arrangement.",
-      "updated": "2026-09-18"
+      "updated": "2026-09-24"
     },
     {
       "slug": "020-soft-collapse",
@@ -387,7 +387,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 9,
       "thumbnail": "thumbnail.jpg",
       "description": "Geometric obstacles in the plan-010 palette rake the sand into nested contours, and coloured waves fill the bands between furrows, reflect off the frame and off each other, and blend like ink washes where they cross.",
-      "updated": "2026-09-15"
+      "updated": "2026-09-24"
     },
     {
       "slug": "033-the-greater-whole",
@@ -412,7 +412,7 @@ window.HYPERGAL_MANIFEST = {
       "rejected": true,
       "thumbnail": "thumbnail.jpg",
       "description": "A loop of 192 eighth-centimeter wood slices shares the 200-ring growth model of Growth Rings. One proportional scale preserves the trunk’s shape, with the widest slice filling 90% of the screen width. Debug mode reveals the end grain and slice grid.",
-      "updated": "2026-09-18"
+      "updated": "2026-09-24"
     },
     {
       "slug": "035-hypermedia-title-01",
@@ -464,7 +464,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 30,
       "thumbnail": "thumbnail.png",
       "description": "A fixed ghost-white screen: anatomical pigment frogs shuttle from the bottom field across two dozen lanes of traffic to the top field and back again, leaving stains the passing cars drag into the asphalt.",
-      "updated": "2026-09-18"
+      "updated": "2026-09-24"
     },
     {
       "slug": "039-drips",
@@ -516,7 +516,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 38,
       "thumbnail": "thumbnail.png",
       "description": "A quilt that keeps re-piecing itself. A grid of half-square triangles, bars and notched blocks is folded through mirror symmetry on both axes into a medallion, then cells retire and return in slow waves, each cycle laying a new colour over the last. Ground and inks are built from a colour scheme rather than drawn at random.",
-      "updated": "2026-09-09"
+      "updated": "2026-09-24"
     },
     {
       "slug": "043-mountains-waves-and-valleys",
@@ -581,7 +581,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 60,
       "thumbnail": "thumbnail.jpg",
       "description": "Dozens of particles got together and decided to draw. They drew nothing but flowers. Fifty to eighty lines fly to drifting targets, then scribble shadowed loops around them onto a field, the shape of your window, that is never wiped, until it fills with blossoms. Six layouts, eight palettes, and a few lines in every swarm that erase instead of paint. Click to reseed; S saves the picture.",
-      "updated": "2026-09-14"
+      "updated": "2026-09-24"
     },
     {
       "slug": "048-growth-rings-2022",
@@ -619,7 +619,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": false,
       "thumbnail": "thumbnail.png",
       "description": "An overflowing drawing of olive-ink spirals, curling tendrils and nested arcs. Several drawing points work together, each tracing one continuous line at a time, until the pattern grows beyond every edge of the window. Click to regrow, Space to pause, S to save.",
-      "updated": "2026-09-15"
+      "updated": "2026-09-24"
     },
     {
       "slug": "051-agate",
@@ -631,7 +631,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": false,
       "thumbnail": "thumbnail.png",
       "description": "A field of tightly fitted, irregular ink spirals grows from several places at once across warm paper. Each drawing point traces one little stone at a time, winding inward as the clusters spread and meet. When the page is full it keeps going, printing plate over plate — iron oxide, indigo, dark gold, verdigris, plum — each a sparser packing than the last. Every line clears a channel of bare paper ahead of itself, so each colour reads as a layer over the one beneath. Click to regrow, Space to pause, F to finish, S to save.",
-      "updated": "2026-09-15"
+      "updated": "2026-09-24"
     },
     {
       "slug": "052-negative-fill",
@@ -643,7 +643,7 @@ window.HYPERGAL_MANIFEST = {
       "wip": false,
       "thumbnail": "thumbnail.png",
       "description": "Silver arcs, curled tendrils, stippled fields and bright patches grow across charcoal paper. Several drawing points work at once, fitting marks around one another and leaving irregular islands of negative space. Click to regrow, Space to pause, F to finish, S to save.",
-      "updated": "2026-09-15"
+      "updated": "2026-09-24"
     },
     {
       "slug": "053-loaded-brush",
@@ -656,7 +656,7 @@ window.HYPERGAL_MANIFEST = {
       "rating": 10,
       "thumbnail": "thumbnail.png",
       "description": "One thick oil stroke, pulled left to right across primed linen by a flat brush loaded with a gradient of paint, ultramarine on one edge to titanium white on the other. Every hair drags its own colour and cuts its own groove; paint lips at the edges, runs dry hair by hair, and lifts away in trailing streaks. A floating palette sets the colours and how the brush is loaded, and the path takes as many points as you like.",
-      "updated": "2026-09-23"
+      "updated": "2026-09-24"
     },
     {
       "slug": "054-tideline",
@@ -669,7 +669,40 @@ window.HYPERGAL_MANIFEST = {
       "rating": 10,
       "thumbnail": "thumbnail.png",
       "description": "Two shores face each other from the top and bottom edges, seen from above, and send waves of dye across the sand between them. Each wave leaves its colour along the line it reached; the fields interleave, blend and weather, with bare sand at the seam. Click to send a wave from the nearer shore, Space to pause, F to skip ahead, S to save.",
-      "updated": "2026-09-23"
+      "updated": "2026-09-24"
+    },
+    {
+      "slug": "055-hypermedia-title-03",
+      "title": "Hypermedia Title 03",
+      "year": 2026,
+      "date": "2026-10-05",
+      "category": "typography",
+      "type": "interactive",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "Hypermedia Club in single-line cursive, rendered as disconnected dots. A little Logo turtle travels through the handwriting from left to right, joining the dots with a continuous ink trail. Space pauses; R replays."
+    },
+    {
+      "slug": "056-micro-tetris",
+      "title": "Micro Tetris",
+      "year": 2026,
+      "date": "2026-10-05",
+      "category": "games",
+      "type": "interactive",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "Self-playing Tetris across the entire window, with one-pixel square cells. A partially filled field grows into deep wells before the imperfect player catches a hot streak and clears the pile. Click or Space pauses; R restarts."
+    },
+    {
+      "slug": "057-moon-orchard",
+      "title": "Moon Orchard",
+      "year": 2026,
+      "date": "2026-10-05",
+      "category": "games",
+      "type": "interactive",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "A self-playing moon buggy jumps craters, breaks rocks and dodges UFO bombs. Every shot that reaches the slowly rotating planet above plants a tree. The forest remembers each impact and carries on between visits. Click or Space pauses; S saves a picture."
     }
   ]
 };

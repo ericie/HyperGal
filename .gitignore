@@ -3,3 +3,4 @@ node_modules/
 *.log
 /undefined
 /.impeccable
+/output

@@ -1,0 +1,10 @@
+{
+  "title": "Micro Tetris",
+  "year": 2026,
+  "date": "2026-10-05",
+  "category": "games",
+  "type": "interactive",
+  "wip": true,
+  "thumbnail": "thumbnail.png",
+  "description": "Self-playing Tetris across the entire window, with one-pixel square cells. A partially filled field grows into deep wells before the imperfect player catches a hot streak and clears the pile. Click or Space pauses; R restarts."
+}

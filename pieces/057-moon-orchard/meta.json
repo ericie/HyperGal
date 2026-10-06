@@ -1,0 +1,10 @@
+{
+  "title": "Moon Orchard",
+  "year": 2026,
+  "date": "2026-10-05",
+  "category": "games",
+  "type": "interactive",
+  "wip": true,
+  "thumbnail": "thumbnail.png",
+  "description": "A self-playing moon buggy jumps craters, breaks rocks and dodges UFO bombs. Every shot that reaches the slowly rotating planet above plants a tree. The forest remembers each impact and carries on between visits. Click or Space pauses; S saves a picture."
+}
