@@ -1,4 +1,4 @@
-// Patchwork Geometry — Eric Ishii Eckhardt, 2023, for HyperMedia Club.
+// Patchwork Geometry — Eric Ishii Eckhardt, 2023, for Hypermedia Club.
 // Ported from the fxhash package PatchworkGeom. The drawing code is the
 // shipped version; setup() is split so a new hash can rebuild the quilt
 // without tearing down the canvas. fxrand() is provided by index.html.

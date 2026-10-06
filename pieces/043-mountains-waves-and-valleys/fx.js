@@ -1,4 +1,4 @@
-// Mountains Waves and Valleys — Eric Ishii Eckhardt, 2024, for HyperMedia Club.
+// Mountains Waves and Valleys — Eric Ishii Eckhardt, 2024, for Hypermedia Club.
 //
 // A stand-in for fxhash's SDK, which the piece was built against and which no
 // longer exists. It provides only what the sketch actually uses: a seeded,

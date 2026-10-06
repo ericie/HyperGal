@@ -8,9 +8,9 @@
     />
     <meta
       name="description"
-      content="HyperMedia Club — an index of browser artworks."
+      content="Hypermedia Club — an index of browser artworks."
     />
-    <title>HyperMedia Club</title>
+    <title>Hypermedia Club</title>
     <style>
       :root {
         --serif: Georgia, "Times New Roman", Times, serif;
@@ -52,7 +52,6 @@
       }
       .skip-link:focus { transform: translateY(0); }
 
-      /* ---- masthead: deadpan, left-aligned (Cory / Emily) ---- */
       header {
         padding: clamp(1.5rem, 5vw, 3.5rem) var(--pad) clamp(1.5rem, 4vw, 2.75rem);
       }
@@ -176,7 +175,6 @@
         font-size: clamp(1.05rem, 1.5vw, 1.28rem);
         line-height: 1.3;
       }
-      /* Cory-blue underlined title */
       .cap .t {
         color: var(--blue);
         text-decoration: underline;
@@ -276,7 +274,7 @@
     <a class="skip-link" href="#works">Skip to the works</a>
 
     <header>
-      <h1>HyperMedia Club</h1>
+      <h1>Hypermedia Club</h1>
       <div class="controls">
         <p class="ctl"><strong class="lbl">Status:</strong><span id="statuses" role="group" aria-label="Status"></span>. <strong class="lbl">Theme:</strong><select id="themes" class="pick" aria-label="Theme"></select>. <strong class="lbl">View:</strong><span id="views" role="group" aria-label="View"></span>. <strong class="lbl">Sort:</strong><span id="sorts" role="group" aria-label="Sort"></span></p>
       </div>
@@ -357,7 +355,7 @@
         document.head.append(script);
 
         function boot() {
-          const data = window.HYPERGAL_MANIFEST;
+          const data = window.HMC_MANIFEST;
           if (!data || !Array.isArray(data.pieces) || data.pieces.length === 0) {
             return fail();
           }

@@ -10,7 +10,7 @@ Visitors are viewing a personal digital art gallery: self-contained browser piec
 
 ## Product Purpose
 
-HyperGal collects durable, dependency-free interactive artworks. Success means each piece feels distinct, launches from the static gallery, and remains portable enough to survive browsers, servers, package managers, and CDNs aging out.
+Hypermedia Club collects durable, dependency-free interactive artworks. Success means each piece feels distinct, launches from the static gallery, and remains portable enough to survive browsers, servers, package managers, and CDNs aging out.
 
 ## Brand Personality
 

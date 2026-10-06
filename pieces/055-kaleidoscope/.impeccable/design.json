@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-28T03:51:42.430336+00:00",
+  "title": "Design System: Kaleidoscope",
+  "extensions": {
+    "shadows": [
+      {
+        "name": "shard-glow",
+        "value": "shadowColor = shard.color; shadowBlur = (source.width / 2) * 0.025",
+        "purpose": "Canvas glow around colored polygons."
+      }
+    ],
+    "motion": [
+      {
+        "name": "field-turn",
+        "value": "0.017 radians/second",
+        "purpose": "Continuous rotation of the mirrored field."
+      },
+      {
+        "name": "shard-drift",
+        "value": "0.014\u20130.039 radians/second, alternating direction",
+        "purpose": "Autonomous recombination of the source geometry."
+      }
+    ],
+    "accessibility": {
+      "reducedMotion": "Starts paused; preference changes synchronize pause state. Play permits explicit motion.",
+      "focus": "2px solid #ffdb63; outline-offset: 4px"
+    },
+    "layout": {
+      "controls": "bottom/right: max(18px, corresponding safe-area inset); gap: 8px",
+      "canvas": "Full viewport; pixel ratio capped at 2; source canvas capped at 1600px."
+    }
+  },
+  "components": [
+    {
+      "name": "Artwork control",
+      "kind": "button",
+      "refersTo": "artwork-control",
+      "description": "Subordinate native control for pause/play or image saving.",
+      "html": "<button class=\"ds-artwork-control\" type=\"button\">Pause</button>",
+      "css": ".ds-artwork-control { font: 13px/1 system-ui, sans-serif; color: #fff5ff; background: #191331; border: 1px solid #706080; border-radius: 20px; min-height: 44px; padding: 0 18px; cursor: pointer; } .ds-artwork-control:hover { background: #3a2855; border-color: #ffc7ed; } .ds-artwork-control:focus-visible { outline: 2px solid #ffdb63; outline-offset: 4px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Luminous candy geometry",
+    "overview": "Bright, playful shapes evolve autonomously into a mirrored field. This design applies only to artwork 055; Hypermedia Club's gallery and other independently styled works retain their own identities. Preserve the artwork's self-contained, dependency-free delivery.",
+    "keyCharacteristics": [
+      "Full-viewport geometric color.",
+      "Continuous mirrored recombination.",
+      "Quiet, legible artwork controls."
+    ],
+    "rules": [],
+    "dos": [
+      "Do preserve bright, playful geometry and autonomous evolution.",
+      "Do keep controls legible and subordinate to the artwork.",
+      "Do preserve reduced-motion support and keyboard controls."
+    ],
+    "donts": [
+      "Don't impose this artwork's palette or composition on the gallery or other pieces.",
+      "Don't introduce external fonts, libraries, or network dependencies."
+    ]
+  }
+}

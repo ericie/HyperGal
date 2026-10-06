@@ -106,7 +106,7 @@
     "donts": [
       "Don't add room frames, uniform rounded geometry, or a gray drawing palette.",
       "Don't substitute the approved reference raster for procedural geometry.",
-      "Don't impose this artwork's design system on other HyperGal pieces."
+      "Don't impose this artwork's design system on other Hypermedia Club pieces."
     ]
   }
 }

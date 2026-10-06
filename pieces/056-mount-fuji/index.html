@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Mount Fuji painted in short, curling impasto strokes: a swirling blue-and-gold sky, ivory snow, and shimmering water.">
+<title>Mount Fuji · Hypermedia Club</title>
+<style>
+:root { color-scheme: light; background: #ebe6da; color: #282a29; }
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+canvas { display: block; width: 100%; height: 100%; }
+[hidden] { display: none !important; }
+#palette { position: fixed; left: max(20px, env(safe-area-inset-left)); bottom: max(18px, env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 18px; font: 12px/1.4 Georgia, serif; }
+h1 { margin: 0; font: inherit; }
+button { border: 1px solid #9b978d; padding: 9px 12px; background: #eee8dc; color: #343b3d; font: inherit; cursor: pointer; }
+button:hover { background: #dcd7cb; }
+button:focus-visible { outline: 2px solid #31508c; outline-offset: 4px; }
+::selection { background: #31508c; color: #fff5dd; }
+.fallback, noscript { position: fixed; inset: 30px; font: 18px/1.5 Georgia, serif; }
+</style>
+</head>
+<body>
+<canvas id="painting" role="img" aria-label="An oil painting of Mount Fuji built entirely from short curved brush strokes, with a swirling blue-and-gold sky, golden sun, ivory snow, blue slopes, shimmering lake and olive reeds."></canvas>
+<div id="palette"><h1>Mount Fuji</h1><button id="save" type="button" title="Save painting (S)">Save PNG</button></div>
+<p class="fallback" id="fallback" hidden>This painting needs WebGL 2. Try opening it in a browser with hardware acceleration enabled.</p>
+<noscript>Enable JavaScript to see the painting of Mount Fuji.</noscript>
+<script src="mount-fuji.js"></script>
+</body>
+</html>
