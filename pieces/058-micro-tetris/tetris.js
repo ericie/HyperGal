@@ -3,6 +3,7 @@
   const context = canvas.getContext('2d', { alpha: false });
   const recipes = window.MICRO_TETRIS_RECIPES;
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
+  const cellSize = 2;
   const colors = ['#090b10', '#76c9cd', '#d6bb6a', '#af93d4', '#83b995', '#cf7d8a', '#7598cf', '#cf9b74'];
   const colorBytes = colors.map(color => [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16)));
   let width, height, board, lanes, image, pixels;
@@ -38,7 +39,7 @@
   function clearRows() {
     // Completed packing bands below every lane are guaranteed full. Waiting
     // for a band boundary keeps in-flight targets intact when rows collapse.
-    const count = Math.min(...lanes.map(lane => lane.base));
+    const count = hot ? Math.min(4, ...lanes.map(lane => lane.base)) : 0;
     if (!count) return;
     board.copyWithin(0, count * width);
     board.fill(0, (height - count) * width);
@@ -46,10 +47,12 @@
     cleared += count;
   }
   function reset() {
-    width = Math.max(1, Math.floor(innerWidth));
-    height = Math.max(16, Math.floor(innerHeight));
+    width = Math.max(1, Math.ceil(innerWidth / cellSize));
+    height = Math.max(16, Math.ceil(innerHeight / cellSize));
     canvas.width = width;
     canvas.height = height;
+    canvas.style.width = `${width * cellSize}px`;
+    canvas.style.height = `${height * cellSize}px`;
     board = new Uint8Array(width * height);
     image = context.createImageData(width, height);
     pixels = new Uint32Array(image.data.buffer);
@@ -57,10 +60,10 @@
     active = [];
     hot = false; cleared = 0; cycles = 0; credit = 0;
     for (let x = 0; x < width; x += 4) {
-      const lane = { x, width: Math.min(4, width - x), base: 0, cursor: 0, recipe: randomRecipe(), busy: false, favored: Math.random() < .72 };
+      const lane = { x, width: Math.min(4, width - x), base: 0, cursor: 0, recipe: randomRecipe(), busy: false };
       lanes.push(lane);
-      // Deep open wells and incomplete bands, all seeded with legal drops.
-      const targetHeight = Math.max(4, Math.floor(height * (.14 + Math.random() * .30) / 4) * 4);
+      // A continuous, evenly packed foundation, seeded with legal drops.
+      const targetHeight = Math.max(4, Math.floor(height * .32 / 4) * 4);
       while (lane.base < targetHeight) lock(lane, nextPiece(lane));
       const extra = Math.floor(Math.random() * (lane.width < 4 ? lane.width : 4));
       for (let i = 0; i < extra; i++) lock(lane, nextPiece(lane));
@@ -68,18 +71,12 @@
     render();
   }
   function chooseLane() {
-    if (hot) {
-      let best = null;
-      const floor = Math.min(...lanes.map(lane => lane.base));
-      for (const lane of lanes) {
-        if (lane.busy || lane.base > floor + 4 || lane.base + 4 > height - 4) continue;
-        if (!best || lane.base < best.base || (lane.base === best.base && lane.cursor > best.cursor)) best = lane;
-      }
-      return best;
-    }
-    for (let i = 0; i < 24; i++) {
-      const lane = lanes[Math.floor(Math.random() * lanes.length)];
-      if (!lane.busy && lane.base + 4 < height * .76 && (lane.favored || Math.random() < .035)) return lane;
+    const floor = Math.min(...lanes.map(lane => lane.base));
+    const start = Math.floor(Math.random() * lanes.length);
+    for (let i = 0; i < lanes.length; i++) {
+      const lane = lanes[(start + i) % lanes.length];
+      // Finish the lowest band across the whole window before building higher.
+      if (!lane.busy && lane.base === floor && lane.base + 4 <= height - 4) return lane;
     }
     return null;
   }
@@ -97,10 +94,8 @@
     if (!hot && peak >= height * .70) hot = true;
     if (hot && peak < height * .27) {
       hot = false; cycles++;
-      for (const lane of lanes) lane.favored = Math.random() < .72;
     }
-    // Throughput scales with window area. Hundreds of four-pixel pieces can
-    // fall concurrently, making a thousand-column game watchable in real time.
+    // Throughput scales with the logical board area.
     credit = Math.min(credit + seconds * width * height / (hot ? 135 : 420), lanes.length);
     while (credit >= 1) {
       const lane = chooseLane();
@@ -119,8 +114,8 @@
     for (const falling of active) {
       const t = Math.min(1, falling.elapsed / falling.duration);
       const cells = target(falling.lane, falling.piece);
-      const start = height + 4;
-      const offset = Math.round((start - falling.lane.base) * (1 - t));
+      // Short drops keep the movement along the surface of the growing field.
+      const offset = Math.round(12 * (1 - t));
       context.fillStyle = colors[falling.piece.color];
       for (const [x, y] of cells) context.fillRect(x, height - 1 - y - offset, 1, 1);
     }

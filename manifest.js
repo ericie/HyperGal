@@ -672,39 +672,6 @@ window.HMC_MANIFEST = {
       "updated": "2026-09-24"
     },
     {
-      "slug": "055-hypermedia-title-03",
-      "title": "Hypermedia Title 03",
-      "year": 2026,
-      "date": "2026-10-05",
-      "category": "typography",
-      "type": "interactive",
-      "wip": true,
-      "thumbnail": "thumbnail.png",
-      "description": "Hypermedia Club in single-line cursive, rendered as disconnected dots. A little Logo turtle travels through the handwriting from left to right, joining the dots with a continuous ink trail. Space pauses; R replays."
-    },
-    {
-      "slug": "056-micro-tetris",
-      "title": "Micro Tetris",
-      "year": 2026,
-      "date": "2026-10-05",
-      "category": "games",
-      "type": "interactive",
-      "wip": true,
-      "thumbnail": "thumbnail.png",
-      "description": "Self-playing Tetris across the entire window, with one-pixel square cells. A partially filled field grows into deep wells before the imperfect player catches a hot streak and clears the pile. Click or Space pauses; R restarts."
-    },
-    {
-      "slug": "057-moon-orchard",
-      "title": "Moon Orchard",
-      "year": 2026,
-      "date": "2026-10-05",
-      "category": "games",
-      "type": "interactive",
-      "wip": true,
-      "thumbnail": "thumbnail.png",
-      "description": "A self-playing moon buggy jumps craters, breaks rocks and dodges UFO bombs. Every shot that reaches the slowly rotating planet above plants a tree. The forest remembers each impact and carries on between visits. Click or Space pauses; S saves a picture."
-    },
-    {
       "slug": "055-kaleidoscope",
       "title": "Kaleidoscope",
       "year": 2026,
@@ -713,7 +680,8 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "A dense, luminous kaleidoscope of drifting glitter, iridescent oil bubbles and candy-colored geometric fragments, reflected through twelve mirrored sections. Space pauses, R rearranges, S saves an image."
+      "description": "A dense, luminous kaleidoscope of drifting glitter, iridescent oil bubbles and candy-colored geometric fragments, reflected through twelve mirrored sections. Space pauses, R rearranges, S saves an image.",
+      "updated": "2026-10-06"
     },
     {
       "slug": "056-mount-fuji",
@@ -724,7 +692,41 @@ window.HMC_MANIFEST = {
       "type": "generative",
       "wip": false,
       "thumbnail": "thumbnail.png",
-      "description": "Mount Fuji built entirely from short, curling oil strokes, inspired by Van Gogh. A blue-and-gold sky swirls around a golden sun above ivory snow, cobalt slopes and a shimmering lake. Loaded Brush’s bristle grooves and raised impasto catch the light. S saves a PNG."
+      "description": "Mount Fuji built entirely from short, curling oil strokes, inspired by Van Gogh. A blue-and-gold sky swirls around a golden sun above ivory snow, cobalt slopes and a shimmering lake. Loaded Brush’s bristle grooves and raised impasto catch the light. S saves a PNG.",
+      "updated": "2026-10-06"
+    },
+    {
+      "slug": "057-hypermedia-title-03",
+      "title": "Hypermedia Title 03",
+      "year": 2026,
+      "date": "2026-10-05",
+      "category": "typography",
+      "type": "interactive",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "Hypermedia Club in single-line cursive, rendered as disconnected dots. A little Logo turtle travels through the handwriting from left to right, joining the dots with a continuous ink trail. Space pauses; R replays."
+    },
+    {
+      "slug": "058-micro-tetris",
+      "title": "Micro Tetris",
+      "year": 2026,
+      "date": "2026-10-05",
+      "category": "games",
+      "type": "interactive",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "Self-playing Tetris across the entire window, with one-pixel square cells. A partially filled field grows into deep wells before the imperfect player catches a hot streak and clears the pile. Click or Space pauses; R restarts."
+    },
+    {
+      "slug": "059-moon-orchard",
+      "title": "Moon Orchard",
+      "year": 2026,
+      "date": "2026-10-05",
+      "category": "games",
+      "type": "interactive",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "A self-playing moon buggy jumps craters, breaks rocks and dodges UFO bombs. Every shot that reaches the slowly rotating planet above plants a tree. The forest remembers each impact and carries on between visits. Click or Space pauses; S saves a picture."
     }
   ]
 };

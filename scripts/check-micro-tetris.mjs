@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const root = new URL('../pieces/056-micro-tetris/', import.meta.url);
+const root = new URL('../pieces/058-micro-tetris/', import.meta.url);
 const recipes = fs.readFileSync(new URL('recipes.js', root), 'utf8');
 const source = fs.readFileSync(new URL('tetris.js', root), 'utf8').replace(/\}\)\(\);\s*$/, `
   globalThis.check = { advance,
