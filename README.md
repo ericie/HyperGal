@@ -1,4 +1,4 @@
-# HyperGal
+# Hypermedia Club
 
 A digital art gallery where each piece is a self-contained folder of vanilla
 HTML/CSS/JS. The goal: each piece runs in any browser, today and twenty years

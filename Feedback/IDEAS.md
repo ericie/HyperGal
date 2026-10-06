@@ -1,4 +1,4 @@
-# HyperGal — riff ideas
+# Hypermedia Club — riff ideas
 
 Extensions of the existing body of work. The riff grammar across the current
 eleven pieces:

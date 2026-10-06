@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="A luminous kaleidoscope of floating glitter, iridescent oil bubbles and playful geometric color.">
+  <title>Kaleidoscope · Hypermedia Club</title>
+  <style>
+    :root { color-scheme: dark; background: #100c29; color: #fff5ff; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; }
+    nav { position: fixed; bottom: max(18px, env(safe-area-inset-bottom)); right: max(18px, env(safe-area-inset-right)); display: flex; gap: 8px; }
+    button { font: 13px/1 system-ui, sans-serif; color: #fff5ff; background: #191331; border: 1px solid #706080; border-radius: 20px; min-height: 44px; padding: 0 18px; cursor: pointer; }
+    button:hover { background: #3a2855; border-color: #ffc7ed; }
+    button:focus-visible { outline: 2px solid #ffdb63; outline-offset: 4px; }
+    ::selection { background: #ffdb63; color: #191331; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    noscript { position: fixed; inset: 2rem; font: 18px/1.5 system-ui, sans-serif; }
+  </style>
+</head>
+<body>
+  <canvas id="kaleidoscope" role="img" aria-label="An evolving kaleidoscope of glitter, translucent rainbow oil bubbles and luminous geometric fragments, reflected into twelve symmetrical sections."></canvas>
+  <p class="sr-only">Space pauses or resumes the kaleidoscope. S saves the current image. R creates a new arrangement. Animation starts paused when reduced motion is preferred.</p>
+  <nav aria-label="Artwork controls"><button id="pause" type="button">Pause</button><button id="save" type="button">Save image</button></nav>
+  <noscript>This kaleidoscope needs JavaScript to draw.</noscript>
+  <script src="kaleidoscope.js"></script>
+</body>
+</html>

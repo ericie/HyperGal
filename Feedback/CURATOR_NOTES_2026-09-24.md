@@ -40,7 +40,7 @@ I am not looking for a theme yet. I am looking for works that hold a wall, hold 
 1. **Bodies.** Fifty-three works and only two need a viewer. Everything else is watched. Nothing responds to presence, proximity, a second person, the room's light, the hour.
 2. **Sound.** Not one piece. Paddle without a beep is a choice, but the archive has no position on sound at all.
 3. **A duration policy.** A few works end; most loop. Nothing is long-form (a day, a week, a season). Nothing remembers a previous visit. An archive built to last twenty years forgets everything on reload.
-4. **An author.** The gallery page is a title and four filters. No name, no statement, no dates, no account of what "HyperMedia Club" is. The strongest curatorial claim in the project, self-contained work that will still run in 2046, is nowhere on the wall.
+4. **An author.** The gallery page is a title and four filters. No name, no statement, no dates, no account of what "Hypermedia Club" is. The strongest curatorial claim in the project, self-contained work that will still run in 2046, is nowhere on the wall.
 5. **And that claim is not true yet.** Fifty of fifty-three pieces call an analytics server on load. Make the no-network promise real and say it loudly, or drop it.
 6. **A wider source pool.** The arcade room is 1978 to 1982, American and Japanese cabinets only. The riff grammar (remove the player, invert the verb) is the artist's best tool; point it at something the artist did not grow up with, or at a game of the artist's own.
 7. **The world.** Everything is abstract or arcade. The one photographic piece uses AI-looking images. No camera, no scan, no dataset, no place named. Growth Rings would gain from one real tree.

@@ -1,4 +1,4 @@
-# HyperGal: Curatorial Review of the Complete Catalog
+# Hypermedia Club: Curatorial Review of the Complete Catalog
 
 **Review date:** 4 August 2026  
 **Scope:** All 25 catalog entries, `001`–`025`  
@@ -6,7 +6,7 @@
 
 ## Collector's verdict
 
-HyperGal already has a recognizable artistic intelligence. Its best recurring idea is not generative beauty or retro-game nostalgia; it is the rule reversal. Defense manufactures war. Success produces more labor. Survival requires assimilation. Resource extraction erases the ground that sustains it. In the strongest works, a familiar system continues to function while revealing that its definition of success is pathological.
+Hypermedia Club already has a recognizable artistic intelligence. Its best recurring idea is not generative beauty or retro-game nostalgia; it is the rule reversal. Defense manufactures war. Success produces more labor. Survival requires assimilation. Resource extraction erases the ground that sustains it. In the strongest works, a familiar system continues to function while revealing that its definition of success is pathological.
 
 That is a real body of work. It is also not yet a consistently resolved collection.
 
@@ -334,6 +334,6 @@ These scores assess the catalog as an encounter, not the artistic quality of any
 
 ## Final assessment
 
-HyperGal should resist becoming a feed of ingenious sketches. Its strongest future is a smaller, more exacting collection of durable browser works about systems that cannot stop: systems that convert success into labor, defense into violence, survival into conformity, and consumption into the destruction of its own ground.
+Hypermedia Club should resist becoming a feed of ingenious sketches. Its strongest future is a smaller, more exacting collection of durable browser works about systems that cannot stop: systems that convert success into labor, defense into violence, survival into conformity, and consumption into the destruction of its own ground.
 
 The code is already capable of carrying that argument. The curatorial task is to stop letting beauty, nostalgia, and automatic renewal rescue the systems from what they do.
