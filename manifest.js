@@ -727,6 +727,17 @@ window.HMC_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.png",
       "description": "A self-playing moon buggy jumps craters, breaks rocks and dodges UFO bombs. Every shot that reaches the slowly rotating planet above plants a tree. The forest remembers each impact and carries on between visits. Click or Space pauses; S saves a picture."
+    },
+    {
+      "slug": "060-apical",
+      "title": "Apical",
+      "year": 2026,
+      "date": "2026-10-13",
+      "category": "nature",
+      "type": "generative",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "An ever-growing plant unfolds in three dimensions. A slowly orbiting camera follows its leading shoot past branching stems and unfurling leaves. Native WebGL, no dependencies. Space pauses; R plants a new seed; S saves an image."
     }
   ]
 };
