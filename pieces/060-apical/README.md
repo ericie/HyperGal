@@ -1,6 +1,6 @@
 # Apical
 
-A plant grows into warm ivory space. Its central shoot follows a gently wandering path; paired branches spiral around the stem, and folded leaves gradually unfurl. The camera follows the leading shoot with a full orbit every 45 seconds, letting older growth fall below the frame. Every one and a half rotations (67.5 seconds), it smoothly looks down toward the original base, lingers briefly, and returns to the growing shoot.
+A plant grows into warm ivory space. Its central shoot follows a gently wandering path; paired branches spiral around the stem, and folded leaves gradually unfurl. About a third of branch tips form buds that open into five-petaled blush, cream, or mauve flowers with golden centers. The camera follows the leading shoot with a full orbit every 45 seconds, letting older growth fall below the frame. Every one and a half rotations (67.5 seconds), it smoothly looks down toward the original base, lingers briefly, and returns to the growing shoot.
 
 Open `index.html` directly. No server, build step, external assets, libraries or network requests are needed. All geometry, matrix math and GLSL lighting use the browser's native WebGL API.
 

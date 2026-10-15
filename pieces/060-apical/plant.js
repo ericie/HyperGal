@@ -44,6 +44,44 @@ function triangle(a,b,c,color, normals){const n=norm(cross(sub(b,a),sub(c,a)));f
 function tube(a,b,ra,rb,color,sides=7){const axis=norm(sub(b,a)),u=norm(cross(axis,Math.abs(axis[1])>.9?[1,0,0]:[0,1,0])),v=cross(axis,u);for(let i=0;i<sides;i++){const radial=t=>add(mul(u,Math.cos(t)),mul(v,Math.sin(t)));const n=radial(i/sides*Math.PI*2),m=radial((i+1)/sides*Math.PI*2);const p=add(a,mul(n,ra)),q=add(a,mul(m,ra)),r=add(b,mul(n,rb)),s=add(b,mul(m,rb));triangle(p,q,r,color,[n,m,n]);triangle(q,s,r,color,[m,m,n]);}}
 function leaf(base,direction,length,width,opening,hue){if(opening<.005)return;const d=norm(direction),side=norm(cross(d,[0,1,0]));const bladeNormal=norm(cross(side,d));let prev;
  for(let i=0;i<=10;i++){const t=i/10;const center=add(base,add(mul(d,length*t*opening),[0,Math.sin(t*Math.PI)*length*.18*opening,0]));const w=Math.pow(Math.sin(t*Math.PI),.85)*width*opening;const fold=(1-opening)*w*2+w*.16;const row=[add(center,add(mul(side,-w),mul(bladeNormal,fold))),center,add(center,add(mul(side,w),mul(bladeNormal,fold)))];if(prev)for(let j=0;j<2;j++){const c=j===0?hue:mul(hue,.9);triangle(prev[j],prev[j+1],row[j],c);triangle(prev[j+1],row[j+1],row[j],c);}if(prev)tube(prev[1],center,.009*opening,.007*opening,[.52,.61,.25],4);prev=row;}}
+// Five curved petals rise as a bud, then spread around a golden center.
+function flower(base,theta,size,opening,color) {
+ if(size<.005)return;
+ const axis=norm([Math.cos(theta)*.3,1,Math.sin(theta)*.3]);
+ const u=norm(cross(axis,[1,0,0])),v=cross(axis,u);
+ const center=add(base,mul(axis,.32*size));
+ tube(base,center,.022*size,.016*size,[.30,.43,.19],6);
+ for(let petal=0;petal<5;petal++) {
+  const angle=theta+petal*Math.PI*2/5;
+  const radial=add(mul(u,Math.cos(angle)),mul(v,Math.sin(angle)));
+  const side=cross(axis,radial);
+  const sepalTip=add(center,add(mul(radial,.16*size),mul(axis,.07*size)));
+  triangle(add(center,mul(side,.035*size)),add(center,mul(side,-.035*size)),sepalTip,[.32,.46,.19]);
+  let previous;
+  for(let i=0;i<=8;i++) {
+   const t=i/8,curve=Math.sin(Math.PI*t);
+   const outward=.52*t*opening+.06*curve;
+   const rise=.48*t*(1-opening)+.12*curve-.045*t*t*opening;
+   const middle=add(center,add(mul(radial,outward*size),mul(axis,rise*size)));
+   const width=Math.pow(Math.max(0,curve),.7)*.20*size*(.22+.78*opening);
+   const row=[add(middle,add(mul(side,-width),mul(axis,.06*curve*size))),middle,add(middle,add(mul(side,width),mul(axis,.06*curve*size)))];
+   const shade=mix(mul(color,.80),color,t);
+   if(previous)for(let j=0;j<2;j++) {
+    triangle(previous[j],previous[j+1],row[j],shade);
+    triangle(previous[j+1],row[j+1],row[j],shade);
+   }
+   previous=row;
+  }
+ }
+ if(opening>.05) {
+  const top=add(center,mul(axis,.08*size));
+  for(let i=0;i<12;i++) {
+   const point=angle=>add(center,mul(add(mul(u,Math.cos(angle)),mul(v,Math.sin(angle))),.105*size*opening));
+   triangle(top,point(i*Math.PI/6),point((i+1)*Math.PI/6),[.91,.66,.17]);
+  }
+ }
+}
+const FLOWER_COLORS=[[.96,.66,.64],[.98,.88,.71],[.82,.51,.65]];
 // One full camera orbit every 45 seconds of growth.
 const ORBIT_SPEED = Math.PI * 2 / 45;
 const BASE_LOOK_PERIOD = 45 * 1.5;
@@ -58,7 +96,7 @@ function baseLookAmount() {
 const stemPosition=index=>[Math.sin(index*.47)*.65,index*1.15,Math.cos(index*.39)*.6];
 let seed,rng,nodes,baseNodes,time,paused=false,last=0,focus,contextLost=false;
 function random(){rng|=0;rng=rng+0x6D2B79F5|0;let t=Math.imul(rng^rng>>>15,1|rng);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}
-function newNode(){const prev=nodes[nodes.length-1];const index=prev.index+1,angle=index*2.39996+random()*.5;const p=stemPosition(index);const branches=[];for(let k=0;k<2;k++){const theta=angle+k*Math.PI*.85;const length=1.8+random()*1.6;const path=[p];for(let j=1;j<=5;j++){const f=j/5;path.push(add(p,[Math.cos(theta+f*.2)*length*f, .35*length*f+f*f*.8,Math.sin(theta+f*.2)*length*f]));}branches.push({path,theta,length,tint:[.19+random()*.09,.34+random()*.1,.13+random()*.04]});}const node={p,index,birth:index*3,branches};nodes.push(node);if(index<=6)baseNodes.push(node);}
+function newNode(){const prev=nodes[nodes.length-1];const index=prev.index+1,angle=index*2.39996+random()*.5;const p=stemPosition(index);const branches=[];for(let k=0;k<2;k++){const theta=angle+k*Math.PI*.85;const length=1.8+random()*1.6;const path=[p];for(let j=1;j<=5;j++){const f=j/5;path.push(add(p,[Math.cos(theta+f*.2)*length*f, .35*length*f+f*f*.8,Math.sin(theta+f*.2)*length*f]));}const flowerHash=(Math.imul(index*2+k+1,1597334677)^seed)>>>0;branches.push({path,theta,length,flower:flowerHash%100<36,flowerColor:FLOWER_COLORS[(flowerHash>>>8)%FLOWER_COLORS.length],tint:[.19+random()*.09,.34+random()*.1,.13+random()*.04]});}const node={p,index,birth:index*3,branches};nodes.push(node);if(index<=6)baseNodes.push(node);}
 function reset(){seed=new Uint32Array(1);crypto.getRandomValues(seed);seed=seed[0];rng=seed;nodes=[{p:[0,0,.6],index:0,birth:0,branches:[]}];baseNodes=[nodes[0]];time=12;focus=[0,2,0];while(nodes.at(-1).birth<time+6)newNode();focus=add(nodes.find(n=>n.index===Math.floor(time/3)).p,[0,-2.1,0]);last=0;document.querySelector('#readout').textContent='';}
 function geometry(lookDown){vertices=[];const tipIndex=Math.floor(time/3);while(nodes.at(-1).index<tipIndex+2)newNode();while(nodes.length>36&&nodes[1].index<tipIndex-30)nodes.shift();let tip=nodes[0].p;
  // Keep the original base and reconstruct a bounded, coarse lower stalk.
@@ -67,7 +105,11 @@ function geometry(lookDown){vertices=[];const tipIndex=Math.floor(time/3);while(
  if(node.index-prev.index>1){const step=Math.max(1,Math.ceil((node.index-prev.index)/120));let a=prev.p;for(let index=prev.index+step;index<node.index;index+=step){const b=stemPosition(index);tube(a,b,.09,.09,[.26,.39,.17]);a=b;}tube(a,node.p,.09,.09,[.26,.39,.17]);tip=node.p;}const growth=clamp((time-prev.birth)/3);if(growth<=0)continue;const end=mix(prev.p,node.p,growth);if(node.index-prev.index===1)tube(prev.p,end,.09,.09*(1-.8*(1-growth)),[.26,.39,.17]);tip=end;
  if(node.p[1]<time/3*1.15-13 && !(lookDown>0&&node.index<=6))continue;
  for(const branch of node.branches){const age=time-node.birth-1;if(age<=0)continue;for(let j=1;j<branch.path.length;j++){const g=ease((age-(j-1)*.65)/1.7);if(g<=0)continue;const a=branch.path[j-1],b=mix(a,branch.path[j],g);tube(a,b,.044*(1-(j-1)/6),.044*(1-j/6)*g,[.30,.43,.19]);if(j>=2){const alternate=j%2?1:-1;const theta=branch.theta+alternate*1.05;const opening=ease((age-j*.65-.5)/3.5);leaf(b,[Math.cos(theta),.25+(.5*(1-opening)),Math.sin(theta)],.9+(j===3?.5:.15),.26,opening,branch.tint);}}
- const opening=ease((age-4.3)/4);leaf(branch.path[5],[Math.cos(branch.theta),.55,Math.sin(branch.theta)],1.25,.27,opening,branch.tint);
+ if(branch.flower) {
+  flower(branch.path[5],branch.theta,ease((age-5)/2),ease((age-8)/5),branch.flowerColor);
+ } else {
+  const opening=ease((age-4.3)/4);leaf(branch.path[5],[Math.cos(branch.theta),.55,Math.sin(branch.theta)],1.25,.27,opening,branch.tint);
+ }
  }
  }
  // Two tender folded leaves at the leading shoot.

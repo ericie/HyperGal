@@ -704,7 +704,8 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "Hypermedia Club in single-line cursive, rendered as disconnected dots. A little Logo turtle travels through the handwriting from left to right, joining the dots with a continuous ink trail. Space pauses; R replays."
+      "description": "Hypermedia Club in single-line cursive, rendered as disconnected dots. A little Logo turtle travels through the handwriting from left to right, joining the dots with a continuous ink trail. Space pauses; R replays.",
+      "updated": "2026-10-06"
     },
     {
       "slug": "058-micro-tetris",
@@ -715,7 +716,8 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "Self-playing Tetris across the entire window, with one-pixel square cells. A partially filled field grows into deep wells before the imperfect player catches a hot streak and clears the pile. Click or Space pauses; R restarts."
+      "description": "Self-playing Tetris across the entire window, with one-pixel square cells. A partially filled field grows into deep wells before the imperfect player catches a hot streak and clears the pile. Click or Space pauses; R restarts.",
+      "updated": "2026-10-06"
     },
     {
       "slug": "059-moon-orchard",
@@ -726,7 +728,8 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "A self-playing moon buggy jumps craters, breaks rocks and dodges UFO bombs. Every shot that reaches the slowly rotating planet above plants a tree. The forest remembers each impact and carries on between visits. Click or Space pauses; S saves a picture."
+      "description": "A self-playing moon buggy jumps craters, breaks rocks and dodges UFO bombs. Every shot that reaches the slowly rotating planet above plants a tree. The forest remembers each impact and carries on between visits. Click or Space pauses; S saves a picture.",
+      "updated": "2026-10-06"
     },
     {
       "slug": "060-apical",
@@ -737,7 +740,30 @@ window.HMC_MANIFEST = {
       "type": "generative",
       "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "An ever-growing plant unfolds in three dimensions. A slowly orbiting camera follows its leading shoot past branching stems and unfurling leaves. Native WebGL, no dependencies. Space pauses; R plants a new seed; S saves an image."
+      "description": "An ever-growing plant unfolds in three dimensions. A slowly orbiting camera follows its leading shoot past branching stems and unfurling leaves. Native WebGL, no dependencies. Space pauses; R plants a new seed; S saves an image.",
+      "updated": "2026-10-14"
+    },
+    {
+      "slug": "061-root-ruin",
+      "title": "Root / Ruin",
+      "year": 2026,
+      "date": "2026-10-14",
+      "category": "nature",
+      "type": "generative",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "A silhouette orchard dismantles its own hill. Bees pollinate flowers; fruit rolls downhill, melts and sprouts. Growing roots split rigid rock into fragments that crumble downhill, carrying plants with them. Space pauses; R starts a new hill; S saves an image."
+    },
+    {
+      "slug": "062-petal-field",
+      "title": "Petal Field",
+      "year": 2026,
+      "date": "2026-10-14",
+      "category": "nature",
+      "type": "generative",
+      "wip": true,
+      "thumbnail": "thumbnail.png",
+      "description": "Two to ten scattered circles unfold into abstract flowers. Petals accumulate in concentric rows until the screen is full, each flower held together on its own depth layer."
     }
   ]
 };
