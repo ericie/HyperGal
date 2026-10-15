@@ -1,15 +1,21 @@
 # Root / Ruin
 
-A small silhouette plant lives on a black hill against warm ivory. Its flower opens, a bee lands and leaves, the petals close around a fruit, and the fruit drops. Gravity carries it onto the hill, where it rolls, settles, and melts into three new seedlings. Their roots cut into the ground. Each generation repeats the cycle while older stems grow taller and roots reach deeper.
+Two to four angular rock formations begin each scene. Their outlines, heights and widths vary, and one small plant starts at a random surface position. Flowers open, bees land and leave, fruit forms and drops. Fruit rolls and settles, then releases a puff of dandelion-like seeds that drift between rocks and germinate when they land.
 
-The hill is made of rigid triangular fragments. Intact rock remains completely still. Growing roots cut cracks into it and accumulate pressure through the hill. Exposed fragments break away from the flanks inward, tip outward, and fall under gravity; the small angular pieces settle as rubble. Plants travel downhill with their fragment and remain on its upper surface. Fruit collides with the moving triangle surfaces, rolls downhill, and spreads seeds along the hill rather than collecting only at the summit. Thin ivory root incisions and cracks reveal the pressure beneath the silhouette.
+## Rock and plant physics
 
-The sketch has no visible text or controls. Keyboard shortcuts remain available.
+Each intact formation is one solid polygon. Root pressure reveals a fracture pattern, then divides the actual outline into three to five convex pieces using Voronoi clipping. The child polygons preserve the parent's total area and inherit its motion. A small separating impulse represents the root wedge. From there, gravity, inertia, angular motion, friction and rock-to-rock collisions make the pieces tip, tumble, collide and form piles. Large fragments can split again under roots or sufficiently hard impacts. Rubble stays in the scene; minimum fragment size and a body limit bound the simulation.
 
-Open `index.html` directly; no dependencies, server or network requests are needed.
+Plants store a fixed attachment point and orientation in their supporting rock's local coordinates. They translate and rotate with that body. When a rock fractures, the plant transfers to the child containing its root without changing its world position or orientation. The stem is never repositioned using a terrain-height lookup. Rock overlapping a stem, or a rock rolling its plant into the floor, kills the plant. Dead plants stop growing, fruiting and applying root pressure, then wilt and fade.
 
-- **Space** stops or resumes the simulation.
-- **R** begins again with one little plant.
-- **S** downloads a PNG.
+Matter.js 0.20.0 supplies the rigid-body collision solver. Its minified distribution and MIT license are vendored in `vendor/`; the sketch makes no network requests and works directly from `index.html`. Intact formations are static until their first fracture. Fruit uses physical circle bodies in the same world. Floating seeds use a lightweight wind model.
 
-A flower-and-fruit cycle takes 24 seconds. New seedlings appear around 25 seconds after starting; substantial fractures accumulate over the following minutes. The simulation uses fixed 120 Hz physics steps and 15 Hz root damage checks, with limits of 48 plants, 80 fruit and 300 dust particles. Once the plant population is full, plants continue flowering and fruiting as their roots dismantle the remaining hill. Fragments collide with the ground; contact between rubble fragments is approximated rather than resolved by a full rigid-body solver. The sketch starts paused for reduced-motion preferences and suspends simulation while its tab is hidden.
+There is no visible text or control interface.
+
+- **Space** pauses or resumes.
+- **R** generates another landscape and starting plant.
+- **S** saves the canvas as a PNG.
+
+The simulation advances at 120 Hz, pauses while hidden, and starts paused for reduced-motion preferences. Limits: 48 living plants, 65 fruit, 180 airborne seeds, roughly 100 rock bodies and 250 dust particles.
+
+Run `node scripts/check-root-ruin.mjs` from the repository root to check stationary intact terrain, conserved fracture area, fixed rotating plant attachments, crushing, stable rubble contact and 150 seconds of natural growth.

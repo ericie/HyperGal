@@ -741,7 +741,7 @@ window.HMC_MANIFEST = {
       "wip": true,
       "thumbnail": "thumbnail.png",
       "description": "An ever-growing plant unfolds in three dimensions. A slowly orbiting camera follows its leading shoot past branching stems and unfurling leaves. Native WebGL, no dependencies. Space pauses; R plants a new seed; S saves an image.",
-      "updated": "2026-10-14"
+      "updated": "2026-10-15"
     },
     {
       "slug": "061-root-ruin",
@@ -752,7 +752,8 @@ window.HMC_MANIFEST = {
       "type": "generative",
       "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "A silhouette orchard dismantles its own hill. Bees pollinate flowers; fruit rolls downhill, melts and sprouts. Growing roots split rigid rock into fragments that crumble downhill, carrying plants with them. Space pauses; R starts a new hill; S saves an image."
+      "description": "Plants grow on angular rock formations and spread floating dandelion-like seeds. Roots split solid rocks into physical chunks that tumble, collide and pile up. Plants remain attached to their rotating rock and die when crushed. Space pauses; R makes a new landscape; S saves an image.",
+      "updated": "2026-10-15"
     },
     {
       "slug": "062-petal-field",
@@ -763,7 +764,8 @@ window.HMC_MANIFEST = {
       "type": "generative",
       "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "Two to ten scattered circles unfold into abstract flowers. Petals accumulate in concentric rows until the screen is full, each flower held together on its own depth layer."
+      "description": "Two to ten scattered circles unfold into abstract flowers. Petals accumulate in concentric rows until the screen is full, each flower held together on its own depth layer.",
+      "updated": "2026-10-15"
     }
   ]
 };
