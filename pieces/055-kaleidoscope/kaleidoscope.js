@@ -8,6 +8,7 @@
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const TAU = Math.PI * 2;
   const slice = TAU / 12;
+  const MOTION_SPEED = 3.5;
   const colors = ['#ff548f', '#ffcc49', '#48f1df', '#b486ff', '#ff814d', '#7baaff'];
   let width, height, radius, scale, time = 0, previous = 0, frame = 0;
   let paused = motion.matches;
@@ -21,7 +22,7 @@
     n ^= n + Math.imul(n ^ n >>> 7, n | 61);
     return ((n ^ n >>> 14) >>> 0) / 4294967296;
   }
-  let shards, bubbles, glitter;
+  let shards, prisms, glitter;
   function arrange() {
     shards = Array.from({ length: 180 }, (_, i) => ({
       r: 0.04 + random() * 1.08, a: random() * TAU,
@@ -31,7 +32,7 @@
       hollow: i % 4 === 0
     }));
     const films = Array.from({ length: 16 }, (_, i) => makeFilm(i));
-    bubbles = Array.from({ length: 100 }, (_, i) => ({
+    prisms = Array.from({ length: 100 }, (_, i) => ({
       r: 0.04 + random() * 1.12, a: random() * TAU,
       size: 0.035 + random() ** 1.4 * 0.20,
       phase: random() * TAU, speed: (0.008 + random() * 0.018) * (i % 2 ? 1 : -1),
@@ -53,18 +54,19 @@
     }
     ink.closePath();
   }
-  // Cache the expensive translucent films; animate their position and deformation.
+  // Cache faceted translucent films; animate their position, scale and rotation.
   function makeFilm(index) {
     const film = document.createElement('canvas');
     film.width = film.height = 256;
     const f = film.getContext('2d');
     const phase = random() * TAU;
+    const sides = [3, 4, 6, 8][index % 4];
     const hue = index * 137.508 % 360;
     function contour(k) {
       f.beginPath();
-      for (let j = 0; j <= 96; j++) {
-        const a = j / 96 * TAU;
-        const r = k * (1 + 0.07 * Math.sin(a * 3 + phase) + 0.035 * Math.cos(a * 5 - phase));
+      for (let j = 0; j < sides; j++) {
+        const a = j / sides * TAU + phase;
+        const r = k;
         const x = 128 + Math.cos(a) * r, y = 128 + Math.sin(a) * r;
         if (j === 0) f.moveTo(x, y); else f.lineTo(x, y);
       }
@@ -99,16 +101,16 @@
   function inMirror(x, y, size) {
     return x > -size && y > -size && y < x * Math.tan(slice) + size * 1.2;
   }
-  function drawBubbles(front) {
-    for (let i = 0; i < bubbles.length; i++) {
+  function drawPrisms(front) {
+    for (let i = 0; i < prisms.length; i++) {
       if ((i % 3 === 0) !== front) continue;
-      const b = bubbles[i], a = b.a + time * b.speed;
-      const r = b.r + 0.10 * Math.sin(time * 0.075 + b.phase);
+      const b = prisms[i], a = b.a + time * MOTION_SPEED * b.speed;
+      const r = b.r + 0.10 * Math.sin(time * MOTION_SPEED * 0.075 + b.phase);
       const x = Math.cos(a) * r, y = Math.sin(a) * r;
       if (!inMirror(x, y, b.size * 1.3)) continue;
-      const breath = Math.sin(time * 0.22 + b.phase);
-      ink.save(); ink.translate(x, y); ink.rotate(b.phase + time * b.speed * 0.7);
-      ink.scale(1 + breath * 0.11, 1 - breath * 0.08);
+      const breath = Math.sin(time * MOTION_SPEED * 0.22 + b.phase);
+      ink.save(); ink.translate(x, y); ink.rotate(b.phase + time * MOTION_SPEED * b.speed * 0.7);
+      ink.scale(1 + breath * 0.08, 1 + breath * 0.08);
       ink.globalAlpha = front ? 0.9 : 0.75;
       ink.drawImage(b.film, -b.size, -b.size, b.size * 2, b.size * 2);
       ink.restore();
@@ -118,14 +120,14 @@
     ink.save(); ink.globalCompositeOperation = 'screen';
     for (let i = 0; i < glitter.length; i++) {
       if ((i % 3 === 0) !== front) continue;
-      const g = glitter[i], a = g.a + time * g.speed * (front ? -1 : 1);
-      const r = g.r + 0.025 * Math.sin(time * 0.16 + g.phase);
+      const g = glitter[i], a = g.a + time * MOTION_SPEED * g.speed * (front ? -1 : 1);
+      const r = g.r + 0.025 * Math.sin(time * MOTION_SPEED * 0.16 + g.phase);
       const x = Math.cos(a) * r, y = Math.sin(a) * r;
       if (!inMirror(x, y, g.size * 5)) continue;
       const shimmer = 0.5 + 0.5 * Math.sin(time * 0.9 + g.phase);
       ink.globalAlpha = 0.25 + shimmer * 0.7;
       ink.fillStyle = g.color;
-      polygon(x, y, g.size, 4, g.phase + time * 0.08);
+      polygon(x, y, g.size, 4, g.phase + time * MOTION_SPEED * 0.08);
       ink.fill();
       if (g.flare) {
         ink.fillStyle = '#fffbe6';
@@ -147,16 +149,16 @@
     light.addColorStop(1, '#100c29');
     ink.fillStyle = light;
     ink.fillRect(-1, -1, 2, 2);
-    drawBubbles(false);
+    drawPrisms(false);
     drawGlitter(false);
     for (const shard of shards) {
       // Drift through the mirror wedge; reflected cuts continually recombine.
-      const a = shard.a + time * shard.speed;
-      const r = shard.r + 0.095 * Math.sin(time * 0.095 + shard.phase);
+      const a = shard.a + time * MOTION_SPEED * shard.speed;
+      const r = shard.r + 0.095 * Math.sin(time * MOTION_SPEED * 0.095 + shard.phase);
       const x = Math.cos(a) * r, y = Math.sin(a) * r;
-      const size = shard.size * (1 + 0.16 * Math.sin(time * 0.18 + shard.phase));
+      const size = shard.size * (1 + 0.16 * Math.sin(time * MOTION_SPEED * 0.18 + shard.phase));
       if (!inMirror(x, y, size * 1.3)) continue;
-      const rotation = shard.phase + time * shard.speed * 1.8;
+      const rotation = shard.phase + time * MOTION_SPEED * shard.speed * 1.8;
       polygon(x, y, size, shard.sides, rotation);
       ink.globalAlpha = shard.hollow ? 0.8 : 0.72;
       ink.fillStyle = shard.color;
@@ -178,12 +180,12 @@
       }
       ink.globalAlpha = 1;
     }
-    drawBubbles(true);
+    drawPrisms(true);
     drawGlitter(true);
     ctx.setTransform(scale, 0, 0, scale, width * scale / 2, height * scale / 2);
     ctx.fillStyle = '#100c29';
     ctx.fillRect(-width / 2, -height / 2, width, height);
-    const turn = time * 0.017 - Math.PI / 2;
+    const turn = time * 0.085 - Math.PI / 2;
     for (let i = 0; i < 12; i++) {
       ctx.save();
       ctx.rotate(turn + i * slice);

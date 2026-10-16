@@ -81,7 +81,7 @@ Pause/Play and Save image are native buttons with a minimum height of 44px. Hove
 
 ### Kaleidoscope field
 
-The field combines 180 geometric fragments, 100 irregular translucent oil bubbles and 4,200 glitter flecks. Cached bubble films carry rainbow interference contours and soft highlights; layered drift and smooth shimmer create depth. Animation suspends while the document is hidden. Reduced-motion preference starts the artwork paused and updates its state when the preference changes; explicit Play remains available.
+The field combines 180 geometric fragments, 100 faceted translucent polygonal prisms and 4,200 glitter flecks. Cached prism films carry rainbow interference contours and soft highlights; layered drift and smooth shimmer create depth. Animation suspends while the document is hidden. Reduced-motion preference starts the artwork paused and updates its state when the preference changes; explicit Play remains available.
 
 ## Do's and Don'ts
 

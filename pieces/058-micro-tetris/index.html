@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#090b10">
   <title>Micro Tetris · HyperGal</title>
-  <meta name="description" content="A full-window, self-playing Tetris field. Every block is one pixel. An imperfect player builds deep wells, then finds a hot streak.">
+  <meta name="description" content="A full-window, self-playing Tetris field. Every cell is 2×2 pixels, with partially filled lines ready at the start. One piece falls from the top at a time, locks on contact, and clears completed lines.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'%3E%3Cpath d='M0 1H3V2H2V3H1V2H0Z' fill='%23b4a1eb'/%3E%3C/svg%3E">
   <style>
     html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#090b10; }
@@ -14,7 +14,7 @@
   </style>
 </head>
 <body>
-  <canvas tabindex="0" role="button" aria-pressed="false" aria-label="Self-playing Micro Tetris. Every cell is one pixel. Click or press Space to pause. R starts a new field."></canvas>
+  <canvas tabindex="0" role="button" aria-pressed="false" aria-label="Self-playing Micro Tetris. Every cell is two by two pixels. Click or press Space to pause. R starts a new field."></canvas>
   <script src="recipes.js"></script>
   <script src="tetris.js"></script>
 </body>

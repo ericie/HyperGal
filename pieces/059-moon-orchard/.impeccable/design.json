@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-06T09:11:40.560099+00:00",
+  "title": "Design System: Moon Orchard",
+  "extensions": {
+    "colorMeta": {
+      "white": {
+        "role": "primary",
+        "displayName": "Arcade White",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "black": {
+        "role": "neutral",
+        "displayName": "Space Black",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Bitmap title",
+        "purpose": "Original 3-by-5 glyphs, two-pixel cells and eight-pixel advance; no font dependency."
+      },
+      "label": {
+        "displayName": "Bitmap label",
+        "purpose": "Original 3-by-5 glyphs, one-pixel cells and four-pixel advance; no font dependency."
+      }
+    },
+    "motion": [
+      {
+        "name": "volley-spacing",
+        "value": "0.11s",
+        "purpose": "Interval between the three paired straight shots."
+      },
+      {
+        "name": "volley-rest",
+        "value": "1.2s",
+        "purpose": "Pause after each three-shot volley."
+      },
+      {
+        "name": "patrol-speed",
+        "value": "66 internal pixels/s",
+        "purpose": "Ground and obstacle scrolling speed."
+      },
+      {
+        "name": "jump",
+        "value": "180 internal pixels/s launch; 420 internal pixels/s\u00b2 gravity",
+        "purpose": "Short automatic hazard hops."
+      },
+      {
+        "name": "tree-growth",
+        "value": "18s",
+        "purpose": "Denominator of the growth progression, starting at 15% size and capped at full size."
+      },
+      {
+        "name": "moon-rotation",
+        "value": "0.008 rad/s",
+        "purpose": "Slow orbit of the persistent orchard."
+      }
+    ],
+    "shadows": [],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Artwork pause target",
+      "kind": "custom",
+      "refersTo": "artwork",
+      "description": "Full-canvas control with inset keyboard focus. This panel sample demonstrates appearance; the artwork implements pause in JavaScript.",
+      "html": "<canvas class=\"ds-artwork\" tabindex=\"0\" role=\"button\" aria-pressed=\"false\" aria-label=\"Moon Orchard pause target\"></canvas>",
+      "css": ".ds-artwork {display:block;width:100%;height:160px;background:#000;image-rendering:pixelated}.ds-artwork:focus-visible {outline:1px solid #fff;outline-offset:-3px}"
+    },
+    {
+      "name": "Straight burst shots",
+      "kind": "custom",
+      "description": "Three vertical and three horizontal shots, drawn at the implemented bullet dimensions.",
+      "html": "<svg class=\"ds-sprite\" viewBox=\"0 0 80 60\" width=\"240\" height=\"180\"><g fill=\"currentColor\"><rect x=\"20\" y=\"8\" width=\"2\" height=\"5\"/><rect x=\"20\" y=\"20\" width=\"2\" height=\"5\"/><rect x=\"20\" y=\"32\" width=\"2\" height=\"5\"/><rect x=\"35\" y=\"45\" width=\"5\" height=\"2\"/><rect x=\"48\" y=\"45\" width=\"5\" height=\"2\"/><rect x=\"61\" y=\"45\" width=\"5\" height=\"2\"/></g></svg>",
+      "css": ".ds-sprite {display:block;background:#000;color:#fff;image-rendering:pixelated}"
+    },
+    {
+      "name": "Saucer sprite",
+      "kind": "custom",
+      "description": "The built saucer silhouette, including black window cutouts.",
+      "html": "<svg class=\"ds-sprite\" viewBox=\"-20 -12 40 24\" width=\"240\" height=\"144\"><g fill=\"currentColor\"><rect x=\"-5\" y=\"-8\" width=\"10\" height=\"2\"/><rect x=\"-8\" y=\"-6\" width=\"16\" height=\"4\"/><rect x=\"-15\" y=\"-2\" width=\"30\" height=\"4\"/><rect x=\"-10\" y=\"2\" width=\"20\" height=\"2\"/><rect x=\"-8\" y=\"6\" width=\"3\" height=\"2\"/><rect x=\"5\" y=\"6\" width=\"3\" height=\"2\"/></g><g fill=\"#000\"><rect x=\"-9\" y=\"-1\" width=\"3\" height=\"2\"/><rect x=\"-1\" y=\"-1\" width=\"3\" height=\"2\"/><rect x=\"7\" y=\"-1\" width=\"3\" height=\"2\"/></g></svg>",
+      "css": ".ds-sprite {display:block;background:#000;color:#fff;image-rendering:pixelated}"
+    },
+    {
+      "name": "Terrain hole",
+      "kind": "custom",
+      "description": "An outlined pit interrupts the ground stroke; the sample uses a 28-pixel pit within the implemented size range.",
+      "html": "<svg class=\"ds-sprite\" viewBox=\"0 0 80 30\" width=\"240\" height=\"90\"><path d=\"M0 8H26 M54 8H80\" stroke=\"currentColor\" stroke-width=\"2\" fill=\"none\"/><path d=\"M23 8L26 10L31 20H49L54 10L57 8\" stroke=\"currentColor\" stroke-width=\"1\" fill=\"none\"/></svg>",
+      "css": ".ds-sprite {display:block;background:#000;color:#fff;image-rendering:pixelated}"
+    },
+    {
+      "name": "Bitmap title",
+      "kind": "custom",
+      "description": "Original 3-by-5 glyphs at the implemented two-pixel title scale.",
+      "html": "<svg class=\"ds-sprite\" viewBox=\"0 0 88 10\" width=\"352\" height=\"40\"><g fill=\"currentColor\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"4\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"0\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"2\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"4\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"0\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"2\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"4\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"0\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"4\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"0\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"4\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"8\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"10\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"12\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"8\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"12\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"8\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"12\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"8\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"12\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"8\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"10\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"12\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"16\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"18\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"20\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"16\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"20\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"16\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"20\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"16\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"20\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"16\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"18\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"20\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"24\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"28\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"24\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"26\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"28\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"24\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"26\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"28\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"24\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"26\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"28\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"24\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"28\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"40\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"42\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"44\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"40\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"44\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"40\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"44\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"40\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"44\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"40\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"42\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"44\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"48\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"50\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"48\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"52\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"48\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"50\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"48\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"52\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"48\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"52\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"56\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"58\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"60\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"56\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"56\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"56\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"56\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"58\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"60\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"64\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"68\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"64\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"68\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"64\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"66\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"68\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"64\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"68\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"64\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"68\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"74\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"72\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"76\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"72\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"74\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"76\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"72\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"76\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"72\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"76\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"80\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"82\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"80\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"84\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"80\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"82\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"80\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"84\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"80\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"84\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"88\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"90\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"88\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"92\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"88\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"92\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"88\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"92\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"88\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"90\" y=\"8\" width=\"2\" height=\"2\"/></g></svg>",
+      "css": ".ds-sprite {display:block;background:#000;color:#fff;image-rendering:pixelated}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Monochrome Lunar Arcade",
+    "overview": "A self-playing black-and-white patrol turns gunfire into slow-growing trees on an enormous moon. Sparse pixel sprites and thin outlined landscapes share open black space. This system belongs only to this artwork, not to the surrounding HyperGal gallery.\n\nThe user-pinned arcade direction is implemented directly in code; no approved visual comp exists. The built artifact and its desktop and mobile finish captures establish the reference.",
+    "keyCharacteristics": [
+      "Two-color marks and open black space.",
+      "A moon clipped above the viewport, with trees along its visible rim.",
+      "Compact sprites, straight three-shot volleys, and short automatic hops.",
+      "Original bitmap lettering and an unobtrusive HUD."
+    ],
+    "rules": [
+      {
+        "name": "The Two-Color Rule",
+        "body": "Author the scene with white and black only; do not introduce colored accents or soft glow. Canvas curve rasterization may produce intermediate edge pixels, but these are not palette tokens.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "Do keep the enormous moon clipped above the screen and preserve open sky below it.",
+      "Do retain straight burst shots, short hops, two rock sizes, and bomb impacts that leave holes.",
+      "Do keep interaction, bitmap drawing, and persistent orchard state self-contained and dependency-free."
+    ],
+    "donts": [
+      "Don't add color, soft glow, or surrounding app chrome to this artwork.",
+      "Don't substitute a small complete moon for the visible rim.",
+      "Don't replace the original bitmap HUD with a system display font."
+    ]
+  }
+}

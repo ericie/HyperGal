@@ -6,5 +6,5 @@
   "type": "interactive",
   "wip": true,
   "thumbnail": "thumbnail.png",
-  "description": "Self-playing Tetris across the entire window, with one-pixel square cells. A partially filled field grows into deep wells before the imperfect player catches a hot streak and clears the pile. Click or Space pauses; R restarts."
+  "description": "Self-playing Tetris across the entire window, with 2×2 pixel square cells and a starting stack of partially filled lines. One piece falls from the top at a time and locks on contact. Full lines clear immediately, while the player keeps the field even. Click or Space pauses; R restarts."
 }
