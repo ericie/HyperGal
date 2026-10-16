@@ -716,8 +716,7 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "Self-playing Tetris across the entire window, with 2×2 pixel square cells and a starting stack of partially filled lines. One piece falls from the top at a time and locks on contact. Full lines clear immediately, while the player keeps the field even. Click or Space pauses; R restarts.",
-      "updated": "2026-10-06"
+      "description": "Self-playing Tetris across the entire window, with one-pixel square cells. A partially filled field grows into deep wells before the imperfect player catches a hot streak and clears the pile. Click or Space pauses; R restarts."
     },
     {
       "slug": "059-moon-orchard",
@@ -728,8 +727,7 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "wip": true,
       "thumbnail": "thumbnail.png",
-      "description": "A black-and-white lunar arcade patrol. The buggy fires in bursts, hops rocks and bomb-blasted craters, and plants an orchard along the edge of an enormous rotating moon. The forest remembers each impact across visits. Click or Space pauses; S saves a picture.",
-      "updated": "2026-10-06"
+      "description": "A self-playing moon buggy jumps craters, breaks rocks and dodges UFO bombs. Every shot that reaches the slowly rotating planet above plants a tree. The forest remembers each impact and carries on between visits. Click or Space pauses; S saves a picture."
     }
   ]
 };

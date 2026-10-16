@@ -1,0 +1,11 @@
+- generic [active] [ref=e1]:
+  - generic "Silhouette plants flower, welcome bees, drop fruit and sprout seeds. Growing roots fracture a hill into falling fragments." [ref=e2]
+  - banner:
+    - heading "Root / Ruin" [level=1]
+    - paragraph: Life takes the ground apart
+  - contentinfo [ref=e3]:
+    - generic [ref=e4]: ONE PLANT · 0 FRACTURES
+    - navigation "Sketch controls" [ref=e5]:
+      - button "Pause" [ref=e6] [cursor=pointer]
+      - button "New hill" [ref=e7] [cursor=pointer]
+      - button "Save image" [ref=e8] [cursor=pointer]
