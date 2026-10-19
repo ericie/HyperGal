@@ -6,6 +6,11 @@ cloud, so the only way through a body is to bore a tunnel and fly down it.
 
 ## The clouds
 
+Each cloud keeps its own solid shade of gray against the black sky. Its edge
+uses a finer contour grid with no silhouette blur or animated wobble; a thin
+single stroke and display-resolution rendering keep the outline crisp. Open cuts read as black
+channels; the ship and rounds invert over the gray bodies to stay visible.
+
 Each cloud is the **union** of its lobes, not their sum. A summed metaball field
 smears the lobes into one featureless blob and piles the density up in the
 middle; a union keeps every lobe's outer curve, which gives the silhouette its
@@ -31,13 +36,14 @@ invisible until they meet an edge, keeping every cloud free of internal rings.
 A fresh cut holds its full shape before beginning to close, then takes roughly
 nine to thirteen minutes to **heal** shut. The wound keeps its depth while its
 radius closes on a smooth quintic ease, fading only at the very end. Its
-sampled outline follows the changing field with a slow spring, so repair looks
+sampled outline follows the changing field with exponential easing, so repair looks
 like liquid weather flowing inward rather than a sequence of geometry swaps. A
 tunnel outlives the pass that made it and the sky keeps a record of where the
 ship has been.
 
 When a bore runs clean through a body, its exact existing outline remains in
-place as two halves divided by the new channel. Nothing is regenerated,
+place as two halves divided by the new channel. Samples stay aligned between rebuilds, and new split edges ease from the
+existing silhouette without a geometry swap. Nothing is regenerated,
 recentered, enlarged, or discarded at the moment of separation; liquid healing
 can eventually join those same halves again.
 
@@ -61,8 +67,8 @@ can never wedge itself in a bore too small to fly.
 
 The camera pans with the ship, riding a little ahead of it so the sky about to
 be cut is already on screen, on a leash short enough that the ship never leaves
-the frame. There is no losing and no winning. The counters track bodies bored
-through and clouds cut in half.
+the frame. There is no losing and no winning. The sky carries a denser population of
+clouds, scaled to the viewport, with no visible counters or labels.
 
 ## Controls
 

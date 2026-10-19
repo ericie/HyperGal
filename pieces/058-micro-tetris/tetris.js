@@ -8,7 +8,7 @@
   const colorBytes = colors.map(color => [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16)));
   let width, height, board, lanes, image, pixels;
   let active = null, paused = motion.matches, last = null, drawn = 0;
-  let cleared = 0, locked = 0;
+  let cleared = 0, locked = 0, clearing = null;
 
   const randomRecipe = () => recipes[Math.floor(Math.random() * recipes.length)];
   function nextPiece(lane) {
@@ -41,6 +41,13 @@
     clearRows();
   }
   function clearRows() {
+    const rows = [];
+    for (let y = 0; y < height; y++) {
+      if (board.subarray(y * width, (y + 1) * width).every(Boolean)) rows.push(y);
+    }
+    if (rows.length) clearing = { rows, elapsed: 0, duration: rows.length === 4 ? .72 : .38 };
+  }
+  function collapseRows() {
     let write = 0;
     for (let read = 0; read < height; read++) {
       const row = board.subarray(read * width, (read + 1) * width);
@@ -53,6 +60,7 @@
     // The gravity-valid recipes leave every remaining piece above cleared rows.
     for (const lane of lanes) lane.base -= count;
     cleared += count;
+    clearing = null;
   }
   function reset() {
     width = Math.max(1, Math.ceil(innerWidth / cellSize));
@@ -66,6 +74,7 @@
     pixels = new Uint32Array(image.data.buffer);
     lanes = [];
     active = null;
+    clearing = null;
     cleared = 0; locked = 0; last = null;
     for (let x = 0; x < width; x += 4) {
       const lane = { x, width: Math.min(4, width - x), base: 0, cursor: 0, recipe: randomRecipe() };
@@ -78,17 +87,20 @@
   function seedRows() {
     if (lanes.length < 2) return;
     const depth = Math.max(4, Math.floor(height * .32 / 4) * 4);
-    // Keep one open four-column well, so every starting row is incomplete
-    // and can be reached by falling pieces. The rest has a level surface.
-    const well = Math.floor(Math.random() * Math.floor(width / 4));
+    // Random partial recipes make a ragged, interleaved stack without a
+    // reserved empty shaft. Keep the same gravity-valid packing as live play.
+    const shallow = Math.floor(Math.random() * lanes.length);
     for (let i = 0; i < lanes.length; i++) {
-      if (i === well) continue;
       const lane = lanes[i];
-      while (lane.base < depth) {
+      const pieces = i === shallow ? 1 : 1 + Math.floor(Math.random() * depth);
+      for (let n = 0; n < pieces; n++) {
         const piece = nextPiece(lane);
         place(lane, piece, lane.x + piece.x, lane.base + piece.y);
       }
     }
+    // Any coincidentally complete seed rows are already settled at startup.
+    collapseRows();
+    cleared = 0;
   }
   function chooseLane() {
     const floor = Math.min(...lanes.map(lane => lane.base));
@@ -101,6 +113,7 @@
     return null;
   }
   function spawn() {
+    if (clearing) return;
     const lane = chooseLane();
     if (!lane) return;
     const piece = nextPiece(lane);
@@ -110,6 +123,11 @@
     active = { lane, piece, x, y, travel: 0 };
   }
   function advance(seconds) {
+    if (clearing) {
+      clearing.elapsed += seconds;
+      if (clearing.elapsed >= clearing.duration) { collapseRows(); spawn(); }
+      return;
+    }
     if (!active) spawn();
     if (!active) return;
     // One visible top-to-bottom drop, checking every cell so frames cannot
@@ -134,6 +152,27 @@
       context.fillStyle = colors[active.piece.color];
       for (const [dx, dy] of active.piece.cells) context.fillRect(active.x + dx, height - 1 - active.y - dy, 1, 1);
     }
+    if (clearing) {
+      const t = clearing.elapsed / clearing.duration;
+      const tetris = clearing.rows.length === 4;
+      const blinkEnd = tetris ? .65 : 1;
+      const bright = Math.floor(t * (tetris ? 8 : 4)) % 2 === 0;
+      for (const row of clearing.rows) {
+        const y = height - 1 - row;
+        if (t < blinkEnd) {
+          context.fillStyle = bright ? '#edf9ef' : colors[0];
+          const swell = tetris && bright ? 1.5 : 0;
+          context.fillRect(0, y - swell, width, 1 + swell * 2);
+        } else {
+          const shrink = 1 - (t - blinkEnd) / (1 - blinkEnd);
+          context.fillStyle = colors[0];
+          context.fillRect(0, y, width, 1);
+          context.fillStyle = '#edf9ef';
+          context.fillRect(width * (1 - shrink) / 2, y, width * shrink, 1);
+        }
+      }
+    }
+    canvas.dataset.clearing = clearing ? clearing.rows.length : 0;
     canvas.dataset.cleared = cleared;
     canvas.dataset.locked = locked;
     canvas.dataset.active = active ? 1 : 0;

@@ -312,8 +312,8 @@
         // "rejected": true once it is cut; rejection outranks both other
         // states, so a cut piece never shows up under Selected or WIP.
         const STATUSES = [
-          ['selected', 'Selected', p => !p.wip && !p.rejected],
-          ['wip', 'WIP', p => p.wip === true && !p.rejected],
+          ['selected', 'Selected', p => p.wip === false && !p.rejected],
+          ['wip', 'WIP', p => p.wip !== false && !p.rejected],
           ['rejected', 'Rejected', p => p.rejected === true],
           ['all', 'All', () => true]
         ];

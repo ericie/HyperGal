@@ -69,15 +69,15 @@ colors:
 
 Scope: pieces/038-many-frogs/ only. A rough, physical, slightly unsettling printed world replaces the former childish sprites. Small living bodies become pigment while an indifferent moving landscape continues to work on their marks. One fixed screen — field, road band, field — printed as a ghost: whites and light grays at low contrast, lit by one shallow isometric camera, so muted madder, oxide, umber, oxblood, and plum bodies are the only color on the board.
 
-This is an autonomous, wordless Canvas 2D artwork. Its identity comes from vulnerable anatomical silhouettes, near-white machinery raised off the ground on a shared camera angle, worn contours, fixed substrate pits, and absorbing impressions. The procedural drawing remains in one HTML file; there is no generated raster asset or framework required for rendering.
+This is an autonomous Canvas 2D artwork with small arrival numerals at the two ends of each frog's column. Its identity comes from vulnerable anatomical silhouettes, near-white machinery raised off the ground on a shared camera angle, worn contours, fixed substrate pits, and absorbing impressions. The procedural drawing remains in one HTML file; there is no generated raster asset or framework required for rendering.
 
 **Key Characteristics:**
 
-- A fixed board sized from the viewport at a 22px tile: a field, a road band holding 60% of the height, and a field.
+- A fixed board using tiles near 22px: a 10% field, a road band holding exactly 80% of screen height, and a 10% field.
 - A cohort scaled to the board width shuttles bottom to top to bottom; flies add three matching offspring.
 - Articulated folded legs and risen pale machinery share one printed material language.
-- Persistent land impressions, broken tire transfers, and current-driven water diffusion.
-- No visible controls, scores, labels, or typography.
+- Persistent land impressions become soft directional pigment trails under passing cars.
+- The only visible typography is each frog's pair of arrival counts, explicitly requested by the user.
 
 The user approved this direction. Independent review returned Ship with no material findings for desktop (1663 × 1000) and mobile (390 × 844). Review evidence lives in [the desktop capture](../../.impeccable/review/frogs-print/desktop.png), [the mobile capture](../../.impeccable/review/frogs-print/mobile.png), and [the simulation benchmark](../../.impeccable/review/frogs-print/simulation-benchmark.txt), and [the review record](../../.impeccable/review/frogs-print/review.md). Screenshots establish the reviewed compositions, not every future procedural state.
 
@@ -99,13 +99,13 @@ Void and Verge frame the course and are the only values darker than the lanes. G
 
 ## Typography
 
-There is no visible typography and no font, size, weight, or spacing scale to extract. The browser title and HTML description are metadata. The canvas is currently `aria-hidden="true"`; this implementation does not expose a textual alternative or an accessible simulation control.
+Arrival counts use 11–13px semibold tabular monospace numerals in the frog's dark pigment rim, on small pale counter marks. Each marker belongs to one frog and sits at the same normalized column at both screen edges. A short pigment pulse acknowledges a touch; reduced motion suppresses the pulse. No other visible text or controls are added. The canvas exposes an image role and a description of the crossing and counters.
 
 ## Layout
 
-The fixed canvas fills the viewport and the whole course is on it at once; nothing scrolls. Tile size is a constant 22 CSS pixels. Columns are `floor(viewportWidth / 22)` and rows `floor(viewportHeight / 22)`, both with a floor of 9, so the board fills the screen with less than one tile of margin. Each field is `round(rows * 0.2)` and the road band takes the remainder, which is about 60% of the height. Cohort size is `clamp(round(columns * 0.35), 10, 24)`. A resize rebuilds the layout and clears the lane, obstacle, and impression caches, and clamps every frog back onto the board. No CSS responsive breakpoints exist.
+The fixed canvas fills the viewport and the whole course is on it at once; nothing scrolls. Rows are the nearest multiple of ten to `viewportHeight / 22`, with a minimum of twenty. Tile size is `viewportHeight / rows`, and columns are `floor(viewportWidth / tile)`. Each field has 10% of the rows and the road has 80%, so its drawn height is exactly 80% of the canvas. Cohort size is `clamp(round(columns * 0.35), 10, 24)`. A resize rebuilds the layout, clears terrain caches, and rebases frogs and stains onto the new board. Counter columns retain their normalized positions when space allows, otherwise they redistribute in the same left-to-right order. Counts survive resize. No CSS responsive breakpoints exist.
 
-The drawing viewport is clamped to at least 300 × 420 CSS pixels and device pixel ratio is capped at 2. The canvas may exceed a smaller viewport. World row zero is the bottom row of the lower field and row `rows - 1` the top row of the upper field; reaching either turns a frog around. Terrain and lane objects are clipped to the course, with narrow verge strips around its edges.
+The drawing width is clamped to at least 300 CSS pixels; height always matches the viewport, including short landscape screens. Device pixel ratio is capped at 2. World row zero is the bottom row of the lower field and row `rows - 1` the top row of the upper field. Frogs steer toward their own counter column in the destination field; contact with that counter increments its count and reverses heading. Initial spawning does not count as a return. Offspring get unique counter columns in the available gaps. Terrain and lane objects are clipped to the course, with narrow verge strips around its edges.
 
 ## Elevation & Depth
 
@@ -137,13 +137,13 @@ A cohort starts along the bottom edge after an opening hold (0.68 seconds) with 
 
 ### Pigment impressions
 
-Each death makes a layered impression with wash, dried rim, stipple, droplets, and angular event marks. The initial impression raster is 128 × 128 pixels, displayed relative to tile size. Bloom takes 1.65 seconds. Stains remain across cohorts; retained history is capped at 640 stains. Road traffic adds broken directional transfers from at most five distinct vehicles per stain, and each pass flattens the pool a little further.
+Each death makes a layered impression with wash, dried rim, stipple, droplets, and angular event marks. The initial impression raster is 128 × 128 pixels, displayed relative to tile size. Bloom takes 1.65 seconds. Stains remain across cohorts; retained history is capped at 640 stains. Swept vehicle contact removes density from the original pool and drags pigment downstream. Translucent, flattened copies of the actual pigment raster form a feathered trail with fine tire grain, clipped to its traffic row and composited with multiply so overlapping pigments blend. A trail raster rebuilds only on a fresh vehicle pass. Length is bounded at 6.5 tiles and density has a residual floor, but additional cars continue to work it. Reduced motion applies each transfer immediately.
 
 ### Camera and motion preferences
 
 After the last death the piece holds on the aftermath for 1.9 seconds, then a new cohort enters at the bottom. Reduced motion makes hops immediate after checking their hazard path, removes limb extension and death particles, and makes stain bloom and tire transfer reveal immediate. It preserves the autonomous simulation and some environmental motion; it is not an animation-off mode. Hidden tabs cancel requestAnimationFrame and resume without time catch-up.
 
-Validation: `node scripts/check-many-frogs.mjs` passed the field/road/field layout, collision windows, shuttle turnaround, cached impressions, visibility, normal/reduced-motion lifecycle, resize, and bounded history checks. The seeded 60-second simulation-only run reports a 2.80 ms mean update on the wider board, up from 1.11 ms on the old 21-column course, which is what roughly double the frogs and triple the board costs. It does not measure rasterization. A live browser sample of update plus draw at 1440 × 900 recorded a 2.6 ms median, 3.4 ms p95, and 6.3 ms worst frame over 1940 frames. These are observed samples on one machine, not a device-independent frame-rate guarantee.
+Validation: `node scripts/check-many-frogs.mjs` covers the exact 80% road, collision windows, paired counter contact and offspring allocation, directional pigment transfer and caching, shuttle turnaround, visibility, normal/reduced-motion lifecycle, resize, and bounded stain history. Live desktop (1440 × 900) and mobile (390 × 844) checks showed independent arrival counts and continuous directional pigment trails without browser errors. Historical timing samples elsewhere in this repository predate the counter and blended-pigment changes.
 
 Rendering has no external asset dependency. The source also contains an external Bakalytics analytics script; portability claims describe the artwork renderer, not the absence of all network requests.
 
@@ -162,4 +162,4 @@ Rendering has no external asset dependency. The source also contains an external
 - Don't scroll the board or add a finish line; the crossing is a shuttle with no end.
 - Don't add color to the environment; the only color on the board belongs to the frogs and their marks.
 - Don't replace the procedural moving field with a static illustration.
-- Don't invent buttons, navigation, type scales, or score overlays for this wordless surface.
+- Don't add buttons, navigation, captions, or additional score overlays beyond the requested paired arrival counters.

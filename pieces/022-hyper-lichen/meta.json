@@ -5,6 +5,7 @@
   "category": "nature",
   "type": "generative",
   "rating": 50,
+  "wip": false,
   "thumbnail": "thumbnail.jpg",
   "description": "Crustose lichen colonies continuously recolonize an entire dark stone surface in full-coverage radial waves of mint, sage, cream, and pale pink. Each completed layer immediately gives way to the next."
 }

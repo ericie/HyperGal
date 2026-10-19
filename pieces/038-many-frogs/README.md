@@ -2,7 +2,7 @@
 
 A Frogger variation on one fixed screen, played by a couple of dozen autonomous
 frogs at once. A field runs along the bottom, a field runs along the top, and a
-road band between them takes sixty percent of the height. Every frog acts as an
+road band between them takes eighty percent of the screen height. Every frog acts as an
 independent player, weighing progress in its own heading, nearby traffic,
 lateral escape routes, and its own appetite for risk before making each move.
 Frogs also reserve their routes and landing spaces, so they wait or reroute
@@ -11,9 +11,13 @@ flies hovering over the fields. Catching one immediately adds three new frogs in
 the collector's exact pigment, placed in nearby open turf before joining the
 same route planner. Each fly can be caught only once per run.
 
-The crossing never ends. A frog enters at the bottom edge, works its way up
-through the band, and the moment it reaches the top edge it turns around and
-works its way back down. Bottom to top to bottom, for as long as it survives. A
+The crossing never ends. Each frog has two small pigment-colored counters in its
+own column, one at the top and one at the bottom. Both begin at zero. A frog enters
+at the bottom edge, works its way up through the band, then steers to its own top
+counter. Touching it records one arrival and turns the frog toward its bottom
+counter; touching that records a return. Each end counts independently, with no
+repeated increments while a frog rests on it. Offspring receive their own paired
+counters. Bottom to top to bottom, for as long as each frog survives. A
 frog's own heading decides which vertical move counts as forward, so the same
 planner carries it in both directions. Before committing, a frog checks the full
 landing window—including its complete path through moving traffic—and runs a
@@ -21,18 +25,20 @@ rolling three-move search across the safest future routes. The planner weighs
 hazard timing, escape options, edge risk, boulders, and spaces reserved by the
 other frogs before every hop. Cars remain lethal throughout a hop.
 
-The board is sized from the viewport at a fixed twenty-two-pixel tile, so it
-fills the screen edge to edge and the whole course is visible at once: roughly
-sixty-five columns and forty rows on a wide display, with two dozen road lanes
-between the fields. Lanes alternate heading down the band, and pace and gaps are
-drawn per row so no two read as one moving block. Gaps are wide—a frog has two
-dozen lanes to thread and needs a readable window in every one of them. Boulders
+The board uses tiles close to twenty-two pixels. Rows come in groups of ten and
+the tile fits their total to the screen height, keeping the road at exactly 80%
+and each field at 10%. At 1440 × 900 the board has sixty-four columns, forty rows,
+and thirty-two road lanes. Lanes alternate heading down the band, and pace and
+gaps are drawn per row so no two read as one moving block. Gaps are wide—a frog
+has dozens of lanes to thread and needs a readable window in every one. Boulders
 create route-planning obstacles on the fields, clear of the two turnaround rows.
 Each death slowly blooms into a layered watercolor stain with a feathered edge,
-dried tide line, stipple, and angular event marks. A stain stays where it fell,
-and every passing vehicle flattens its pool and pulls a new set of broken,
-directional tire streaks through it, so the road slowly becomes a record of the
-crossing. When the last frog dies, the piece holds on the aftermath for a beat
+dried tide line, stipple, and angular event marks. Passing vehicles lift pigment
+out of the pool and pull a continuous, softened wash in the direction of traffic.
+Repeated passes lengthen the trail, flatten and dilute the original impression,
+and blend overlapping pigments into the asphalt. Fine tire grain sits inside
+the wash. The road slowly becomes a record of the crossing. When the last frog
+dies, the piece holds on the aftermath for a beat
 and a new cohort enters at the bottom.
 
 The drawing uses a ghost field-print language. Every surface, machine, and
@@ -52,7 +58,10 @@ flickering over the screen. The frogs use a close family of natural
 pigments—madder, oxblood, oxide, umber, and plum—instead of a spectral rainbow.
 Every bloodstain keeps the pigment of the frog that left it.
 
-There are no controls, labels, scores, instructions, or other visible interface.
+The only visible text is the requested pair of arrival counts for each frog.
+Counts remain after death and reset when the next cohort starts. If a larger
+cohort is resized onto a narrow screen, counter columns spread evenly in the
+same left-to-right order to stay legible.
 The frogs play continuously on their own. Reduced-motion preferences remove the
 limb extension and death particles while preserving the simulation.
 
@@ -68,16 +77,18 @@ traffic for each sample. Distant frog reservations are rejected before predictin
 their positions. The three-move look-ahead remains.
 
 Terrain impressions are cached per row as rasters. Pigment is printed to a small
-offscreen canvas once, so drawing each stain is a single image operation instead
-of dozens of paths every frame. The latest 640 stains are retained across
+offscreen canvas once; a tire pass rebuilds a bounded blend raster. Both
+impressions are reused between passes instead of drawing dozens of paths every
+frame. There is no five-car limit on working a stain. The latest 640 stains are retained across
 cohorts, bounding long-running history. Vehicles outside the viewport are
 skipped before any path is built. Hidden tabs stop animation frames completely
 and resume without catching up.
 
 Run `node scripts/check-many-frogs.mjs` from the repository root for layout,
-collision, shuttle-turnaround, cache, visibility, resize, and lifecycle checks.
+collision, paired counter contact, directional pigment transfer, shuttle
+turnaround, cache, visibility, resize, and lifecycle checks.
 Add `--benchmark` for a seeded 60-second simulation-only timing run.
 `--baseline=/path/to/old/index.html` compares an earlier self-contained version
 and verifies the same final state. The timing test does not measure browser
-rasterization; a live browser sample of update plus draw at 1440 × 900 recorded
+rasterization; an earlier version's live sample of update plus draw at 1440 × 900 recorded
 a 2.6 ms median, 3.4 ms p95, and 6.3 ms worst frame over 1940 frames.

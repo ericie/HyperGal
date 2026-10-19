@@ -80,7 +80,7 @@ for (const entry of entries) {
   try {
     const meta = JSON.parse(await readFile(metaPath, 'utf8'));
     const updated = meta.updated || await lastCodeChangeDate(`pieces/${entry.name}`);
-    pieces.push({ slug: entry.name, ...meta, ...(updated && { updated }) });
+    pieces.push({ slug: entry.name, wip: true, ...meta, ...(updated && { updated }) });
   } catch (err) {
     console.warn(`Skipping ${entry.name}: ${err.message}`);
   }

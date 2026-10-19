@@ -34,6 +34,7 @@
       const LAND_CONTACT = 7;
       const MUZZLE_LENGTH = 25;
       const BOSS_BULLET_SPEED = 118;
+      const BOSS_CHARGE_DURATION = 1.5;
       const BOSS_HIT_GROWTH = 1.6;
       const SIDES = ['top', 'right', 'bottom', 'left'];
       const OPPOSITE = { top: 'bottom', right: 'left', bottom: 'top', left: 'right' };
@@ -92,6 +93,7 @@
           wobble: Math.random() * Math.PI * 2,
           muzzleGlow: 0,
           bossLaunchFlash: 0,
+          bossChargeStartedAt: null,
           ammo: AMMO_CAPACITY,
           alive: true,
           nextFocusShotAt: 0,
@@ -165,6 +167,7 @@
           def.alive = true;
           def.muzzleGlow = 0;
           def.bossLaunchFlash = 0;
+          def.bossChargeStartedAt = null;
           def.nextFocusShotAt = 0;
           def.aimX = W / 2;
           def.aimY = H / 2;
@@ -215,6 +218,7 @@
           );
         }
 
+        updateBossCharge();
         updateLastBullet(dt);
         if (!gameOver) {
           updateDefenders(dt);
@@ -409,6 +413,7 @@
         if (
           !defenders[side].alive
           || gameOver
+          || defenders[side].ammo === 1
           || (lastBullet && side === lastBullet.targetSide)
         ) return 0;
         const reservedAttacks = pendingAttacks.filter((b) => b.side === side).length;
@@ -419,11 +424,26 @@
       function useAmmunition(defender) {
         if (!defender.alive || defender.ammo <= 0 || gameOver) return false;
         if (defender.ammo === 1) {
-          if (!lastBullet) fireLastBullet(defender);
           return false;
         }
         defender.ammo -= 1;
+        if (defender.ammo === 1 && !lastBullet) defender.bossChargeStartedAt = now;
         return true;
+      }
+
+      function updateBossCharge() {
+        if (lastBullet || gameOver) return;
+        for (const side of SIDES) {
+          const def = defenders[side];
+          if (!def.alive || def.ammo !== 1 || def.bossChargeStartedAt === null) continue;
+          const opponent = defenders[OPPOSITE[side]];
+          def.aimX = opponent.x;
+          def.aimY = opponent.y;
+          if (now - def.bossChargeStartedAt >= BOSS_CHARGE_DURATION) {
+            fireLastBullet(def);
+            return;
+          }
+        }
       }
 
       function fireLastBullet(defender) {
@@ -999,9 +1019,18 @@
       function drawDefender(def) {
         const x = def.x;
         const y = def.y;
-        const angle = Math.atan2(def.aimY - y, def.aimX - x);
+        const aimAngle = Math.atan2(def.aimY - y, def.aimX - x);
         const barrelLen = 20 + def.muzzleGlow * 4;
         const bossReady = def.ammo === 1 && !lastBullet && !gameOver;
+        const chargeAge = bossReady ? Math.max(0, now - def.bossChargeStartedAt) : 0;
+        const chargeProgress = clamp(chargeAge / BOSS_CHARGE_DURATION, 0, 1);
+        const blink = bossReady && !REDUCED_MOTION
+          ? 0.35 + 0.65 * (0.5 + 0.5 * Math.cos(chargeAge * Math.PI * 4))
+          : 1;
+        const shake = bossReady && !REDUCED_MOTION ? 0.4 + chargeProgress * 1.2 : 0;
+        const turretX = x + Math.sin(chargeAge * 83) * shake;
+        const turretY = y + Math.sin(chargeAge * 109) * shake * 0.65;
+        const angle = aimAngle + Math.sin(chargeAge * 71) * shake * 0.018;
         const readyPulse = bossReady
           ? REDUCED_MOTION ? 0.72 : 0.5 + Math.sin(now * 8.4 + def.wobble) * 0.5
           : 0;
@@ -1034,6 +1063,7 @@
         ctx.translate(x, y);
         ctx.scale(bodyScale, bodyScale);
         ctx.rotate(def.surfaceAngle);
+        ctx.globalAlpha = blink;
 
         ctx.shadowColor = def.color;
         ctx.shadowBlur = 12 + def.muzzleGlow * 10;
@@ -1044,7 +1074,7 @@
 
         if (charge > 0) {
           ctx.globalCompositeOperation = 'lighter';
-          ctx.globalAlpha = clamp(flashBeat * 0.58 + def.bossLaunchFlash * 0.48, 0, 0.7);
+          ctx.globalAlpha = blink * clamp(flashBeat * 0.58 + def.bossLaunchFlash * 0.48, 0, 0.7);
           ctx.fillStyle = def.color;
           ctx.fillRect(-DEFENDER_W / 2, 4, DEFENDER_W, 7);
           ctx.fillRect(-DEFENDER_W / 2 + 7, -3, DEFENDER_W - 14, 9);
@@ -1053,7 +1083,8 @@
         ctx.restore();
 
         ctx.save();
-        ctx.translate(x, y);
+        ctx.translate(turretX, turretY);
+        ctx.globalAlpha = blink;
         ctx.scale(bodyScale, bodyScale);
         ctx.rotate(angle + Math.PI / 2);
         ctx.fillStyle = def.color;
@@ -1062,8 +1093,8 @@
         ctx.restore();
 
         if (def.muzzleGlow > 0) {
-          const mx = x + Math.cos(angle) * (barrelLen + 4);
-          const my = y + Math.sin(angle) * (barrelLen + 4);
+          const mx = turretX + Math.cos(angle) * (barrelLen + 4);
+          const my = turretY + Math.sin(angle) * (barrelLen + 4);
           ctx.save();
           ctx.globalCompositeOperation = 'lighter';
           ctx.fillStyle = hexA(def.color, def.muzzleGlow * 0.65);

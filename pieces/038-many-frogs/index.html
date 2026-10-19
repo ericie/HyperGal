@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="description" content="Autonomous frogs shuttle across a ghost-white highway between two fields, leaving watercolor bloodstains that passing traffic drags into the asphalt." />
+    <meta name="description" content="Autonomous frogs touch arrival counters across a ghost-white highway filling 80% of the screen, leaving pigment that passing traffic drags and blends into the asphalt." />
     <link rel="icon" href="data:," />
     <title>Many Frogs · Hypermedia Club</title>
     <style>
@@ -22,16 +22,17 @@
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
   <body>
-    <canvas id="game" aria-hidden="true"></canvas>
+    <canvas id="game" role="img" aria-label="Autonomous frogs crossing traffic. Each frog has an arrival counter at the top and bottom of its column."></canvas>
     <script>
       (() => {
         'use strict';
 
         // One fixed screen: a field along the bottom, a field along the top, and
-        // a road band between them that takes 60% of the height. Frogs shuttle
+        // a road band between them that takes 80% of the height. Frogs shuttle
         // across it, turn around at the far field, and shuttle back.
         const TILE = 22;
-        const FIELD_FRACTION = 0.2;
+        const FIELD_FRACTION = 0.1;
+        const COUNTER_HIT_RADIUS = 0.32;
         const HOP_TIME = 0.18;
         const OPENING_HOLD = 0.68;
         const RESTART_PAUSE = 1.9;
@@ -191,6 +192,11 @@
             waitStreak: 0,
             heading: 1,
             crossings: 0,
+            homeU: x / COLS,
+            topTouches: 0,
+            bottomTouches: 0,
+            topTouchedAt: -Infinity,
+            bottomTouchedAt: -Infinity,
             nextMoveAt: waiting ? Infinity : elapsed + OPENING_HOLD + id * 0.03 + hash(seed + id * 613) * 0.08,
             boldness: hash(seed + id * 1709),
             patience: hash(seed + id * 2347),
@@ -270,7 +276,7 @@
 
           moveOptions.forEach((choice, index) => {
             const arrival = elapsed + (choice.direction === 'wait' ? 0.11 : HOP_TIME);
-            const x = frog.x + choice.dx;
+            const x = moveTargetX(frog, frog.x, frog.y, choice.dx);
             const y = frog.y + choice.dy;
             if (x < 0.25 || x > COLS - 0.25) return;
             if (y < 0 || y > ROWS - 1) return;
@@ -280,6 +286,7 @@
             const danger = moveDanger(frog, choice, x, y, arrival, dwell);
             const riskWeight = lerp(2.3, 1.55, frog.boldness);
             let score = moveBase(frog, choice) - danger * riskWeight;
+            score += counterApproachScore(frog, frog.x, frog.y, x, y);
             const forward = choice.dy === frog.heading;
 
             if (forward) score += frog.boldness * 1.2;
@@ -297,7 +304,7 @@
             let escapeDanger = Infinity;
 
             escapeMoves.forEach(([nextDx, nextDy]) => {
-              const nextX = x + nextDx;
+              const nextX = moveTargetX(frog, x, y, nextDx);
               const nextY = y + nextDy;
               if (nextX < 0.25 || nextX > COLS - 0.25) return;
               if (nextY < 0 || nextY > ROWS - 1) return;
@@ -391,7 +398,7 @@
           const currentLane = getLane(Math.round(state.y));
           const duration = move.direction === 'wait' ? 0.12 : HOP_TIME;
           const arrival = state.atTime + duration;
-          const targetX = state.x + move.dx;
+          const targetX = moveTargetX(frog, state.x, state.y, move.dx);
           const targetY = state.y + move.dy;
 
           if (targetX < 0.25 || targetX > COLS - 0.25) return null;
@@ -424,6 +431,7 @@
             ? 12
             : move.dy === -frog.heading ? -10 : move.direction === 'wait' ? -0.8 : 1.1;
           localScore -= danger * 1.8;
+          localScore += counterApproachScore(frog, state.x, state.y, targetX, targetY);
           if (targetLane.type === 'grass') localScore += 1.2;
           if (targetX < 0.8 || targetX > COLS - 0.8) localScore -= 5;
           if (isReverseMove(state.previousDirection, move.direction)) localScore -= 3.5;
@@ -524,7 +532,7 @@
             up: [0, 1], down: [0, -1], left: [-1, 0], right: [1, 0]
           };
           const [dx, dy] = vectors[direction];
-          const targetX = clamp(frog.x + dx, 0.25, COLS - 0.25);
+          const targetX = clamp(moveTargetX(frog, frog.x, frog.y, dx), 0.25, COLS - 0.25);
           const targetY = clamp(frog.y + dy, 0, ROWS - 1);
           if (frogSpaceBlocked(frog, targetX, targetY, elapsed + HOP_TIME, frog.x, frog.y)) {
             frog.waitStreak += 1;
@@ -585,18 +593,72 @@
             return;
           }
 
-          // Reaching the far field turns the frog around; the crossing never ends.
-          if (frog.heading > 0 && frog.y >= ROWS - 1) {
-            frog.heading = -1;
-            frog.crossings += 1;
-          } else if (frog.heading < 0 && frog.y <= 0) {
-            frog.heading = 1;
-            frog.crossings += 1;
-          }
+          touchCounter(frog);
 
           const urgency = lane.type === 'grass' ? 0.24 : 0.035;
           const variation = lane.type === 'grass' ? 0.3 : 0.045;
           frog.nextMoveAt = elapsed + urgency + brainRandom(frog, 117) * variation;
+        }
+
+        function counterX(frog) {
+          return clamp(frog.homeU * COLS, 0.45, COLS - 0.45);
+        }
+
+        function inDestinationField(frog, y) {
+          return frog.heading > 0 ? y >= ROWS - fieldRows : y < fieldRows;
+        }
+
+        function moveTargetX(frog, x, y, dx) {
+          const home = counterX(frog);
+          // A final partial sideways hop lands exactly on the frog's marker.
+          if (dx && inDestinationField(frog, y) && Math.sign(home - x) === dx && Math.abs(home - x) < 1) {
+            return home;
+          }
+          return x + dx;
+        }
+
+        function counterApproachScore(frog, x, y, nextX, nextY) {
+          if (!inDestinationField(frog, y) || !inDestinationField(frog, nextY)) return 0;
+          const before = Math.abs(x - counterX(frog));
+          const after = Math.abs(nextX - counterX(frog));
+          return (before - after) * 24;
+        }
+
+        function touchCounter(frog) {
+          if (!frog.alive || Math.abs(frog.x - counterX(frog)) > COUNTER_HIT_RADIUS) return;
+          const top = frog.heading > 0 && frog.y >= ROWS - 1;
+          const bottom = frog.heading < 0 && frog.y <= 0;
+          if (!top && !bottom) return;
+          const end = top ? 'top' : 'bottom';
+          frog[`${end}Touches`] += 1;
+          frog[`${end}TouchedAt`] = elapsed;
+          frog.crossings += 1;
+          // Flipping heading latches the contact until a full return crossing.
+          frog.heading = top ? -1 : 1;
+        }
+
+        function assignBroodCounter(child) {
+          const occupied = [0.02, ...frogs.map(frog => frog.homeU), 0.98].sort((a, b) => a - b);
+          let best = child.homeU, bestScore = -Infinity;
+          for (let index = 1; index < occupied.length; index += 1) {
+            const gap = occupied[index] - occupied[index - 1];
+            const middle = (occupied[index] + occupied[index - 1]) * 0.5;
+            const score = gap / (1 + Math.abs(middle - child.homeU));
+            if (score > bestScore) { bestScore = score; best = middle; }
+          }
+          child.homeU = best;
+        }
+
+        function spaceCounterColumns(cohort) {
+          if (cohort.length < 2) return;
+          const ordered = [...cohort].sort((a, b) => a.homeU - b.homeU);
+          const gap = Math.min(0.8, (COLS - 0.9) / (ordered.length - 1));
+          if (ordered.every((frog, index) => !index || counterX(frog) - counterX(ordered[index - 1]) >= gap)) return;
+          // Keep every counter legible when an existing large cohort is resized
+          // onto a phone, or a brood fills the remaining gaps. Preserve order.
+          ordered.forEach((frog, index) => {
+            frog.homeU = (0.45 + index * (COLS - 0.9) / (ordered.length - 1)) / COLS;
+          });
         }
 
         function killFrog(frog, kind) {
@@ -690,9 +752,15 @@
             surfaceType: surface.type,
             surfaceRow: surface.row,
             opacity: 1,
-            roadStretch: 1,
-            vehicleSmears: [],
-            smearedBy: new Set(),
+            poolStrength: 1,
+            smearPasses: 0,
+            lastVehicleKey: null,
+            dragDistance: 0,
+            dragX: 0,
+            dragFromX: 0,
+            dragTargetX: 0,
+            smearBorn: -Infinity,
+            smearPrint: null,
             rotation: hash(seed + 17) * TAU,
             scale: 0.82 + hash(seed + 29) * 0.48,
             layers,
@@ -722,15 +790,20 @@
 
 
         function updateBloodStains(dt) {
+          const traffic = new Map();
           bloodStains.forEach((stain) => {
-            if (stain.surfaceType !== 'road' || stain.smearedBy.size >= 5) return;
+            if (stain.surfaceType !== 'road') return;
+            const progress = reducedMotion.matches ? 1 : easeOutQuart(clamp((elapsed - stain.smearBorn) / 0.45, 0, 1));
+            stain.dragX = lerp(stain.dragFromX, stain.dragTargetX, progress);
             const lane = getLane(stain.surfaceRow);
             if (lane.type !== 'road') return;
-            laneObjectsAt(lane, elapsed).forEach((vehicle) => {
-              if (stain.smearedBy.size >= 5) return;
-              const contactMargin = 0.3 * stain.roadStretch;
-              const touching = stain.x >= vehicle.x - contactMargin &&
-                stain.x <= vehicle.x + vehicle.length + contactMargin;
+            if (!traffic.has(lane.row)) traffic.set(lane.row, laneObjectsAt(lane, elapsed));
+            traffic.get(lane.row).forEach((vehicle) => {
+              const previousX = vehicle.x - lane.speed * dt;
+              const contactX = stain.x + stain.dragX;
+              // Swept contact catches a car crossing the pool between frames.
+              const touching = contactX >= Math.min(vehicle.x, previousX) - 0.38 &&
+                contactX <= Math.max(vehicle.x, previousX) + vehicle.length + 0.38;
               if (touching) addVehicleSmear(stain, lane, vehicle);
             });
           });
@@ -740,30 +813,18 @@
 
         function addVehicleSmear(stain, lane, vehicle) {
           const vehicleKey = `${lane.row}:${vehicle.id}`;
-          if (stain.smearedBy.has(vehicleKey)) return;
-          stain.smearedBy.add(vehicleKey);
-          stain.roadStretch = Math.min(2.45, stain.roadStretch + 0.28);
-          stain.rotation *= 0.52;
-
-          const direction = Math.sign(lane.speed) || 1;
-          const passIndex = stain.smearedBy.size - 1;
-          const seed = hashString(`${stain.frogId}-${vehicleKey}-${passIndex}`);
-          const length = 0.55 + hash(seed + 43) * 0.8 + passIndex * 0.12;
-          for (let track = 0; track < 3; track += 1) {
-            stain.vehicleSmears.push({
-              born: elapsed,
-              direction,
-              length: length * (0.82 + hash(seed + track * 317) * 0.24),
-              offsetY: (track - 1) * 0.1 + (hash(seed + track * 617) - 0.5) * 0.045,
-              width: track === 1 ? 0.075 : 0.032 + hash(seed + track * 911) * 0.018,
-              alpha: track === 1 ? 0.18 : 0.32,
-              gaps: [
-                0.2 + hash(seed + track * 1217) * 0.08,
-                0.48 + hash(seed + track * 1451) * 0.1
-              ],
-              wobble: (hash(seed + track * 1693) - 0.5) * 0.055
-            });
-          }
+          if (stain.lastVehicleKey === vehicleKey) return;
+          stain.lastVehicleKey = vehicleKey;
+          stain.smearPasses += 1;
+          stain.smearDirection = Math.sign(lane.speed);
+          stain.smearBorn = elapsed;
+          stain.dragFromX = stain.dragX;
+          stain.dragTargetX = stain.smearDirection * Math.min(1.8, Math.abs(stain.dragTargetX) + 0.18);
+          stain.dragDistance = Math.min(6.5, 1.2 + vehicle.length * 0.45 + stain.smearPasses * 0.38);
+          stain.poolStrength = Math.max(0.08, stain.poolStrength * 0.67);
+          stain.opacity = Math.max(0.16, stain.opacity * 0.96);
+          // Only a fresh tire pass rebuilds the cached, blended impression.
+          stain.smearPrint = null;
         }
 
         function getLane(row) {
@@ -882,12 +943,14 @@
             const id = nextFrogId++;
             const seed = hashString(`${round}-${fly.id}-${parent.id}-${id}`);
             const child = createFrog(id, x, y, parent.pigment, seed);
+            assignBroodCounter(child);
             child.facing = parent.facing;
             child.heading = parent.heading;
             child.nextMoveAt = elapsed + 0.2 + born * 0.08 + hash(seed + 31) * 0.08;
             frogs.push(child);
             born += 1;
           }
+          spaceCounterColumns(frogs);
 
           if (!reducedMotion.matches) {
             for (let index = 0; index < 12; index += 1) {
@@ -981,6 +1044,39 @@
           drawParticles();
           waitingFrogs.forEach(drawFrog);
           frogs.forEach(drawFrog);
+          drawCounters();
+        }
+
+        function drawCounters() {
+          ctx.save();
+          ctx.font = `600 ${Math.max(11, Math.min(13, tile * 0.56))}px ui-monospace, monospace`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const ordered = [...frogs].sort((a, b) => a.homeU - b.homeU);
+          ordered.forEach((frog, index) => {
+            const x = worldToScreenX(counterX(frog));
+            const leftGap = index ? counterX(frog) - counterX(ordered[index - 1]) : Infinity;
+            const rightGap = index + 1 < ordered.length ? counterX(ordered[index + 1]) - counterX(frog) : Infinity;
+            const markerWidth = Math.min(0.76, Math.min(leftGap, rightGap) * 0.82) * tile;
+            for (const top of [false, true]) {
+              const end = top ? 'top' : 'bottom';
+              const y = worldToScreenY(top ? ROWS - 1 : 0);
+              const inward = top ? 1 : -1;
+              const pulse = reducedMotion.matches ? 0 : Math.max(0, 1 - (elapsed - frog[`${end}TouchedAt`]) / 0.7);
+              ctx.fillStyle = palette.paper;
+              ctx.globalAlpha = 0.88;
+              ctx.fillRect(x - markerWidth * 0.5, y - tile * 0.36, markerWidth, tile * 0.72);
+              ctx.fillStyle = frog.color;
+              ctx.globalAlpha = 0.12 + pulse * 0.2;
+              ctx.fillRect(x - markerWidth * 0.5, y - tile * 0.36, markerWidth, tile * 0.72);
+              ctx.globalAlpha = frog.alive ? 0.9 : 0.45;
+              ctx.fillRect(x - markerWidth * 0.5, y + inward * tile * 0.4, markerWidth, 1);
+              ctx.globalAlpha = 1;
+              ctx.fillStyle = frog.pigment.rim;
+              ctx.fillText(String(frog[`${end}Touches`]), x, y, markerWidth * 0.95);
+            }
+          });
+          ctx.restore();
         }
 
 
@@ -1243,16 +1339,17 @@
 
         function drawBloodStains() {
           bloodStains.forEach(stain=>{
-            const x=worldToScreenX(stain.x),y=worldToScreenY(stain.y);
+            const x=worldToScreenX(stain.x+stain.dragX),y=worldToScreenY(stain.y);
             if(y < -tile*2 || y > height+tile*2)return;
             const age=elapsed-stain.born;
             const progress=reducedMotion.matches ? 1 : easeOutQuart(clamp(age/1.65,0,1));
-            if(stain.vehicleSmears.length)drawVehicleSmears(stain,x,y,progress);
             if(!stain.print)stain.print=makePigmentPrint(stain);
+            if(stain.smearPasses)drawVehicleSmears(stain,x,progress);
             ctx.save();ctx.translate(x,y);ctx.rotate(stain.rotation);
             const bloom=.4+.6*progress;
-            ctx.scale(stain.scale*stain.roadStretch*bloom,stain.scale*bloom);
-            ctx.globalAlpha=stain.opacity*progress;
+            ctx.scale(stain.scale*bloom,stain.scale*bloom);
+            ctx.globalCompositeOperation='multiply';
+            ctx.globalAlpha=stain.opacity*stain.poolStrength*progress;
             ctx.drawImage(stain.print,-tile,-tile,tile*2,tile*2);
             ctx.restore();
           });
@@ -1284,39 +1381,52 @@
           return print;
         }
 
-        function drawVehicleSmears(stain, x, y, stainProgress) {
+        function makeSmearPrint(stain) {
+          const resolution = 48;
+          const print = document.createElement('canvas');
+          print.width = Math.ceil((stain.dragDistance + 3) * resolution);
+          print.height = resolution;
+          const ink = print.getContext('2d');
+          ink.translate(resolution, resolution * 0.5);
+          // Many translucent pulls of the actual pigment form a continuous,
+          // feathered blend. Rasterize once per pass, never once per frame.
+          ink.filter = 'blur(1px)';
+          for (let tap = 0; tap < 40; tap += 1) {
+            const t = tap / 39;
+            const w = resolution * stain.scale * (2 + t * 1.2);
+            const h = resolution * stain.scale * (1.25 - t * 0.65);
+            ink.globalAlpha = 0.075 * Math.pow(1 - t, 1.3);
+            ink.drawImage(stain.print, t * stain.dragDistance * resolution - w * 0.5, -h * 0.5, w, h);
+          }
+          ink.filter = 'none';
+          ink.strokeStyle = stain.pigment.wash;
+          ink.lineCap = 'round';
+          // A little residual tire grain lives inside the broad wash.
+          for (let track = 0; track < 5; track += 1) {
+            const y = (track - 2) * resolution * 0.055;
+            ink.globalAlpha = 0.14;
+            ink.lineWidth = resolution * (track % 2 ? 0.018 : 0.035);
+            ink.beginPath();
+            ink.moveTo(0, y);
+            ink.lineTo(stain.dragDistance * resolution * (0.45 + hash(track * 733 + stain.frogId) * 0.4), y);
+            ink.stroke();
+          }
+          return print;
+        }
+
+        function drawVehicleSmears(stain, x, stainProgress) {
+          if (!stain.smearPrint) stain.smearPrint = makeSmearPrint(stain);
+          const reveal = reducedMotion.matches ? 1 : easeOutQuart(clamp((elapsed - stain.smearBorn) / 0.45, 0, 1));
+          const y = worldToScreenY(stain.surfaceRow);
           ctx.save();
+          ctx.beginPath();
+          ctx.rect(boardLeft, y - tile * 0.5, COLS * tile, tile);
+          ctx.clip();
           ctx.translate(x, y);
-          ctx.strokeStyle = stain.pigment.wash;
-          ctx.lineCap = 'butt';
-          stain.vehicleSmears.forEach((smear) => {
-            const reveal = reducedMotion.matches
-              ? 1
-              : easeOutQuart(clamp((elapsed - smear.born) / 0.16, 0, 1));
-            const ranges = [
-              [0, smear.gaps[0]],
-              [smear.gaps[0] + 0.07, smear.gaps[1]],
-              [smear.gaps[1] + 0.08, 1]
-            ];
-            ctx.globalAlpha = smear.alpha * stainProgress * reveal;
-            ctx.lineWidth = Math.max(1, smear.width * tile);
-            ranges.forEach(([from, to], segmentIndex) => {
-              const visibleTo = Math.min(to, reveal);
-              if (visibleTo <= from) return;
-              const fromX = smear.direction * smear.length * from * tile;
-              const toX = smear.direction * smear.length * visibleTo * tile;
-              const offsetY = smear.offsetY * tile;
-              ctx.beginPath();
-              ctx.moveTo(fromX, offsetY);
-              ctx.quadraticCurveTo(
-                (fromX + toX) * 0.5,
-                offsetY + smear.wobble * tile * (segmentIndex % 2 ? -1 : 1),
-                toX,
-                offsetY + smear.wobble * tile * 0.35
-              );
-              ctx.stroke();
-            });
-          });
+          ctx.scale(stain.smearDirection * (0.65 + reveal * 0.35), 1);
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.globalAlpha = stain.opacity * stainProgress * (0.7 + reveal * 0.3);
+          ctx.drawImage(stain.smearPrint, -tile, -tile * 0.5, stain.smearPrint.width / 48 * tile, tile);
           ctx.restore();
         }
 
@@ -1375,8 +1485,10 @@
 
 
         function resize() {
+          const previousCols = COLS, previousRows = ROWS;
+          const previousFieldRows = fieldRows, previousRoadRows = roadRows;
           width = Math.max(300, window.innerWidth);
-          height = Math.max(420, window.innerHeight);
+          height = Math.max(1, window.innerHeight);
           dpr = Math.min(2, window.devicePixelRatio || 1);
           canvas.width = Math.round(width * dpr);
           canvas.height = Math.round(height * dpr);
@@ -1384,12 +1496,13 @@
           canvas.style.height = `${height}px`;
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-          tile = TILE;
+          // Ten-row groups keep the fields at 10% each and the road at exactly
+          // 80% of viewport height, with tiles still close to 22 CSS pixels.
+          ROWS = Math.max(20, Math.round(height / TILE / 10) * 10);
+          tile = height / ROWS;
           COLS = Math.max(9, Math.floor(width / tile));
-          ROWS = Math.max(9, Math.floor(height / tile));
-          fieldRows = Math.max(2, Math.round(ROWS * FIELD_FRACTION));
-          roadRows = Math.max(3, ROWS - fieldRows * 2);
-          ROWS = fieldRows * 2 + roadRows;
+          fieldRows = Math.round(ROWS * FIELD_FRACTION);
+          roadRows = ROWS - fieldRows * 2;
           frogCount = clamp(Math.round(COLS * 0.35), 10, 24);
           boardLeft = (width - COLS * tile) / 2;
           boardBaseY = (height + ROWS * tile) / 2 - tile * 0.5;
@@ -1399,11 +1512,30 @@
           obstacleCache.clear();
           surfacePrints.clear();
           [...frogs, ...waitingFrogs].forEach((frog) => {
-            frog.x = clamp(frog.x, 0.25, COLS - 0.25);
-            frog.y = clamp(frog.y, 0, ROWS - 1);
+            frog.x = clamp(frog.x * COLS / previousCols, 0.25, COLS - 0.25);
+            frog.y = clamp(Math.round(frog.y * (ROWS - 1) / (previousRows - 1)), 0, ROWS - 1);
             frog.fromX = frog.toX = frog.x;
             frog.fromY = frog.toY = frog.y;
             frog.hop = 1;
+            frog.nextMoveAt = Math.min(frog.nextMoveAt, elapsed + 0.12);
+          });
+          spaceCounterColumns(frogs);
+          spaceCounterColumns(waitingFrogs);
+          bloodStains.forEach(stain => {
+            stain.x *= COLS / previousCols;
+            if (stain.surfaceType === 'road') {
+              const withinLane = stain.y - stain.surfaceRow;
+              stain.surfaceRow = fieldRows + clamp(Math.floor(
+                (stain.surfaceRow - previousFieldRows) / previousRoadRows * roadRows
+              ), 0, roadRows - 1);
+              stain.y = stain.surfaceRow + withinLane;
+              // Existing pigment belongs to the resized road; new tires should
+              // be able to work it regardless of the previous lane's car IDs.
+              stain.lastVehicleKey = null;
+            } else {
+              stain.y *= (ROWS - 1) / (previousRows - 1);
+              stain.surfaceRow = Math.round(stain.y);
+            }
           });
         }
 
@@ -1443,6 +1575,7 @@
             rows: ROWS,
             fieldRows,
             roadRows,
+            roadHeightFraction: roadRows * tile / height,
             topFrogY: frogs.filter((frog) => frog.alive).reduce((top, frog) => Math.max(top, frog.y), -1),
             gameOver: gameOverAt >= 0,
             waiting: waitingFrogs.length,
@@ -1458,6 +1591,9 @@
               waitStreak: frog.waitStreak,
               heading: frog.heading,
               crossings: frog.crossings,
+              counterX: counterX(frog),
+              topTouches: frog.topTouches,
+              bottomTouches: frog.bottomTouches,
               deathKind: frog.deathKind,
               deathPhase: frog.deathPhase
             }))

@@ -25,10 +25,13 @@ from now, with zero external dependencies.
    external links.**
 3. Edit `meta.json` (title, publication `date`, year, type, thumbnail filename,
    and description). Three optional curatorial fields drive the gallery's
-   Status and Sort controls: `"wip": true` while a piece is in progress,
+   Status and Sort controls: `"wip": true` by default until you explicitly promote it to Selected
+   with `"wip": false`,
    `"rejected": true` once it is cut (rejection outranks WIP), and
    `"rating"`, a 1-100 score that is never displayed and only orders the
    Recommended sort. Unrated pieces sort below every rated one.
+   Missing status fields mean WIP. Completion, ratings, and imports do not
+   promote a composition; only your explicit curatorial decision does.
 4. Commit the piece, then run `node scripts/build-manifest.mjs` to regenerate
    the gallery index.
 

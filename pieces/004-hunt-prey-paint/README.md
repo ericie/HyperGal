@@ -11,19 +11,21 @@ there are no corners to win or die in.
   grids, arcs, and route lines sit underneath the ecosystem. Lush patches sprout
   tiny 8-bit signal sparks from the active bloom palette. Plants grow more
   slowly and the visible terrain is painted incrementally, one small pixel at a
-  time, so new groundcover fills in instead of popping on all at once.
+  time, so new groundcover fills in instead of popping on all at once. Mature
+  clumps keep open paper between them. Grazers cut crisp pixel paths that stay
+  clear for twelve seconds before regrowth; foliage is never dragged or blurred.
 - **Prey** — blocky pixel grazers, each wearing one of many **colours**. They
   eat plants, grow into larger bodies, and flee hunters. Giant prey become
   spiny square emblems, age continuously toward white, and sample the surrounding
   terrain for richer plant patches instead of camping in place. They must reach
   a visibly grown body before they can breed. Every prey is born with its own
   **alertness** (how far off it spots a hunter) and **sprint speed**; a fleeing
-  one sheds square motion ticks in its own colour. A sprint outruns a hunter but
+  one leaves square motion ticks in its own colour as it moves. A fast sprint can escape a hunter but
   burns energy fast, so a hounded prey can run itself to starvation.
 - **Hunters** — compact black arcade glyphs that run the nearest prey down and
   **grow** as they feed (a weakening hunter is simply *smaller*, never faded
-  out). Their energy is spent by **moving**: a starving hunter sprints faster
-  but burns out faster for it. The only way a hunter breeds is to eat enough to
+  out). Their energy is spent by **moving**. Hungry hunters retain pursuit speed,
+  lead running prey, and sustain chases long enough to land more catches. The only way a hunter breeds is to eat enough to
   swell and **split in half**, dividing into two.
 
 Prey and hunters have solid bodies — their own kind cannot overlap, only bump

@@ -4,7 +4,7 @@
   "date": "2026-01-01",
   "category": "generative",
   "type": "interactive",
-  "wip": false,
+  "wip": true,
   "thumbnail": "thumbnail.png",
   "description": "Short description of the piece."
 }

@@ -5,6 +5,7 @@
   "category": "generative",
   "type": "interactive",
   "rating": 60,
+  "wip": false,
   "thumbnail": "thumbnail.png",
   "description": "A field of Geist Sans makes every letter active: crossing one with the knife cursor cuts it from the statement and releases a 2.5-second abstract composition built only from that glyph; each composition can overlap the next."
 }

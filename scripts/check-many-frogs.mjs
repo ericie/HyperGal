@@ -27,6 +27,7 @@ function simulation(file = target, reduced = false) {
   vm.createContext(env);
   vm.runInContext(source.replace('window.__manyFrogs = {', `window.__test = {
     update, draw, getLane, laneObjectsAt, laneDanger, hitsVehicleAt, addBloodStain,
+    updateBloodStains, addVehicleSmear, touchCounter, counterX, spawnFrogBrood,
     get frogs() { return frogs; }, get stains() { return bloodStains; },
     get rows() { return ROWS; }, get cols() { return COLS; }
   }; window.__manyFrogs = {`), env);
@@ -45,7 +46,7 @@ const state0 = sim.api.getState();
 
 // The board is one fixed screen: field, road band, field.
 assert.equal(state0.fieldRows * 2 + state0.roadRows, ROWS, 'the three bands fill the board');
-assert.ok(Math.abs(state0.roadRows / ROWS - .6) < .06, 'the road band holds about 60% of the height');
+assert.equal(state0.roadHeightFraction, .8, 'the road band holds exactly 80% of screen height');
 for (let row = 0; row < ROWS; row++) {
   const expected = row >= state0.fieldRows && row < state0.fieldRows + state0.roadRows ? 'road' : 'grass';
   assert.equal(sim.test.getLane(row).type, expected, `row ${row} is ${expected}`);
@@ -81,6 +82,80 @@ const stainSurfaces = sim.surfaces;
 sim.test.draw();
 assert.equal(sim.surfaces, stainSurfaces, 'stationary pigment is not repainted');
 
+// Pigment moves only after contact, follows either traffic direction, and can
+// be worked again after the former five-car limit. A car transfers only once.
+for (const direction of [-1, 1]) {
+  const paint = simulation();
+  const road = Array.from({length: paint.test.rows}, (_, row) => paint.test.getLane(row))
+    .find(lane => lane.type === 'road' && lane.direction === direction);
+  const car = paint.test.laneObjectsAt(road, 0).find(item => item.x > 2 && item.x + item.length < paint.test.cols - 2);
+  paint.test.addBloodStain({...paint.test.frogs[0], x: car.x + car.length / 2, y: road.row}, 'traffic');
+  const stain = paint.test.stains[0];
+  assert.equal(stain.dragDistance, 0);
+  paint.test.updateBloodStains(1 / 60);
+  assert.equal(stain.smearPasses, 1, 'actual vehicle contact triggers transfer');
+  assert.equal(Math.sign(stain.dragTargetX), direction, 'pool follows traffic');
+  assert.ok(stain.poolStrength < 1 && stain.dragDistance > 1, 'pool becomes a long diluted wash');
+  paint.test.updateBloodStains(1 / 60);
+  assert.equal(stain.smearPasses, 1, 'continuous contact is one pass');
+  paint.test.draw();
+  const cached = stain.smearPrint, surfaces = paint.surfaces;
+  paint.test.draw();
+  assert.equal(stain.smearPrint, cached);
+  assert.equal(paint.surfaces, surfaces, 'the blended impression is cached');
+  const firstLength = stain.dragDistance;
+  for (let pass = 1; pass <= 8; pass++) paint.test.addVehicleSmear(stain, road, {...car, id: car.id + pass});
+  assert.equal(stain.smearPasses, 9);
+  assert.ok(stain.dragDistance > firstLength && stain.dragDistance <= 6.5);
+  assert.equal(stain.smearPrint, null, 'new transfer invalidates the blend cache');
+  paint.test.addBloodStain({...paint.test.frogs[0], x: car.x, y: 0}, 'grass');
+  paint.test.updateBloodStains(1 / 60);
+  assert.equal(paint.test.stains[1].smearPasses, 0, 'traffic never drags pigment out of a field');
+}
+
+const contacts = simulation();
+const frog = contacts.test.frogs[0];
+contacts.test.touchCounter(frog);
+assert.equal(frog.bottomTouches, 0, 'initial spawning is not a return trip');
+frog.y = contacts.test.rows - 1;
+frog.x = contacts.test.counterX(frog) + 1;
+contacts.test.touchCounter(frog);
+assert.equal(frog.topTouches, 0, 'touching a different column does not count');
+frog.x = contacts.test.counterX(frog);
+contacts.test.touchCounter(frog);
+contacts.test.touchCounter(frog);
+assert.equal(frog.topTouches, 1, 'one touch increments exactly once');
+assert.equal(frog.heading, -1);
+frog.y = 0;
+contacts.test.touchCounter(frog);
+contacts.test.touchCounter(frog);
+assert.equal(frog.bottomTouches, 1);
+assert.equal(frog.crossings, 2);
+const parent = contacts.test.frogs[2];
+contacts.test.spawnFrogBrood(parent, {row: 1, x: parent.x, y: 1, id: 'test', seed: 12});
+assert.equal(contacts.test.frogs.length, state0.totalFrogs + 3);
+assert.equal(new Set(contacts.test.frogs.map(item => item.homeU)).size, contacts.test.frogs.length,
+  'every child receives its own paired counter column');
+assert.ok(contacts.test.frogs.slice(-3).every(child => child.topTouches === 0 && child.bottomTouches === 0));
+
+// Resizing during a hop must not leave its former Infinity think-time parked.
+const resizeRun = simulation();
+const moving = resizeRun.test.frogs[0];
+moving.hop = 0.4; moving.nextMoveAt = Infinity;
+moving.topTouches = 2; moving.bottomTouches = 1;
+resizeRun.env.window.innerWidth = 390; resizeRun.env.window.innerHeight = 844;
+resizeRun.events.resize();
+assert.ok(Number.isFinite(moving.nextMoveAt), 'a resized hop resumes planning');
+assert.equal(moving.topTouches, 2);
+assert.equal(moving.bottomTouches, 1);
+assert.equal(resizeRun.api.getState().roadHeightFraction, .8);
+const counterPositions = resizeRun.api.getState().frogs.map(f => f.counterX).sort((a, b) => a - b);
+assert.ok(counterPositions.every((x, index) => !index || x - counterPositions[index - 1] >= .7),
+  'a wide cohort resizes without crowded counter markers');
+resizeRun.env.window.innerWidth = 844; resizeRun.env.window.innerHeight = 390;
+resizeRun.events.resize();
+assert.equal(resizeRun.api.getState().roadHeightFraction, .8, 'short landscape view uses actual screen height');
+
 sim.frame();
 sim.env.document.hidden = true; sim.events.visibilitychange();
 assert.equal(sim.frames.size, 0, 'hidden page stops its RAF');
@@ -110,15 +185,20 @@ for (const reduced of [false, true]) {
   assert.ok(state.frogs.every(f => Number.isFinite(f.x) && Number.isFinite(f.y)));
   assert.ok(!offBoard, 'frogs stay on the board');
   assert.ok(mostCrossings >= 2, `a frog completes a round trip (saw ${mostCrossings} turns)`);
+  assert.ok(state.frogs.every(f => f.topTouches + f.bottomTouches === f.crossings), 'counters match completed trips');
   run.api.eliminateAll();
   assert.equal(run.api.getState().live, 0);
   for (let i = 0; i < 250; i++) run.test.update(1 / 60);
   assert.equal(run.api.getState().round, state.round + 1, 'aftermath returns to a new cohort');
   assert.ok(run.api.getState().live > 0, 'a new cohort enters');
+  assert.ok(run.api.getState().frogs.every(f => f.topTouches === 0 && f.bottomTouches === 0), 'new cohort resets counters');
   run.env.window.innerWidth = 390; run.env.window.innerHeight = 844; run.events.resize();
   assert.ok(run.api.getState().frogs.every(f => f.x <= run.api.getState().columns - 0.25),
     'a resize keeps every frog on the narrower board');
   run.test.draw();
+  assert.equal(run.api.getState().roadHeightFraction, .8, 'mobile keeps the 80% road');
+  assert.ok(run.api.getState().frogs.every(f => f.counterX >= .45 && f.counterX <= run.test.cols - .45),
+    'paired counters follow their columns on resize');
   for (let i = 0; i < 120; i++) run.test.update(1 / 60);
 }
 
@@ -127,7 +207,7 @@ const accumulation = simulation();
 for (let i = 0; i < 660; i++) accumulation.test.addBloodStain(accumulation.test.frogs[0], 'traffic');
 accumulation.test.update(1 / 60);
 assert.equal(accumulation.test.stains.length, 640);
-console.log(`Passed ${samples} collision samples, fixed field/road/field layout, shuttle turnaround, continuous traffic windows, pigment/terrain caching, visibility, normal/reduced-motion lifecycle, resize, and bounded stain history.`);
+console.log(`Passed ${samples} collision samples, 80% road layout, paired contact counters, offspring counters, directional pigment transfer and caching, shuttle turnaround, visibility, normal/reduced-motion lifecycle, resize, and bounded stain history.`);
 
 if (process.argv.includes('--benchmark')) {
   const files = [target];

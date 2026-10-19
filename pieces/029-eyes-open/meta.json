@@ -5,6 +5,7 @@
   "category": "generative",
   "type": "generative",
   "rating": 45,
+  "wip": false,
   "thumbnail": "thumbnail.png",
   "description": "A black field populated by bright graphic eyes. Ten to twenty are open at once on a phone, each arriving independently, holding its gaze, blinking shut, and vanishing before another appears elsewhere."
 }

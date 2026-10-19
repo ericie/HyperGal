@@ -549,7 +549,7 @@
         ship.fireCd = Math.max(0, ship.fireCd - dt);
         ship.invuln = Math.max(0, ship.invuln - dt);
 
-        if (controls.fire && ship.fireCd <= 0) {
+        if (controls.fire && ship.fireCd <= 0 && (playerControl || autoShotAligned())) {
           fire(controls.fireAngle ?? ship.a);
         }
       }
@@ -573,7 +573,6 @@
         let evading = false;
         let escapeBurn = false;
         let braking = false;
-        let fireUnsafe = false;
         let urgentSteer = false;
         let steerMode = 'cruise';
         const speed = shipSpeed();
@@ -584,35 +583,51 @@
           danger.predictedClearance < 42 ||
           (danger.closing > 30 && threat < 150)
         );
+        const centerX = W / 2 - ship.x;
+        const centerY = H / 2 - ship.y;
+        const centerDist = Math.hypot(centerX, centerY);
+        const closeTarget = shot && shot.close;
+        const returnToCenter = centerDist > Math.min(W, H) * .16;
         const pausing = now < ship.autoPauseUntil && threat > 170;
-        if (speed > 8 && !hardDanger) ship.autoBrakeUntil = Math.max(ship.autoBrakeUntil || 0, now + .9);
+        if (speed > 35 && !hardDanger) ship.autoBrakeUntil = Math.max(ship.autoBrakeUntil || 0, now + .9);
         if (speed < 1.8 || hardDanger) ship.autoBrakeUntil = Math.min(ship.autoBrakeUntil || 0, now);
-        const wantsStationary = speed > 2 && threat > 95 && now < (ship.autoBrakeUntil || 0);
+        // Reserve short braking windows instead of letting parking starve targeting.
+        const wantsStationary = speed > 12 && (!shot || now - ship.lastShot < .24 || now % 2.4 < .65) && threat > 95 && now < (ship.autoBrakeUntil || 0);
         const brakeWindow = wantsStationary && (!danger || openingClear || danger.closing <= 8 || danger.predictedClearance > 170 || threat > 210);
 
         if (hardDanger) {
           const plan = avoidancePlan(danger, true);
           desired = plan.angle;
           evading = true;
-          fireUnsafe = true;
           escapeBurn = plan.thrust || threat < 34 || danger.predictedClearance < 24 ||
             (danger.closing > 12 && (threat < 90 || danger.predictedClearance < 84)) ||
             (danger.closing > 34 && threat < 150);
           urgentSteer = true;
           steerMode = 'avoid';
-        } else if (brakeWindow) {
+        } else if (brakeWindow && !closeTarget && !returnToCenter) {
           desired = Math.atan2(-ship.vy, -ship.vx);
           steerMode = 'brake';
           braking = true;
-        } else if (danger && !openingClear && threat < 340 + speed * .18) {
+        } else if (danger && !openingClear && threat < 160 + speed * .18 && (danger.closing > 8 || danger.clearance < 100)) {
           const plan = avoidancePlan(danger, false);
           desired = plan.angle;
           evading = true;
-          fireUnsafe = threat < 92 || danger.predictedClearance < 88 || (danger.closing > 30 && threat < 150);
           steerMode = 'avoid';
           const aim = Math.abs(normAngle(desired - ship.a));
           escapeBurn = danger.closing > 8 || danger.predictedClearance < 160 || threat < 180;
           thrust = (plan.thrust || escapeBurn) && aim < 1.05 && speed < 220 && danger.dist > 65;
+        } else if (closeTarget) {
+          desired = aimAngle;
+          steerMode = 'aim';
+        } else if (returnToCenter) {
+          // A damped velocity goal brings the ship home without overshooting.
+          const homeVx = centerX * .28;
+          const homeVy = centerY * .28;
+          const ax = homeVx - ship.vx;
+          const ay = homeVy - ship.vy;
+          desired = Math.atan2(ay, ax);
+          steerMode = 'center';
+          thrust = Math.abs(normAngle(desired - ship.a)) < .25 && Math.hypot(ax, ay) > 9;
         } else if (wantsStationary) {
           desired = Math.atan2(-ship.vy, -ship.vx);
           steerMode = 'brake';
@@ -639,32 +654,31 @@
           ship.autoBrakeBurstUntil = Math.min(ship.autoBrakeBurstUntil || 0, now);
           ship.autoBrakeNextBurst = Math.max(ship.autoBrakeNextBurst || 0, now + .08);
         }
-        const patient = now - ship.lastShot > .85 && bullets.length < MAX_BULLETS;
+        // Evasive steering can still carry the nose across a valid shot.
         const shotReady = now >= ship.nextAutoShot && ship.fireCd <= 0 && bullets.length < MAX_BULLETS;
         let shoot = false;
         if (ship.autoBurstLeft > 0 && now - ship.autoBurstAt > .9) ship.autoBurstLeft = 0;
-        if (fireUnsafe) ship.autoBurstLeft = 0;
-        if (!fireUnsafe && ship.autoBurstLeft > 0 && now >= ship.autoBurstAt && threat > 95 && ship.fireCd <= 0 && bullets.length < MAX_BULLETS) {
+        if (ship.autoBurstLeft > 0 && now >= ship.autoBurstAt && ship.fireCd <= 0 && bullets.length < MAX_BULLETS) {
           const burstShot = autoShot();
-          if (burstShot && burstShot.aim < Math.max(burstShot.cone * 1.25, burstShot.small ? .3 : .24)) {
+          if (burstShot && burstShot.aim < burstShot.cone) {
             shoot = true;
             ship.autoBurstLeft--;
             ship.autoBurstAt = now + rand(.08, .14);
           } else {
             ship.autoBurstLeft = 0;
           }
-        } else if (!fireUnsafe && threat > 100 && shotReady && !!shot && (shot.aim < Math.max(shot.cone * 1.2, shot.small ? .3 : .24) || (patient && shot.aim < Math.max(shot.cone * 1.7, shot.small ? .44 : .34)))) {
+        } else if (shotReady && !!shot && shot.aim < shot.cone) {
           shoot = true;
           const burst = autoBurstCountForShot(shot);
           ship.autoBurstLeft = Math.max(0, burst - 1);
           ship.autoBurstAt = now + rand(.08, .13);
-          ship.nextAutoShot = now + rand(burst > 1 ? .3 : .22, burst > 1 ? .62 : .48);
+          ship.nextAutoShot = now + (shot.close ? rand(.22, .32) : rand(.55, .8));
         }
         const aiming = steerMode === 'aim' || steerMode === 'target';
         const turnGain = evading ? (urgentSteer ? 2.05 : 1.75) : braking ? 1.75 : aiming ? 1.55 : 1.12;
         const maxTurn = evading ? (urgentSteer ? 1 : .92) : braking ? .9 : aiming ? .84 : .68;
         let turn = clamp(delta * turnGain, -maxTurn, maxTurn);
-        if (Math.abs(delta) < (evading ? AUTO_TURN_DEADZONE : braking ? .055 : .12)) turn = 0;
+        if (Math.abs(delta) < (evading ? AUTO_TURN_DEADZONE : braking ? .055 : aiming ? .012 : .12)) turn = 0;
         else if (!evading && !braking && !aiming && Math.abs(delta) < .36) turn *= .16;
         return {
           turn,
@@ -778,19 +792,18 @@
 
       function holdAutoAim(shot) {
         if (!shot) return null;
-        const current = ship.autoAimAngle ?? shot.angle;
-        const drift = Math.abs(normAngle(shot.angle - current));
-        const refresh = now >= (ship.autoAimUntil || 0) || drift > (shot.small ? .4 : .54);
-        if (refresh) {
-          ship.autoAimAngle = shot.angle;
-          ship.autoAimUntil = now + rand(.26, .55);
-        } else {
-          ship.autoAimAngle = normAngle(current + normAngle(shot.angle - current) * .05);
-        }
-        return ship.autoAimAngle;
+        // Track the current intercept directly so small moving rocks stay in sight.
+        ship.autoAimAngle = shot.angle;
+        return shot.angle;
       }
 
       function holdAutoSteer(angle, mode, urgent) {
+        if (mode === 'aim' || mode === 'center') {
+          ship.autoSteerAngle = angle;
+          ship.autoSteerMode = mode;
+          ship.autoSteerUntil = now;
+          return angle;
+        }
         if (urgent) {
           const current = ship.autoSteerAngle ?? angle;
           const drift = Math.abs(normAngle(angle - current));
@@ -899,19 +912,34 @@
           const dx = wrapDelta(rock.x - ship.x, W);
           const dy = wrapDelta(rock.y - ship.y, H);
           const dist = Math.hypot(dx, dy);
-          if (dist > 920) continue;
+          if (dist > 650) continue;
           const lead = leadRock(rock, dx, dy, dist);
           const aim = Math.abs(normAngle(lead.angle - ship.a));
           const closing = Math.cos(ship.a) * lead.x + Math.sin(ship.a) * lead.y;
-          if (closing < -rockExtent(rock)) continue;
+          const close = dist - rockExtent(rock) < 230;
+          if (!close && closing < -rockExtent(rock)) continue;
           const extent = rockExtent(rock);
           const small = !canSplitRock(rock) || extent < 17;
-          const smallBonus = small ? 96 : 0;
-          const cone = clamp(Math.atan2(extent + (small ? 7 : 12), dist) * 1.55 + (dist < 280 ? .055 : .035), .12, .58);
-          const value = (cone - aim) * 350 + extent * (small ? .45 : 1.12) + smallBonus - dist * .014 - Math.abs(lead.t) * 2;
-          if (!best || value > best.value) best = { rock, aim, cone, angle: lead.angle, value, dist, small };
+          const smallBonus = 0;
+          const cone = Math.atan2(Math.max(2, extent * .42), Math.max(1, dist));
+          const value = (close ? 1200 - dist : 0) + (cone - aim) * 350 + extent * (small ? .45 : 1.12) + smallBonus - dist * .014 - Math.abs(lead.t) * 2;
+          if (!best || value > best.value) best = { rock, aim, cone, angle: lead.angle, value, dist, small, close };
         }
         return best;
+      }
+
+      function autoShotAligned() {
+        // Recheck after rotation and movement, using the actual muzzle path.
+        const nx = Math.cos(ship.a), ny = Math.sin(ship.a);
+        return rocks.some((rock) => {
+          const dx = wrapDelta(rock.x - ship.x, W) - nx * 17;
+          const dy = wrapDelta(rock.y - ship.y, H) - ny * 17;
+          const vx = rock.vx - nx * BULLET_SPEED;
+          const vy = rock.vy - ny * BULLET_SPEED;
+          const t = -(dx * vx + dy * vy) / (vx * vx + vy * vy);
+          if (t < 0 || t > .9) return false;
+          return Math.hypot(dx + vx * t, dy + vy * t) < rockExtent(rock) * .42;
+        });
       }
 
       function leadRock(rock, dx, dy, dist) {
@@ -937,11 +965,7 @@
       function autoBurstCountForShot(shot) {
         const available = MAX_BULLETS - bullets.length;
         if (available <= 0) return 0;
-        const aimRatio = shot.aim / Math.max(.001, shot.cone);
-        if (shot.small && aimRatio < 1.15 && shot.dist < 780) return Math.min(3, available);
-        if (aimRatio < .7 && shot.dist < 860) return Math.min(3, available);
-        if (aimRatio < 1.05 && shot.dist < 820) return Math.min(2, available);
-        return 1;
+        return shot.close ? Math.min(2, available) : 1;
       }
 
       function canSplitRock(rock) {

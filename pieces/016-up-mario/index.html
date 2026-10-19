@@ -71,7 +71,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Many Mario: a flock of floppy navy bags climbs through a different anime-painted cloudscape on every run, dodging barrels and spinning saw blades."
+      aria-label="Many Mario: a flock of floppy navy bags climbs through a different anime-painted cloudscape on every run, dodging barrels, spinning saw blades, and spiky patrolling creatures."
     ></canvas>
     <pre id="debug" class="debug" hidden></pre>
 
@@ -414,7 +414,11 @@
         }
 
         function update(dt) {
+          // Carry the lead runner before its brain chooses a world-space takeoff.
+          const support = hero.grounded && platformById(hero.groundId);
+          const supportX = support ? platformLeft(support) : 0;
           simTime += dt;
+          if (support && !hero.walkInDir) hero.x += platformLeft(support) - supportX;
           for (const runner of [hero, ...buddies]) runner.previousX = runner.x;
           extendWorld();
           updatePlatformStates();
@@ -807,8 +811,8 @@
 
         function ensureCrumbleBricks(platform) {
           if (platform.crumbleBricks) return platform.crumbleBricks;
-          const count = Math.max(4, Math.round(platform.baseW / CRUMBLE_TILE_SIZE));
-          const tileW = platform.baseW / count;
+          const count = Math.max(4, Math.round((platform.baseW ?? platform.w) / CRUMBLE_TILE_SIZE));
+          const tileW = (platform.baseW ?? platform.w) / count;
           platform.crumbleBricks = Array.from({ length: count }, (_, index) => ({
             index,
             x: index * tileW,
@@ -1157,12 +1161,13 @@
           cameraLeaderId = leader.id;
 
           const target = leader.y - height * 0.48;
-          const followSpeed = !leader.grounded && leader.vy < 0 ? 4.8 : 2.7;
-          cameraY += (target - cameraY) * (1 - Math.exp(-followSpeed * dt));
-
-          /* A falling leader can pull the camera downward. This lower-frame
-             guard keeps that Mario visible even at terminal speed. */
-          cameraY = Math.min(cameraY, leader.y - height * 0.28);
+          const descending = target < cameraY;
+          const followSpeed = descending ? 2.2 : 2.7;
+          const movement = (target - cameraY) * (1 - Math.exp(-followSpeed * dt));
+          // A lower survivor can be far below the previous leader. Limit the
+          // descent as well as easing it; visibility guards must never snap
+          // the camera straight to that survivor after a death.
+          cameraY += descending ? Math.max(movement, -height * 0.75 * dt) : movement;
 
           const leaderHeight = Math.max(0, leader.y - 88);
           bestHeight = Math.max(bestHeight, leaderHeight);
@@ -1279,13 +1284,50 @@
                 pulseCloud(landed);
               }
             }
+            const hitSpiny = platforms.some(platform => {
+              if (platform.collapsed || !platform.saw?.spiny) return false;
+              const [x, y] = sawCenter(platform);
+              const [previousX, previousY] = sawCenter(platform, simTime - dt);
+              const ax = barrel.previousX - previousX;
+              const ay = barrel.previousY - previousY;
+              const dx = barrel.x - x - ax;
+              const dy = barrel.y - y - ay;
+              const length = dx * dx + dy * dy;
+              const t = length ? clamp(-(ax * dx + ay * dy) / length, 0, 1) : 0;
+              return (ax + dx * t) ** 2 + (ay + dy * t) ** 2 <
+                (barrel.radius + platform.saw.radius) ** 2;
+            });
+            if (hitSpiny) {
+              burstBarrel(barrel);
+              continue;
+            }
             barrel.rotation += barrel.vx / barrel.radius * dt * (prefersReducedMotion ? 0.35 : 1);
             for (const runner of [hero, ...buddies]) {
               if (barrelHitsMario(barrel, runner)) defeatMario(runner, barrel);
             }
           }
-          barrels = barrels.filter(barrel => simTime - barrel.bornAt < 18 &&
+          barrels = barrels.filter(barrel => !barrel.burst && simTime - barrel.bornAt < 18 &&
             sceneScreenY(barrel.y) < height + 100 && sceneScreenX(barrel.x) > -100 && sceneScreenX(barrel.x) < width + 100);
+        }
+
+        function burstBarrel(barrel) {
+          if (barrel.burst) return;
+          barrel.burst = true;
+          const count = prefersReducedMotion ? 5 : 12;
+          for (let i = 0; i < count; i++) {
+            const variation = hash01(barrel.id * 397 + i * 71);
+            const angle = i / count * TAU;
+            const speed = prefersReducedMotion ? 32 : 100 + variation * 100;
+            particles.push({
+              kind: 'barrel', x: barrel.x, y: barrel.y,
+              vx: Math.cos(angle) * speed + barrel.vx * 0.25,
+              vy: Math.sin(angle) * speed + (prefersReducedMotion ? 10 : 80),
+              w: 3 + variation * 4, h: 8 + variation * 7,
+              rotation: angle, spin: prefersReducedMotion ? 0 : (variation - 0.5) * 14,
+              age: 0, life: prefersReducedMotion ? 0.35 : 0.7 + variation * 0.4,
+              color: i % 4 === 0 ? '#66507D' : i % 2 ? '#D69961' : '#714B43',
+            });
+          }
         }
 
         function updateParticles(dt) {
@@ -1721,7 +1763,7 @@
         }
 
         function marioLandingPause(runner, platform) {
-          if (platform.type === 'crumble') return 0.12;
+          if (platform.type === 'crumble') return 0;
           if (platform.type === 'cloud' && platform.shrinkLevel >= 3) return 0.2;
           const leader = highestMario();
           if (!leader) return 0.3;
@@ -1738,13 +1780,16 @@
         function committedMarioRoute(current, runner, jumpSpeed = BUDDY_JUMP_SPEED) {
           const plan = runner.groundRoute;
           if (plan && plan.fromId === current.id && platformIsSolid(plan.target)) {
+            const sourceLeft = platformLeft(current);
+            plan.launchX += sourceLeft - (plan.sourceLeft ?? sourceLeft);
+            plan.sourceLeft = sourceLeft;
             const bounds = landingBounds(plan.target);
             const footing = landingBounds(current);
             if (bounds && footing && plan.landingX >= bounds.left && plan.landingX <= bounds.right &&
                 plan.launchX >= footing.left && plan.launchX <= footing.right) {
               // A neighbor may block the run-up. Take the same jump from here
               // when it is reachable instead of pushing forever toward a mark.
-              if (simTime - plan.chosenAt > 0.55 &&
+              if (simTime - plan.chosenAt > (current.type === 'crumble' ? 0.06 : 0.55) &&
                   Math.abs(plan.landingX - runner.x) < LEADER_AIR_SPEED * plan.flightTime * 0.8 &&
                   !routeHitsEarlierPlatform(current, plan.target, runner.x, plan.landingX, plan.flightTime, jumpSpeed)) {
                 plan.launchX = clamp(runner.x, footing.left, footing.right);
@@ -1753,7 +1798,7 @@
             }
           }
           const route = chooseMarioBuddyTarget(current, runner, jumpSpeed);
-          runner.groundRoute = route ? { ...route, fromId: current.id, chosenAt: simTime } : null;
+          runner.groundRoute = route ? { ...route, fromId: current.id, sourceLeft: platformLeft(current), chosenAt: simTime } : null;
           return runner.groundRoute;
         }
 
@@ -1963,7 +2008,10 @@
           const type = nextPlatformType();
           const moving = type === 'ink' && y > 420 && w > 120 && rng() < 0.26;
           const platform = makePlatform(center, y, w, type, moving);
-          if (type === 'ink' && !moving && y > 620 && w > 170 && rng() < sawChance) attachSaw(platform, rng);
+          if (type === 'ink' && !moving && y > 620 && w > 170 && rng() < sawChance) {
+            if (hash01(platform.id * 719) < 0.6) attachSpiny(platform, rng);
+            else attachSaw(platform, rng);
+          }
           // Validate the final geometry, including motion added after planning.
           if (!canPlacePlatform(platform) && platform.moving) {
             platform.moving = false;
@@ -2092,6 +2140,12 @@
         /* A blade bolted to a ledge, sliding along a fixed span. Its
            position is a pure function of simTime, like the drifting
            platforms, so a seed always replays the same near miss. */
+        function attachSpiny(platform, rng) {
+          attachSaw(platform, rng);
+          if (!platform.saw) return;
+          Object.assign(platform.saw, { spiny: true });
+        }
+
         function attachSaw(platform, rng) {
           // The blade crosses most of the ledge, so it sits in the path a
           // runner actually walks rather than guarding a corner nobody uses.
@@ -2236,13 +2290,14 @@
           const saw = platform.saw;
           const slide = Math.sin(atTime * saw.speed + saw.phase) * saw.span * 0.5;
           return [platformLeft(platform, atTime) + platform.w * 0.5 + slide,
-            platform.y + saw.radius * 0.82];
+            platform.y + (saw.spiny ? saw.radius * 0.82 : 0)];
         }
 
         /* A slow blade does not need the swept test the barrels use; a circle
            against the body box is honest at this speed. */
         function sawHitsMario(platform, runner) {
           if (runner.dead || runner.entryPending) return false;
+          if (!platform.saw.spiny && runner.y + HERO_H <= platform.y) return false;
           const [cx, cy] = sawCenter(platform);
           const dx = Math.max(0, Math.abs(cx - runner.x) - HERO_W * 0.3);
           const dy = cy - clamp(cy, runner.y, runner.y + HERO_H);
@@ -2645,48 +2700,109 @@
             if (sy < -90 || sy > height + 90) continue;
             const sx = worldLeft + platformLeft(platform);
             const pulse = clamp(1 - (simTime - platform.pulseUntil + 0.24) / 0.24, 0, 1);
-            if (platform.moving) drawMovingPlatform(platform, sx, sy, pulse);
-            else if (platform.type === 'ink') drawSolidPlatform(platform, sx, sy, pulse);
+            if (platform.saw && !platform.saw.spiny) drawSawPlatform(platform, sx, sy);
+            else if (platform.moving) drawMovingPlatform(platform, sx, sy);
+            else if (platform.type === 'ink') drawSolidPlatform(platform, sx, sy);
             else if (platform.type === 'crumble') drawCrumblePlatform(platform, sx, sy, pulse);
             else if (platform.type === 'cloud') drawCloudPlatform(platform, sx, sy, pulse);
             if (platform.saw) drawSaw(platform);
           }
         }
 
-        /* The blade is built from the world's own palette rather than a
-           foreign steel grey, so it reads as part of the same picture. The
-           hub is drawn unspun so the eye has something still to hold. */
+        function drawSawPlatform(platform, sx, sy) {
+          const w = platform.w;
+          // Timber and purple metal bands echo the barrels.
+          fillRound(sx, sy, w, 32, 5, '#714B43');
+          fillRound(sx + 3, sy + 3, w - 6, 25, 3, '#D69961');
+          ctx.strokeStyle = '#A96A45';
+          ctx.lineWidth = 1.5;
+          for (let x = sx + 22; x < sx + w - 10; x += 25) {
+            ctx.beginPath(); ctx.moveTo(x, sy + 6); ctx.lineTo(x, sy + 26); ctx.stroke();
+          }
+          fillRound(sx + 8, sy + 3, 5, 25, 1, '#66507D');
+          fillRound(sx + w - 13, sy + 3, 5, 25, 1, '#66507D');
+          const trackWidth = platform.saw.span + platform.saw.radius * 2 + 4;
+          fillRound(sx + (w - trackWidth) * 0.5, sy - 2, trackWidth, 4, 2, '#714B43');
+        }
+
         function drawSaw(platform) {
           const saw = platform.saw;
+          if (saw.spiny) { drawSpiny(platform); return; }
           const [worldX, worldY] = sawCenter(platform);
           const cx = worldLeft + worldX;
           const cy = screenY(worldY);
           const r = saw.radius;
-          const teeth = 10;
-
-          fillOval(cx, screenY(platform.y) + 7, r * 0.8, 2.6, SHADOW);
+          const teeth = 14;
 
           ctx.save();
-          ctx.translate(cx, cy);
-          ctx.rotate(simTime * (prefersReducedMotion ? 0.7 : 4.2) * saw.dir);
+          // Only the upper half clears the table; the lower half stays hidden.
           ctx.beginPath();
-          for (let i = 0; i < teeth; i += 1) {
-            const outer = (i / teeth) * TAU;
-            const inner = ((i + 0.5) / teeth) * TAU;
+          ctx.rect(cx - r - 2, cy - r - 2, r * 2 + 4, r + 2);
+          ctx.clip();
+          ctx.translate(cx, cy);
+          ctx.rotate(simTime * (prefersReducedMotion ? 1.2 : 32) * saw.dir);
+          ctx.beginPath();
+          for (let i = 0; i < teeth; i++) {
+            const outer = i / teeth * TAU;
+            const inner = (i + 0.5) / teeth * TAU;
             ctx.lineTo(Math.cos(outer) * r, Math.sin(outer) * r);
-            ctx.lineTo(Math.cos(inner) * r * 0.72, Math.sin(inner) * r * 0.72);
+            ctx.lineTo(Math.cos(inner) * r * 0.78, Math.sin(inner) * r * 0.78);
           }
           ctx.closePath();
-          ctx.fillStyle = '#CFDCEA';
-          ctx.fill();
-          ctx.strokeStyle = C.ink;
-          ctx.lineWidth = 2;
-          ctx.lineJoin = 'round';
-          ctx.stroke();
+          ctx.fillStyle = '#CFDCEA'; ctx.fill();
+          ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.stroke();
+          ctx.strokeStyle = '#8093A6'; ctx.lineWidth = 1;
+          for (let i = 0; i < 3; i++) {
+            const angle = i * TAU / 3;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(angle) * r * 0.35, Math.sin(angle) * r * 0.35);
+            ctx.lineTo(Math.cos(angle) * r * 0.7, Math.sin(angle) * r * 0.7);
+            ctx.stroke();
+          }
+          fillCircle(0, 0, r * 0.22, C.ink);
           ctx.restore();
+        }
 
-          fillCircle(cx, cy, r * 0.32, C.ink);
-          fillCircle(cx, cy, r * 0.15, C.blush);
+        function drawSpiny(platform) {
+          const [x] = sawCenter(platform);
+          const cx = worldLeft + x;
+          const floor = screenY(platform.y);
+          const facing = Math.cos(simTime * platform.saw.speed + platform.saw.phase) >= 0 ? 1 : -1;
+          const radius = 21;
+          const bodyY = floor - 5;
+          const crimson = '#792441';
+          ctx.fillStyle = crimson;
+          for (const side of [-1, 1]) {
+            const hipX = cx + side * 10;
+            const stride = Math.sin(simTime * (prefersReducedMotion ? 3 : 11) + (side > 0 ? Math.PI : 0));
+            ctx.beginPath();
+            ctx.moveTo(hipX - 4, bodyY - 1);
+            ctx.lineTo(hipX + 4, bodyY - 1);
+            ctx.lineTo(hipX + stride * 2, floor - Math.max(0, stride) * 2);
+            ctx.closePath();
+            ctx.fill();
+          }
+          // One flat-bottomed semicircle; every spike shares its radial center
+          // and fill, so the creature reads as a single warm silhouette.
+          ctx.beginPath();
+          ctx.moveTo(cx - radius, bodyY);
+          for (let i = 0; i < 7; i++) {
+            const start = Math.PI + i * Math.PI / 7;
+            const end = start + Math.PI / 7;
+            const middle = (start + end) * 0.5;
+            ctx.arc(cx, bodyY, radius, start, middle - 0.075);
+            ctx.lineTo(cx + Math.cos(middle) * 31, bodyY + Math.sin(middle) * 31);
+            ctx.lineTo(cx + Math.cos(middle + 0.075) * radius,
+              bodyY + Math.sin(middle + 0.075) * radius);
+            ctx.arc(cx, bodyY, radius, middle + 0.075, end);
+          }
+          ctx.closePath();
+          ctx.fillStyle = crimson;
+          ctx.fill();
+          // Both eyes stay inside the body, looking in the patrol direction.
+          for (const offset of [-5, 5]) {
+            fillOval(cx + offset + facing * 4, bodyY - 9, 2.2, 3.4, '#F1B2C2');
+          }
         }
 
         function applyPlatformPulse(cx, sy, pulse) {
@@ -2733,10 +2849,9 @@
           ctx.closePath();
         }
 
-        function drawSolidPlatform(platform, sx, sy, pulse) {
+        function drawSolidPlatform(platform, sx, sy) {
           const w = platform.w;
           ctx.save();
-          applyPlatformPulse(sx + w * 0.5, sy, pulse);
           fillRound(sx, sy - 5, w, 15, 4, '#66507D');
           fillRound(sx + 4, sy - 3, w - 8, 8, 3, '#B7E8D9');
           ctx.restore();
@@ -2746,10 +2861,9 @@
            so it gets its own material: pastel purple, corners rounded much
            harder than the mint ledges, and a triangle at each end pointing the
            way it travels. */
-        function drawMovingPlatform(platform, sx, sy, pulse) {
+        function drawMovingPlatform(platform, sx, sy) {
           const w = platform.w;
           ctx.save();
-          applyPlatformPulse(sx + w * 0.5, sy, pulse);
           fillRound(sx, sy - 5, w, 15, 7, C.ink);
           fillRound(sx + 4, sy - 3, w - 8, 8, 5, C.pale);
 
@@ -2839,7 +2953,7 @@
             const sx = worldLeft + particle.x;
             const sy = screenY(particle.y);
             ctx.globalAlpha = (1 - age) * 0.85;
-            if (particle.kind === 'brick') {
+            if (particle.kind === 'brick' || particle.kind === 'barrel') {
               ctx.save();
               ctx.translate(sx, sy);
               ctx.rotate(particle.rotation || 0);

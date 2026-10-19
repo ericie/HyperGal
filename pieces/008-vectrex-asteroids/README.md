@@ -3,11 +3,12 @@
 A black-and-white vector Asteroids variant for a Vectrex monitor that never
 really clears the field.
 
-The ship pilots itself until a player takes the controls, mostly trying to park
-itself with visible retrograde burns, then thrusting mainly to dodge predicted
-asteroid paths. It fires tight two- or three-shot bursts one bullet at a time
-when the aim is clean. It keeps up to three bullets alive at once, with
-extra-narrow aim for small fragments. A bullet does not
+The ship pilots itself until a player takes the controls. It returns toward the
+center with damped steering, brakes to settle there, and dodges approaching
+asteroids. Nearby rocks take targeting priority from any direction. It tracks
+moving intercepts, waits for a precise muzzle-path alignment, and fires measured
+single shots at distant rocks or short two-shot bursts at nearby ones. It keeps
+up to three bullets alive at once, including during evasive turns. A bullet does not
 destroy an asteroid: it breaks the rock into two to five procedural pieces that
 burst away from the ship and keep dividing into smaller generations. The
 smallest rocks no longer divide; shots kick them away so they stay in play.

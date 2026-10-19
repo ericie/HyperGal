@@ -17,7 +17,12 @@ intelligence rises continuously with body length: safety tolerance tightens,
 the required escape pocket grows, and lookahead deepens from two moves to seven
 through roughly 60 segments. Safety tier and proven survival depth are applied
 before food distance, so a mature snake takes a longer route instead of entering
-a short trap. There is no density reward, space-filling route, or packing mode:
+a short trap. The longest snake, once at least 20 segments long, searches up to
+24 moves ahead with a bounded search budget. It also simulates a food route with
+its moving body and bite growth, requiring room, tail access, and an escape after
+eating before treating that route as safe. Its deepest proven survival horizon
+takes priority over local exit counts and hunger. Rival bodies are held fixed
+while planning; other snakes can still change the situation before arrival. There is no density reward, space-filling route, or packing mode:
 every snake hunts the mouse directly from the survivable routes available to
 it. Hunger strengthens with body length, but food cannot override an obvious
 cul-de-sac. Corner mice use a
@@ -43,9 +48,9 @@ never cuts diagonally between grid cells. The rule set stays small:
 - after a final visible hold, the leading three tenths of the body — at least
   three times the length of any offspring — becomes the heir, and the remaining
   body divides into smaller snakes that start the next round,
-- the heir keeps the winner's exact colour; the final fragment takes the next
-  swatch in the active palette, and every fragment between them is an even RGB
-  interpolation from the head colour to that palette endpoint.
+- the heir keeps the winner's exact colour; offspring vary by up to 35 degrees
+  of hue, with modest lightness and saturation variation. Each new winner becomes
+  the centre of the next colour family, allowing gradual drift over generations.
 
 ## The look
 
@@ -63,8 +68,9 @@ crisp without either snapping or breaking the body into loose squares.
 
 **Palettes.** The control panel offers neon, vaporwave, and hokusai, with Neon
 selected by default. A chosen palette stays locked across reseeds. After a win,
-the split forms a colour ramp from the winner to the next swatch in that
-palette.
+offspring stay within a narrow colour family around the winner. The family
+can slowly drift with successive winners, gradually changing the colours left
+in the field’s memory. Far and near shades alternate along the divided body.
 
 **Memory.** Everything that has ever died is painted into a layer beneath the
 living as crosshatched cells in its own colour. Each corpse gets its own loose,

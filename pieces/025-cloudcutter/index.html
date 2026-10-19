@@ -72,7 +72,7 @@
 
       function resize() {
         cancelAnimationFrame(raf);
-        dpr = 1;
+        dpr = Math.min(devicePixelRatio || 1, 2);
         W = innerWidth;
         H = innerHeight;
         canvas.width = Math.round(W * dpr);
@@ -102,7 +102,7 @@
         const viewR = Math.hypot(W, H) * .5;
         liveR = viewR * 1.55;
         killR = viewR * 2.4;
-        cloudTarget = clamp(Math.round(1.8 * Math.PI * liveR * liveR / (W * H)), 6, 14);
+        cloudTarget = clamp(Math.round(7.2 * Math.PI * liveR * liveR / (W * H)), 24, 56);
         ship = {
           x: 0, y: 0,
           vx: 150, vy: 0,
@@ -174,6 +174,7 @@
           renderContours: [],
           bounds: { minx: -size, miny: -size, maxx: size, maxy: size },
           radius: size,
+          shade: Math.round(rand(85, 210)),
           phase: rand(0, TAU),
           bob: rand(0, TAU),
           healRate: rand(.008, .014),
@@ -331,7 +332,7 @@
         const w = (b.maxx - b.minx) + pad * 2;
         const h = (b.maxy - b.miny) + pad * 2;
         if (!(w > 0) || !(h > 0)) return [];
-        const cell = Math.max(2.8, Math.max(w, h) / 50);
+        const cell = Math.max(1.8, Math.max(w, h) / 80);
         const nx = Math.max(2, Math.ceil(w / cell));
         const ny = Math.max(2, Math.ceil(h / cell));
         const gw = nx + 1;
@@ -411,7 +412,7 @@
             loop.push(edgePoint(e));
             e = next.get(e);
           }
-          if (loop.length >= 6) loops.push(decimate(smoothLoop(loop, 1)));
+          if (loop.length >= 6) loops.push(loop);
         }
         return loops;
       }
@@ -474,7 +475,7 @@
 
         // Render only solid outer boundaries. Enclosed voids still affect the
         // field and can join a bore later, but never appear as internal rings.
-        setCloudContours(cloud, solids.map((l) => dressLoop(resampleLoop(l.pts, 96))));
+        setCloudContours(cloud, solids.map((l) => dressLoop(resampleLoop(l.pts, 128))));
         return { empty: false, solids };
       }
 
@@ -526,10 +527,49 @@
       }
 
       function setCloudContours(cloud, contours) {
-        const compatible = cloud.renderContours.length === contours.length &&
-          contours.every((loop, i) => cloud.renderContours[i]?.length === loop.length);
+        const previous = cloud.renderContours;
+        if (!previous.length) {
+          cloud.renderContours = cloneContours(contours);
+        } else if (previous.length === contours.length) {
+          // Match bodies spatially, then align their cyclic samples. Area
+          // ordering and a new leftmost vertex must never rotate the outline.
+          const available = new Set(previous);
+          cloud.renderContours = contours.map((target) => {
+            let best, bestOffset = 0, bestError = Infinity;
+            for (const shown of available) {
+              for (let offset = 0; offset < shown.length; offset++) {
+                let error = 0;
+                for (let i = 0; i < target.length; i++) {
+                  const p = shown[(i + offset) % shown.length];
+                  error += (p.x - target[i].x) ** 2 + (p.y - target[i].y) ** 2;
+                }
+                if (error < bestError) { bestError = error; best = shown; bestOffset = offset; }
+              }
+            }
+            available.delete(best);
+            return best.slice(bestOffset).concat(best.slice(0, bestOffset));
+          });
+        } else {
+          // A through-cut changes topology. Start each new edge on the nearest
+          // existing segment, so the channel opens without replacing or
+          // dragging the entire silhouette to a different sampling landmark.
+          cloud.renderContours = contours.map((loop) => loop.map((target) => {
+            let nearest = target, distance = Infinity;
+            for (const old of previous) {
+              for (let i = 0; i < old.length; i++) {
+                const a = old[i], b = old[(i + 1) % old.length];
+                const dx = b.x - a.x, dy = b.y - a.y;
+                const t = clamp(((target.x - a.x) * dx + (target.y - a.y) * dy) /
+                  (dx * dx + dy * dy || 1), 0, 1);
+                const x = a.x + dx * t, y = a.y + dy * t;
+                const d = (x - target.x) ** 2 + (y - target.y) ** 2;
+                if (d < distance) { distance = d; nearest = { ...target, x, y }; }
+              }
+            }
+            return { ...nearest };
+          }));
+        }
         cloud.contours = contours;
-        if (!compatible) cloud.renderContours = cloneContours(contours);
       }
 
       function easeCloudContours(cloud, dt) {
@@ -1042,16 +1082,20 @@
           if (Math.abs(cloud.y - cam.y) > H / 2 + ext) continue;
           visibleClouds.push(cloud);
         }
-        // Opaque bodies mask the distant haze first; outlines are composed in
-        // a second pass so nothing can show through a cloud's interior.
+        // Solid white bodies cover the distant haze; shared edges stay hidden
+        // so overlapping weather reads as one continuous mass.
         for (const cloud of visibleClouds) fillCloud(cloud);
         for (const cloud of visibleClouds) drawCloud(cloud);
         drawWisps();
         drawCloudChunks();
+        // Invert the white linework over cloud bodies to keep the pilot and
+        // rounds legible both in open sky and while entering the weather.
+        ctx.save();
+        ctx.globalCompositeOperation = 'difference';
         drawBullets();
         drawShip();
         ctx.restore();
-        drawHud();
+        ctx.restore();
       }
 
       function drawStreaks() {
@@ -1067,8 +1111,7 @@
         for (const loop of cloud.renderContours) {
           const pts = loopPoints(cloud, loop, w1, w2);
           for (const run of visibleCloudRuns(cloud, pts)) {
-            strokePath(run.points, run.close, 3.4, .05 + lift * .3);
-            strokePath(run.points, run.close, 1.3, .76 + lift);
+            strokePath(run.points, run.close, 1, .76 + lift);
           }
         }
       }
@@ -1077,7 +1120,7 @@
         const w1 = now * 1.15 + cloud.phase;
         const w2 = now * .63 - cloud.phase;
         ctx.save();
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = `rgb(${cloud.shade}, ${cloud.shade}, ${cloud.shade})`;
         ctx.beginPath();
         for (const loop of cloud.renderContours) {
           const pts = loopPoints(cloud, loop, w1, w2);
@@ -1139,10 +1182,9 @@
         const out = new Array(loop.length);
         for (let i = 0; i < loop.length; i++) {
           const p = loop[i];
-          const d = Math.sin(w1 + p.k) * 1.15 + Math.sin(w2 + p.k * 1.9) * .8;
           out[i] = {
-            x: cloud.x + (p.x + p.nx * d) * s,
-            y: cloud.y + (p.y + p.ny * d) * s,
+            x: cloud.x + p.x * s,
+            y: cloud.y + p.y * s,
           };
         }
         return out;

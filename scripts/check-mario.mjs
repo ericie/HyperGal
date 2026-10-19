@@ -19,6 +19,7 @@ function simulation(seed = 'competence', width = 1280, height = 720, reduced = f
   vm.createContext(sandbox);
   // Expose the real sketch only inside this test VM; no test API ships in the piece.
   vm.runInContext(source.replace(/\}\)\(\);\s*$/, `globalThis.sim = {
+    platformLeft, marioLandingPause, attachSpiny, drawSpiny, drawSaw, drawSawPlatform,
     update, render, routeToPlatform, chooseMarioBuddyTarget, launchMarioBuddy,
     steerMarioBuddy, updateMarioBuddies, landingBounds, committedMarioRoute,
     updatePlatformStates, breakCloudPlatform, cloudLayerPositions, chooseMarioWalkIn, startMarioWalkIn,
@@ -30,7 +31,7 @@ function simulation(seed = 'competence', width = 1280, height = 720, reduced = f
     barrelBlocksLaunch, barrelSwerve, headBounce,
     get sawLedges() { return platforms.filter(p => p.saw).length; },
     advanceClock(seconds) { simTime += seconds; },
-    get state() { return { hero, buddies, platforms, simTime, bestHeight, barrels, barrelWarning, cameraY }; },
+    get state() { return { hero, buddies, platforms, simTime, bestHeight, barrels, barrelWarning, cameraY, particles }; },
     get visible() { return [hero, ...buddies].filter(r => !r.dead && !r.entryPending && marioIsOnStage(r)).length; }
   }; })();`), sandbox);
   if (!hazards) { sandbox.sim.disableBarrels(); sandbox.sim.disableSaws(); }
@@ -292,6 +293,77 @@ function assertPlatformSpacing(platforms) {
   for (let i = 0; i < 120 && sim.state.hero.entryPending; i++) sim.updateHero(1 / 60);
   assert.ok(!sim.state.hero.entryPending && sim.state.hero.grounded, 'the revived hero walks into play');
 }
+// Spikes shatter rolling and falling barrels, including fast swept contacts.
+for (const reduced of [false, true]) {
+  for (const falling of [false, true]) {
+    const sim = simulation('barrel-spikes', 1280, 720, reduced);
+    const shelf = platform(101, 200, 400, 240);
+    sim.attachSpiny(shelf, () => 0.2);
+    sim.state.platforms.splice(0, sim.state.platforms.length, shelf);
+    const [x, y] = sim.sawCenter(shelf);
+    const barrel = { id: 1, x: x - (falling ? 0 : 50), y: y + (falling ? 50 : 0),
+      vx: falling ? 0 : 1200, vy: falling ? -600 : 0, radius: 17,
+      rotation: 0, bornAt: 0, platformId: falling ? null : shelf.id };
+    sim.state.barrels.push(barrel);
+    sim.updateBarrels(1 / 15);
+    assert.equal(sim.state.barrels.length, 0, 'contact removes the barrel immediately');
+    assert.ok(sim.state.particles.length >= 5, 'the barrel bursts into fragments');
+    assert.ok(shelf.saw.spiny, 'the spiky enemy survives the barrel');
+    sim.updateBarrels(1 / 60);
+    assert.equal(sim.state.particles.length, reduced ? 5 : 12, 'a barrel bursts only once');
+    sim.render();
+  }
+}
+
+// Losing a high leader eases toward the lower survivor without a one-frame snap.
+for (const fps of [30, 60]) {
+  const sim = simulation('camera-descent');
+  const hero = sim.state.hero;
+  Object.assign(hero, { y: 2000, grounded: true, dead: false, entryPending: false });
+  sim.state.buddies.splice(0, sim.state.buddies.length,
+    { id: 1, x: 300, y: 300, grounded: true, dead: false, entryPending: false });
+  for (let i = 0; i < fps * 4; i++) sim.updateCamera(1 / fps);
+  const before = sim.state.cameraY;
+  sim.defeatMario(hero, { x: hero.x, vx: 1 });
+  sim.updateCamera(1 / fps);
+  assert.ok(sim.state.cameraY < before, 'camera starts descending toward the survivor');
+  assert.ok(before - sim.state.cameraY <= 720 * 0.75 / fps + 1e-6,
+    'leader death cannot snap the camera down');
+  for (let i = 0; i < fps * 8; i++) {
+    const previous = sim.state.cameraY;
+    sim.updateCamera(1 / fps);
+    assert.ok(sim.state.cameraY <= previous, 'descent stays monotonic');
+    assert.ok(previous - sim.state.cameraY <= 720 * 0.75 / fps + 1e-6,
+      'the whole descent respects its speed limit');
+  }
+  assert.ok(Math.abs(sim.state.cameraY - (300 - 720 * 0.48)) < 0.1,
+    'camera settles on the surviving Mario');
+}
+
+// Platforms carry the hero in world space, while takeoff marks stay local.
+{
+  const sim = simulation('platform-carry');
+  const shelf = { ...platform(101, 200, 300, 240), moving: true, travel: 80, speed: 0.5, phase: 0 };
+  sim.state.platforms.splice(0, sim.state.platforms.length, shelf);
+  sim.state.buddies.splice(0);
+  const hero = sim.state.hero;
+  Object.assign(hero, { x: 320, y: 300, vx: 0, vy: 0, grounded: true,
+    groundId: shelf.id, platformId: shelf.id, walkInDir: 0, entryPending: false,
+    landedAt: sim.state.simTime });
+  const offset = hero.x - sim.platformLeft(shelf);
+  for (let i = 0; i < 20; i++) sim.update(1 / 60);
+  assert.ok(Math.abs(hero.x - sim.platformLeft(shelf) - offset) < 0.001,
+    'a resting hero stays attached to a swaying platform');
+  assert.equal(sim.marioLandingPause(hero, { type: 'crumble' }), 0,
+    'crumbly blocks never impose a landing pause');
+  sim.attachSpiny(shelf, () => 0.2);
+  assert.ok(shelf.saw.spiny, 'spiky creatures patrol a platform');
+  const [x, y] = sim.sawCenter(shelf);
+  assert.ok(sim.sawHitsMario(shelf, { x, y: shelf.y }), 'spikes hurt on contact');
+  assert.ok(!sim.sawHitsMario(shelf, { x, y: y + 50 }), 'a jump above the spikes clears them');
+  sim.drawSpiny(shelf);
+}
+
 const results = [];
 for (const width of [1280, 390]) {
   for (const seed of ['competence', 'summer', 'crowd']) {
@@ -393,6 +465,11 @@ for (const width of [1280, 390]) {
 
   sim.state.platforms.splice(0, sim.state.platforms.length, ledge);
   const [bladeX] = sim.sawCenter(ledge);
+  assert.equal(sim.sawCenter(ledge)[1], ledge.y, 'table saw center sits at the platform surface');
+  assert.ok(!sim.sawHitsMario(ledge, { x: bladeX, y: ledge.y - 60 }),
+    'the hidden lower half cannot cut a runner underneath');
+  sim.drawSawPlatform(ledge, ledge.x, 300);
+  sim.drawSaw(ledge);
   assert.ok(sim.sawHitsMario(ledge, { x: bladeX, y: ledge.y }), 'the blade cuts a runner standing in it');
   assert.ok(!sim.sawHitsMario(ledge, { x: bladeX + 90, y: ledge.y }), 'and spares one standing clear');
   assert.ok(!sim.sawHitsMario(ledge, { x: bladeX, y: ledge.y, dead: true }), 'a body already falling is not cut again');
