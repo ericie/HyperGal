@@ -80,3 +80,4 @@ Every loaded or changed state is also sent to Bakalytics as a
   survives if Node, npm, or anything else rots.
 - Folders starting with `_` or `.` are skipped by the indexer (used for the
   template and any work-in-progress drafts you don't want listed yet).
+- Never add text or titles of any kind unless the author specifically requests it
