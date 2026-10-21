@@ -29,7 +29,7 @@ window.HMC_MANIFEST = {
     },
     {
       "slug": "004-hunt-prey-paint",
-      "wip": true,
+      "wip": false,
       "title": "hunt prey paint",
       "year": 2026,
       "date": "2026-06-24",
@@ -38,7 +38,7 @@ window.HMC_MANIFEST = {
       "rating": 50,
       "thumbnail": "thumbnail.jpg",
       "description": "An abstract ecosystem that paints itself in watercolour and cartographic linework, then wipes the painting clean forever. Over a pale NES-bright pixel terrain, blocky prey graze, grow into spiny square emblems that age toward white, and flee hunters with their own alertness and sprint speed. Spiny prey trundle toward richer plant patches and, when they die, burst into clean eraser blasts that wipe stains, foliage, food, and husks instead of fertilizing the ground. Compact black arcade hunters run prey down, fatten, and breed only by splitting in half. Floored and capped so neither side ever wins. Tap or click to reseed; ?warm= opens it already alive; ?debug for stats.",
-      "updated": "2026-09-10"
+      "updated": "2026-10-19"
     },
     {
       "slug": "005-only-invaders",
@@ -51,7 +51,7 @@ window.HMC_MANIFEST = {
       "rating": 50,
       "thumbnail": "thumbnail.jpg",
       "description": "Space Invaders after the invaders have vanished. Four inset cannons burn through forty-three rounds in volleys and sudden spasms. Each rail ends in an unstoppable circular boss round that grows under defensive fire, reaches the opposite cannon, and detonates to wipe the field blank.",
-      "updated": "2026-09-14"
+      "updated": "2026-10-19"
     },
     {
       "slug": "006-only-centipede",
@@ -77,7 +77,7 @@ window.HMC_MANIFEST = {
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
       "description": "Autonomous snakes hunt one mouse on a field that remembers its dead — eight to start, up to twenty as the winner's body is divided. Flat integer cells with a hard offset shadow, one of eight palettes per round, one swatch per snake. Success compounds through triangular streak growth, length bonuses, faster movement, and head-to-head dominance, while large snakes use deeper escape-space, tail-route, and rival-head analysis to avoid traps. Death travels from head to tail, and every segment it passes is painted into the memory beneath the living. Click to reseed.",
-      "updated": "2026-09-15"
+      "updated": "2026-10-19"
     },
     {
       "slug": "008-vectrex-asteroids",
@@ -90,7 +90,7 @@ window.HMC_MANIFEST = {
       "rating": 75,
       "thumbnail": "thumbnail.jpg",
       "description": "A black-and-white Vectrex-style Asteroids variant. The ship tries to park with visible retrograde burns, predicts asteroid paths, and fires tight two- or three-shot bursts one bullet at a time until a player takes over, thrusting mainly to dodge and keeping only three shots alive at once. Bullets split asteroids into deeper generations of two to five procedural chunks, while the smallest rocks get kicked away instead of dividing. Heavier fragments accelerate slowly, drift together under stronger gravity, bump instead of passing through, settle before they glom, and weld into rough integrated asteroid outlines that animate from their joined pieces. Any asteroid can kill the ship on contact.",
-      "updated": "2026-07-25"
+      "updated": "2026-10-19"
     },
     {
       "slug": "009-mutual-command",
@@ -194,7 +194,7 @@ window.HMC_MANIFEST = {
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
       "description": "Floppy navy bags climb a dense platform course, dodging barrels and saw blades and springing off each other's heads, while the camera follows whichever one is highest.",
-      "updated": "2026-09-24"
+      "updated": "2026-10-19"
     },
     {
       "slug": "017-knot-work",
@@ -311,7 +311,7 @@ window.HMC_MANIFEST = {
       "rating": 80,
       "thumbnail": "thumbnail.jpg",
       "description": "A black-and-white vector Asteroids variant flown against weather instead of rock. Rounds explosively punch broad chunks out of wide, scalloped cumulus, so the only way through a body is to bore a tunnel and fly down it. The ship never targets anything. It holds a wandering course with the guns held down, and where the sky is thick it grinds to a crawl until its own fire has opened the way — an icebreaker, not a hunter. Its hull reams out what the guns began, so it can never wedge itself in a bore too narrow to fly. Sparse cloudscapes pan endlessly left while the ship works up and down through them; the camera follows, keeping it in frame. Bites heal slowly like liquid, and a bore that reaches all the way through leaves the exact same cloud outline divided into two halves.",
-      "updated": "2026-08-10"
+      "updated": "2026-10-19"
     },
     {
       "slug": "026-top-of-the-heap",
@@ -480,7 +480,7 @@ window.HMC_MANIFEST = {
       "rating": 30,
       "thumbnail": "thumbnail.png",
       "description": "Pigment frogs shuttle across a ghost-white highway filling 80% of the screen, touching individual arrival counters at either end while passing cars drag and blend their stains into the asphalt.",
-      "updated": "2026-09-24"
+      "updated": "2026-10-19"
     },
     {
       "slug": "039-drips",
@@ -733,7 +733,7 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.png",
       "description": "Self-playing Tetris across the entire window, with 2×2 pixel square cells and a starting stack of partially filled lines. One piece falls from the top at a time and locks on contact. Full lines clear immediately, while the player keeps the field even. Click or Space pauses; R restarts.",
-      "updated": "2026-10-17"
+      "updated": "2026-10-19"
     },
     {
       "slug": "059-moon-orchard",
