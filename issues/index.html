@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Issue 01: The Arcade. Selected game artworks from Hypermedia Club. Neon hum, sticky floors, no closing time.">
+  <meta name="theme-color" content="#111010">
+  <title>Issue 01: The Arcade — Hypermedia Club</title>
+  <link rel="stylesheet" href="arcade.css">
+  <script src="../manifest.js" defer></script>
+  <script src="arcade.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#works">Skip to the artworks</a>
+  <div class="room">
+    <header class="masthead">
+      <a href="../index.html" class="club">Hypermedia<br>Club <span aria-hidden="true">↗</span></a>
+      <p class="edition">An issue of browser art<br><span>Issue 01 / Game studies</span></p>
+    </header>
+    <main>
+      <section class="entrance" aria-labelledby="issue-title">
+        <p class="eyebrow"><span class="lamp" aria-hidden="true"></span> Issue 01 <span class="divider">/</span> The doors are open</p>
+        <h1 id="issue-title"><span class="the">The</span><span class="arcade">Arcade<span class="period">.</span></span></h1>
+        <div class="intro">
+          <p class="subtitle">Neon hum. Sticky floors.<br>No closing time.</p>
+          <p class="intro-copy">Old obsessions, strange new rules. A collection of games that slipped out of the cabinet and took on a life of their own.</p>
+          <a href="#works" class="enter">Step inside <span aria-hidden="true">↓</span></a>
+        </div>
+        <div class="floor-line" aria-hidden="true"></div>
+      </section>
+      <section id="works" class="collection" aria-labelledby="collection-title">
+        <div class="section-head"><h2 id="collection-title">On the floor</h2><p id="count">Selected game artworks</p></div>
+        <ol class="cabinets" id="cabinets"></ol>
+        <noscript><p>JavaScript is needed to load this collection. <a href="../index.html?theme=games&status=selected">Visit the Game collection.</a></p></noscript>
+      </section>
+      <section class="closing" aria-label="End of issue">
+        <span class="coin" aria-hidden="true">✳</span>
+        <p>One more go.</p>
+        <a href="#issue-title">Back to the entrance <span aria-hidden="true">↑</span></a>
+      </section>
+    </main>
+    <footer><a href="../index.html">Hypermedia Club</a><span>Issue 01 — The Arcade</span><a href="../index.html?theme=games&status=selected">Explore the collection ↗</a></footer>
+  </div>
+</body>
+</html>

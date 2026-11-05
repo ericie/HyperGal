@@ -3,22 +3,41 @@
   const canvas = document.querySelector('canvas'), ctx = canvas.getContext('2d');
   const TAU = Math.PI * 2, key = 'hypergal-moon-orchard-v1';
   const WHITE = '#fff', BLACK = '#000', SPEED = 66, GRAVITY = 420;
-  let trees = [], time = 0, rotation = 0, paused = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let moonHoles = [], trees = [], time = 0, rotation = 0, paused = matchMedia('(prefers-reduced-motion: reduce)').matches;
   try {
     const s = JSON.parse(localStorage.getItem(key));
     if (s && Number.isFinite(s.time) && Number.isFinite(s.rotation) && Array.isArray(s.trees)) {
       time = s.time; rotation = s.rotation;
+      moonHoles = Array.isArray(s.moonHoles) ? s.moonHoles.filter(v => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite) && v[1] > 0 && v[1] <= 30) : [];
       trees = s.trees.filter(t => Array.isArray(t) && t.length === 5 && t.every(Number.isFinite));
     }
   } catch (_) {}
   let w, h, ground, planet, scroll = 0, last = 0, shotClock = .3, volley = 0;
   let obstacleClock = .6, ufoClock = 2, saveClock = 0;
   let shots = [], obstacles = [], ufos = [], bombs = [], sparks = [], jump = 0, velocity = 0;
-  let distance = 0, jumps = 0, craters = 0;
+  let distance = 0, jumps = 0, craters = 0, hopFired = false;
+  const repairSaucer = {x: 40, direction: 1, beam: null};
+  const moonY = x => planet.y + Math.sqrt(Math.max(0, planet.r ** 2 - (x - planet.x) ** 2));
   const rand = (a, b) => a + Math.random() * (b - a);
   const buggyX = () => w * .23;
   const ufoY = u => u.y + Math.sin(time * 3 + u.phase) * 3;
-  function save() { try { localStorage.setItem(key, JSON.stringify({time, rotation, trees})); } catch (_) {} }
+  let holeScore = 0;
+  const seenHoles = new WeakSet();
+  function countVisibleHoles() {
+    const see = hole => {if (!seenHoles.has(hole)) {seenHoles.add(hole); holeScore++;}};
+    obstacles.forEach(o => {
+      if (!o.dead && o.kind === 'pit' && o.x + o.size / 2 >= 0 && o.x - o.size / 2 <= w) see(o);
+    });
+    moonHoles.forEach(hole => {
+      const angle = hole[0] + rotation, x = planet.x + Math.cos(angle) * planet.r;
+      const y = planet.y + Math.sin(angle) * planet.r;
+      if (Math.sin(angle) > 0 && x + hole[1] >= 0 && x - hole[1] <= w && y >= 0 && y - hole[1] <= h) see(hole);
+    });
+  }
+  function filledHole(hole) {
+    if (seenHoles.delete(hole)) holeScore--;
+  }
+  function save() { try { localStorage.setItem(key, JSON.stringify({time, rotation, trees, moonHoles})); } catch (_) {} }
   function resize() {
     const oldW = w, oldGround = ground;
     // Keep sprites legible on phones and expose more terrain on wide screens.
@@ -40,19 +59,25 @@
     for (let i = 0; i < n; i++) sparks.push({x, y, vx: rand(-45, 45), vy: rand(-65, 20), life: rand(.2, .65)});
   }
   function plant(x, y) {
-    const a = Math.atan2(y - planet.y, x - planet.x) - rotation;
-    // Burst fire can share a root; let those shots nourish one tree instead of
-    // storing several identical silhouettes on top of each other forever.
-    const neighbor = trees.find(t => Math.abs(Math.atan2(Math.sin(t[0] - a), Math.cos(t[0] - a))) * planet.r < 5);
-    if (neighbor) neighbor[2] = Math.min(27, neighbor[2] + .5);
-    else trees.push([a, time, rand(12, 25), Math.random(), Math.random()]);
-    burst(x, y, 5);
+    const angle = Math.atan2(y - planet.y, x - planet.x) - rotation;
+    const near = moonHoles.find(v => Math.abs(Math.atan2(Math.sin(v[0] - angle), Math.cos(v[0] - angle))) * planet.r < 14);
+    if (near) near[1] = Math.min(30, near[1] + 4);
+    else moonHoles.push([angle, 16]);
+    countVisibleHoles();
+    burst(x, y, 8);
+  }
+  function fireHop() {
+    const x = buggyX(), y = ground - jump;
+    shots.push({x: x + 6, y: y - 31, vx: 0, vy: -270, up: true});
+    shots.push({x: x + 29, y: y - 10, vx: 270, vy: 0, up: false});
+    shots.push({x, y: y - 1, vx: -SPEED, vy: 270, down: true});
   }
   function crater(x, size) {
     const near = obstacles.find(o => o.kind === 'pit' && Math.abs(o.x - x) < (o.size + size) / 2);
     if (near) near.size = Math.min(32, Math.max(near.size, size));
     else obstacles.push({x, kind: 'pit', size, bomb: true});
     obstacles.forEach(o => {if (o.kind === 'rock' && Math.abs(o.x - x) < size / 2) o.dead = true;});
+    countVisibleHoles();
     craters++; burst(x, ground, 22);
   }
   function update(dt) {
@@ -60,11 +85,28 @@
     const bx = buggyX();
     obstacles.forEach(o => o.x -= dt * SPEED);
     const threat = obstacles.some(o => !o.dead && o.x + o.size / 2 > bx - 12 && o.x - o.size / 2 < bx + 27);
-    if (jump === 0 && threat) {velocity = 180; jump = .1; jumps++;}
+    if (jump === 0 && threat) {velocity = 180; jump = .1; jumps++; hopFired = false;}
     if (jump > 0) {
       jump += velocity * dt - GRAVITY * dt * dt / 2; velocity -= GRAVITY * dt;
       if (jump <= 0) {jump = 0; velocity = 0;}
     }
+    if (jump > 12 && !hopFired && obstacles.some(o => !o.dead && o.kind === 'pit' && Math.abs(o.x - bx) < o.size / 2)) {
+      fireHop(); hopFired = true;
+    }
+    repairSaucer.x += repairSaucer.direction * dt * 58;
+    if (repairSaucer.x > w - 22 || repairSaucer.x < 22) {
+      repairSaucer.x = Math.max(22, Math.min(w - 22, repairSaucer.x)); repairSaucer.direction *= -1;
+    }
+    countVisibleHoles();
+    repairSaucer.beam = null;
+    moonHoles = moonHoles.filter(hole => {
+      const angle = hole[0] + rotation, x = planet.x + Math.cos(angle) * planet.r;
+      if (Math.sin(angle) > 0 && Math.abs(x - repairSaucer.x) < 20) {
+        repairSaucer.beam = {x, y: moonY(x)}; hole[1] -= dt * 22;
+      }
+      if (hole[1] <= 0) filledHole(hole);
+      return hole[1] > 0;
+    });
     shotClock -= dt;
     if (shotClock <= 0) {
       if (volley === 0) volley = 3;
@@ -101,6 +143,14 @@
     for (const s of shots) {
       s.x += s.vx * dt; s.y += s.vy * dt;
       if (s.up && Math.hypot(s.x - planet.x, s.y - planet.y) <= planet.r) {plant(s.x, s.y); s.dead = true; continue;}
+      if (s.down) {
+        if (s.y >= ground) {
+          const pit = obstacles.find(o => !o.dead && o.kind === 'pit' && Math.abs(o.x - s.x) <= o.size / 2 + 3);
+          if (pit) {filledHole(pit); pit.dead = true; burst(s.x, ground, 10);}
+          s.dead = true;
+        }
+        continue;
+      }
       const rock = obstacles.find(o => o.kind === 'rock' && !o.dead && Math.abs(s.x - o.x) < o.size * .65 && s.y > ground - o.size && s.y < ground);
       const ufo = ufos.find(u => !u.dead && Math.abs(s.x - u.x) < 17 && Math.abs(s.y - ufoY(u)) < 9);
       const bomb = bombs.find(b => !b.dead && Math.hypot(s.x - b.x, s.y - b.y) < 7);
@@ -111,7 +161,7 @@
         s.dead = true; burst(s.x, s.y, rock && !rock.dead ? 4 : 12);
       }
     }
-    shots = shots.filter(s => !s.dead && s.x < w + 10 && s.y > -10);
+    shots = shots.filter(s => !s.dead && s.x < w + 10 && s.y > -10 && s.y < h + 10);
     obstacles = obstacles.filter(o => !o.dead && o.x > -45);
     ufos = ufos.filter(u => !u.dead && u.x > -35);
     bombs = bombs.filter(b => !b.dead && b.x > -10);
@@ -151,24 +201,8 @@
     }
     ctx.restore();
   }
-  // Small, original 3x5 raster lettering keeps the HUD on the same pixel grid.
-  const glyphs = {
-    A:'010101111101101', C:'111100100100111', D:'110101101101110', E:'111100110100111',
-    H:'101101111101101', I:'111010010010111', L:'100100100100111', M:'101111111101101',
-    N:'101111111111101', O:'111101101101111', P:'110101110100100', R:'110101110101101',
-    S:'111100111001111', T:'111010010010010', U:'101101101101111', V:'101101101101010',
-    '0':'111101101101111','1':'010110010010111','2':'110001111100111','3':'110001110001110',
-    '4':'101101111001001','5':'111100110001110','6':'011100111101111','7':'111001010010010',
-    '8':'111101111101111','9':'111101111001110', ' ':'000000000000000', '/':'001001010100100'
-  };
-  function label(text, x, y, scale = 1) {
-    for (const c of text) {
-      const bits = glyphs[c] || glyphs[' '];
-      for (let i = 0; i < 15; i++) if (bits[i] === '1') rect(x + i % 3 * scale, y + Math.floor(i / 3) * scale, scale, scale);
-      x += 4 * scale;
-    }
-  }
   function draw() {
+    countVisibleHoles();
     rect(0, 0, w, h, BLACK);
     for (let i = 0; i < 55; i++) {
       const x = ((i * 137.51) % 1) * w, y = ((i * 83.37) % 1) * ground;
@@ -186,7 +220,14 @@
     }
     ctx.restore();
     const rim = [];
-    for (let x = 0; x <= w; x += 2) rim.push([x, planet.y + Math.sqrt(planet.r * planet.r - (x - planet.x) ** 2)]);
+    for (let x = 0; x <= w; x += 2) {
+      let depth = 0;
+      for (const hole of moonHoles) {
+        const angle = hole[0] + rotation, hx = planet.x + Math.cos(angle) * planet.r;
+        if (Math.sin(angle) > 0 && Math.abs(x - hx) < hole[1]) depth = Math.max(depth, Math.sqrt(hole[1] ** 2 - (x - hx) ** 2) * .7);
+      }
+      rim.push([x, moonY(x) - depth]);
+    }
     line(rim); trees.forEach(drawTree);
     mountain();
     rect(0, ground, w, 2);
@@ -205,7 +246,9 @@
         line(points); line([[o.x - o.size * .15, ground - o.size + 3], [o.x + 1, ground - o.size * .48], [o.x - o.size * .25, ground - 3]]);
       }
     });
-    ufos.forEach(u => {
+    const repairY = moonY(repairSaucer.x) + 35;
+    if (repairSaucer.beam) line([[repairSaucer.x - 6, repairY - 8], [repairSaucer.beam.x, repairSaucer.beam.y - 7], [repairSaucer.x + 6, repairY - 8]]);
+    [...ufos, {x: repairSaucer.x, y: repairY, phase: -time * 3}].forEach(u => {
       const y = ufoY(u);
       rect(u.x - 5, y - 8, 10, 2); rect(u.x - 8, y - 6, 16, 4);
       rect(u.x - 15, y - 2, 30, 4); rect(u.x - 10, y + 2, 20, 2);
@@ -213,7 +256,7 @@
       rect(u.x - 8, y + 6, 3, 2); rect(u.x + 5, y + 6, 3, 2);
     });
     bombs.forEach(b => {rect(b.x - 1, b.y - 8, 2, 4); rect(b.x - 3, b.y - 3, 6, 5); rect(b.x - 1, b.y + 2, 2, 2);});
-    shots.forEach(s => rect(s.x - 1, s.y - 1, s.up ? 2 : 5, s.up ? 5 : 2));
+    shots.forEach(s => rect(s.x - 1, s.y - 1, s.up || s.down ? 2 : 5, s.up || s.down ? 5 : 2));
     const bx = buggyX(), by = ground - jump;
     ctx.save(); ctx.translate(Math.round(bx), Math.round(by));
     for (const x of [-13, 0, 13]) {
@@ -224,12 +267,12 @@
     rect(-3, -25, 10, 6, BLACK); rect(5, -31, 3, 6); rect(16, -12, 12, 3); rect(-22, -13, 3, 4);
     rect(-15, -13, 25, 2, BLACK); ctx.restore();
     sparks.forEach(p => rect(p.x, p.y, 2, 2));
-    rect(10, 10, 113, 30, BLACK);
-    label('MOON ORCHARD', 14, 14, 2); label(String(trees.length).padStart(5, '0') + ' TREES', 14, 30);
-    label('PATROL ' + String(Math.floor(distance / 100)).padStart(5, '0'), 14, h - 16);
-    const status = paused ? 'PAUSED / SPACE' : 'AUTOPILOT';
-    label(status, w - 14 - status.length * 4, h - 16);
-    canvas.dataset.trees = trees.length; canvas.dataset.jumps = jumps; canvas.dataset.craters = craters;
+    ctx.fillStyle = WHITE; ctx.font = '12px monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    const scoreText = 'HOLES ' + holeScore;
+    rect(10, 10, ctx.measureText(scoreText).width + 12, 24, BLACK);
+    ctx.fillStyle = WHITE; ctx.fillText(scoreText, 16, 16);
+    canvas.dataset.holeScore = holeScore;
+    canvas.dataset.moonHoles = moonHoles.length; canvas.dataset.trees = trees.length; canvas.dataset.jumps = jumps; canvas.dataset.craters = craters;
   }
   function toggle() {paused = !paused; canvas.setAttribute('aria-pressed', String(paused)); draw();}
   canvas.addEventListener('click', toggle);

@@ -11,6 +11,8 @@ from now, with zero external dependencies.
   view.
 - `pieces/_template/` — copy this to start a new piece.
 - `index.html` — the master gallery. Vanilla HTML/JS, no build needed to view.
+- `issues/index.html` — Issue 01: The Arcade, a landing page collecting Selected
+  Game pieces in numbered slug order from the shared manifest.
 - `manifest.js` — generated list of pieces, loaded by `index.html` as a plain
   script tag so the gallery works on `file://` (no server required).
 - `scripts/build-manifest.mjs` — Node script (stdlib only) that scans
