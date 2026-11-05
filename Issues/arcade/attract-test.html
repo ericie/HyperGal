@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Asteroids attract study — Hypermedia Club</title>
+  <style>
+    @font-face{font-family:'Public Sans';src:url('assets/public-sans.ttf');font-display:swap}
+    :root{color-scheme:dark}
+    *{box-sizing:border-box}
+    body{margin:0;min-width:320px;background:#080909;color:#e3d7bf;font:14px 'Public Sans',sans-serif}
+    nav{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:center;max-width:1120px;margin:auto;padding:22px 24px}
+    a{color:inherit;text-underline-offset:.25em}
+    button{padding:12px 16px;border:1px solid #8d8269;background:#080909;color:inherit;font:inherit;cursor:pointer}
+    :is(a,button):focus-visible{outline:3px solid #c9dc64;outline-offset:6px}
+    ::selection{background:#c9dc64;color:#11140e}
+    .room{position:relative;isolation:isolate;overflow:hidden;min-height:calc(100dvh - 90px);display:grid;place-items:center;padding:36px 24px 80px;background:url('assets/wall-wear.jpg') center/900px}
+    .prints{position:absolute;inset:0;z-index:-1;pointer-events:none}
+    .prints img{position:absolute;width:32%;max-width:430px;filter:grayscale(.65) sepia(.22) brightness(.5);opacity:.45}
+    .prints img:nth-child(1){left:-5%;top:1%;transform:rotate(-11deg)}
+    .prints img:nth-child(2){right:-3%;top:8%;transform:rotate(14deg)}
+    .prints img:nth-child(3){left:12%;bottom:-4%;transform:rotate(7deg)}
+    .screen{display:block;width:min(100%,960px);aspect-ratio:4/3;background:#000;box-shadow:0 20px 60px #000a}
+    canvas{display:block;width:100%;height:100%}
+    @media(max-width:650px){nav{padding:12px 18px}.room{padding:24px 12px 70px;min-height:calc(100dvh - 70px)}.prints img{width:65%}}
+  </style>
+  <script defer src="asteroids-attract.js"></script>
+</head>
+<body>
+  <nav aria-label="Study controls"><a href="index.html">Arcade</a><button id="pause" type="button" aria-pressed="false">Pause loop</button></nav>
+  <main class="room">
+    <div class="prints" aria-hidden="true"><img src="assets/raw/asteroids.jpg" alt=""><img src="assets/raw/pacman.jpg" alt=""><img src="assets/raw/frogs.jpg" alt=""></div>
+    <a class="screen" href="../../pieces/008-vectrex-asteroids/index.html" aria-label="Play Vectrex Asteroids"><canvas width="960" height="720" role="img" aria-label="Asteroids Assemble — letter parts assemble while background asteroids merge, then both explode and scatter together"></canvas></a>
+  </main>
+  <script>
+    addEventListener('DOMContentLoaded',()=>{
+      const canvas=document.querySelector('canvas'),button=document.querySelector('#pause'),link=document.querySelector('.screen');
+      const reduce=matchMedia('(prefers-reduced-motion:reduce)');
+      let paused=false,focused=false,time=0,last=0,timer=null;
+      function draw(){const at=reduce.matches||focused?AsteroidsAttract.still:time;AsteroidsAttract.draw(canvas,at);canvas.dataset.time=String(at.toFixed(3));}
+      function sync(){button.disabled=reduce.matches;button.setAttribute('aria-pressed',String(paused||reduce.matches));button.textContent=reduce.matches?'Motion paused':paused?'Play loop':'Pause loop';schedule();}
+      function schedule(){clearTimeout(timer);timer=null;last=performance.now();if(!paused&&!focused&&!reduce.matches&&!document.hidden)timer=setTimeout(tick,1000/24);}
+      function tick(){const now=performance.now();time=(time+Math.min(.15,(now-last)/1000))%AsteroidsAttract.duration;draw();schedule();}
+      button.addEventListener('click',()=>{paused=!paused;sync();});
+      link.addEventListener('focus',()=>{focused=true;draw();schedule();});
+      link.addEventListener('blur',()=>{focused=false;draw();schedule();});
+      document.addEventListener('visibilitychange',schedule);
+      reduce.addEventListener('change',()=>{draw();sync();});
+      new ResizeObserver(()=>{const b=canvas.getBoundingClientRect(),scale=Math.min(devicePixelRatio||1,1.5);canvas.width=Math.round(b.width*scale);canvas.height=Math.round(canvas.width*.75);draw();}).observe(canvas);
+      draw();sync();
+    });
+  </script>
+</body>
+</html>

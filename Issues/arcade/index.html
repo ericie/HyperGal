@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Arcade — three-frame attract films and a collection of browser artworks from Hypermedia Club.">
+  <title>Arcade — Hypermedia Club Issues</title>
+  <link rel="stylesheet" href="arcade.css">
+  <link rel="preload" href="assets/PermanentMarker.woff2" as="font" type="font/woff2" crossorigin>
+  <script defer src="attract-art.js"></script>
+  <script defer src="arcade.js"></script>
+  <script defer src="cabinet.js"></script>
+  <script defer src="attract.js"></script>
+</head>
+<body>
+  <a class="skip" href="#posters">Skip to the works</a>
+  <main class="issue">
+    <div class="wall" aria-hidden="true"></div>
+    <nav class="navigation" aria-label="Gallery navigation"><a href="../index.html">Issues</a><a href="../../index.html">Hypermedia Club</a></nav>
+    <header class="masthead">
+      <h1 class="marquee"><span class="sr-only">Arcade</span><svg viewBox="0 0 1440 278" aria-hidden="true"><defs><pattern id="marquee-ink" width="420" height="420" patternUnits="userSpaceOnUse"><rect width="420" height="420" fill="#e3d7bf"/><image href="assets/wall-wear.jpg" width="420" height="420" opacity=".22"/></pattern></defs><text x="8" y="226" textLength="1400" lengthAdjust="spacingAndGlyphs" font-size="268" fill="url(#marquee-ink)">ARCADE</text></svg></h1>
+      <button class="attract-toggle" type="button" aria-label="Pause attract-screen loops" aria-pressed="false" aria-controls="posters" title="Pause / play" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path class="pause-mark" d="M5 3h5v18H5Zm9 0h5v18h-5Z"/><path class="play-mark" d="m5 2 17 10L5 22Z"/></svg></button>
+    </header>
+    <button class="scrap wall-slot" type="button" disabled style="--x:6%;--y:94%;--size:120px;--rotation:12deg" aria-label="Insert a quarter — play a surprise artwork" title="Insert a quarter"><img src="assets/coin-slot.png" alt="" width="480" height="720"></button>
+    <div class="ephemera" aria-hidden="true">
+      <div class="scrap flyer" style="--x:70%;--y:6.0%;--size:330px;--rotation:8deg"><img src="assets/asteroids.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:-8%;--y:11.8%;--size:450px;--rotation:-11deg"><img src="assets/pacman.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:48%;--y:17.6%;--size:280px;--rotation:17deg"><img src="assets/cloudcutter.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:5%;--y:23.4%;--size:390px;--rotation:-6deg"><img src="assets/frogs.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:81%;--y:29.2%;--size:300px;--rotation:-16deg"><img src="assets/heap.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:22%;--y:35.0%;--size:330px;--rotation:8deg"><img src="assets/moon.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:65%;--y:40.8%;--size:450px;--rotation:-11deg"><img src="assets/invaders.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:-4%;--y:46.6%;--size:280px;--rotation:17deg"><img src="assets/centipede.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:42%;--y:52.4%;--size:390px;--rotation:-6deg"><img src="assets/snake.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:3%;--y:58.199999999999996%;--size:300px;--rotation:-16deg"><img src="assets/command.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:79%;--y:64.0%;--size:330px;--rotation:8deg"><img src="assets/happiness.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:30%;--y:69.8%;--size:450px;--rotation:-11deg"><img src="assets/paddle.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:-9%;--y:75.6%;--size:280px;--rotation:17deg"><img src="assets/mario.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:63%;--y:81.39999999999999%;--size:390px;--rotation:-6deg"><img src="assets/unbreakable.jpg" alt="" loading="lazy" width="720" height="960"></div>
+      <div class="scrap flyer" style="--x:22%;--y:87.2%;--size:300px;--rotation:-16deg"><img src="assets/tetris.jpg" alt="" loading="lazy" width="720" height="960"></div>
+    </div>
+    <section class="posters" id="posters" aria-label="Arcade works">
+      <a class="poster" data-game="asteroids" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/008-vectrex-asteroids/index.html" aria-label="Vectrex Asteroids"><img src="assets/raw/asteroids.jpg" alt="Vectrex Asteroids — attract screen" width="900" height="675" loading="eager" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="pacman" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/014-to-big-for-this-world/index.html" aria-label="To Big for This World"><img src="assets/raw/pacman.jpg" alt="To Big for This World — attract screen" width="900" height="675" loading="eager" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="cloudcutter" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/025-cloudcutter/index.html" aria-label="Cloudcutter"><img src="assets/raw/cloudcutter.jpg" alt="Cloudcutter — attract screen" width="900" height="675" loading="lazy" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="frogs" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/038-many-frogs/index.html" aria-label="Many Frogs"><img src="assets/raw/frogs.jpg" alt="Many Frogs — attract screen" width="900" height="675" loading="lazy" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="heap" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/026-top-of-the-heap/index.html" aria-label="Top of the Heap"><img src="assets/raw/heap.jpg" alt="Top of the Heap — attract screen" width="900" height="675" loading="lazy" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="moon" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/059-moon-orchard/index.html" aria-label="Moon Orchard"><img src="assets/raw/moon.jpg" alt="Moon Orchard — attract screen" width="900" height="675" loading="lazy" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="invaders" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/005-only-invaders/index.html" aria-label="Only Invaders"><img src="assets/raw/invaders.jpg" alt="Only Invaders — attract screen" width="900" height="675" loading="lazy" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="centipede" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/006-only-centipede/index.html" aria-label="Only Centipede"><img src="assets/raw/centipede.jpg" alt="Only Centipede — attract screen" width="900" height="675" loading="lazy" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="snake" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/007-hydra/index.html" aria-label="Snake Pit"><img src="assets/raw/snake.jpg" alt="Snake Pit — attract screen" width="900" height="675" loading="lazy" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="command" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/009-mutual-command/index.html" aria-label="Mutual Command"><img src="assets/raw/command.jpg" alt="Mutual Command — attract screen" width="900" height="675" loading="lazy" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="happiness" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/012-happiness-hunter/index.html" aria-label="Happiness Hunter"><img src="assets/raw/happiness.jpg" alt="Happiness Hunter — attract screen" width="900" height="675" loading="lazy" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="paddle" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/013-paddle/index.html" aria-label="Paddle"><img src="assets/raw/paddle.jpg" alt="Paddle — attract screen" width="900" height="675" loading="lazy" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="mario" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/016-up-mario/index.html" aria-label="Many Mario"><img src="assets/raw/mario.jpg" alt="Many Mario — attract screen" width="900" height="675" loading="lazy" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="unbreakable" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/003-unbreakable/index.html" aria-label="unbreakable"><img src="assets/raw/unbreakable.jpg" alt="unbreakable — attract screen" width="900" height="675" loading="lazy" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+      <a class="poster" data-game="tetris" data-ratio="1.333333" style="--ratio:4/3" href="../../pieces/058-micro-tetris/index.html" aria-label="Micro Tetris"><img src="assets/raw/tetris.jpg" alt="Micro Tetris — attract screen" width="900" height="675" loading="lazy" decoding="async"><canvas aria-hidden="true" data-frame="0" width="1" height="1"></canvas></a>
+    </section>
+    <footer class="end"><a href="../index.html">Back to Issues</a></footer>
+  </main>
+  <aside class="pocket" aria-label="Arcade controls" hidden>
+    <button class="pocket-coin" type="button" aria-label="Drop a quarter — play a surprise artwork" title="Drop a quarter">
+      <svg viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="36"/><circle cx="40" cy="40" r="28"/><path d="m40 20 6 13 15 2-11 11 3 15-13-7-13 7 3-15-11-11 15-2Z"/></svg>
+    </button>
+    <button class="sound-toggle" type="button" aria-label="Enable arcade sounds" aria-pressed="false" title="Arcade sound">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 12h6l8-7v22l-8-7H5Z"/><path class="sound-wave" d="M23 10q8 6 0 12"/><path class="sound-slash" d="m5 4 23 24"/></svg>
+    </button>
+  </aside>
+
+  <dialog class="player" aria-labelledby="cabinet-title">
+    <div class="cabinet">
+      <header class="cabinet-marquee">
+        <button class="cabinet-exit machine-button" type="button" aria-label="Return to the attract screens" title="Return to the wall">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="m19 6-10 10 10 10M9 16h20"/></svg>
+        </button>
+        <h2 id="cabinet-title"></h2>
+        <a class="cabinet-direct machine-button" href="../../index.html" target="_blank" rel="noopener" aria-label="Open this artwork on its own" title="Open artwork on its own">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M18 5h9v9M27 5 15 17M11 7H5v20h20v-6"/></svg>
+        </a>
+      </header>
+      <div class="crt">
+        <iframe class="game-screen" title="Arcade artwork" src="about:blank" allow="fullscreen"></iframe>
+        <div class="startup" aria-hidden="true"><i></i></div>
+      </div>
+      <div class="control-deck">
+        <div class="game-selector" role="group" aria-label="Choose an artwork">
+          <button class="game-prev arcade-button" type="button" aria-label="Previous artwork" title="Previous artwork"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m21 7-12 9 12 9Z"/></svg></button>
+          <button class="joystick" type="button" aria-label="Play a surprise artwork" title="Surprise me"><span class="joystick-base"></span><span class="joystick-stick"></span><span class="joystick-ball"></span></button>
+          <button class="game-next arcade-button" type="button" aria-label="Next artwork" title="Next artwork"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m11 7 12 9-12 9Z"/></svg></button>
+        </div>
+        <button class="cabinet-coin" type="button" aria-label="Drop a quarter — play another surprise artwork" title="Drop a quarter"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 8h5l16 16h5M3 24h5L24 8h5m-6-4 6 4-6 4m0 8 6 4-6 4"/></svg></button>
+        <button class="sound-toggle cabinet-sound" type="button" aria-label="Enable arcade sounds" aria-pressed="false" title="Arcade sound"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 12h6l8-7v22l-8-7H5Z"/><path class="sound-wave" d="M23 10q8 6 0 12"/><path class="sound-slash" d="m5 4 23 24"/></svg></button>
+      </div>
+    </div>
+    <p class="sr-only" id="player-status" role="status" aria-live="polite"></p>
+  </dialog>
+</body>
+</html>

@@ -1,0 +1,69 @@
+{
+  "title": "Arcade",
+  "date": "2026-11-03",
+  "wip": true,
+  "theme": "games",
+  "description": "Three-frame attract films over printed ephemera, collecting every work tagged Games.",
+  "works": [
+    {
+      "slug": "008-vectrex-asteroids",
+      "poster": "asteroids"
+    },
+    {
+      "slug": "014-to-big-for-this-world",
+      "poster": "pacman"
+    },
+    {
+      "slug": "025-cloudcutter",
+      "poster": "cloudcutter"
+    },
+    {
+      "slug": "038-many-frogs",
+      "poster": "frogs"
+    },
+    {
+      "slug": "026-top-of-the-heap",
+      "poster": "heap"
+    },
+    {
+      "slug": "059-moon-orchard",
+      "poster": "moon"
+    },
+    {
+      "slug": "005-only-invaders",
+      "poster": "invaders"
+    },
+    {
+      "slug": "006-only-centipede",
+      "poster": "centipede"
+    },
+    {
+      "slug": "007-hydra",
+      "poster": "snake"
+    },
+    {
+      "slug": "009-mutual-command",
+      "poster": "command"
+    },
+    {
+      "slug": "012-happiness-hunter",
+      "poster": "happiness"
+    },
+    {
+      "slug": "013-paddle",
+      "poster": "paddle"
+    },
+    {
+      "slug": "016-up-mario",
+      "poster": "mario"
+    },
+    {
+      "slug": "003-unbreakable",
+      "poster": "unbreakable"
+    },
+    {
+      "slug": "058-micro-tetris",
+      "poster": "tetris"
+    }
+  ]
+}

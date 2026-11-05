@@ -11,6 +11,8 @@ from now, with zero external dependencies.
   view.
 - `pieces/_template/` — copy this to start a new piece.
 - `index.html` — the master gallery. Vanilla HTML/JS, no build needed to view.
+- `Issues/` — thematic magazine-like collections, starting with **Arcade**.
+  Each issue has its own static page and links to existing works.
 - `manifest.js` — generated list of pieces, loaded by `index.html` as a plain
   script tag so the gallery works on `file://` (no server required).
 - `scripts/build-manifest.mjs` — Node script (stdlib only) that scans

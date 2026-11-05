@@ -186,7 +186,7 @@ window.HMC_MANIFEST = {
     {
       "slug": "016-up-mario",
       "wip": true,
-      "title": "Many Mario",
+      "title": "Always Moving Up",
       "year": 2026,
       "date": "2026-07-24",
       "category": "games",

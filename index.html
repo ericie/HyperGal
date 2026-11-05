@@ -63,6 +63,9 @@
         letter-spacing: -.015em;
         line-height: 1.02;
       }
+      .issues-link { display: inline-block; margin-top: 1rem; font-size: 1.18rem; color: var(--blue); text-underline-offset: 2px; }
+      .issues-link:visited { color: var(--visited); }
+      .issues-link:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; }
       /* Catalog controls */
       .controls {
         margin-top: clamp(1rem, 2.4vw, 1.6rem);
@@ -275,6 +278,7 @@
 
     <header>
       <h1>Hypermedia Club</h1>
+      <a class="issues-link" href="Issues/index.html">Issues</a>
       <div class="controls">
         <p class="ctl"><strong class="lbl">Status:</strong><span id="statuses" role="group" aria-label="Status"></span>. <strong class="lbl">Theme:</strong><select id="themes" class="pick" aria-label="Theme"></select>. <strong class="lbl">View:</strong><span id="views" role="group" aria-label="View"></span>. <strong class="lbl">Sort:</strong><span id="sorts" role="group" aria-label="Sort"></span></p>
       </div>

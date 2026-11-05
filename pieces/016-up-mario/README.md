@@ -1,4 +1,4 @@
-# Many Mario
+# Always Moving Up
 
 A self-playing vertical platform climber in a simplified anime-painted summer
 sky.

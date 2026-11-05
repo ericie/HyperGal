@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Many Mario attract plate source</title><style>@font-face{font-family:'Rubik Dirt';src:url('../RubikDirt.woff2')}body{margin:0;background:#080909}canvas{display:block;width:1200px;height:900px}</style><canvas width="1200" height="900" aria-label="Original Many Mario attract-screen collage"></canvas><script>
+(async()=>{
+ const image=new Image(),wall=new Image();image.src='../../../../pieces/016-up-mario/thumbnail.jpg';wall.src='../wall-wear.jpg';
+ await Promise.all([image.decode(),wall.decode(),document.fonts.load('100px "Rubik Dirt"')]);
+ const source=document.createElement('canvas');source.width=720;source.height=720;const s=source.getContext('2d');s.drawImage(image,0,0);
+ const pixels=s.getImageData(0,0,720,720);
+ for(let i=0;i<pixels.data.length;i+=4){const d=pixels.data,l=d[i]*.2126+d[i+1]*.7152+d[i+2]*.0722;const rgb=l<75?[252,242,35]:l<155?[37,58,234]:l<235?[10,11,15]:[222,215,185];d[i]=rgb[0];d[i+1]=rgb[1];d[i+2]=rgb[2];}
+ s.putImageData(pixels,0,0);
+ const c=document.querySelector('canvas').getContext('2d');c.fillStyle='#080909';c.fillRect(0,0,1200,900);
+ c.drawImage(source,0,210,720,510,0,0,1200,900);
+ c.save();c.translate(675,590);c.rotate(-.16);c.imageSmoothingEnabled=false;c.drawImage(source,195,557,95,83,-240,-100,790,690);c.restore();
+ c.save();c.translate(-80,460);c.rotate(-.14);c.drawImage(source,350,415,190,45,0,0,900,213);c.restore();
+ function word(text,x,y,w,h,color,angle){c.save();c.translate(x,y);c.rotate(angle);c.font='100px "Rubik Dirt"';const m=c.measureText(text);c.scale(w/m.width,h/m.actualBoundingBoxAscent);c.strokeStyle='#080909';c.lineWidth=12;c.strokeText(text,0,0);c.fillStyle=color;c.fillText(text,0,0);c.restore();}
+ word('MANY',45,224,790,200,'#ff3828',-.045);word('MARIO',44,446,1080,205,'#fff12b',-.055);
+ c.globalCompositeOperation='multiply';c.globalAlpha=.26;c.drawImage(wall,0,0,1200,900);c.globalAlpha=1;c.globalCompositeOperation='source-over';
+ document.body.dataset.ready='true';
+})();
+</script></html>

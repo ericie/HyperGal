@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="960" viewBox="0 0 720 960">
+  <style>@font-face { font-family: Public; src: url('public-sans.ttf'); } text { font-family: Public, sans-serif; font-weight: 950; }</style>
+  <defs>
+    <pattern id="bricks" width="120" height="80" patternUnits="userSpaceOnUse"><path d="M0 0h120v80H0Zm0 40h120M60 0v40M0 40v40m120-40v40" fill="none" stroke="#1854c5" stroke-width="2"/></pattern>
+    <path id="arrow" d="M-14 23V-6h-15L0-34 29-6H14v29Z"/>
+  </defs>
+  <rect width="720" height="960" fill="#f8ebc9"/>
+  <text x="34" y="143" textLength="650" lengthAdjust="spacingAndGlyphs" font-size="150" fill="#e4493b">MANY</text>
+  <text x="30" y="280" textLength="658" lengthAdjust="spacingAndGlyphs" font-size="150" fill="#1749ae">MARIO</text>
+  <path d="M0 330h720v630H0Z" fill="#1749ae"/>
+  <circle cx="370" cy="615" r="240" fill="none" stroke="#f8ebc9" stroke-width="19"/>
+  <circle cx="370" cy="615" r="207" fill="none" stroke="#f8ebc9" stroke-width="3"/>
+  <path d="M0 815h120V695h120V575h120V455h120V335h120V295h120v665H0Z" fill="#edac2d"/>
+  <path d="M0 815h120V695h120V575h120V455h120V335h120V295h120" fill="none" stroke="#f8ebc9" stroke-width="8"/>
+  <path d="M0 815h120V695h120V575h120V455h120V335h120V295h120v665H0Z" fill="url(#bricks)"/>
+  <g fill="#e4493b" stroke="#f8ebc9" stroke-width="5" stroke-linejoin="round">
+    <use href="#arrow" transform="translate(65 712) rotate(-20)"/>
+    <use href="#arrow" transform="translate(184 588) rotate(-10)"/>
+    <use href="#arrow" transform="translate(307 464) rotate(8)"/>
+    <use href="#arrow" transform="translate(430 348) rotate(18)"/>
+  </g>
+  <g fill="none" stroke="#f8ebc9" stroke-width="3" stroke-dasharray="4 8"><path d="M61 760q-29-147 76-108M180 640q-29-147 76-108M302 520q-29-147 76-108"/></g>
+  <g fill="#f8ebc9"><circle cx="55" cy="398" r="7"/><circle cx="161" cy="361" r="4"/><circle cx="678" cy="421" r="6"/></g>
+  <path d="M0 938h720v22H0Z" fill="#e4493b"/>
+</svg>

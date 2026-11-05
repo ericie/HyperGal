@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Themed collections of work from Hypermedia Club.">
+  <title>Issues — Hypermedia Club</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: clamp(24px, 5vw, 64px); color: #111; background: #fff; font-family: Georgia, "Times New Roman", serif; }
+    a { color: #0000ee; text-underline-offset: 3px; }
+    a:visited { color: #551a8b; }
+    a:focus-visible { outline: 2px solid #0000ee; outline-offset: 6px; }
+    ::selection { color: #fff; background: #0000ee; }
+    h1 { margin: 28px 0 36px; font-size: clamp(2rem, 5.5vw, 3.1rem); line-height: 1.02; letter-spacing: -.015em; }
+    .issue { display: block; width: min(100%, 560px); text-decoration: none; }
+    .cover { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #101211; }
+    .cover img { position: absolute; height: auto; }
+    .cover img:nth-child(1) { width:56%; left:6%; top:17%; }
+    .cover img:nth-child(2) { width:44%; right:4%; top:52%; }
+    .cover img:nth-child(3) { width:35%; left:61%; top:-5%; }
+    .caption { display: flex; align-items: baseline; gap: 1ch; margin-top: 14px; }
+    .title { font-size: 1.5rem; text-decoration: underline; }
+    .status { color: #555; font: 600 .75rem system-ui, sans-serif; letter-spacing: .08em; border: 1px solid #8a8a8a; padding: .15em .4em; }
+    .issue:hover .title { text-decoration-thickness: 2px; }
+  </style>
+</head>
+<body>
+  <nav aria-label="Gallery navigation"><a href="../index.html">Hypermedia Club</a></nav>
+  <main>
+    <h1>Issues</h1>
+    <a class="issue" href="arcade/index.html" aria-label="Arcade — work in progress">
+      <div class="cover" aria-hidden="true">
+        <img src="arcade/assets/raw/asteroids.jpg" alt="" width="1200" height="900">
+        <img src="arcade/assets/raw/pacman.jpg" alt="" width="1200" height="900">
+        <img src="arcade/assets/raw/frogs.jpg" alt="" width="1200" height="900">
+      </div>
+      <div class="caption"><span class="title">Arcade</span><span class="status">WIP</span></div>
+    </a>
+  </main>
+</body>
+</html>
