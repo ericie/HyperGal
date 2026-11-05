@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const source = fs.readFileSync(new URL('../pieces/059-moon-orchard/orchard.js', import.meta.url), 'utf8').replace(/\}\)\(\);\s*$/, `
   globalThis.check = {
-    update, draw, resize, save, toggle, crater,
-    get state() { return {w,h,ground,planet,shots,obstacles,ufos,bombs,trees,time,rotation,jump,jumps,craters,paused}; },
-    set scene(s) { if (s.obstacles) obstacles=s.obstacles; if (s.bombs) bombs=s.bombs; if (s.shots) shots=s.shots; if (s.ufos) ufos=s.ufos; },
+    update, draw, resize, save, toggle, crater, plant,
+    get state() { return {w,h,ground,planet,holeScore,moonHoles,repairSaucer,shots,obstacles,ufos,bombs,trees,time,rotation,jump,jumps,craters,paused}; },
+    set scene(s) { if (s.moonHoles) moonHoles=s.moonHoles; if (s.obstacles) obstacles=s.obstacles; if (s.bombs) bombs=s.bombs; if (s.shots) shots=s.shots; if (s.ufos) ufos=s.ufos; },
   };
 })();`);
 function setup(width = 1280, height = 720, storage = new Map(), reduced = false) {
@@ -14,7 +14,7 @@ function setup(width = 1280, height = 720, storage = new Map(), reduced = false)
   const math = Object.create(Math);
   math.random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
   const events = {}, attributes = {}, colors = new Set();
-  const context = new Proxy({}, {get: (o,k) => o[k] ?? (() => {}), set: (o,k,v) => {if(k === 'fillStyle' || k === 'strokeStyle') colors.add(v); o[k]=v; return true;}});
+  const context = new Proxy({measureText: text => ({width: text.length * 7})}, {get: (o,k) => o[k] ?? (() => {}), set: (o,k,v) => {if(k === 'fillStyle' || k === 'strokeStyle') colors.add(v); o[k]=v; return true;}});
   const canvas = {getContext: () => context, dataset: {}, addEventListener: (k,v) => events[k]=v, setAttribute: (k,v) => attributes[k]=v};
   const env = {Math: math, innerWidth: width, innerHeight: height, document: {querySelector: () => canvas, hidden: false, activeElement: canvas, addEventListener: (k,v) => events[k]=v},
     localStorage: {getItem: k => storage.get(k), setItem: (k,v) => storage.set(k,v)}, matchMedia: () => ({matches: reduced}),
@@ -35,7 +35,7 @@ for (const [width,height] of [[1280,720],[390,844],[844,390]]) {
     const fresh = s.shots.filter(shot => !previous.has(shot));
     if(fresh.length) bursts.push(s.time);
     previous = new Set(s.shots);
-    for(const shot of s.shots) assert.ok(shot.up ? shot.vx === 0 && shot.vy < 0 : shot.vx > 0 && shot.vy === 0, 'shots have no diagonal velocity');
+    for(const shot of s.shots) assert.ok(shot.down ? shot.vx === -66 && shot.vy > 0 : shot.up ? shot.vx === 0 && shot.vy < 0 : shot.vx > 0 && shot.vy === 0, 'shots have no diagonal velocity');
     maxJump = Math.max(maxJump,s.jump);
     sawSmall ||= s.obstacles.some(o => o.kind === 'rock' && o.size < 16);
     sawBig ||= s.obstacles.some(o => o.kind === 'rock' && o.size > 22);
@@ -47,11 +47,11 @@ for (const [width,height] of [[1280,720],[390,844],[844,390]]) {
   assert.ok(maxJump > 30 && maxJump < 40, 'short controlled hops');
   assert.ok(sawSmall && sawBig, 'both rock sizes spawn');
   assert.ok(check.state.craters > 0, 'UFO bombs reach ground and make holes');
-  assert.ok(check.state.trees.length > 0, 'vertical shots plant on the oversized moon');
+  assert.ok(check.state.moonHoles.length > 0, 'vertical shots carve the oversized moon');
   assert.deepEqual([...sim.colors].sort(), ['#000','#fff'], 'all drawing colors monochrome');
   check.save();
   const restored = setup(width,height,sim.storage);
-  assert.equal(restored.check.state.trees.length,check.state.trees.length,'orchard survives reload');
+  assert.equal(restored.check.state.moonHoles.length,check.state.moonHoles.length,'moon holes survive reload');
   assert.equal(restored.check.state.time,check.state.time,'growth time survives reload');
   sim.events.keydown({code:'Space', repeat:false, preventDefault(){}});
   const frozen = check.state.time;
@@ -90,3 +90,53 @@ assert.equal(reduced.check.state.time,0,'reduced motion starts paused');
 const failedStorage = new Map(); failedStorage.set = () => {throw new Error('storage blocked');};
 setup(390,844,failedStorage).check.save();
 console.log('Bomb-to-crater interaction, three-hit rocks, reduced motion and unavailable storage passed.');
+
+const repair = setup().check;
+const moon = repair.state.planet;
+repair.plant(moon.x, moon.y + moon.r);
+assert.equal(repair.state.moonHoles.length, 1, 'moon hit carves a hole');
+repair.state.repairSaucer.x = moon.x;
+const depth = repair.state.moonHoles[0][1];
+repair.update(.02);
+assert.ok(repair.state.moonHoles[0][1] < depth, 'overhead saucer fills nearby holes');
+assert.ok(repair.state.repairSaucer.beam, 'repair beam is visible during filling');
+repair.state.repairSaucer.x = repair.state.w - 22;
+repair.state.repairSaucer.direction = 1;
+repair.update(.02);
+assert.equal(repair.state.repairSaucer.direction, -1, 'repair saucer reverses at edge');
+const hop = setup().check;
+const pit = {x: hop.state.w * .23 + 12, kind: 'pit', size: 28};
+hop.scene = {obstacles: [pit]};
+for (let i = 0; i < 4; i++) hop.update(.02);
+assert.equal(hop.state.shots.length, 3, 'pit hop fires exactly three directions');
+assert.ok(hop.state.shots.some(s => s.up) && hop.state.shots.some(s => s.down) && hop.state.shots.some(s => s.vx > 0), 'hop shoots up, forward and down');
+for (let i = 0; i < 20; i++) hop.update(.02);
+assert.ok(!hop.state.obstacles.includes(pit), 'downward shot fills the scrolling pit below');
+console.log('Moon damage, saucer repair and reversal, and three-way pit repair shots passed.');
+
+const score = setup().check;
+const sx = score.state.w * .7;
+score.crater(sx, 28);
+assert.equal(score.state.holeScore, 1, 'visible crater increments score immediately');
+score.crater(sx, 28);
+score.draw(); score.draw();
+assert.equal(score.state.holeScore, 1, 'overlapping crater and repeated draws count only once');
+score.scene = {shots: [{x:sx, y:score.state.ground - 1, vx:0, vy:270, down:true}]};
+score.update(.01);
+assert.equal(score.state.holeScore, 0, 'filling ground pit decrements score');
+const incoming = {x:score.state.w + 20, kind:'pit', size:28};
+score.scene = {obstacles: [incoming], shots: []};
+score.draw();
+assert.equal(score.state.holeScore, 0, 'offscreen hole waits to be seen');
+score.update(.15); score.draw();
+assert.equal(score.state.holeScore, 1, 'hole entering screen increments score');
+incoming.x = -100; score.draw(); incoming.x = sx; score.draw();
+assert.equal(score.state.holeScore, 1, 'leaving and returning does not recount a hole');
+const mp = score.state.planet;
+score.plant(mp.x, mp.y + mp.r);
+assert.equal(score.state.holeScore, 2, 'new moon hole increments score');
+score.state.moonHoles[0][1] = .01;
+score.state.repairSaucer.x = mp.x;
+score.update(.01);
+assert.equal(score.state.holeScore, 1, 'saucer completing moon repair decrements score');
+console.log('Hole score creation, entry, deduplication and both repair paths passed.');

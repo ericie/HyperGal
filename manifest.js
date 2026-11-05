@@ -732,7 +732,7 @@ window.HMC_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.png",
-      "description": "Self-playing Tetris across the entire window, with 2×2 pixel square cells and a starting stack of partially filled lines. One piece falls from the top at a time and locks on contact. Full lines clear immediately, while the player keeps the field even. Click or Space pauses; R restarts.",
+      "description": "Self-playing Tetris across the entire window, with 4×4 pixel square cells and a starting stack of partially filled lines. One piece falls from the top at a time and locks on contact. Full lines clear immediately, while the player keeps the field even. Click or Space pauses; R restarts.",
       "updated": "2026-10-19"
     },
     {
@@ -744,7 +744,7 @@ window.HMC_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.png",
-      "description": "A black-and-white lunar arcade patrol. The buggy fires in bursts, hops rocks and bomb-blasted craters, and plants an orchard along the edge of an enormous rotating moon. The forest remembers each impact across visits. Click or Space pauses; S saves a picture.",
+      "description": "A black-and-white lunar arcade patrol. Buggy bullets carve holes in the rotating moon while a patrolling saucer repairs them. Pit jumps fire up, forward and down; downward shots fill the terrain below. Click or Space pauses; S saves a picture.",
       "updated": "2026-10-17"
     },
     {

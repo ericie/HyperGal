@@ -3,7 +3,7 @@
   const context = canvas.getContext('2d', { alpha: false });
   const recipes = window.MICRO_TETRIS_RECIPES;
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
-  const cellSize = 2;
+  const cellSize = 4;
   const colors = ['#090b10', '#76c9cd', '#d6bb6a', '#af93d4', '#83b995', '#cf7d8a', '#7598cf', '#cf9b74'];
   const colorBytes = colors.map(color => [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16)));
   let width, height, board, lanes, image, pixels;

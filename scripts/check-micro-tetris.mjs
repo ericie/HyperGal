@@ -25,12 +25,12 @@ for (const [width, height] of [[390, 844], [1200, 800], [391, 845], [10, 32], [7
   vm.runInContext(recipes, env);
   vm.runInContext(source, env);
   const check = env.check;
-  const columns = Math.max(1, Math.ceil(width / 2));
-  const rows = Math.max(16, Math.ceil(height / 2));
+  const columns = Math.max(1, Math.ceil(width / 4));
+  const rows = Math.max(16, Math.ceil(height / 4));
   assert.equal(canvas.width, columns);
   assert.equal(canvas.height, rows);
-  assert.equal(canvas.style.width, `${columns * 2}px`);
-  assert.equal(canvas.style.height, `${rows * 2}px`);
+  assert.equal(canvas.style.width, `${columns * 4}px`);
+  assert.equal(canvas.style.height, `${rows * 4}px`);
   const initialCells = check.board.filter(Boolean).length;
   const initialDepth = columns > 4 ? Math.max(4, Math.floor(rows * .32 / 4) * 4) : 0;
   if (columns > 4) {

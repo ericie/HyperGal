@@ -1,6 +1,6 @@
 # Micro Tetris
 
-A self-playing, full-window Tetris field. Each tetromino consists of four **2×2 CSS pixel square cells**, including on high-density displays. The board has one column for every two CSS pixels of window width. No grid, score overlay, or external dependencies.
+A self-playing, full-window Tetris field. Each tetromino consists of four **4×4 CSS pixel square cells**, including on high-density displays. The board has one column for every four CSS pixels of window width. No grid, score overlay, or external dependencies.
 
 Starts with haphazardly filled, uneven stacks reaching into the lower third of the window, with partial tetromino recipes scattered across the field. No empty well is reserved. Extremely narrow windows with fewer than five columns start empty. Exactly one tetromino falls from the top at a time, moves down until it contacts the floor or another piece, then locks. Completed full-width rows blink before disappearing and the rows above collapse down before the next piece begins. Four-line clears get a larger, longer blink, then contract inward before collapsing.
 
