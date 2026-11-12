@@ -6,7 +6,7 @@
   const toggle = document.querySelector('.attract-toggle');
   const player = document.querySelector('.player');
   const holds = [1800, 1050, 1450];
-  const states = [...document.querySelectorAll('.poster')].map((link, i) => ({
+  const states = [...document.querySelectorAll('.poster:not([data-attract])')].map((link, i) => ({
     link, canvas: link.querySelector('canvas'), key: link.dataset.game,
     phase: 0, visible: false, focused: false, scrubbing: false, loaded: false, loading: false,
     next: performance.now() + 300 + i * 173, offset: i * 173 % 650, size: ''

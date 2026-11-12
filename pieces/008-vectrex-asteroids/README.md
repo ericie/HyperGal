@@ -1,4 +1,7 @@
-# Vectrex Asteroids
+# Asteroids Assemble
+
+Previously titled Vectrex Asteroids. The `008-vectrex-asteroids` folder is retained
+so existing links keep working.
 
 A black-and-white vector Asteroids variant for a Vectrex monitor that never
 really clears the field.

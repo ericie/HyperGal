@@ -44,23 +44,17 @@ remain in the scene.
 ## Hazards
 
 Wooden barrels tumble in from above; spinning saw blades are bolted to some of
-the ledges. Both knock a bag out the same way, and a knocked-out bag returns
+the ledges, and stationary nozzles fire short horizontal flame bursts.
+All three knock a bag out the same way, and a knocked-out bag returns
 through the same spaced, below-leader entrances as everyone else.
 
-Runners try not to die. On the ground they read the nearest thing bearing down
-on them -- the ledge's blade, a barrel rolling along it, a barrel still falling
-toward it, even the amber warning marker for one about to drop -- and back away
-while there is ledge to back onto. Once there is not, or the thing is too close
-to outrun, they hop it and let it pass underneath. Anything moving away is
-ignored, so a runner will happily fall in behind a hazard rather than flee
-something already past.
-
-In the air they have less to work with, so the important decision is made
-before takeoff: a jump waits rather than commits while a barrel is anywhere
-over the run. Mid-flight they lean away from a barrel sharing the air, which
-rarely saves anyone outright but turns a lot of direct hits into near misses.
-Jumping into a falling barrel was by a wide margin the commonest way to die
-here; holding the jump roughly halved the casualty rate on its own.
+Runners look ahead before moving: they forecast barrel rolls, ledge catches,
+and falls, then compare continuing, stopping, and retreating over the next
+half second. A dodge takes priority over a planned jump. Falling barrels are
+read by their future landing column, and takeoffs check the full flight for
+incoming barrels and timed flames. Evasive hops also check for overhead danger.
+In the air, runners lean away from nearby barrels while trying to keep their
+landing target.
 
 ### Barrels
 
@@ -89,6 +83,41 @@ more footing; one already backed against a lip cuts past the blade instead.
 That reaction is deliberately late, so a cornered or committed bird still gets
 caught. Birds treat a bladed ledge as a slightly worse step than a clean one
 and route around it when there is a choice.
+
+### Flamethrowers
+
+Small brass-and-coral nozzles stay bolted to stationary solid platforms. Each
+shows a pilot light and sparks for 0.65 seconds, fires for 0.55 seconds, then
+cools for several seconds. Jets point along the ledge and leave a clear refuge
+at the far end. Runners retreat from the warning and aim for landings beyond
+the full jet; they do not try to dodge a sustained flame with a tiny hop.
+The nozzle timing and placement replay with the seed.
+
+### Warp pipes
+
+Mint and lilac pipes form matching pairs between stationary solid ledges.
+Runners approach a lower mouth, sink into it, and emerge a few ledges higher.
+They check the destination for barrels, other runners, and an occupied pipe
+before entering, then recheck before emerging. A short cooldown prevents
+immediate return trips. Pipes share the same bounded world lifecycle as their
+platforms; an exit that scrolls away disconnects its partner.
+
+The controllable runner can use either direction: stand at a mouth and press
+Down or S. Autopilot chooses upward trips.
+
+### Chained bear traps
+
+Steel jaws and a short linked chain are bolted to some stationary solid ledges.
+Stepping on the pressure plate snaps the jaws shut around the runner's feet.
+A trapped runner stays alive, tugs against the fixed chain, and cannot walk,
+jump, warp, or be pushed free. Each trap catches one runner and stays sprung.
+Captives remain alive through passing hazards so they can be left behind as
+the free runners climb out of view.
+
+The camera and entrance rules follow the free pack. If everyone is caught,
+the view drifts upward until a new walk-in can take over. A captive is reused
+only after scrolling completely offscreen, through the usual hidden entrance;
+abandoned trap platforms are reclaimed with the rest of the world.
 
 ## World
 
@@ -187,6 +216,7 @@ produces a deep squash.
 
 - Arrow keys or A/D: move.
 - Space, W, or Up: jump.
+- Down or S at a pipe: warp to its partner.
 - Tap/click: reseed.
 - R: reseed.
 

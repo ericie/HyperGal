@@ -71,7 +71,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Always Moving Up: a flock of floppy navy bags climbs through a different anime-painted cloudscape on every run, dodging barrels, spinning saw blades, and spiky patrolling creatures."
+      aria-label="Always Moving Up: a flock of floppy navy bags climbs through a different anime-painted cloudscape on every run, dodging barrels, spinning saw blades, spiky patrolling creatures, and short flame bursts, with paired warp pipes and chained bear traps that hold runners behind as the climb continues."
     ></canvas>
     <pre id="debug" class="debug" hidden></pre>
 
@@ -130,6 +130,10 @@
         const HAZARD_HOP_SPEED = 420;
         const HEAD_BOUNCE_SPEED = 585;
         let sawChance = 0.26;
+        let courseFeatures = true;
+        const FLAME_WARNING = 0.65;
+        const FLAME_BURST = 0.55;
+        const WARP_SECONDS = 0.7;
         const BARREL_WARNING_SECONDS = 0.85;
         const BARREL_LIMIT = 3;
         const SCENE_SCALE = 0.9;
@@ -208,6 +212,7 @@
           left: false,
           right: false,
           jump: false,
+          down: false,
         };
         let pointer = {
           active: false,
@@ -422,12 +427,15 @@
           for (const runner of [hero, ...buddies]) runner.previousX = runner.x;
           extendWorld();
           updatePlatformStates();
+          updateWarps();
           updateControls(dt);
           updateHero(dt);
           updateMarioBuddies(dt);
           resolveMarioShoves(dt);
+          updateBearTraps();
           updateBarrels(dt);
           updateSaws();
+          updateFlames();
           updateParticles(dt);
           updateCamera(dt);
           maintainMarioPopulation();
@@ -436,12 +444,16 @@
         }
 
         function updateControls(dt) {
-          if (hero.dead || hero.walkInDir) {
+          if (hero.dead || hero.walkInDir || hero.warp || hero.trapped) {
             jumpBufferedUntil = 0;
             return;
           }
           if (keys.jump && simTime > jumpBufferedUntil) jumpBufferedUntil = simTime + 0.12;
           if (manualActive()) {
+            if (keys.down && hero.grounded) {
+              const source = platformById(hero.groundId);
+              if (source?.pipe && Math.abs(hero.x - source.pipe.x) < 24) beginWarp(hero, source);
+            }
             hero.groundRoute = null;
             targetPlatformId = null;
             return;
@@ -450,6 +462,7 @@
         }
 
         function updateHero(dt) {
+          if (hero.warp || hero.trapped) return;
           if (hero.dead) { updateDefeatedMario(hero, dt); return; }
           if (hero.walkInDir) {
             if (hero.entryPending && hero.y >= marioEntryCeiling()) return;
@@ -536,20 +549,21 @@
             return;
           }
 
-          const dodge = hazardPlan(current, hero.x);
+          const dodge = hazardPlan(current, hero.x, hero);
           if (dodge) {
             targetPlatformId = null;
-            if (dodge.hop && simTime >= hero.jumpCooldownUntil) {
+            if (dodge.hop && simTime >= hero.jumpCooldownUntil && hopIsSafe(hero, current, dodge.away)) {
               hopHero(current, dodge.away);
               return;
             }
-            hero.autoVx = dodge.away * runSpeed;
+            hero.autoVx = safeGroundVelocity(current, hero, dodge.away * runSpeed);
             return;
           }
 
+          if (planWarp(hero, current, runSpeed)) return;
           if (simTime < hero.landedAt + marioLandingPause(hero, current)) {
             targetPlatformId = null;
-            hero.autoVx = 0;
+            hero.autoVx = safeGroundVelocity(current, hero, 0);
             return;
           }
 
@@ -557,7 +571,7 @@
           targetPlatformId = route ? route.target.id : null;
           if (!route) {
             if (!hero.noRouteSince) hero.noRouteSince = simTime;
-            hero.autoVx = clamp((platformCenter(current) - hero.x) * 2.8, -runSpeed, runSpeed);
+            hero.autoVx = safeGroundVelocity(current, hero, clamp((platformCenter(current) - hero.x) * 2.8, -runSpeed, runSpeed));
             return;
           }
           hero.noRouteSince = 0;
@@ -573,7 +587,8 @@
             ? clamp(landingDx * (leading ? 2.8 : 3.6), -runSpeed, runSpeed)
             : clamp(launchDx * (leading ? 3.6 : 4.8), -runSpeed, runSpeed);
 
-          if (atLaunch && simTime >= hero.jumpCooldownUntil && !barrelBlocksLaunch(hero, route.landingX)) {
+          hero.autoVx = safeGroundVelocity(current, hero, hero.autoVx);
+          if (atLaunch && simTime >= hero.jumpCooldownUntil && !barrelBlocksLaunch(hero, route.landingX, route)) {
             jump(route);
           }
         }
@@ -728,6 +743,12 @@
           const heroInset = HERO_W * 0.5 + 4;
           let hardLeft = Math.max(heroInset, platformEdge + HERO_W * 0.42);
           let hardRight = Math.min(worldWidth - heroInset, platformEdge + platform.w - HERO_W * 0.42);
+          if (platform.flame) {
+            const f = platform.flame;
+            const tip = f.x + f.dir * (13 + f.length);
+            if (f.dir > 0) hardLeft = Math.max(hardLeft, tip + HERO_W * 0.5 + 5);
+            else hardRight = Math.min(hardRight, tip - HERO_W * 0.5 - 5);
+          }
           if (platform.saw) {
             // Aim for whichever side of the blade has more room right now.
             // The blade keeps moving during the flight, which is exactly
@@ -851,13 +872,13 @@
             }
           }
 
-          if (hero.grounded) {
+          if (hero.grounded && !hero.trapped) {
             const platform = platformById(hero.groundId);
             if (!platformIsSolid(platform)) releaseHeroFromPlatform();
             else updatePlatformContact(platform, hero.x);
           }
           for (const buddy of buddies) {
-            if (!buddy.grounded) continue;
+            if (!buddy.grounded || buddy.trapped) continue;
             const platform = platformById(buddy.platformId);
             if (!platformIsSolid(platform)) dropMarioBuddy(buddy);
             else updatePlatformContact(platform, buddy.x);
@@ -1057,7 +1078,7 @@
         }
 
         function manualActive() {
-          return keys.left || keys.right || keys.jump || pointer.active || simTime < manualUntil;
+          return keys.left || keys.right || keys.jump || keys.down || pointer.active || simTime < manualUntil;
         }
 
         function jump(route) {
@@ -1157,7 +1178,13 @@
 
         function updateCamera(dt) {
           const leader = highestMario();
-          if (!leader) { cameraLeaderId = null; return; }
+          if (!leader) {
+            cameraLeaderId = null;
+            // If the whole pack is caught, keep scrolling gently so a fresh
+            // walk-in can take over instead of pinning the film to the traps.
+            if ([hero, ...buddies].some(runner => runner.trapped)) cameraY += 30 * dt;
+            return;
+          }
           cameraLeaderId = leader.id;
 
           const target = leader.y - height * 0.48;
@@ -1174,12 +1201,12 @@
         }
 
         function highestMario() {
-          const runners = [hero, ...buddies].filter(runner => !runner.dead && !runner.entryPending);
+          const runners = [hero, ...buddies].filter(runner => !runner.dead && !runner.trapped && !runner.entryPending);
           return runners.reduce((highest, runner) => !highest || runner.y > highest.y ? runner : highest, null);
         }
 
         function marioEntryCeiling() {
-          const active = [hero, ...buddies].filter(runner => !runner.dead && !runner.entryPending &&
+          const active = [hero, ...buddies].filter(runner => !runner.dead && !runner.trapped && !runner.entryPending &&
             (runner.grounded || runner.vy >= 0 || sceneScreenY(runner.y) <= height + HERO_H ||
               chooseAirLandingTarget(runner)));
           // Knocked-out runners no longer set the entrance ceiling. A living
@@ -1188,7 +1215,7 @@
         }
 
         function defeatMario(runner, barrel) {
-          if (runner.dead || runner.entryPending) return;
+          if (runner.dead || runner.entryPending || runner.warp || runner.trapped) return;
           runner.dead = true;
           runner.deadAt = simTime;
           runner.grounded = false;
@@ -1218,7 +1245,7 @@
         }
 
         function barrelHitsMario(barrel, runner) {
-          if (runner.dead || runner.entryPending) return false;
+          if (runner.dead || runner.entryPending || runner.warp || runner.trapped) return false;
           // Sweep the relative movement through the body, so a fast barrel
           // cannot skip a Mario between frames (including during a jump).
           const start = [barrel.previousX - (runner.previousX ?? runner.x), barrel.previousY - runner.previousY];
@@ -1252,7 +1279,7 @@
             nextBarrelAt = simTime + 4 + barrelRng() * 2.2;
           }
           if (!barrelWarning && simTime >= nextBarrelAt && barrels.length < BARREL_LIMIT) {
-            const targets = [hero, ...buddies].filter(runner => !runner.dead && !runner.entryPending && marioIsOnStage(runner));
+            const targets = [hero, ...buddies].filter(runner => !runner.dead && !runner.trapped && !runner.entryPending && marioIsOnStage(runner));
             if (targets.length) {
               const target = targets[Math.floor(barrelRng() * targets.length)];
               const x = clamp(target.x + (barrelRng() - 0.5) * worldWidth * 0.35, 36, worldWidth - 36);
@@ -1313,18 +1340,18 @@
         function burstBarrel(barrel) {
           if (barrel.burst) return;
           barrel.burst = true;
-          const count = prefersReducedMotion ? 5 : 12;
+          // A few loose staves fall out of the broken barrel, close to impact.
+          const count = prefersReducedMotion ? 3 : 5;
           for (let i = 0; i < count; i++) {
             const variation = hash01(barrel.id * 397 + i * 71);
-            const angle = i / count * TAU;
-            const speed = prefersReducedMotion ? 32 : 100 + variation * 100;
+            const spread = i / (count - 1) - 0.5;
             particles.push({
-              kind: 'barrel', x: barrel.x, y: barrel.y,
-              vx: Math.cos(angle) * speed + barrel.vx * 0.25,
-              vy: Math.sin(angle) * speed + (prefersReducedMotion ? 10 : 80),
-              w: 3 + variation * 4, h: 8 + variation * 7,
-              rotation: angle, spin: prefersReducedMotion ? 0 : (variation - 0.5) * 14,
-              age: 0, life: prefersReducedMotion ? 0.35 : 0.7 + variation * 0.4,
+              kind: 'barrel', x: barrel.x + spread * 18, y: barrel.y + (variation - 0.5) * 10,
+              vx: spread * (prefersReducedMotion ? 26 : 64) + barrel.vx * 0.12,
+              vy: (prefersReducedMotion ? 4 : 12) + variation * 16,
+              w: 3 + variation * 2, h: 7 + variation * 4,
+              rotation: (variation - 0.5) * 0.8, spin: prefersReducedMotion ? 0 : (variation - 0.5) * 5,
+              age: 0, life: prefersReducedMotion ? 0.3 : 0.42 + variation * 0.12,
               color: i % 4 === 0 ? '#66507D' : i % 2 ? '#D69961' : '#714B43',
             });
           }
@@ -1335,7 +1362,7 @@
             particle.age += dt;
             particle.x += particle.vx * dt;
             particle.y += particle.vy * dt;
-            particle.vy += GRAVITY * 0.18 * dt;
+            particle.vy += GRAVITY * (particle.kind === 'barrel' ? 0.48 : 0.18) * dt;
             if (particle.rotation !== undefined) particle.rotation += (particle.spin || 0) * dt;
           }
           particles = particles.filter((particle) => particle.age < particle.life);
@@ -1360,7 +1387,7 @@
           if (simTime < nextBuddySpawnAt) return;
 
           const visibleCount = [hero, ...buddies]
-            .filter((runner) => !runner.dead && !runner.entryPending && marioIsOnStage(runner))
+            .filter((runner) => !runner.dead && !runner.trapped && !runner.entryPending && marioIsOnStage(runner))
             .length;
           const inbound = [hero, ...buddies].filter(buddy => !buddy.dead && (buddy.entryPending ||
             (buddy.entryFrom && !marioIsOnStage(buddy))));
@@ -1380,7 +1407,7 @@
             return;
           }
 
-          let buddy = reusableArrival || (hero.dead && !marioIsOnStage(hero, 150) ? hero : null) || buddies
+          let buddy = reusableArrival || ((hero.dead || hero.trapped) && !marioIsOnStage(hero, 150) ? hero : null) || buddies
             .filter((candidate) => !marioIsOnStage(candidate, 150))
             .filter((candidate) => !candidate.entryFrom || simTime - candidate.entryStartedAt >= MARIO_ENTRY_TIMEOUT)
             .sort((a, b) => a.y - b.y)[0];
@@ -1457,11 +1484,18 @@
         }
 
         function startMarioWalkIn(buddy, platform, dir) {
+          if (buddy.trapped) {
+            const oldTrap = platformById(buddy.trapped.platformId)?.trap;
+            if (oldTrap?.runnerId === buddy.id) oldTrap.runnerId = null;
+            buddy.trapped = null;
+          }
           recentMarioEntries.push({ platformId: platform.id, y: platform.y, dir, at: simTime });
           const left = platformLeft(platform);
           /* Start well clear of the frame so nobody pops into the visible
              scene -- they have to walk the last stretch in. */
           const x = marioWalkInStart(platform, dir);
+          buddy.warp = null;
+          buddy.warpCooldownUntil = 0;
           buddy.dead = false;
           buddy.deadAt = 0;
           buddy.platformId = platform.id;
@@ -1555,6 +1589,7 @@
           const ordered = [...buddies.filter(buddy => !buddy.entryPending),
             ...buddies.filter(buddy => buddy.entryPending)];
           for (const buddy of ordered) {
+            if (buddy.warp || buddy.trapped) continue;
             if (buddy.dead) { updateDefeatedMario(buddy, dt); continue; }
             if (buddy.entryPending && buddy.y >= marioEntryCeiling()) {
               buddy.vx = 0;
@@ -1592,7 +1627,7 @@
             for (let j = i + 1; j < runners.length; j += 1) {
               const first = runners[i];
               const second = runners[j];
-              if (first.entryPending || second.entryPending || !first.grounded || !second.grounded) continue;
+              if (first.dead || second.dead || first.warp || second.warp || first.trapped || second.trapped || first.entryPending || second.entryPending || !first.grounded || !second.grounded) continue;
               const platformId = marioGroundId(first);
               if (!platformId || marioGroundId(second) !== platformId) continue;
               if (Math.abs(first.y - second.y) > 5) continue;
@@ -1697,18 +1732,19 @@
           }
           const route = committedMarioRoute(platform, buddy);
           const launchDx = route ? route.launchX - buddy.x : 0;
-          const dodge = hazardPlan(platform, buddy.x);
-          if (dodge && dodge.hop && simTime >= (buddy.hopCooldownUntil || 0)) {
+          const dodge = hazardPlan(platform, buddy.x, buddy);
+          if (dodge && dodge.hop && simTime >= (buddy.hopCooldownUntil || 0) && hopIsSafe(buddy, platform, dodge.away)) {
             hopMarioBuddy(buddy, platform, dodge.away);
             return;
           }
-          const desired = dodge ? dodge.away * BUDDY_RUN_SPEED
-            : clamp(launchDx * 7, -BUDDY_RUN_SPEED, BUDDY_RUN_SPEED);
+          if (!dodge && planWarp(buddy, platform, BUDDY_RUN_SPEED, dt)) return;
+          const desired = safeGroundVelocity(platform, buddy, dodge ? dodge.away * BUDDY_RUN_SPEED
+            : clamp(launchDx * 7, -BUDDY_RUN_SPEED, BUDDY_RUN_SPEED));
           buddy.vx += (desired - buddy.vx) * (1 - Math.exp(-14 * dt));
-          if (Math.abs(launchDx) > 7) buddy.facing = Math.sign(launchDx);
+          if (Math.abs(desired) > 7) buddy.facing = Math.sign(desired);
           const readyAt = buddy.landedAt + marioLandingPause(buddy, platform);
-          if (route && Math.abs(launchDx) < 7 && simTime >= readyAt &&
-            !barrelBlocksLaunch(buddy, route.landingX)) {
+          if (!dodge && route && Math.abs(launchDx) < 7 && simTime >= readyAt &&
+            !barrelBlocksLaunch(buddy, route.landingX, route)) {
             launchMarioBuddy(buddy, platform, route);
             return;
           }
@@ -1772,7 +1808,7 @@
           // The front group waits according to the gap behind it. Reassess
           // each frame so runners accelerate as they fall behind.
           const pack = [hero, ...buddies].filter(other => other !== runner &&
-            !other.dead && marioIsOnStage(other) && !other.walkInDir).sort((a, b) => b.y - a.y);
+            !other.dead && !other.trapped && marioIsOnStage(other) && !other.walkInDir).sort((a, b) => b.y - a.y);
           const gap = pack.length ? runner.y - pack[Math.min(2, pack.length - 1)].y : height;
           return lerp(0.85, pack.length < 5 ? 2.8 : 1.8, clamp(gap / 260, 0, 1)) + rhythm * 0.18;
         }
@@ -1872,9 +1908,9 @@
            route so it re-plans from its new height -- which is the whole
            point: heads are a way onto a ledge that was out of reach. */
         function headBounce(runner) {
-          if (runner.dead || runner.entryPending || runner.grounded || runner.vy > 0) return false;
+          if (runner.dead || runner.warp || runner.trapped || runner.entryPending || runner.grounded || runner.vy > 0) return false;
           for (const other of [hero, ...buddies]) {
-            if (other === runner || other.dead || other.entryPending || other.walkInDir) continue;
+            if (other === runner || other.dead || other.warp || other.trapped || other.entryPending || other.walkInDir) continue;
             if (Math.abs(other.x - runner.x) > HERO_W * 0.6) continue;
             const head = other.y + HERO_H * 0.82;
             if (runner.previousY < head || runner.y > head + 2) continue;
@@ -1962,12 +1998,18 @@
         function trimWorld() {
           const cutoff = cameraY - height * 3;
           const occupied = new Set([
-            hero.groundId,
-            ...buddies.filter((buddy) => buddy.grounded).map((buddy) => buddy.platformId),
+            hero.trapped ? null : hero.groundId,
+            ...buddies.filter((buddy) => buddy.grounded && !buddy.trapped).map((buddy) => buddy.platformId),
           ]);
+          for (const runner of [hero, ...buddies]) {
+            if (runner.warp) { occupied.add(runner.warp.fromId); occupied.add(runner.warp.toId); }
+          }
           platforms = platforms.filter(
             (platform) => platform.y > cutoff || occupied.has(platform.id)
           );
+          for (const platform of platforms) {
+            if (platform.pipe && !platformById(platform.pipe.toId)) platform.pipe = null;
+          }
         }
 
         function addPlatform() {
@@ -2034,6 +2076,10 @@
           lastPlatform = platform;
           highestPlatformY = y;
           trunkCount += 1;
+          if (courseFeatures) {
+            decoratePlatform(platform, previous);
+            if (platform.flame && !routeToPlatform(previous, platform)) platform.flame = null;
+          }
 
           addBranchPlatforms(previous, platform);
           return true;
@@ -2107,6 +2153,10 @@
             if (platform.type === 'crumble') ensureCrumbleBricks(platform);
             platform.branch = true;
             platforms.push(platform);
+            if (courseFeatures) {
+              decoratePlatform(platform, base);
+              if (platform.flame && !routeToPlatform(base, platform)) platform.flame = null;
+            }
           }
         }
 
@@ -2135,6 +2185,389 @@
             visited: false,
             pulseUntil: 0,
           };
+        }
+
+        // Features use hashes so adding them never changes the seeded course.
+        function decoratePlatform(platform, previous = null) {
+          if (platform.type !== 'ink' || platform.moving || platform.saw) return;
+          const left = Math.max(30, platform.x + 26);
+          const right = Math.min(worldWidth - 30, platform.x + platform.w - 26);
+          if (right - left < 64) return;
+          if (platform.y > 300 && hash01(platform.id * 631) < 0.32) {
+            const from = platforms.filter(p => p !== platform && p.type === 'ink' && !p.moving &&
+              !p.saw && !p.flame && !p.pipe && !p.trap && platform.y - p.y >= 145 && platform.y - p.y <= 360 &&
+              Math.min(worldWidth - 30, p.x + p.w - 26) - Math.max(30, p.x + 26) > 64).pop();
+            if (from) {
+              const tint = hash01(platform.id * 103) < 0.5 ? 'mint' : 'pale';
+              const x = clamp(platformCenter(platform), left + 14, right - 14);
+              const fromX = clamp(platformCenter(from), Math.max(44, from.x + 40),
+                Math.min(worldWidth - 44, from.x + from.w - 40));
+              platform.pipe = { x, toId: from.id, tint };
+              from.pipe = { x: fromX, toId: platform.id, tint };
+              return;
+            }
+          }
+          if (platform.y > 420 && right - left >= 80 && hash01(platform.id * 947) < 0.34) {
+            const dir = previous ? (Math.sign(platformCenter(previous) - platformCenter(platform)) || 1)
+              : (hash01(platform.id * 433) < 0.5 ? 1 : -1);
+            platform.flame = {
+              x: dir > 0 ? left : right, dir,
+              length: Math.min(90, (right - left) * 0.43),
+              period: 4.2 + hash01(platform.id * 127) * 1.6,
+              phase: hash01(platform.id * 787) * 5,
+            };
+          }
+          if (!platform.flame && platform.y > 280 && hash01(platform.id * 1597) < 0.3) {
+            const dir = hash01(platform.id * 1789) < 0.5 ? 1 : -1;
+            const x = lerp(left, right, dir > 0 ? 0.72 : 0.28);
+            const anchorX = clamp(x - dir * 46, left, right);
+            platform.trap = { x, anchorX, length: Math.abs(x - anchorX) + 3,
+              sprung: false, runnerId: null, caughtAt: 0 };
+          }
+        }
+
+        function catchInBearTrap(runner, platform) {
+          const trap = platform.trap;
+          if (!trap || trap.sprung || runner.dead || runner.trapped || runner.warp || runner.entryPending) return false;
+          trap.sprung = true;
+          trap.runnerId = runner.id;
+          trap.caughtAt = simTime;
+          runner.trapped = { platformId: platform.id, caughtAt: simTime, x: trap.x };
+          runner.x = trap.x;
+          runner.y = platform.y;
+          runner.previousX = runner.x;
+          runner.previousY = runner.y;
+          runner.vx = 0;
+          runner.vy = 0;
+          runner.grounded = true;
+          runner.groundId = platform.id;
+          runner.platformId = platform.id;
+          runner.localX = runner.x - platformLeft(platform);
+          runner.falling = false;
+          runner.groundRoute = null;
+          runner.autoVx = 0;
+          runner.targetId = null;
+          runner.autoTargetId = null;
+          runner.autoLandingX = null;
+          runner.landingX = null;
+          runner.walkInDir = 0;
+          runner.entryFrom = null;
+          if (runner === hero) { jumpBufferedUntil = 0; targetPlatformId = null; }
+          spawnDust(runner.x, runner.y + 3, 5, C.pale);
+          return true;
+        }
+
+        function updateBearTraps() {
+          for (const platform of platforms) {
+            const trap = platform.trap;
+            if (!trap || trap.sprung || !platformIsSolid(platform)) continue;
+            for (const runner of [hero, ...buddies]) {
+              if (!runner.grounded || marioGroundId(runner) !== platform.id ||
+                  runner.dead || runner.trapped || runner.warp || runner.entryPending) continue;
+              const left = Math.min(runner.previousX ?? runner.x, runner.x);
+              const right = Math.max(runner.previousX ?? runner.x, runner.x);
+              // Sweep the feet so a quick run cannot skip the pressure plate.
+              if (left <= trap.x + 12 && right >= trap.x - 12) {
+                catchInBearTrap(runner, platform);
+                break;
+              }
+            }
+          }
+          for (const runner of [hero, ...buddies]) {
+            if (!runner.trapped) continue;
+            const platform = platformById(runner.trapped.platformId);
+            if (!platform?.trap) continue; // An offscreen captive waits for reuse.
+            const trap = platform.trap;
+            const age = simTime - runner.trapped.caughtAt;
+            const tug = Math.sin(age * 4) * Math.min(age * 3, prefersReducedMotion ? 0.4 : 2.5);
+            runner.previousX = runner.x;
+            runner.previousY = runner.y;
+            runner.x = clamp(runner.trapped.x + tug, trap.anchorX - trap.length, trap.anchorX + trap.length);
+            runner.y = platform.y;
+            runner.localX = runner.x - platformLeft(platform);
+            runner.vx = 0;
+            runner.vy = 0;
+            trap.x = runner.x;
+          }
+        }
+
+        function drawBearTrap(platform) {
+          const trap = platform.trap;
+          const floor = screenY(platform.y);
+          const x = worldLeft + trap.x;
+          const anchor = worldLeft + trap.anchorX;
+          const distance = x - anchor;
+          const links = Math.max(4, Math.ceil(Math.abs(distance) / 7));
+          ctx.strokeStyle = C.ink;
+          ctx.lineWidth = 1.7;
+          for (let i = 0; i < links; i++) {
+            const t = (i + 0.5) / links;
+            const sag = Math.sin(t * Math.PI) * (trap.sprung ? 1 : 3.5);
+            ctx.beginPath();
+            ctx.ellipse(lerp(anchor, x, t), floor - 2 + sag, 4.5, i % 2 ? 1.5 : 2.8, 0, 0, TAU);
+            ctx.stroke();
+          }
+          fillCircle(anchor, floor - 2, 5, C.ink);
+          fillCircle(anchor, floor - 2, 2.6, '#CFDCEA');
+          fillRound(x - 15, floor - 1, 30, 5, 2, C.ink);
+          fillRound(x - 12, floor - 1, 24, 3, 1, '#8093A6');
+          fillRound(x + 18, floor - 3, 8, 6, 2, C.ink);
+          fillRound(x + 19, floor - 2, 6, 3, 1, '#CFDCEA');
+          if (trap.sprung) return;
+          ctx.beginPath();
+          ctx.ellipse(x, floor - 3, 21, 8, 0, 0, TAU);
+          ctx.fillStyle = '#CFDCEA'; ctx.fill();
+          ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.stroke();
+          ctx.beginPath();
+          ctx.ellipse(x, floor - 3, 15, 4, 0, 0, TAU);
+          ctx.fillStyle = C.night; ctx.fill();
+          // Inward teeth surround a small copper pressure plate.
+          ctx.fillStyle = '#CFDCEA';
+          for (let i = 0; i < 10; i++) {
+            const a = i / 10 * TAU;
+            ctx.beginPath();
+            ctx.moveTo(x + Math.cos(a - 0.13) * 18, floor - 3 + Math.sin(a - 0.13) * 6);
+            ctx.lineTo(x + Math.cos(a) * 10, floor - 3 + Math.sin(a) * 2.5);
+            ctx.lineTo(x + Math.cos(a + 0.13) * 18, floor - 3 + Math.sin(a + 0.13) * 6);
+            ctx.closePath(); ctx.fill();
+          }
+          fillOval(x, floor - 2, 6, 2, '#E8BB83');
+        }
+
+        function drawClosedTrapJaws() {
+          for (const platform of platforms) {
+            const trap = platform.trap;
+            if (!trap?.sprung) continue;
+            const y = screenY(platform.y);
+            if (y < -90 || y > height + 90) continue;
+            const snap = clamp((simTime - trap.caughtAt) / 0.12, 0, 1);
+            const x = worldLeft + trap.x;
+            ctx.beginPath();
+            ctx.moveTo(x - 20, y + 1);
+            ctx.lineTo(x - 15, y - 3 - snap * 10);
+            ctx.lineTo(x - 9, y - 2 - snap * 7);
+            ctx.lineTo(x - 5, y - 5 - snap * 5);
+            ctx.lineTo(x, y - 2 - snap * 4);
+            ctx.lineTo(x + 5, y - 5 - snap * 5);
+            ctx.lineTo(x + 9, y - 2 - snap * 7);
+            ctx.lineTo(x + 15, y - 3 - snap * 10);
+            ctx.lineTo(x + 20, y + 1);
+            ctx.closePath();
+            ctx.fillStyle = '#CFDCEA'; ctx.fill();
+            ctx.strokeStyle = C.ink; ctx.lineWidth = 1.8; ctx.stroke();
+          }
+        }
+
+        function drawTetheredRunner(runner) {
+          const y = screenY(runner.y);
+          if (y < -90 || y > height + 120) return;
+          const trap = platformById(runner.trapped.platformId)?.trap;
+          const direction = Math.sign(runner.x - (trap?.anchorX ?? runner.x - 1)) || 1;
+          const phase = (simTime - runner.trapped.caughtAt) * 4;
+          ctx.save();
+          ctx.translate(worldLeft + runner.x, y);
+          ctx.rotate(direction * (prefersReducedMotion ? 0.025 : 0.045 + Math.sin(phase) * 0.035));
+          ctx.scale(runner.facing * 0.9, 0.9);
+          runnerTint = marioTint(runner);
+          runnerShape = marioShape(runner);
+          drawBuddyRunner(runner, phase, 0, false);
+          ctx.restore();
+        }
+
+        function flameState(platform, atTime = simTime) {
+          const f = platform.flame;
+          const cycle = mod(atTime + f.phase, f.period);
+          return { warning: cycle < FLAME_WARNING, active: cycle >= FLAME_WARNING &&
+            cycle < FLAME_WARNING + FLAME_BURST, age: cycle - FLAME_WARNING };
+        }
+
+        function flameGeometry(platform, atTime = simTime) {
+          const f = platform.flame;
+          const state = flameState(platform, atTime);
+          const mouth = f.x + f.dir * 13;
+          // Quick ignition, a held jet, then a short taper to nothing.
+          const envelope = state.active ? Math.min(1, state.age / 0.07,
+            (FLAME_BURST - state.age) / 0.1) : 0;
+          const tip = mouth + f.dir * f.length * Math.max(0, envelope);
+          return { ...state, mouth, tip, left: Math.min(mouth, tip), right: Math.max(mouth, tip) };
+        }
+
+        function flameHitsMario(platform, runner) {
+          if (runner.dead || runner.entryPending || runner.warp || runner.trapped) return false;
+          const flame = flameGeometry(platform);
+          return flame.active && runner.x + HERO_W * 0.3 > flame.left &&
+            runner.x - HERO_W * 0.3 < flame.right && runner.y < platform.y + 29 &&
+            runner.y + HERO_H > platform.y + 7;
+        }
+
+        function updateFlames() {
+          for (const platform of platforms) {
+            if (!platform.flame || platform.collapsed) continue;
+            for (const runner of [hero, ...buddies]) {
+              if (flameHitsMario(platform, runner)) {
+                defeatMario(runner, { x: platform.flame.x, vx: platform.flame.dir * 120 });
+              }
+            }
+          }
+        }
+
+        function warpExitSafe(runner, destination) {
+          if (!platformIsSolid(destination) || !destination.pipe) return false;
+          const x = destination.pipe.x;
+          if ([hero, ...buddies].some(other => other !== runner && other.warp?.toId === destination.id)) return false;
+          // Don't send somebody into a barrel or eject into a crowded mouth.
+          if ([hero, ...buddies].some(other => other !== runner && !other.dead && !other.entryPending &&
+              Math.abs(other.x - x) < 30 && Math.abs(other.y - destination.y) < HERO_H)) return false;
+          for (const barrel of barrels) {
+            for (const t of [WARP_SECONDS * 0.5, WARP_SECONDS, WARP_SECONDS + 0.25]) {
+              const b = predictBarrel(barrel, t);
+              if (Math.abs(b.x - x) < 48 && b.y > destination.y - 20 && b.y < destination.y + HERO_H + 22) return false;
+            }
+          }
+          return true;
+        }
+
+        function beginWarp(runner, source) {
+          const destination = platformById(source.pipe?.toId);
+          if (runner.dead || runner.warp || runner.trapped || !runner.grounded || runner.walkInDir ||
+              simTime < (runner.warpCooldownUntil || 0) || !warpExitSafe(runner, destination)) return false;
+          runner.warp = { fromId: source.id, toId: destination.id, startedAt: simTime, moved: false };
+          runner.x = source.pipe.x;
+          runner.vx = 0;
+          runner.vy = 0;
+          runner.groundRoute = null;
+          runner.targetId = null;
+          runner.autoTargetId = null;
+          runner.autoLandingX = null;
+          runner.landingX = null;
+          if (runner === hero) { jumpBufferedUntil = 0; targetPlatformId = null; }
+          return true;
+        }
+
+        function planWarp(runner, source, speed, dt = 0) {
+          const destination = platformById(source.pipe?.toId);
+          if (!destination || destination.y <= source.y || simTime < (runner.warpCooldownUntil || 0) ||
+              simTime < runner.landedAt + 0.5 || !warpExitSafe(runner, destination)) return false;
+          const dx = source.pipe.x - runner.x;
+          const desired = safeGroundVelocity(source, runner, clamp(dx * 7, -speed, speed));
+          if (Math.abs(dx) < 6) return beginWarp(runner, source);
+          if (runner === hero) runner.autoVx = desired;
+          else {
+            runner.vx += (desired - runner.vx) * (1 - Math.exp(-14 * dt));
+            moveGroundedMario(runner, runner.x + runner.vx * dt);
+            if (Math.abs(runner.vx) > 8) runner.facing = Math.sign(runner.vx);
+          }
+          return true;
+        }
+
+        function updateWarps() {
+          for (const runner of [hero, ...buddies]) {
+            const warp = runner.warp;
+            if (!warp) continue;
+            const destination = platformById(warp.toId);
+            const source = platformById(warp.fromId);
+            if (!destination?.pipe || !source?.pipe) {
+              runner.warp = null;
+              runner.warpCooldownUntil = simTime + 2;
+              continue;
+            }
+            const elapsed = simTime - warp.startedAt;
+            if (elapsed >= WARP_SECONDS * 0.5 && !warp.moved) {
+              // Recheck the mouth before emerging; wait inside if it is unsafe.
+              if (!warpExitSafe(runner, destination)) {
+                warp.startedAt += elapsed - WARP_SECONDS * 0.5;
+                continue;
+              }
+              warp.moved = true;
+              runner.x = destination.pipe.x;
+              runner.y = destination.y;
+              runner.previousX = runner.x;
+              runner.previousY = runner.y;
+              runner.platformId = destination.id;
+              runner.groundId = destination.id;
+              runner.localX = runner.x - platformLeft(destination);
+            }
+            if (elapsed >= WARP_SECONDS) {
+              runner.warp = null;
+              runner.warpCooldownUntil = simTime + 4;
+              runner.landedAt = simTime;
+              runner.lastGroundedAt = simTime;
+              runner.groundedSince = simTime;
+              runner.falling = false;
+              pulseCloud(destination);
+              spawnDust(runner.x, runner.y, 5, C[destination.pipe.tint]);
+            }
+          }
+        }
+
+        function drawFlamethrower(platform) {
+          const f = platform.flame;
+          const state = flameGeometry(platform);
+          const x = worldLeft + f.x;
+          const floor = screenY(platform.y);
+          fillRound(x - 12, floor - 12, 24, 14, 4, C.ink);
+          fillRound(x - 9, floor - 25, 18, 19, 5, '#C88983');
+          fillRound(x - 6, floor - 23, 12, 13, 3, '#F4B79D');
+          ctx.save();
+          ctx.translate(x, floor - 18);
+          ctx.scale(f.dir, 1);
+          fillRound(0, -7, 16, 14, 3, C.ink);
+          fillRound(1, -5, 12, 10, 2, '#E8BB83');
+          fillRound(12, -6, 4, 12, 1, C.night);
+          fillCircle(-2, 0, 2.6, state.warning || state.active ? C.lemon : C.red);
+          if (state.warning) {
+            const pulse = prefersReducedMotion ? 1 : 0.8 + Math.sin(simTime * 12) * 0.2;
+            fillOval(18, 0, 3 * pulse, 2.5, C.lemon);
+            // A few sparks mark the wind-up without words or flashing panels.
+            for (let i = 0; i < 3; i++) {
+              const phase = mod(simTime * 2 + i / 3, 1);
+              fillCircle(19 + phase * 13, -phase * (i - 1) * 7, 1.4 * (1 - phase), C.deep);
+            }
+          }
+          if (state.active) {
+            const length = state.right - state.left;
+            const flicker = prefersReducedMotion ? 0 : Math.sin(simTime * 32) * 2;
+            for (const [scale, color] of [[1, '#EF805C'], [0.78, '#FFBD67'], [0.48, '#FFF2B6']]) {
+              ctx.beginPath();
+              ctx.moveTo(13, -6 * scale);
+              ctx.bezierCurveTo(24, -14 * scale, 35, (-8 + flicker) * scale, 13 + length * scale, 0);
+              ctx.bezierCurveTo(36, (10 + flicker) * scale, 24, 12 * scale, 13, 6 * scale);
+              ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+            }
+          }
+          ctx.restore();
+        }
+
+        function drawWarpPipe(platform) {
+          const x = worldLeft + platform.pipe.x;
+          const y = screenY(platform.y);
+          const color = C[platform.pipe.tint];
+          // A short collared pipe embedded in the deck, with an open dark bore.
+          fillRound(x - 21, y + 1, 42, 31, 4, C.ink);
+          fillRound(x - 18, y + 1, 36, 27, 3, color);
+          fillRound(x - 13, y + 5, 6, 20, 2, 'rgba(255,253,252,0.42)');
+          fillRound(x - 28, y - 6, 56, 14, 5, C.ink);
+          fillRound(x - 25, y - 4, 50, 9, 4, color);
+          fillOval(x, y - 4, 20, 4, C.night);
+          fillOval(x, y - 5, 15, 1.5, '#30283F');
+          fillCircle(x + 21, y + 1, 1.4, C.white);
+        }
+
+        function drawWarpRunners() {
+          for (const runner of [hero, ...buddies]) {
+            if (!runner.warp) continue;
+            const progress = clamp((simTime - runner.warp.startedAt) / WARP_SECONDS, 0, 1);
+            const visible = runner.warp.moved ? (progress - 0.5) * 2 : 1 - progress * 2;
+            const x = worldLeft + runner.x, y = screenY(runner.y);
+            ctx.save();
+            ctx.beginPath(); ctx.rect(x - 24, y - HERO_H - 8, 48, HERO_H + 3); ctx.clip();
+            ctx.translate(x, y + (1 - visible) * HERO_H);
+            ctx.scale(runner.facing * 0.9, 0.9);
+            runnerTint = marioTint(runner);
+            runnerShape = marioShape(runner);
+            drawBuddyRunner(runner, 0, 0, false);
+            ctx.restore();
+          }
         }
 
         /* A blade bolted to a ledge, sliding along a fixed span. Its
@@ -2204,8 +2637,33 @@
         /* Back away while there is ledge to back onto; go over the top once
            there is not, or once the thing is too close to outrun. Reading it
            that finely is also what leaves room to read it wrong. */
-        function hazardPlan(platform, runnerX) {
-          const threat = nearestHazard(platform, runnerX);
+        function hazardPlan(platform, runnerX, runner = null) {
+          if (platform.flame) {
+            const flame = flameGeometry(platform);
+            if (flame.warning) {
+              const tip = flame.mouth + platform.flame.dir * platform.flame.length;
+              flame.left = Math.min(flame.mouth, tip);
+              flame.right = Math.max(flame.mouth, tip);
+            }
+            const imminent = flame.warning || flame.active;
+            if (imminent && runnerX > flame.left - 26 && runnerX < flame.right + 26) {
+              // A jet outlasts a little evasive hop. Retreat to the clear end.
+              return { hop: false, away: platform.flame.dir };
+            }
+          }
+          let threat = nearestHazard(platform, runnerX);
+          // Read the future landing column, not just the barrel's current x.
+          for (const barrel of barrels) {
+            if (barrel.platformId || barrel.y <= platform.y + HERO_H) continue;
+            const fall = barrelArrivalTime(barrel, platform.y + HERO_H * 0.6);
+            if (fall > 0.65) continue;
+            const x = barrel.x + barrel.vx * fall;
+            if (Math.abs(x - runnerX) > 62) continue;
+            const limits = marioFootingLimits(platform);
+            const away = Math.sign(runnerX - x) || (limits && limits.right - runnerX > runnerX - limits.left ? 1 : -1);
+            const predicted = { distance: Math.abs(x - runnerX) - 28, away, canHop: false };
+            if (!threat || predicted.distance < threat.distance) threat = predicted;
+          }
           if (!threat) return null;
           const limits = marioFootingLimits(platform);
           if (!limits) return null;
@@ -2216,6 +2674,82 @@
           }
           // Nothing to hop and nowhere to back to: cut past it and hope.
           return { hop: false, away: cornered ? -threat.away : threat.away };
+        }
+
+        function barrelArrivalTime(barrel, y) {
+          const vy = barrel.vy || 0;
+          const disc = vy * vy + 2 * (-GRAVITY * 0.58) * (barrel.y - y);
+          return disc < 0 ? Infinity : (vy + Math.sqrt(disc)) / (-GRAVITY * 0.58);
+        }
+
+        function predictBarrel(barrel, time) {
+          // Integrate the same ledge catches and edge falls as the live barrel.
+          const stamp = `${simTime}:${barrel.x}:${barrel.y}:${barrel.vx}:${barrel.vy}:${barrel.platformId}`;
+          if (barrel.forecastAt !== stamp) { barrel.forecastAt = stamp; barrel.forecast = new Map(); }
+          const key = Math.round(time * 10000);
+          if (barrel.forecast.has(key)) return barrel.forecast.get(key);
+          let x = barrel.x, y = barrel.y, vy = barrel.vy || 0;
+          let support = platformById(barrel.platformId);
+          const steps = Math.max(1, Math.ceil(time / 0.06));
+          const dt = time / steps;
+          for (let i = 0; i < steps; i++) {
+            const oldY = y;
+            x += barrel.vx * dt;
+            if (support && platformHasFootingAt(support, x)) { y = support.y + barrel.radius; vy = 0; }
+            else {
+              support = null;
+              vy = Math.max(-620, vy + GRAVITY * 0.58 * dt);
+              y += vy * dt;
+              for (const p of platforms) {
+                if (platformIsSolid(p) && platformHasFootingAt(p, x) &&
+                    oldY - barrel.radius >= p.y && y - barrel.radius <= p.y &&
+                    (!support || p.y > support.y)) support = p;
+              }
+              if (support) { y = support.y + barrel.radius; vy = 0; }
+            }
+          }
+          const result = { x, y };
+          barrel.forecast.set(key, result);
+          return result;
+        }
+
+        function groundDanger(platform, runner, velocity) {
+          if (!barrels.length && !platform.flame) return 0;
+          let danger = 0;
+          const limits = marioFootingLimits(platform);
+          if (!limits) return 0;
+          for (let i = 1; i <= 6; i++) {
+            const t = i * 0.09;
+            const x = clamp(runner.x + velocity * t + ((runner.vx || 0) - velocity) * 0.07,
+              limits.left, limits.right);
+            for (const barrel of barrels) {
+              const predicted = predictBarrel(barrel, t);
+              const dx = Math.abs(x - predicted.x);
+              const dy = predicted.y - platform.y;
+              if (dy > -barrel.radius && dy < HERO_H + barrel.radius && dx < 48) {
+                danger += (48 - dx) * (1.2 - t);
+                // Never trade an immediate impact for fewer risky samples later.
+                if (dx < 25) danger = Math.max(danger, 10000 / (t + 0.12) + (25 - dx) * 2);
+              }
+            }
+            if (platform.flame) {
+              const f = flameGeometry(platform, simTime + t);
+              if (f.active && x > f.left - 18 && x < f.right + 18) danger += 80;
+            }
+          }
+          return danger;
+        }
+
+        function safeGroundVelocity(platform, runner, desired) {
+          const risk = groundDanger(platform, runner, desired);
+          if (risk < 8) return desired;
+          const speed = runner.id === 0 ? LEADER_RUN_SPEED : BUDDY_RUN_SPEED;
+          let best = desired, bestCost = risk;
+          for (const velocity of [0, -speed, speed]) {
+            const cost = groundDanger(platform, runner, velocity) + Math.abs(velocity - desired) * 0.018;
+            if (cost < bestCost) { bestCost = cost; best = velocity; }
+          }
+          return best;
         }
 
         function sawFleeDirection(platform, runnerX) {
@@ -2244,13 +2778,38 @@
         /* A runner about to leave the ground looks up first. Jumping into a
            falling barrel is far and away the commonest way to die here, so a
            jump waits rather than commits while one is over the run. */
-        function barrelBlocksLaunch(runner, landingX) {
+        function hopIsSafe(runner, platform, away) {
+          return !barrelBlocksLaunch(runner, safeLandingX(platform, runner.x + away * 14), {
+            flightTime: HAZARD_HOP_SPEED * 2 / -GRAVITY, jumpSpeed: HAZARD_HOP_SPEED, evasion: true,
+          });
+        }
+
+        function barrelBlocksLaunch(runner, landingX, route = null) {
           const left = Math.min(runner.x, landingX) - 34;
           const right = Math.max(runner.x, landingX) + 34;
           for (const barrel of barrels) {
+            if (route?.evasion) break;
             if (barrel.x < left || barrel.x > right) continue;
             const rise = barrel.y - runner.y;
             if (rise > -30 && rise < 210) return true;
+          }
+          if (route) {
+            const speed = route.jumpSpeed || (runner.id === 0 ? JUMP_SPEED : BUDDY_JUMP_SPEED);
+            for (let i = 1; i <= 10; i++) {
+              const t = route.flightTime * i / 10;
+              const x = lerp(runner.x, landingX, i / 10);
+              const y = runner.y + speed * t + GRAVITY * t * t * 0.5;
+              for (const barrel of barrels) {
+                const b = predictBarrel(barrel, t);
+                if (Math.abs(b.x - x) < 38 && b.y > y - 20 && b.y < y + HERO_H + 22) return true;
+              }
+              for (const platform of platforms) {
+                if (!platform.flame) continue;
+                const f = flameGeometry(platform, simTime + t);
+                if (f.active && x > f.left - 16 && x < f.right + 16 &&
+                    y < platform.y + 34 && y + HERO_H > platform.y + 4) return true;
+              }
+            }
           }
           return false;
         }
@@ -2296,7 +2855,7 @@
         /* A slow blade does not need the swept test the barrels use; a circle
            against the body box is honest at this speed. */
         function sawHitsMario(platform, runner) {
-          if (runner.dead || runner.entryPending) return false;
+          if (runner.dead || runner.entryPending || runner.warp || runner.trapped) return false;
           if (!platform.saw.spiny && runner.y + HERO_H <= platform.y) return false;
           const [cx, cy] = sawCenter(platform);
           const dx = Math.max(0, Math.abs(cx - runner.x) - HERO_W * 0.3);
@@ -2429,8 +2988,10 @@
           ctx.translate(-width * 0.5, -height * 0.5);
           drawPlatforms();
           drawParticles();
+          drawWarpRunners();
           drawMarioBuddies();
           drawHero();
+          drawClosedTrapJaws();
           drawBarrels();
           ctx.restore();
         }
@@ -2706,6 +3267,9 @@
             else if (platform.type === 'crumble') drawCrumblePlatform(platform, sx, sy, pulse);
             else if (platform.type === 'cloud') drawCloudPlatform(platform, sx, sy, pulse);
             if (platform.saw) drawSaw(platform);
+            if (platform.flame) drawFlamethrower(platform);
+            if (platform.pipe) drawWarpPipe(platform);
+            if (platform.trap) drawBearTrap(platform);
           }
         }
 
@@ -3112,8 +3676,9 @@
 
         function drawMarioBuddies() {
           for (const buddy of buddies) {
-            if (buddy.entryPending) continue;
+            if (buddy.entryPending || buddy.warp) continue;
             if (buddy.dead) { drawDefeatedMario(buddy); continue; }
+            if (buddy.trapped) { drawTetheredRunner(buddy); continue; }
             const sx = worldLeft + buddy.x;
             const sy = screenY(buddy.y);
             if (sy < -90 || sy > height + 120) continue;
@@ -3172,7 +3737,11 @@
           const armReach = ARM_ANCHOR[runnerShape] || ARM_ANCHOR.square;
           let armBack;
           let armFront;
-          if (panic) {
+          if (buddy.trapped) {
+            const pull = prefersReducedMotion ? 0 : Math.sin(phase) * 0.12;
+            armBack = 3.05 + pull;
+            armFront = 0.12 - pull;
+          } else if (panic) {
             armBack = 3.55;
             armFront = -0.4;
           } else if (!buddy.grounded) {
@@ -3197,8 +3766,9 @@
         }
 
         function drawHero() {
-          if (hero.entryPending) return;
+          if (hero.entryPending || hero.warp) return;
           if (hero.dead) { drawDefeatedMario(hero); return; }
+          if (hero.trapped) { drawTetheredRunner(hero); return; }
           const sx = worldLeft + hero.x;
           const sy = screenY(hero.y);
           const hurt = hero.stumbleUntil > simTime;
@@ -3436,6 +4006,10 @@
             jumpBufferedUntil = simTime + 0.14;
             markManual();
             event.preventDefault();
+          } else if (event.key === 'ArrowDown' || event.key === 's' || event.key === 'S') {
+            keys.down = true;
+            markManual();
+            event.preventDefault();
           } else if (event.key === 'r' || event.key === 'R') {
             reset(randomSeed());
             event.preventDefault();
@@ -3451,6 +4025,9 @@
             event.preventDefault();
           } else if (event.key === 'ArrowUp' || event.key === 'w' || event.key === 'W' || event.key === ' ') {
             keys.jump = false;
+            event.preventDefault();
+          } else if (event.key === 'ArrowDown' || event.key === 's' || event.key === 'S') {
+            keys.down = false;
             event.preventDefault();
           }
         }

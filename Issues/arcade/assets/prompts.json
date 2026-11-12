@@ -127,6 +127,17 @@
     },
     "raw/mario.jpg": {
       "origin": "Original code-authored photostat collage, rendered from assets/source/mario.html in local Chrome at 1200 x 900. Source imagery: existing pieces/016-up-mario/thumbnail.jpg; original gallery artwork by the user. Duotone pixel mapping, independent collage crops and Rubik Dirt titles. Wall grain from this issue\u2019s provenance-recorded wall-wear.jpg. No generated character imagery or copied reference graphics. JPEG quality 88."
+    },
+    "asteroids-attract.png": {
+      "origin": "Original native canvas render of Issues/arcade/asteroids-attract.js at the completed title time11s,1200x900 PNG. Includes user-requested constant0\u00a2 TO PLAY. Used as static landing-page and no-enhancement fallback. No generated imagery; original authored vector title and asteroid outlines."
+    },
+    "snake-attract.png": {
+      "origin": "Original code-authored native canvas frame from Issues/arcade/snake-attract.js, rendered at SnakeAttract.still (15 seconds), 1200 \u00d7 900 pixels. A continuous first-person snake chase on a blue vector grid pulls back into cyan and acid-green snakes forming the requested word SNAKES!; constant requested 0\u00a2 TO PLAY at bottom. This is the overhead title state used as a static fallback. No generative imagery, third-party picture, or bitmap animation frames.",
+      "production": "Native SnakeAttract.draw at still=15 seconds, 1200 \u00d7 900 PNG; no bitmap animation frames. Shared by the Snake study, Issues landing card, and Arcade wall."
+    },
+    "warlords-attract.png": {
+      "origin": "Original code-authored native canvas frame from Issues/arcade/warlords-attract.js, rendered at WarlordsAttract.still (18 seconds), 1200 \u00d7 900 pixels. Oversized WARLORDS vector lettering alone on black, with constant 0\u00a2 TO PLAY. Current 24-second film stays at 2.8\u00d7 close magnification, fast-pans in 280ms between the four firing cannons, then shows this title and explodes its actual strokes outward at 19.8 seconds. No four-gun overview. Static fallback only, not a bitmap animation; no generative imagery or third-party pictures.",
+      "production": "Native WarlordsAttract.draw at still=18 seconds, 1200 \u00d7 900 PNG. Oversized title alone on black; shared by standalone study, landing card and Arcade wall."
     }
   }
 }

@@ -6,6 +6,8 @@
   const mix=(a,b,p)=>a+(b-a)*p;
   const wrap=(n,m)=>((n%m)+m)%m;
   const glyphs={
+    '0':[[[1,0],[3,0],[4,1],[4,5],[3,6],[1,6],[0,5],[0,1],[1,0]],[[.8,5.2],[3.2,.8]]],
+    '¢':[[[4,1],[3,0],[1,0],[0,1],[0,5],[1,6],[3,6],[4,5]],[[2,-.7],[2,6.7]]],
     A:[[[0,6],[0,2],[2,0],[4,2],[4,6]],[[0,3],[4,3]]],
     S:[[[4,0],[0,0],[0,3],[4,3],[4,6],[0,6]]],
     T:[[[0,0],[4,0]],[[2,0],[2,6]]],
@@ -16,7 +18,9 @@
     D:[[[0,0],[2,0],[4,2],[4,4],[2,6],[0,6],[0,0]]],
     M:[[[0,6],[0,0],[2,3],[4,0],[4,6]]],
     B:[[[0,0],[3,0],[4,1],[4,2],[3,3],[0,3],[3,3],[4,4],[4,5],[3,6],[0,6],[0,0]]],
-    L:[[[0,0],[0,6],[4,6]]]
+    L:[[[0,0],[0,6],[4,6]]],
+    P:[[[0,6],[0,0],[3,0],[4,1],[4,2],[3,3],[0,3]]],
+    Y:[[[0,0],[2,3],[4,0]],[[2,3],[2,6]]]
   };
   const parts=[];
   function word(text,x,y,width,height,row){
@@ -191,6 +195,13 @@
       }
       c.restore();
     }
+    // A permanent invitation stays readable even while fragments pass the bottom edge.
+    c.globalAlpha=1;c.fillStyle='#000';c.fillRect(222,532,356,56);
+    const prompt='0¢ TO PLAY',unit=6,sy=32/6,left=(800-(prompt.length*5.6-1.6)*unit)/2;
+    [...prompt].forEach((letter,i)=>{
+      for(const segment of glyphs[letter]||[])
+        path(segment.map(([x,y])=>[left+(i*5.6+x)*unit,544+y*sy]),'#f0fff6',1.7);
+    });
     c.globalAlpha=1;return {visibleParts,totalParts:parts.length,visibleAsteroidFragments,exploding};
   }
   window.AsteroidsAttract={draw,duration,still};

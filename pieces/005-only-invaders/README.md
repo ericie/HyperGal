@@ -1,6 +1,7 @@
-# Only Invaders
+# Warlords
 
-A Space Invaders riff with the invaders removed.
+A Space Invaders riff with the invaders removed. Previously titled Only Invaders;
+the `005-only-invaders` folder is retained so existing links keep working.
 
 Four defender cannons ride fixed color-matched worlds at the top, right, bottom,
 and left edges of a clean star field. Each landmass is the shallow visible cap

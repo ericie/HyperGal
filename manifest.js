@@ -43,7 +43,7 @@ window.HMC_MANIFEST = {
     {
       "slug": "005-only-invaders",
       "wip": false,
-      "title": "Only Invaders",
+      "title": "Warlords",
       "year": 2026,
       "date": "2026-06-24",
       "category": "games",
@@ -82,7 +82,7 @@ window.HMC_MANIFEST = {
     {
       "slug": "008-vectrex-asteroids",
       "wip": false,
-      "title": "Vectrex Asteroids",
+      "title": "Asteroids Assemble",
       "year": 2026,
       "date": "2026-06-25",
       "category": "games",
@@ -206,7 +206,7 @@ window.HMC_MANIFEST = {
       "type": "generative",
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
-      "description": "An edge-to-edge field of loose Celtic interlace printed in dark brown on worn paper. Continuous rounded cords pass through a Truchet-like knot grid, alternating over and under at crossings and running beyond every side of the browser. Click or press Enter/Space to reseed.",
+      "description": "A woven knot of continuous rounded cords on worn paper, with alternating over-under crossings and nested border loops. A floating, collapsible panel controls four edge paddings, single/double/triple lines, density, weight, colors, and gradients that follow each cord. Click the artwork or press Enter/Space to reseed.",
       "updated": "2026-07-28"
     },
     {
@@ -732,7 +732,7 @@ window.HMC_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.png",
-      "description": "Self-playing Tetris across the entire window, with 4×4 pixel square cells and a starting stack of partially filled lines. One piece falls from the top at a time and locks on contact. Full lines clear immediately, while the player keeps the field even. Click or Space pauses; R restarts.",
+      "description": "Self-playing Tetris across the entire window, with 4×4 pixel square cells and 8% of the board initially occupied by individual squares in sparse, irregular patches with broad gaps across the lower area. One piece falls from the top at a time and locks on contact. Completed lines blink, then collapse, while the player fills the gaps. Click or Space pauses; R restarts.",
       "updated": "2026-10-19"
     },
     {
@@ -782,6 +782,17 @@ window.HMC_MANIFEST = {
       "thumbnail": "thumbnail.png",
       "description": "Two to ten scattered circles unfold into abstract flowers. Petals accumulate in concentric rows until the screen is full, each flower held together on its own depth layer.",
       "updated": "2026-10-15"
+    },
+    {
+      "slug": "063-counterform",
+      "wip": true,
+      "title": "Counterform",
+      "year": 2026,
+      "date": "2026-11-05",
+      "category": "generative",
+      "type": "generative",
+      "thumbnail": "thumbnail.png",
+      "description": "Purple and cream forms rise and sink like a lava lamp, briefly becoming hearts, cat heads and skulls before melting back into blobs. Hollow centers reveal the fixed stripes; every boundary reverses the colors. Click or Space pauses. S saves a frame."
     }
   ]
 };

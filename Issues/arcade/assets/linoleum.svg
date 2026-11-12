@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="224" height="224" viewBox="0 0 224 224">
+  <defs>
+    <g id="flecks" fill="#31392f" opacity=".23">
+      <path d="m8 19 23-5-12 6Zm42-9 16 3-20 1Zm30 21 19-3-11 5ZM17 45l24-6-15 7Zm43 10 17-4-8 5Zm29 12 13 2-19 2ZM4 79l18-4-10 6Zm27 12 23-5-12 6Zm40-8 23-3-13 5Zm-23-12 12-3-6 4Zm-11-39 16-4-8 5ZM8 104l19-5-12 6Zm66 1 20-4-10 6Z"/>
+      <path d="m16 29 9-2-3 3Zm49 4 12-4-5 4ZM8 62l9-2-4 3Zm43 18 12-4-4 4Zm42 13 13-3-7 4Z" fill="#07100b" opacity=".8"/>
+    </g>
+  </defs>
+  <path fill="#101512" d="M0 0h224v224H0Z"/>
+  <path fill="#181d18" d="M0 0h112v112H0Zm112 112h112v112H112Z"/>
+  <use href="#flecks"/><use href="#flecks" transform="translate(224 112) rotate(180)"/>
+  <use href="#flecks" transform="translate(0 112)"/><use href="#flecks" transform="translate(224 224) rotate(180)"/>
+  <path d="M112 0v224M0 112h224" fill="none" stroke="#080d0a" stroke-width="1"/>
+</svg>

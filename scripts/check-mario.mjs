@@ -28,15 +28,20 @@ function simulation(seed = 'competence', width = 1280, height = 720, reduced = f
     disableBarrels() { nextBarrelAt = Infinity; barrelWarning = null; barrels = []; },
     disableSaws() { sawChance = 0; for (const p of platforms) p.saw = null; },
     sawFleeDirection, sawHitsMario, attachSaw, sawCenter, hazardPlan, nearestHazard,
-    barrelBlocksLaunch, barrelSwerve, headBounce,
+    barrelBlocksLaunch, barrelSwerve, headBounce, predictBarrel, safeGroundVelocity,
+    decoratePlatform, flameState, flameGeometry, flameHitsMario, updateFlames,
+    beginWarp, updateWarps, planWarp, warpExitSafe, onKeyDown, onKeyUp, updateControls,
+    updateBearTraps, catchInBearTrap, drawBearTrap, drawClosedTrapJaws, trimWorld, resolveMarioShoves,
+    disableFeatures() { courseFeatures = false; for (const p of platforms) { p.flame = null; p.pipe = null; p.trap = null; } },
     get sawLedges() { return platforms.filter(p => p.saw).length; },
     advanceClock(seconds) { simTime += seconds; },
     get state() { return { hero, buddies, platforms, simTime, bestHeight, barrels, barrelWarning, cameraY, particles }; },
     get visible() { return [hero, ...buddies].filter(r => !r.dead && !r.entryPending && marioIsOnStage(r)).length; }
   }; })();`), sandbox);
-  if (!hazards) { sandbox.sim.disableBarrels(); sandbox.sim.disableSaws(); }
+  if (!hazards) { sandbox.sim.disableBarrels(); sandbox.sim.disableSaws(); sandbox.sim.disableFeatures(); }
   return sandbox.sim;
 }
+let seenFlames = 0, seenPipes = 0, seenWarps = 0, seenCaptures = 0;
 const platform = (id, x, y, w) => ({ id, x, y, w, type: 'ink', moving: false });
 {
   const sim = simulation();
@@ -307,10 +312,10 @@ for (const reduced of [false, true]) {
     sim.state.barrels.push(barrel);
     sim.updateBarrels(1 / 15);
     assert.equal(sim.state.barrels.length, 0, 'contact removes the barrel immediately');
-    assert.ok(sim.state.particles.length >= 5, 'the barrel bursts into fragments');
+    assert.equal(sim.state.particles.length, reduced ? 3 : 5, 'the barrel breaks into a few local fragments');
     assert.ok(shelf.saw.spiny, 'the spiky enemy survives the barrel');
     sim.updateBarrels(1 / 60);
-    assert.equal(sim.state.particles.length, reduced ? 5 : 12, 'a barrel bursts only once');
+    assert.equal(sim.state.particles.length, reduced ? 3 : 5, 'a barrel bursts only once');
     sim.render();
   }
 }
@@ -429,7 +434,15 @@ for (const width of [1280, 390]) {
     for (let frame = 0; frame < 5400; frame++) {
       const before = [sim.state.hero, ...sim.state.buddies].map(r => ({ ...r }));
       sim.update(1 / 60);
+      seenFlames += sim.state.platforms.filter(p => p.flame).length;
+      seenPipes += sim.state.platforms.filter(p => p.pipe).length;
       const runners = [sim.state.hero, ...sim.state.buddies];
+      seenWarps += runners.filter((r, i) => r.warp && !before[i]?.warp).length;
+      seenCaptures += runners.filter((r, i) => r.trapped && !before[i]?.trapped).length;
+      for (const r of runners.filter(r => r.trapped)) {
+        assert.ok(!r.dead, 'captures remain nonlethal during live play');
+        assert.ok(r.vx === 0 && r.vy === 0, 'captured runners stay tethered');
+      }
       assert.ok(sim.state.barrels.length <= 3, 'barrel population remains bounded');
       for (const barrel of sim.state.barrels) assert.ok(Number.isFinite(barrel.x) && Number.isFinite(barrel.y));
       for (let i = 0; i < before.length; i++) {
@@ -454,6 +467,7 @@ for (const width of [1280, 390]) {
     hazardResults.push({ seed, width, deaths, returns, height: Math.round(sim.state.bestHeight) });
   }
 }
+assert.ok(seenFlames && seenPipes && seenWarps && seenCaptures, 'live courses exercise flames, warps, and nonlethal traps');
 {
   const sim = simulation('saws');
   const ledge = { ...platform(101, 200, 400, 240), saw: null };
@@ -559,6 +573,163 @@ for (const width of [1280, 390]) {
 const slowHazards = simulation('summer', 390, 844, false, true);
 for (let i = 0; i < 1800; i++) slowHazards.update(1 / 30);
 assert.ok(slowHazards.state.bestHeight > 2500, 'barrel collisions also work at 30 fps');
+// A dodge wins over a ready route, even while the evasive hop is cooling down.
+{
+  const sim = simulation('dodge-priority');
+  const from = platform(101, 200, 400, 240);
+  const to = platform(102, 450, 500, 200);
+  sim.state.platforms.splice(0, sim.state.platforms.length, from, to);
+  const buddy = { id: 1, x: 400, y: 400, localX: 200, grounded: true, platformId: from.id,
+    vx: 0, vy: 0, landedAt: -10, hopCooldownUntil: Infinity };
+  sim.state.buddies.splice(0, sim.state.buddies.length, buddy);
+  sim.state.barrels.push({ id: 1, x: 364, y: 417, vx: 130, vy: 0, radius: 17, platformId: from.id });
+  assert.ok(sim.committedMarioRoute(from, buddy), 'the jump is otherwise ready');
+  sim.updateMarioBuddies(1 / 60);
+  assert.ok(buddy.grounded, 'a dodge cannot be overwritten by the planned jump');
+  assert.ok(buddy.vx > 0, 'the runner retreats from the barrel');
+}
+{
+  const sim = simulation('anticipate-barrels');
+  const shelf = platform(101, 200, 400, 240);
+  sim.state.platforms.splice(0, sim.state.platforms.length, shelf);
+  sim.state.barrels.push({ id: 1, x: 260, y: 530, vx: 220, vy: -400, radius: 17, platformId: null });
+  const dodge = sim.hazardPlan(shelf, 350);
+  assert.ok(dodge && !dodge.hop && dodge.away === 1,
+    'evade the future falling column before the barrel is directly overhead');
+  sim.state.barrels.splice(0, 1, { id: 2, x: 300, y: 417, vx: 130, vy: 0, radius: 17, platformId: shelf.id });
+  assert.ok(sim.safeGroundVelocity(shelf, { id: 1, x: 360, y: 400, vx: -162 }, -162) >= 0,
+    'do not walk toward an oncoming barrel just because the takeoff point is there');
+  const forecast = sim.predictBarrel(sim.state.barrels[0], 1.2);
+  assert.ok(forecast.y < shelf.y, 'forecast accounts for a barrel falling off its shelf');
+  sim.state.barrels.splice(0, 1, { id: 3, x: 500, y: 630, vx: -360, vy: -30, radius: 17, platformId: null });
+  assert.ok(sim.barrelBlocksLaunch({ id: 1, x: 300, y: 400 }, 420, { flightTime: 0.68 }),
+    'check a barrel that is outside the jump corridor now but crosses the flight later');
+}
+for (const dir of [-1, 1]) {
+  const sim = simulation('flame-timing');
+  const shelf = platform(101, 100, 400, 300);
+  shelf.flame = { x: dir > 0 ? 125 : 375, dir, length: 90, period: 5, phase: 0 };
+  sim.state.platforms.splice(0, sim.state.platforms.length, shelf);
+  sim.state.buddies.splice(0);
+  const runner = sim.state.hero;
+  Object.assign(runner, { x: shelf.flame.x + dir * 50, y: 400, grounded: true, groundId: shelf.id });
+  assert.ok(sim.flameState(shelf).warning, 'a cold nozzle gives a visible warning');
+  assert.ok(!sim.flameHitsMario(shelf, runner), 'warning sparks are harmless');
+  const dodge = sim.hazardPlan(shelf, runner.x, runner);
+  assert.ok(dodge && !dodge.hop && dodge.away === dir, 'retreat toward the clear end of a jet');
+  sim.advanceClock(0.8);
+  assert.ok(sim.flameHitsMario(shelf, runner), 'the short burst has real collision');
+  assert.ok(!sim.flameHitsMario(shelf, { ...runner, y: 440 }), 'a jump fully above the jet clears it');
+  sim.updateFlames();
+  assert.ok(runner.dead, 'flames use the ordinary knockout and return lifecycle');
+  sim.advanceClock(0.5);
+  assert.ok(!sim.flameState(shelf).active && !sim.flameState(shelf).warning, 'the nozzle cools after a brief burst');
+  sim.render();
+}
+for (const reduced of [false, true]) {
+  const sim = simulation('warp-transition', 390, 844, reduced);
+  const from = platform(101, 40, 100, 180);
+  const to = platform(102, 160, 320, 180);
+  from.pipe = { x: 130, toId: to.id, tint: 'mint' };
+  to.pipe = { x: 250, toId: from.id, tint: 'mint' };
+  sim.state.platforms.splice(0, sim.state.platforms.length, from, to);
+  sim.state.buddies.splice(0);
+  const runner = sim.state.hero;
+  Object.assign(runner, { x: 130, y: 100, groundId: from.id, grounded: true });
+  sim.state.barrels.push({ id: 1, x: 250, y: 337, vx: 0, vy: 0, radius: 17, platformId: to.id });
+  assert.ok(!sim.beginWarp(runner, from), 'a pipe does not eject into a barrel');
+  sim.state.barrels.splice(0);
+  assert.ok(sim.beginWarp(runner, from), 'an open paired pipe accepts the runner');
+  sim.advanceClock(0.2); sim.updateWarps(); sim.render();
+  assert.equal(runner.y, from.y, 'the runner sinks at the source before teleporting');
+  sim.advanceClock(0.2); sim.updateWarps(); sim.render();
+  assert.equal(runner.y, to.y, 'the runner emerges from its paired pipe');
+  assert.equal(runner.previousY, to.y, 'teleporting cannot create a swept hazard collision');
+  sim.advanceClock(0.4); sim.updateWarps();
+  assert.ok(!runner.warp && runner.grounded && runner.groundId === to.id, 'warping hands back ordinary climbing');
+  assert.ok(!sim.beginWarp(runner, to), 'the cooldown prevents immediate back-and-forth warps');
+  sim.render();
+  sim.advanceClock(4.1);
+  for (const key of ['ArrowDown', 's']) {
+    sim.onKeyDown({ key, preventDefault() {} });
+    sim.updateControls(1 / 60);
+    sim.onKeyUp({ key, preventDefault() {} });
+    assert.equal(runner.warp?.toId, from.id, 'manual pipe input also allows a downward trip');
+    sim.advanceClock(0.8); sim.updateWarps();
+    sim.advanceClock(4.1);
+    // Return to the upper pipe to independently exercise the other binding.
+    Object.assign(runner, { x: to.pipe.x, y: to.y, groundId: to.id });
+  }
+}
+
+// Traps capture feet, never kill, and keep both manual and automatic movement tethered.
+for (const reduced of [false, true]) {
+  const sim = simulation('chain-capture', 390, 844, reduced);
+  const shelf = platform(101, 30, 400, 260);
+  shelf.trap = { x: 160, anchorX: 114, length: 49, sprung: false, runnerId: null, caughtAt: 0 };
+  sim.state.platforms.splice(0, sim.state.platforms.length, shelf);
+  sim.state.buddies.splice(0);
+  const runner = sim.state.hero;
+  Object.assign(runner, { x: 160, previousX: 160, y: 400, grounded: true, groundId: shelf.id });
+  sim.updateBearTraps();
+  assert.ok(runner.trapped && !runner.dead && shelf.trap.sprung, 'the jaws capture a living runner');
+  assert.equal(shelf.trap.runnerId, 0, 'the controllable runner can be caught too');
+  assert.equal(sim.highestMario(), null, 'a captive cannot pin the camera');
+  assert.equal(sim.marioEntryCeiling(), Infinity, 'captives do not block fresh arrivals');
+  const cameraBefore = sim.state.cameraY;
+  sim.updateCamera(1 / 30);
+  assert.ok(sim.state.cameraY > cameraBefore, 'an entirely trapped pack still scrolls forward');
+  sim.onKeyDown({ key: 'ArrowRight', preventDefault() {} });
+  sim.onKeyDown({ key: ' ', preventDefault() {} });
+  for (let i = 0; i < 180; i++) {
+    sim.advanceClock(1 / 60);
+    sim.updateControls(1 / 60); sim.updateHero(1 / 60); sim.updateBearTraps();
+    assert.ok(Math.abs(runner.x - shelf.trap.anchorX) <= shelf.trap.length, 'the chain never stretches');
+    assert.equal(runner.y, shelf.y, 'jumping cannot free a captive');
+  }
+  sim.onKeyUp({ key: 'ArrowRight', preventDefault() {} });
+  sim.onKeyUp({ key: ' ', preventDefault() {} });
+  sim.defeatMario(runner, { x: runner.x, vx: 130 });
+  assert.ok(!runner.dead, 'a captive stays alive instead of becoming a knockout');
+  const barrel = { x: runner.x, y: runner.y + 20, previousX: runner.x, previousY: runner.y + 20, radius: 17 };
+  assert.ok(!sim.barrelHitsMario(barrel, runner), 'passing hazards cannot replace the capture with death');
+  sim.render();
+  const free = { id: 1, x: 200, y: 4000, grounded: true, platformId: 102 };
+  const next = platform(102, -130, 4000, 410);
+  sim.state.platforms.push(next);
+  sim.state.buddies.push(free);
+  assert.equal(sim.highestMario(), free, 'the free runner leads the climb');
+  for (let i = 0; i < 180; i++) sim.updateCamera(1 / 60);
+  assert.ok(!sim.marioIsOnStage(runner, 150), 'the living captive is left below the frame');
+  sim.startMarioWalkIn(runner, next, 1);
+  assert.ok(!runner.trapped && !runner.dead && runner.entryPending, 'only an offscreen return clears capture');
+  assert.equal(shelf.trap.runnerId, null, 'reuse disconnects the old chain');
+  assert.ok(shelf.trap.sprung, 'a spent trap stays closed');
+  sim.trimWorld();
+  assert.ok(!sim.state.platforms.includes(shelf), 'the abandoned trap platform is reclaimed');
+}
+{
+  const sim = simulation('trap-sweep');
+  const shelf = platform(101, 100, 400, 240);
+  shelf.trap = { x: 200, anchorX: 154, length: 49, sprung: false, runnerId: null, caughtAt: 0 };
+  sim.state.platforms.splice(0, sim.state.platforms.length, shelf);
+  const jumper = { id: 1, x: 200, previousX: 200, y: 440, grounded: false, vy: 150 };
+  sim.state.buddies.splice(0, sim.state.buddies.length, jumper);
+  sim.updateBearTraps();
+  assert.ok(!jumper.trapped && !shelf.trap.sprung, 'jumping cleanly over a trap is safe');
+  Object.assign(jumper, { x: 230, previousX: 170, y: 400, grounded: true, platformId: shelf.id, vx: 162 });
+  sim.updateBearTraps();
+  assert.ok(jumper.trapped && !jumper.dead, 'a fast crossing cannot skip the pressure plate');
+  const trappedX = jumper.x;
+  sim.updateMarioBuddies(1 / 30);
+  assert.equal(jumper.x, trappedX, 'autopilot cannot walk out of a trap');
+  const late = { id: 2, x: 200, previousX: 200, y: 400, grounded: true, platformId: shelf.id };
+  sim.state.buddies.push(late);
+  sim.updateBearTraps();
+  assert.ok(!late.trapped, 'each trap captures only one runner');
+  sim.render();
+}
+
 console.table(hazardResults);
 console.table(results);
-console.log('Mario behavior checks passed.');
+console.log('Always Moving Up behavior checks passed.');
