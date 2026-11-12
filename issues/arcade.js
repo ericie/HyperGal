@@ -33,7 +33,7 @@
       item.id = film;
       link.dataset.attract = film;
       image.src = `arcade/assets/${film}-attract.png`;
-      image.alt = `${({snake:'SNAKES!',asteroids:'Asteroids Assemble',warlords:'Warlords'})[film]} — 0 cents to play`;
+      image.alt = `${({snake:"WE'RE ALL SNAKES",asteroids:'Asteroids Assemble',warlords:'Warlords'})[film]} — 0 cents to play`;
       const media = document.createElement('div');
       media.className = 'attract-media';
       const canvas = document.createElement('canvas');

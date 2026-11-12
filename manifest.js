@@ -69,7 +69,7 @@ window.HMC_MANIFEST = {
     {
       "slug": "007-hydra",
       "wip": false,
-      "title": "Snake Pit",
+      "title": "We're All Snakes",
       "year": 2026,
       "date": "2026-06-25",
       "category": "games",

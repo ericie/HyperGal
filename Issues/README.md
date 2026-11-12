@@ -11,12 +11,12 @@ Current direction status: the user rejected the street-art/comic/photostat
 foreground described below and a later glossy 3D exploration, which was not
 applied. Twelve wall films still use that raw foreground. The user has now
 approved placing the Asteroids native film on the current landing card and the
-first original-wall link to review it in context. Snake Pit now extends that
-native direction on both entry surfaces with the local chase-and-reveal film
+first original-wall link to review it in context. We're All Snakes now extends that
+native direction on both entry surfaces with the local cursor-hunt and moving-title film
 below. Warlords adds the requested four-turret firing tour and public rename
 on both entry surfaces. The remaining films have not been redesigned; these
 placements do not promote composition status. All three studies stay WIP, and the
-original Asteroids, Snake Pit, and Warlords works retain their manual `"wip": false`. The supplied GIF references
+original Asteroids, We're All Snakes, and Warlords works retain their manual `"wip": false`. The supplied GIF references
 are now clarified toward classic Atari attract screens; only still previews
 were available, so their motion has not been inspected.
 
@@ -47,24 +47,33 @@ original Asteroids Assemble work. The wall and three old raw images remain as
 permitted dim background posters. No new fonts or shared tokens are introduced.
 The test metadata starts with `"wip": true`; original piece content and status
 remain unchanged. Longer loops within reasonable byte budgets are permitted;
-Asteroids, Snake Pit, and Warlords are placed on both entry surfaces; further film redesigns
+Asteroids, We're All Snakes, and Warlords are placed on both entry surfaces; further film redesigns
 wait for direction.
 
-Preview the [Snake Pit attract study](arcade/snake-test.html). Its 22-second
-native loop begins with a first-person snake hunting a coral pixel mouse across
-a dim blue grid, amid cyan and acid-green right-angle light-cycle trails. From
-6–12 seconds the camera climbs and turns continuously; the same world-coordinate
-snake paths flatten into the exact requested **SNAKES!**, with heads and tiny
-eyes. The overhead word holds until 19.5 seconds, then the camera returns into
-the next chase. Flat wireframe ribbon walls recede through the pullback; there
-is no replacement title scene. **0¢ TO PLAY** remains stationary below the field.
-This is a local classic Atari/vector extension, with no new fonts, shared tokens,
-or gallery identity change. The renderer is 8,116 bytes; HTML plus renderer is
-10,130 bytes; renderer plus the shared controller is 11,596 bytes. Its native 1200×900 completed-word fallback at 15 seconds is
-`arcade/assets/snake-attract.png` (61,273 bytes), with embedded provenance and a
-registry entry. That PNG and the ordinary original-work link remain usable in
-the standalone study without JavaScript. The study starts with `"wip": true`;
-the original Snake Pit game and its manual `"wip": false` remain unchanged.
+Preview the [We're All Snakes attract study](arcade/snake-test.html). Its 18-second
+native loop begins with a first-person snake hunting a pale upright blinking
+cursor across a dim blue grid, amid cyan and acid-green right-angle light-cycle
+trails. The .56-wide, .72-high world plane uses the original game's .24-second
+hard blink with .10 seconds off; the mouse character is removed. From
+4.4–5.8 seconds the camera climbs and turns continuously in 1.4 seconds. The same
+world-coordinate paths form exact **WE'RE ALL SNAKES** in two rows: **WE'RE ALL**
+above **SNAKES**. Fourteen glyph snakes finish growing by 7.1 seconds; their heads
+and bright tail segments keep traveling through dimmer full-letter memory
+trails throughout the title. Flat wireframe ribbon walls recede through the
+pullback. The camera returns from 16.3–18 seconds. **0¢ TO PLAY** remains stationary
+below the field. This is a local classic Atari/vector extension, with no new
+fonts, shared tokens, or gallery identity change. The renderer is 8,817 bytes;
+HTML plus renderer is 10,845 bytes; renderer plus the shared controller is
+12,297 bytes. Its native 1200×900 completed-title fallback at 9 seconds is
+`arcade/assets/snake-attract.png` (79,850 bytes), with updated embedded provenance
+and registry entry. That PNG and the ordinary original-work link remain usable
+in the standalone study without JavaScript. The study stays `"wip": true`.
+The original game's public title is now We're All Snakes (formerly Snake Pit);
+browser and accessible names, metadata, manifest, and README alias follow the
+rename. Its `pieces/007-hydra/` link, gameplay, rating, and manual `"wip": false`
+remain unchanged; no visible title is added inside the game. Checks in
+`.impeccable/review/snake-cursor-title/checks.json` pass across three surfaces and
+three viewports, and fresh visual review of 23 captures found no material fixes.
 
 Preview the [Warlords attract study](arcade/warlords-test.html). Its 24-second
 native loop uses the original four flat colored cannons, curved planet caps,
@@ -96,7 +105,7 @@ shared font, palette, token, or gallery identity changes.
 cards and original-wall links, using each film’s duration and still time. It
 renders only visible films at 24fps; offscreen canvases shrink
 to 1×1 and show the PNG fallback. Hidden, pause, and player-open states suspend
-timing. Focus/reduced motion holds Asteroids at 11s, Snake at 15s, and Warlords at 18s; rendering caps DPR 1.5 and width 1400px.
+timing. Focus/reduced motion holds Asteroids at 11s, Snake at 9s, and Warlords at 18s; rendering caps DPR 1.5 and width 1400px.
 The original wall’s shared pause controls both native and raw films, while
 `arcade/attract.js` excludes native-marked links. Landing uses 44px back and pause
 icon buttons outside artwork, with accessible names. The controller preserves
@@ -106,7 +115,7 @@ current landing keeps its existing noscript link to the Selected Games catalog.
 
 The 1200×900 completed-title `arcade/assets/asteroids-attract.png` is 60,326 bytes,
 with embedded origin metadata and a provenance-registry entry. It includes the
-constant `0¢ TO PLAY`. Current-landing cards other than Asteroids, Snake Pit, and Warlords keep their original thumbnails
+constant `0¢ TO PLAY`. Current-landing cards other than Asteroids, We're All Snakes, and Warlords keep their original thumbnails
 and existing Selected-only game filter. The landing now shows only the requested
 Arcade heading in local Anybody (650) with pink neon stroke/shadows, actual work
 names, and essential controls. The top metadata band, promotional/editorial copy,
@@ -210,7 +219,7 @@ authored Many Mario geometric print, generated transparent slot prop, and
 generated dark `wall-wear.jpg` texture retain their original records. The
 registry contains thirty-five shipping rasters: fifteen retained raw plates,
 fifteen background prints, the slot, the wall texture, and the native Asteroids,
-Snake Pit, and Warlords completed-title PNGs.
+We're All Snakes, and Warlords completed-title PNGs.
 
 Bangers, Rubik Dirt, and Permanent Marker are uppercase-subset WOFF2 additions
 for expressive film lettering; Permanent Marker also draws the wordmark.

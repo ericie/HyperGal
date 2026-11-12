@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   const duration=24,still=18,TAU=Math.PI*2;
-  const dwell=3.6,pan=.28,step=dwell+pan,titleStart=15.4,blastAt=19.8;
+  const dwell=3.6,pan=.28,step=dwell+pan,titleStart=15.4,blastAt=16.05,titleScale=.78;
   const clamp=n=>Math.max(0,Math.min(1,n));
   const ease=n=>{n=clamp(n);return n*n*(3-2*n);};
   const mix=(a,b,p)=>a+(b-a)*p;
@@ -49,35 +49,65 @@
     });
   }
   const titlePaths=[...'WARLORDS'].flatMap((letter,i)=>glyphs[letter].map(path=>path.map(([x,y])=>[32+(i*5.7+x)*16.75,165+y*33.5])));
-  const fragments=[];
-  for(const path of titlePaths)for(let i=1;i<path.length;i++){
-    const a=path[i-1],b=path[i],length=Math.hypot(b[0]-a[0],b[1]-a[1]),count=Math.ceil(length/35);
-    for(let j=0;j<count;j++){
-      const start=a.map((v,k)=>mix(v,b[k],j/count)),end=a.map((v,k)=>mix(v,b[k],(j+1)/count));
-      const center=start.map((v,k)=>(v+end[k])/2),id=fragments.length;
-      const angle=Math.atan2((center[1]-265)*2.4,center[0]-400)+Math.sin(id*8.79)*.43;
-      fragments.push({start:start.map((v,k)=>v-center[k]),end:end.map((v,k)=>v-center[k]),center,angle,speed:680+(id%9)*85,spin:(id%2?1:-1)*(3+id%7),color:colors[id%4]});
+  const noise=(x,y,frame)=>{let n=Math.imul(x+frame*73,374761393)^Math.imul(y-frame*31,668265263);n=Math.imul(n^(n>>>13),1274126177);return((n^(n>>>16))>>>0)/4294967295;};
+  const embers=Array.from({length:62},(_,i)=>{
+    const a=-Math.PI+noise(i,4,0)*Math.PI;
+    return {angle:a,speed:100+noise(i,9,0)*360,life:.7+noise(i,12,0)*2.4,size:i%3===0?6:3};
+  });
+  function blast(ctx,age){
+    if(age<0||age>3.2)return 0;
+    const cell=8,frame=Math.floor(age*18);let fireCells=0;
+    ctx.save();ctx.beginPath();ctx.rect(0,0,800,532);ctx.clip();
+    // Flat, coarse sprite smoke. No gradients or shaded objects.
+    if(age>.25&&age<2.8){
+      const p=age-.25,rx=100+140*(1-Math.exp(-p*4)),ry=55+80*(1-Math.exp(-p*3)),cy=350-p*70;
+      ctx.globalAlpha=.7*(1-ease((age-1.1)/1.7));
+      for(let y=Math.floor((cy-ry*1.2)/cell)*cell;y<cy+ry*1.2;y+=cell)for(let x=400-rx*1.2;x<400+rx*1.2;x+=cell){
+        const dx=(x-400)/rx,dy=(y-cy)/ry,n=noise(Math.floor(x/cell),y/cell,frame>>1);
+        if(dx*dx+dy*dy<.9+n*.24){ctx.fillStyle=n>.56?'#3d3029':'#261f1d';ctx.fillRect(Math.floor(x/cell)*cell,y,cell,cell);}
+      }
     }
+    // White-hot impact grows into jagged yellow, orange and red fire.
+    if(age<1.6){
+      const bloom=1-Math.exp(-age*7),rx=16+270*bloom,ry=12+165*bloom,cy=370-120*(1-Math.exp(-age*3));
+      ctx.globalAlpha=1-ease((age-.85)/.75);
+      for(let y=Math.floor((cy-ry*1.25)/cell)*cell;y<cy+ry*1.25;y+=cell)for(let x=Math.floor((400-rx*1.25)/cell)*cell;x<400+rx*1.25;x+=cell){
+        const dx=(x-400)/rx,dy=(y-cy)/ry,r=Math.hypot(dx,dy),angle=Math.atan2(dy,dx);
+        const n=noise(x/cell,y/cell,frame),edge=1+.1*Math.sin(angle*7+age*8)+.07*Math.sin(angle*13-age*4);
+        if(r>edge+n*.12)continue;
+        const heat=1-r*.72+n*.2-age*.42;
+        ctx.fillStyle=heat>.91?'#fff4c2':heat>.72?'#ffdf63':heat>.52?'#ffae28':heat>.3?'#fa641b':heat>.13?'#cc3217':'#7b2116';
+        ctx.fillRect(x,y,cell,cell);fireCells++;
+      }
+    }
+    if(age<.8){
+      const radius=330*(1-Math.exp(-age*7));ctx.globalAlpha=1-age/.8;ctx.fillStyle='#ffb837';
+      for(let i=0;i<100;i++){const a=i/100*TAU;ctx.fillRect(Math.round((400+Math.cos(a)*radius)/4)*4,Math.round((370+Math.sin(a)*radius*.13)/4)*4,8,4);}
+    }
+    for(const ember of embers){
+      if(age>ember.life)continue;
+      const x=400+Math.cos(ember.angle)*ember.speed*age,y=370+Math.sin(ember.angle)*ember.speed*age+105*age*age;
+      if(x<0||x>800||y<0||y>532)continue;
+      ctx.globalAlpha=1-age/ember.life;ctx.fillStyle=age<.25?'#fff4c2':age<1?'#ffae28':'#dd4c19';ctx.fillRect(Math.round(x/4)*4,Math.round(y/4)*4,ember.size,ember.size);
+    }
+    ctx.restore();return fireCells;
   }
   function title(ctx,t){
     const age=t-blastAt;
-    ctx.lineWidth=12;ctx.lineJoin='miter';ctx.lineCap='butt';
-    if(age<0){
-      const impact=1+.06*(1-ease((t-titleStart)/.22));
-      ctx.save();ctx.translate(400,265);ctx.scale(impact,impact);ctx.translate(-400,-265);ctx.strokeStyle='#eff6e9';
+    const u=clamp((t-titleStart)/(blastAt-titleStart));
+    const offset=age<0?-430*(1-u*u):0;
+    const impulse=age>=0?Math.exp(-age*12):0;
+    const shakeX=Math.sin(Math.max(0,age)*71)*4*impulse,shakeY=Math.sin(Math.max(0,age)*91)*3*impulse;
+    const squash=1-.09*impulse*Math.sin(Math.max(0,age)*27);
+    const fireCells=blast(ctx,age);
+    ctx.save();ctx.translate(400+shakeX,265+offset+shakeY);ctx.scale(titleScale,titleScale*squash);ctx.translate(-400,-265);
+    ctx.lineJoin='miter';ctx.lineCap='butt';
+    // The whole word remains one object before, during and after impact.
+    for(const [color,width] of [['#070a12',20],['#eff6e9',12]]){
+      ctx.strokeStyle=color;ctx.lineWidth=width;
       for(const path of titlePaths){ctx.beginPath();path.forEach((p,i)=>i?ctx.lineTo(...p):ctx.moveTo(...p));ctx.stroke();}
-      ctx.restore();return 0;
     }
-    let visible=0;
-    for(const part of fragments){
-      const travel=part.speed*age+240*age*age;
-      const x=part.center[0]+Math.cos(part.angle)*travel,y=part.center[1]+Math.sin(part.angle)*travel+110*age*age;
-      if(x< -50||x>850||y< -50||y>582)continue;
-      visible++;
-      ctx.save();ctx.translate(x,y);ctx.rotate(part.spin*age);ctx.strokeStyle=age<.075?'#fff':part.color;
-      ctx.beginPath();ctx.moveTo(...part.start);ctx.lineTo(...part.end);ctx.stroke();ctx.restore();
-    }
-    return visible;
+    ctx.restore();return {fireCells,titleOffset:offset,blastAge:age};
   }
   function draw(canvas,seconds){
     const ctx=canvas.getContext('2d'),t=wrap(seconds,duration);
@@ -131,11 +161,11 @@
     });
     ctx.restore();
     }
-    let visibleFragments=0;
-    if(t>=titleStart&&!returning)visibleFragments=title(ctx,t);
+    let impact={fireCells:0,titleOffset:0,blastAge:-1};
+    if(t>=titleStart&&!returning)impact=title(ctx,t);
     ctx.fillStyle='#000';ctx.fillRect(0,532,800,68);
     ctx.strokeStyle='#d6e9db';lettering(ctx,'0¢ TO PLAY',259,546,5.1,2);
-    return{phase:tour?(progress>0?'pan':'turret'):returning?'return':t<blastAt?'title':'explode',turret:tour?index:null,panProgress:progress,scale,firingMask,activeShots:activeShots.length,visibleGuns,visibleFragments,totalFragments:fragments.length};
+    return{phase:tour?(progress>0?'pan':'turret'):returning?'return':t<blastAt?'drop':t<blastAt+2.8?'blast':'title',turret:tour?index:null,panProgress:progress,scale,firingMask,activeShots:activeShots.length,visibleGuns,titleScale,titleIntact:true,...impact};
   }
   window.WarlordsAttract={draw,duration,still};
 })();

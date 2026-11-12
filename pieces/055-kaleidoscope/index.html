@@ -3,27 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="A luminous kaleidoscope of floating glitter, iridescent polygonal prisms and playful geometric color.">
+  <meta name="description" content="An adjustable kaleidoscope of glitter, glass, liquid cells and mirrored geometry.">
   <title>Kaleidoscope · Hypermedia Club</title>
-  <style>
-    :root { color-scheme: dark; background: #100c29; color: #fff5ff; }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
-    canvas { display: block; width: 100%; height: 100%; }
-    nav { position: fixed; bottom: max(18px, env(safe-area-inset-bottom)); right: max(18px, env(safe-area-inset-right)); display: flex; gap: 8px; }
-    button { font: 13px/1 system-ui, sans-serif; color: #fff5ff; background: #191331; border: 1px solid #706080; border-radius: 20px; min-height: 44px; padding: 0 18px; cursor: pointer; }
-    button:hover { background: #3a2855; border-color: #ffc7ed; }
-    button:focus-visible { outline: 2px solid #ffdb63; outline-offset: 4px; }
-    ::selection { background: #ffdb63; color: #191331; }
-    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-    noscript { position: fixed; inset: 2rem; font: 18px/1.5 system-ui, sans-serif; }
-  </style>
+  <link rel="stylesheet" href="controls.css">
 </head>
 <body>
-  <canvas id="kaleidoscope" role="img" aria-label="An evolving kaleidoscope of glitter, translucent rainbow polygonal prisms and luminous geometric fragments, reflected into twelve symmetrical sections."></canvas>
-  <p class="sr-only">Space pauses or resumes the kaleidoscope. S saves the current image. R creates a new arrangement. Animation starts paused when reduced motion is preferred.</p>
-  <nav aria-label="Artwork controls"><button id="pause" type="button">Pause</button><button id="save" type="button">Save image</button></nav>
+  <canvas id="kaleidoscope" role="img" aria-label="An evolving kaleidoscope of luminous objects reflected through adjustable mirrors."></canvas>
+  <p class="sr-only">Space pauses or resumes. S saves an image. R rearranges the objects. H hides or shows the controls. Drag the canvas to turn the object cell. Arrow keys on the panel grip move the controls. Animation starts paused when reduced motion is preferred.</p>
+  <aside id="controls" aria-label="Kaleidoscope controls">
+    <div class="panel-bar">
+      <button id="move" class="icon-button grip" type="button" aria-label="Move controls" title="Drag to move; arrow keys when focused"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" stroke-width="3"/></svg></button>
+      <button id="hide" class="panel-toggle" type="button" aria-expanded="true" aria-controls="panel-body">Controls<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 14 4-4 4 4"/></svg></button>
+      <button id="pause" class="icon-button" type="button" aria-label="Pause kaleidoscope" title="Pause (Space)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg></button>
+      <button id="save" class="icon-button" type="button" aria-label="Save image" title="Save image (S)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 16v4h14v-4"/></svg></button>
+    </div>
+    <div id="panel-body">
+      <div class="preset-row"><label for="preset">Preset</label><select id="preset"></select></div>
+      <div class="tabs" role="tablist" aria-label="Control groups">
+        <button id="tab-optics" type="button" role="tab" aria-selected="true" aria-controls="optics">Optics</button>
+        <button id="tab-objects" type="button" role="tab" aria-selected="false" aria-controls="objects" tabindex="-1">Objects</button>
+        <button id="tab-light" type="button" role="tab" aria-selected="false" aria-controls="light" tabindex="-1">Light</button>
+        <button id="tab-motion" type="button" role="tab" aria-selected="false" aria-controls="motion" tabindex="-1">Motion</button>
+      </div>
+      <div id="fields" class="fields"></div>
+      <div class="panel-footer">
+        <button id="shuffle" type="button">Rearrange</button>
+        <button id="reset" type="button">Reset</button>
+        <button id="share" class="icon-button" type="button" aria-label="Copy settings link" title="Copy settings link"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 14 4-4m-6 6-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 2 1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" transform="translate(1 0)"/></svg></button>
+      </div>
+      <p id="feedback" class="feedback" role="status" hidden></p>
+    </div>
+  </aside>
   <noscript>This kaleidoscope needs JavaScript to draw.</noscript>
   <script src="kaleidoscope.js"></script>
+  <script src="controls.js"></script>
 </body>
 </html>

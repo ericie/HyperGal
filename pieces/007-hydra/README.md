@@ -1,4 +1,7 @@
-# Snake Pit
+# We're All Snakes
+
+Previously titled Snake Pit. The `007-hydra` folder is retained so existing links
+keep working.
 
 An autonomous game of traditional Snake, painted in flat cells over the memory
 of every snake that came before.

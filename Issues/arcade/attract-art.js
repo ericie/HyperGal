@@ -10,7 +10,7 @@
     moon: { title:['MOON','ORCHARD'], ink:'#c6f9ff', acid:'#ee249d', color:'#3b3a93', crop:[.5,.66], font:'Rubik Dirt', cut:2 },
     invaders: { title:['WARLORDS'], ink:'#aeff27', acid:'#fb6c1f', color:'#76ed2d', crop:[.5,.65], font:'Permanent Marker', cut:0 },
     centipede: { title:['ONLY','CENTIPEDE'], ink:'#f7f025', acid:'#f84b37', color:'#193fab', crop:[.5,.66], font:'Bangers', cut:2 },
-    snake: { title:['SNAKE','PIT'], ink:'#f9e8c5', acid:'#fc26ab', color:'#16d4c4', crop:[.5,.64], font:'Rubik Dirt', cut:1 },
+    snake: { title:["WE'RE ALL","SNAKES"], ink:'#f9e8c5', acid:'#fc26ab', color:'#16d4c4', crop:[.5,.64], font:'Rubik Dirt', cut:1 },
     command: { title:['MUTUAL','COMMAND'], ink:'#fff234', acid:'#f42b21', color:'#ed3b25', crop:[.52,.68], font:'Rubik Dirt', cut:0 },
     happiness: { title:['HAPPINESS','HUNTER'], ink:'#ff44b6', acid:'#caff41', color:'#f33499', crop:[.5,.65], font:'Permanent Marker', cut:2 },
     paddle: { title:['PADDLE'], ink:'#d4ffff', acid:'#f63523', color:'#e93621', crop:[.5,.65], font:'Permanent Marker', cut:1 },
