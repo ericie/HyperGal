@@ -40,7 +40,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 44px; min-width: 44px; padding: 0; }
 .grip { color: var(--muted); cursor: grab; touch-action: none; }
 .grip:active { cursor: grabbing; }
-.panel-toggle { flex: 1; display: flex; gap: 12px; align-items: center; justify-content: space-between; text-align: left; font-weight: 600; }
+.panel-toggle { flex: 1; min-width: 0; display: flex; gap: 6px; align-items: center; justify-content: space-between; text-align: left; font-weight: 600; padding-inline: 6px; }
 .panel-toggle svg { width: 16px; }
 #panel-body { display: flex; flex-direction: column; min-height: 0; }
 .preset-row { padding: 10px 16px 14px; display: grid; gap: 6px; }
@@ -68,7 +68,7 @@ select { width: 100%; min-width: 0; background: #100c29; border: 1px solid var(-
 .panel-footer .icon-button { margin-left: auto; }
 .feedback { padding: 0 16px 10px; margin: 0; color: var(--accent); font-size: 12px; }
 #controls.collapsed .panel-toggle svg { transform: rotate(180deg); }
-#controls.collapsed { width: 230px; }
+#controls.collapsed { width: 242px; }
 ::selection { background: var(--accent); color: #191331; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 noscript { position: fixed; inset: 2rem; font: 18px/1.5 system-ui, sans-serif; }
@@ -80,3 +80,9 @@ noscript { position: fixed; inset: 2rem; font: 18px/1.5 system-ui, sans-serif; }
   .preset-row { padding-block: 2px 8px; }
   .fields { padding-top: 10px; }
 }
+.field:has(:disabled) { opacity: .5; }
+.field :disabled { cursor: default; }
+.image-field { gap: 8px; }
+.image-field input { grid-column: 1 / -1; width: 100%; font-size: 12px; min-height: 44px; color: var(--muted); }
+.image-field input::file-selector-button { font: inherit; color: var(--ink); background: #100c29; border: 1px solid var(--line); border-radius: 7px; min-height: 40px; padding: 0 10px; margin-right: 8px; cursor: pointer; }
+.feedback input { width: 100%; margin-top: 8px; background: #100c29; border: 1px solid var(--line); border-radius: 4px; min-height: 36px; padding: 4px 8px; }

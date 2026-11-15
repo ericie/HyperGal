@@ -186,16 +186,18 @@
       }
       .work:visited .cap .t { color: var(--visited); }
       .dates {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
         gap: .1rem 1ch;
         color: #555;
         font-style: italic;
       }
+      .date-item { grid-column: 1; }
       .cap .dates { margin-top: .18rem; font-size: .88em; }
       .date-label { color: #767676; }
       /* Small bordered tag on the date line, e.g. W.I.P. */
       .tag {
+        grid-column: 2;
+        grid-row: 1 / span 2;
         align-self: center;
         padding: 0 .38em;
         border: 1px solid #8a8a8a;
@@ -475,7 +477,7 @@
         }
 
         function dateItem(label, iso) {
-          const item = document.createElement('span');
+          const item = el('span', 'date-item');
           item.append(el('span', 'date-label', `${label} `));
           const time = el('time', '', fmtDate(iso));
           if (iso) time.dateTime = iso;

@@ -1,61 +1,95 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-28T03:51:42.430336+00:00",
+  "generatedAt": "2026-11-12T00:00:00Z",
   "title": "Design System: Kaleidoscope",
   "extensions": {
-    "shadows": [
-      {
-        "name": "shard-glow",
-        "value": "shadowColor = shard.color; shadowBlur = (source.width / 2) * 0.025",
-        "purpose": "Canvas glow around colored polygons."
-      }
-    ],
     "motion": [
       {
-        "name": "field-turn",
-        "value": "0.017 radians/second",
-        "purpose": "Continuous rotation of the mirrored field."
+        "name": "original-scope-turn",
+        "value": "4.87 degrees/second at 100% time scale",
+        "purpose": "Default mirror field rotation; independently adjustable from cell motion."
       },
       {
-        "name": "shard-drift",
-        "value": "0.014\u20130.039 radians/second, alternating direction",
-        "purpose": "Autonomous recombination of the source geometry."
+        "name": "procedural-drift",
+        "value": "time \u00d7 3.5 \u00d7 viscosity factor \u00d7 drift setting",
+        "purpose": "Stylized internal object motion, with cell-specific paths."
       }
     ],
-    "accessibility": {
-      "reducedMotion": "Starts paused; preference changes synchronize pause state. Play permits explicit motion.",
-      "focus": "2px solid #ffdb63; outline-offset: 4px"
-    },
-    "layout": {
-      "controls": "bottom/right: max(18px, corresponding safe-area inset); gap: 8px",
-      "canvas": "Full viewport; pixel ratio capped at 2; source canvas capped at 1600px."
-    }
+    "breakpoints": [
+      {
+        "name": "compact-width",
+        "value": "600px"
+      },
+      {
+        "name": "compact-height",
+        "value": "500px"
+      }
+    ],
+    "shadows": [
+      {
+        "name": "canvas-material-glow",
+        "value": "Canvas shadowBlur varies with source size and Edge glow",
+        "purpose": "Material depth inside the artwork; panel and controls have no shadows."
+      }
+    ]
   },
   "components": [
     {
       "name": "Artwork control",
       "kind": "button",
       "refersTo": "artwork-control",
-      "description": "Subordinate native control for pause/play or image saving.",
-      "html": "<button class=\"ds-artwork-control\" type=\"button\">Pause</button>",
-      "css": ".ds-artwork-control { font: 13px/1 system-ui, sans-serif; color: #fff5ff; background: #191331; border: 1px solid #706080; border-radius: 20px; min-height: 44px; padding: 0 18px; cursor: pointer; } .ds-artwork-control:hover { background: #3a2855; border-color: #ffc7ed; } .ds-artwork-control:focus-visible { outline: 2px solid #ffdb63; outline-offset: 4px; }"
+      "description": "Compact native action inside the optical panel.",
+      "html": "<button class=\"ds-control\" type=\"button\">Rearrange</button>",
+      "css": ".ds-control{font:13px/1.4 system-ui,sans-serif;color:#fff5ff;background:transparent;border:0;border-radius:8px;min-height:44px;padding:0 12px;cursor:pointer}.ds-control:hover{background:#3a2855}.ds-control:active{background:#513865}.ds-control:focus-visible{outline:2px solid #ffdb63;outline-offset:2px;}"
+    },
+    {
+      "name": "Control panel",
+      "kind": "card",
+      "refersTo": "control-panel",
+      "description": "Opaque violet enclosure for optical controls.",
+      "html": "<div class=\"ds-panel\"><button class=\"ds-panel-toggle\" type=\"button\" aria-expanded=\"true\">Controls</button></div>",
+      "css": ".ds-panel{font:13px/1.4 system-ui,sans-serif;width:318px;max-width:100%;background:#191331;color:#fff5ff;border:1px solid #706080;border-radius:14px;overflow:hidden}.ds-panel-toggle{font:600 13px/1.4 system-ui,sans-serif;color:inherit;background:transparent;border:0;border-radius:8px;min-height:44px;padding:0 12px;cursor:pointer}.ds-panel-toggle:hover{background:#3a2855}.ds-panel-toggle:active{background:#513865}.ds-panel-toggle:focus-visible{outline:2px solid #ffdb63;outline-offset:2px;}"
+    },
+    {
+      "name": "Select",
+      "kind": "input",
+      "refersTo": "select",
+      "description": "Native choice control on the dark field.",
+      "html": "<label class=\"ds-select-label\">Mirror system<select class=\"ds-select\"><option>Full field</option><option>Two-mirror mandala</option></select></label>",
+      "css": ".ds-select-label{font:13px/1.4 system-ui,sans-serif;display:grid;gap:7px;color:#fff5ff}.ds-select{font:13px/1.4 system-ui,sans-serif;color:#fff5ff;background:#100c29;border:1px solid #706080;border-radius:7px;min-height:44px;padding:0 30px 0 10px;cursor:pointer}.ds-select:focus-visible{outline:2px solid #ffdb63;outline-offset:2px;}.ds-select:disabled{opacity:.5;cursor:default}"
+    },
+    {
+      "name": "Control tabs",
+      "kind": "nav",
+      "refersTo": "control-tab",
+      "description": "Four equal tabs with yellow selected underline.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\" aria-label=\"Control groups\"><button type=\"button\" role=\"tab\" aria-selected=\"true\">Optics</button><button type=\"button\" role=\"tab\" aria-selected=\"false\">Objects</button><button type=\"button\" role=\"tab\" aria-selected=\"false\">Light</button><button type=\"button\" role=\"tab\" aria-selected=\"false\">Motion</button></div>",
+      "css": ".ds-tabs{display:grid;grid-template-columns:repeat(4,1fr);border-block:1px solid #493956;background:#191331}.ds-tabs button{font:13px/1.4 system-ui,sans-serif;min-height:44px;padding:0 5px;border:0;background:transparent;color:#c2b4d2;position:relative;cursor:pointer}.ds-tabs button:hover{background:#3a2855}.ds-tabs button:active{background:#513865}.ds-tabs button:focus-visible{outline:2px solid #ffdb63;outline-offset:2px;}.ds-tabs [aria-selected=\"true\"]{color:#ffdb63}.ds-tabs [aria-selected=\"true\"]:after{content:\"\";position:absolute;bottom:-1px;left:8px;right:8px;height:2px;background:#ffdb63}"
+    },
+    {
+      "name": "Range field",
+      "kind": "input",
+      "description": "Labeled native range with muted numeric output.",
+      "html": "<label class=\"ds-range-field\">Magnification <output>100%</output><input type=\"range\" min=\"30\" max=\"240\" value=\"100\" aria-label=\"Magnification\"></label>",
+      "css": ".ds-range-field{font:13px/1.4 system-ui,sans-serif;display:grid;grid-template-columns:1fr auto;gap:0 12px;color:#fff5ff}.ds-range-field output{font-size:12px;color:#c2b4d2;font-variant-numeric:tabular-nums}.ds-range-field input{grid-column:1/-1;width:100%;height:30px;margin:0;appearance:none;background:transparent;cursor:pointer;accent-color:#ffdb63}.ds-range-field input::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:#706080}.ds-range-field input::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;margin-top:-6px;border-radius:50%;background:#ffdb63}.ds-range-field input::-moz-range-track{height:3px;border-radius:2px;background:#706080}.ds-range-field input::-moz-range-thumb{width:15px;height:15px;border:0;border-radius:50%;background:#ffdb63}.ds-range-field input:focus-visible{outline:2px solid #ffdb63;outline-offset:2px;}"
     }
   ],
   "narrative": {
     "northStar": "Luminous candy geometry",
-    "overview": "Bright, playful shapes evolve autonomously into a mirrored field. This design applies only to artwork 055; Hypermedia Club's gallery and other independently styled works retain their own identities. Preserve the artwork's self-contained, dependency-free delivery.",
+    "overview": "Bright, playful shapes evolve autonomously into a mirrored field. This design applies only to artwork 055; Hypermedia Club's gallery and other independently styled works retain their own identities. Preserve the artwork's self-contained, dependency-free delivery.\n\nThe requested optical controls extend the original artwork with an opaque violet instrument panel. Mirror layouts, materials, object cells, light, and motion are independent experiments. Their effects are stylized procedural interpretations of optical instruments, not physical simulations.",
     "keyCharacteristics": [
       "Full-viewport geometric color.",
       "Continuous mirrored recombination.",
-      "Quiet, legible artwork controls."
+      "Compact, legible optical controls."
     ],
     "rules": [],
     "dos": [
       "Do preserve bright, playful geometry and autonomous evolution.",
-      "Do keep controls legible and subordinate to the artwork.",
-      "Do preserve reduced-motion support and keyboard controls."
+      "Do keep functional controls inside the requested panel and subordinate to the artwork.",
+      "Do preserve reduced-motion support, native controls, and keyboard access."
     ],
     "donts": [
+      "Don't display a title, captions, or explanatory prose over the artwork.",
       "Don't impose this artwork's palette or composition on the gallery or other pieces.",
       "Don't introduce external fonts, libraries, or network dependencies."
     ]

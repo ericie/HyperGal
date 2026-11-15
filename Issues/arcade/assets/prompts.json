@@ -136,8 +136,8 @@
       "production": "Native SnakeAttract.draw at still=9 seconds, 1200 \u00d7 900 PNG of WE'RE ALL SNAKES. Shared by standalone study, landing card and Arcade wall."
     },
     "warlords-attract.png": {
-      "origin": "Original code-authored native canvas frame from Issues/arcade/warlords-attract.js, rendered at WarlordsAttract.still (18 seconds), 1200 \u00d7 900 pixels. Oversized WARLORDS vector lettering alone on black, with constant 0\u00a2 TO PLAY. Current 24-second film stays at 2.8\u00d7 close magnification, fast-pans in 280ms between the four firing cannons, then shows this title and explodes its actual strokes outward at 19.8 seconds. No four-gun overview. Static fallback only, not a bitmap animation; no generative imagery or third-party pictures.",
-      "production": "Native WarlordsAttract.draw at still=18 seconds, 1200 \u00d7 900 PNG. Oversized title alone on black; shared by standalone study, landing card and Arcade wall."
+      "origin": "Original code-authored native canvas frame from Issues/arcade/warlords-attract.js at WarlordsAttract.still (18 seconds), 1200 \u00d7 900 pixels. Smaller intact WARLORDS vector title, uniformly 78% of its preceding size, settled after a heavy downward impact. Current 24-second film retains fixed-close turret pans, then drops the complete word at 15.4\u201316.05s; contact causes a flat pixel fireball, shockwave, smoke and embers behind it. The word never breaks into pieces. This still shows the readable settled title with fading smoke; constant 0\u00a2 TO PLAY. No four-gun overview, generative imagery, third-party pictures, bitmap animation or video.",
+      "production": "Native WarlordsAttract.draw at still=18 seconds, 1200 \u00d7 900 PNG. Smaller intact settled title after its impact-triggered fire blast; shared by standalone study, landing card and Arcade wall."
     }
   }
 }

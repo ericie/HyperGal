@@ -194,7 +194,7 @@ window.HMC_MANIFEST = {
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
       "description": "Floppy navy bags climb a dense platform course, dodging barrels and saw blades and springing off each other's heads, while the camera follows whichever one is highest.",
-      "updated": "2026-10-19"
+      "updated": "2026-11-12"
     },
     {
       "slug": "017-knot-work",
@@ -207,7 +207,7 @@ window.HMC_MANIFEST = {
       "rating": 25,
       "thumbnail": "thumbnail.jpg",
       "description": "A woven knot of continuous rounded cords on worn paper, with alternating over-under crossings and nested border loops. A floating, collapsible panel controls four edge paddings, single/double/triple lines, density, weight, colors, and gradients that follow each cord. Click the artwork or press Enter/Space to reseed.",
-      "updated": "2026-07-28"
+      "updated": "2026-11-12"
     },
     {
       "slug": "018-life-checkers",
@@ -697,7 +697,7 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.png",
       "description": "A dense, luminous kaleidoscope of drifting glitter, iridescent polygonal prisms and candy-colored geometric fragments, reflected through twelve mirrored sections. Space pauses, R rearranges, S saves an image.",
-      "updated": "2026-10-17"
+      "updated": "2026-11-12"
     },
     {
       "slug": "056-mount-fuji",
@@ -733,7 +733,7 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.png",
       "description": "Self-playing Tetris across the entire window, with 4×4 pixel square cells and 8% of the board initially occupied by individual squares in sparse, irregular patches with broad gaps across the lower area. One piece falls from the top at a time and locks on contact. Completed lines blink, then collapse, while the player fills the gaps. Click or Space pauses; R restarts.",
-      "updated": "2026-10-19"
+      "updated": "2026-11-12"
     },
     {
       "slug": "059-moon-orchard",
@@ -745,7 +745,7 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.png",
       "description": "A black-and-white lunar arcade patrol. Buggy bullets carve holes in the rotating moon while a patrolling saucer repairs them. Pit jumps fire up, forward and down; downward shots fill the terrain below. Click or Space pauses; S saves a picture.",
-      "updated": "2026-10-17"
+      "updated": "2026-11-05"
     },
     {
       "slug": "060-apical",
@@ -792,7 +792,8 @@ window.HMC_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.png",
-      "description": "Purple and cream forms rise and sink like a lava lamp, briefly becoming hearts, cat heads and skulls before melting back into blobs. Hollow centers reveal the fixed stripes; every boundary reverses the colors. Click or Space pauses. S saves a frame."
+      "description": "Purple and cream forms rise and sink like a lava lamp, briefly becoming hearts, cat heads and skulls before melting back into blobs. Hollow centers reveal the fixed stripes; every boundary reverses the colors. Click or Space pauses. S saves a frame.",
+      "updated": "2026-11-12"
     }
   ]
 };

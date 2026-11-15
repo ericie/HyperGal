@@ -81,15 +81,19 @@ star field, and ammunition marks. The camera stays at 2.8× through the firing
 close-ups in north/east/south/west order: pink, orange, mint, then blue. Each
 3.6-second dwell fires seven shots with recoil and color-matched projectiles
 toward the opposite edge; 280ms pans connect the close-ups. At 15.4 seconds,
-the scene cuts to **WARLORDS** alone on black, with 201-unit cap height and a
-brief impact scale. At 19.8 seconds its actual strokes explode into 126
-ballistic, tumbling fragments, culled offscreen and all gone by 21.5 seconds.
+the intact **WARLORDS** word accelerates downward, landing at 16.05 seconds.
+Its existing letter geometry is uniformly scaled to 78%, roughly 573px wide
+with 157px cap height at native 800×600. Contact triggers a brief squash/shake
+and flat 8px-cell fireball, ground shockwave, rising dark smoke, and embers
+behind the word. A dark keyline keeps the lettering readable; the letters
+never fragment. Fire ends 1.6 seconds after contact, smoke/embers dissipate
+within 3.2 seconds, and the intact title holds.
 Only the first close-up returns at 23.4–24 seconds; no four-gun overview appears
 anywhere. **0¢ TO PLAY** stays stationary below the field. The renderer is
-8,698 bytes; study HTML plus renderer is 10,694 bytes, and renderer plus shared
-controller is 12,178 bytes. Its native 1200×900
-`arcade/assets/warlords-attract.png` fallback shows the completed word alone at
-18 seconds and is 40,523 bytes, with embedded provenance and an updated registry
+10,728 bytes; the 1,996-byte study HTML plus renderer is 12,724 bytes, and
+renderer plus shared controller is 14,208 bytes. Its native 1200×900
+`arcade/assets/warlords-attract.png` fallback shows the settled intact word with residual smoke at
+18 seconds and is 49,759 bytes, with embedded provenance and an updated registry
 entry. The standalone study and
 original wall keep that PNG and ordinary work link without JavaScript. The
 study starts with `"wip": true`; the original work retains its manual
