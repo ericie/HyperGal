@@ -41,9 +41,12 @@ move the grid. No timer or invisible boundary moves the wall.
 
 ## Color
 
-The wall uses Growth Rings' Renaissance palette: chestnut, pale brown, crimson,
-peach, and eggshell against a deep aubergine field. The opening wall is loosely
-randomized, while every five paddle-made bricks contain all five swatches.
+Each newly completed brick advances one step through a twelve-color rainbow:
+red, orange, yellow, lime, green, teal, cyan, blue, indigo, violet, magenta, and
+rose, then back to red. The opening wall uses the same ordered palette against
+a deep aubergine field. Existing bricks keep their colors as the wall scrolls.
+The ball and paddle take the next brick's color when the ball launches, with no
+ball trail. Click to rebuild the wall and restart the rainbow at red.
 
 ## Interaction
 

@@ -3,6 +3,7 @@ name: Kaleidoscope
 description: Luminous candy geometry with adjustable mirror fields and object cells.
 colors:
   midnight: "#100c29"
+  initial-violet: "#2d2085"
   candy-pink: "#ff548f"
   sunny-yellow: "#ffcc49"
   turquoise: "#48f1df"
@@ -103,7 +104,7 @@ System sans-serif labels serve controls only. The base label role is used by but
 
 The canvas fills the viewport without page scrolling. The panel starts at the upper right with safe-area-aware edge spacing, a width of 318px, and a maximum width of the viewport minus 24px. Its maximum height is the dynamic viewport minus 36px; the fields scroll independently while the bar, preset selector, tabs, and footer remain available.
 
-At widths up to 600px, the panel starts collapsed and uses compact-edge spacing. The collapsed bar is 242px wide. At heights up to 500px, vertical padding contracts and the maximum height becomes the viewport minus 24px. The grip supports pointer dragging and keyboard movement; moved panels remain clamped at least 12px inside the viewport and are reclamped after resize or collapse.
+The panel starts collapsed on every screen as a 118px-wide Settings tab, showing only the toggle. Opening the tab reveals the full panel; clicking the artwork closes it. At widths up to 600px, the panel uses compact-edge spacing. At heights up to 500px, vertical padding contracts and the maximum height becomes the viewport minus 24px. The grip supports pointer dragging and keyboard movement; moved panels remain clamped at least 12px inside the viewport and are reclamped after resize or collapse.
 
 ## Elevation & Depth
 
@@ -119,7 +120,7 @@ The panel, buttons, and selects use their respective rounded tokens. Tabs remain
 
 ### Floating control panel
 
-A grip, Controls toggle, Pause/Play, and Save image stay in the bar. Collapse hides the body while retaining these actions. Four tabs—Optics, Objects, Light, and Motion—organize 36 settings. A preset selector offers 12 starting configurations; edited settings display Custom. The footer contains Rearrange, Reset, and Copy settings link. Functional status feedback appears only when needed.
+The open panel bar contains a grip, Settings toggle, Pause/Play, and Save image. Collapse hides the body and icon actions, leaving only the Settings tab. Four tabs—Optics, Objects, Light, and Motion—organize 36 settings. A preset selector offers 13 starting configurations; edited settings display Custom. The footer contains Rearrange, Reset, and Copy settings link. Functional status feedback appears only when needed.
 
 ### Buttons and navigation
 
@@ -130,6 +131,8 @@ Buttons and selects have a minimum height of 44px; icon buttons are 44px square 
 Each range has a visible label and secondary numeric output; selects span the field width beneath their label. A native color input adjusts the background. The Objects tab includes a local image file input for the teleidoscope cell. Inapplicable settings are disabled and rendered at half opacity. Shared-link clipboard failure reveals a selectable text field inside the panel.
 
 ### Kaleidoscope field
+
+The initial configuration uses the requested Mineral / side-lit Gravity wand setting against violet, with 116% object density, 152% size, and 180% glitter. Reset restores it; the earlier presets retain their original settings. The vignette uses viewport-normalized coordinates, scales to the viewport aspect ratio at every pixel density, and stays centered independently of the optical center.
 
 The original configuration retains 180 geometric fragments, 100 iridescent polygonal prisms, and 4,200 glitter flecks. Density and glitter settings scale these counts. Material sprites and prism films are cached; source rendering is bounded to 1400px and device pixel density to 2×. Local images are bounded to 2048px on their longest side. Export saves the canvas alone, excluding the interface.
 

@@ -8,7 +8,7 @@
       html, body {
         margin: 0;
         height: 100%;
-        background: #000;
+        background: #48a7f5;
         overflow: hidden;
       }
       canvas {
@@ -17,31 +17,41 @@
         display: block;
         width: 100%;
         height: 100%;
-        background: #000;
+        background: #48a7f5;
       }
     </style>
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
   <body>
-    <canvas id="stage"></canvas>
+    <canvas id="stage" role="img" aria-label="Cloudcutter: a ship carving through white clouds in a blue sky"></canvas>
     <script>
       const canvas = document.getElementById('stage');
       const ctx = canvas.getContext('2d');
       const TAU = Math.PI * 2;
 
-      const LINE = 'rgba(244,255,250,';
+      const LINE = 'rgba(247,251,255,';
+      const SKY = '#48a7f5';
+      const CLOUD_TOP = '#f7fbff';
+      const CLOUD_BODY = '#deefff';
+      const CLOUD_SHADE = '#bfe2fa';
+      const PILOT_INK = 'rgba(27,65,100,';
+      const SHIP_INK = '#0047ff';
+      const SHIP_LIGHT = '#2a69ff';
+      const SHIP_SHADE = '#0032c4';
+      const SHIP_CAP = '#4382ff';
+      const ROCKET_INK = 'rgba(255,226,59,';
       const FIELD_T = .4;          // field threshold: the visible cloud edge
       const VIS = Math.sqrt(1 - Math.sqrt(.4));  // visible radius / kernel radius
-      const BITE_S = 5;            // a round punches decisively through the field
-      const BITE_R = 21.5;         // a broad radial crater, not only a forward bore
+      const BITE_S = 7.5;            // a round punches decisively through the field
+      const BITE_R = 45;           // fewer rounds, each opening a much broader crater
       const BITE_SETTLE = 18;      // eased expansion, never an instant geometry pop
       const HEAL_HOLD = 18;        // seconds a fresh cut keeps its full shape
       const HEAL_MIN = 540;        // nine to thirteen minutes of visible closure
       const HEAL_MAX = 780;
       const BULLET_SPEED = 680;
-      const BULLET_RANGE = 330;    // the guns only reach a little way ahead
+      const BULLET_RANGE = 900;    // long shots can clear weather well ahead of the bow
       const MAX_BULLETS = 26;
-      const FIRE_CD = .045;        // held down, not squeezed
+      const FIRE_CD = .22;         // deliberate, powerful shots in both control modes
       const SHIP_ACCEL = 300;
       const SHIP_TURN = 3.4;
       const AIR_DRAG = 1.6;        // open sky: cruises near 190
@@ -54,7 +64,7 @@
 
       let W = 0, H = 0, dpr = 1;
       let last = 0, raf = 0, now = 0, serial = 0;
-      let clouds, bullets, wisps, chunks, streaks;
+      let clouds, bullets, wisps, chunks;
       let ship, cam, score, cuts, bored, playerControl, spawnCd, cloudTarget;
       let liveR = 0, killR = 0;
       const keys = new Set();
@@ -96,7 +106,7 @@
         spawnCd = 0;
         playerControl = false;
         // The sky is unbounded. Weather is kept stocked inside a ring around
-        // the camera and forgotten once it falls well outside one.
+        // the camera. Cuts reset outside the viewport; distant bodies are retired.
         // The ring scales with the viewport, so the quota below stocks the
         // same amount of visible sky on a phone as on a wall.
         const viewR = Math.hypot(W, H) * .5;
@@ -108,7 +118,6 @@
           vx: 150, vy: 0,
           a: 0,
           turn: 0,
-          thrusting: false,
           fireCd: 0,
           reamCd: 0,
           wander: rand(0, 40),
@@ -118,26 +127,11 @@
           buried: 0,
         };
         cam = { x: 0, y: 0 };
-        streaks = makeStreaks();
         seedClouds();
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = SKY;
         ctx.fillRect(0, 0, W, H);
         last = performance.now();
         raf = requestAnimationFrame(frame);
-      }
-
-      // Drawn in screen space and dragged by a fraction of the pan, so the
-      // haze behind the weather reads as further off than the weather is.
-      function makeStreaks() {
-        const n = clamp(Math.round(W * H / 24000), 20, 80);
-        return Array.from({ length: n }, () => ({
-          x: rand(-40, W + 40),
-          y: rand(-40, H + 40),
-          len: rand(10, 52),
-          v: rand(14, 70),
-          depth: rand(.22, .55),
-          a: rand(.04, .12),
-        }));
       }
 
       function sizeScale() {
@@ -174,7 +168,6 @@
           renderContours: [],
           bounds: { minx: -size, miny: -size, maxx: size, maxy: size },
           radius: size,
-          shade: Math.round(rand(85, 210)),
           phase: rand(0, TAU),
           bob: rand(0, TAU),
           healRate: rand(.008, .014),
@@ -237,6 +230,16 @@
           lobes.push({
             x: host.x + rand(-.025, .025) * size,
             y: host.y - (host.vr + vr) * rand(.48, .56),
+            vr,
+          });
+        }
+
+        for (let i = 0; i < base.length - 1; i++) {
+          const left = base[i], right = base[i + 1];
+          const vr = size * rand(.085, .12);
+          lobes.push({
+            x: (left.x + right.x) * .5,
+            y: baseline - vr * .75,
             vr,
           });
         }
@@ -642,8 +645,7 @@
         if (bites.length > 130) bites.shift();
         cloud.dirty = true;
         cloud.nextBuild = 0;
-        // Rounds land many times a second; only some of them show as vapor,
-        // or the cut disappears behind its own smoke.
+        // Keep vapor sparse so a powerful cut stays visible through its smoke.
         if (Math.random() < .3) puffWisp(wx + rand(-5, 5), wy + rand(-5, 5), rand(3.5, 7), cloud.vx);
       }
 
@@ -658,10 +660,29 @@
 
       // ---------- per-frame cloud upkeep ----------
 
+      function cloudOutsideView(cloud) {
+        const b = cloud.bounds, s = cloud.scale;
+        const left = cam.x - W / 2 - 2, right = cam.x + W / 2 + 2;
+        const top = cam.y - H / 2 - 2, bottom = cam.y + H / 2 + 2;
+        return cloud.x + b.maxx * s < left || cloud.x + b.minx * s > right ||
+          cloud.y + b.maxy * s < top || cloud.y + b.miny * s > bottom;
+      }
+
       function updateClouds(dt) {
         for (let i = clouds.length - 1; i >= 0; i--) {
           const cloud = clouds[i];
           cloud.x += cloud.vx * dt;   // weather only ever pans, never rises
+          if (cloud.bites.length && cloudOutsideView(cloud)) {
+            // Restore only once the entire uncut silhouette is off screen.
+            // Drop the eased outline too, so returning clouds are intact.
+            cloud.bites.length = 0;
+            cloud.contours = [];
+            cloud.renderContours = [];
+            cloud.severed = false;
+            cloud.cutCd = cloud.cutEnergy = cloud.flash = 0;
+            cloud.dirty = true;
+            cloud.nextBuild = 0;
+          }
           if (cloud.cutCd > 0) cloud.cutCd -= dt;
           if (cloud.cutEnergy > 0) cloud.cutEnergy = Math.max(0, cloud.cutEnergy - dt * 7);
           if (cloud.flash > 0) cloud.flash = Math.max(0, cloud.flash - dt * 1.6);
@@ -766,17 +787,14 @@
         updateShip(dt);
         updateBullets(dt);
         collideBullets();
-        const px = cam.x, py = cam.y;
         updateCamera(dt);
         updateClouds(dt);
         processCloudGeometry();
         updateWisps(dt);
         updateCloudChunks(dt);
-        updateStreaks(dt, cam.x - px, cam.y - py);
       }
 
       function updateShip(dt) {
-        ship.thrusting = false;
         ship.turn = 0;
 
         // What matters is not whether the ship is standing in cloud — down its
@@ -787,6 +805,8 @@
         trackBurial(surround, dt);
         if (playerControl) playerControls(dt);
         else pilot(dt, surround);
+        // The engine runs continuously, including after player takeover.
+        thrust(dt);
         ream(dt);
 
         // Open sky is cheap; a face of cloud is thick going. The ship makes
@@ -871,7 +891,6 @@
         }
         // A drill does not turn sharply while it is in the cut.
         turnToward(want, dt, cloud ? .08 : 1);
-        thrust(dt);
         if (workAhead()) autoFire();
       }
 
@@ -897,14 +916,12 @@
       function playerControls(dt) {
         if (keys.has('ArrowLeft') || keys.has('KeyA')) { ship.a -= SHIP_TURN * dt; ship.turn = -1; }
         if (keys.has('ArrowRight') || keys.has('KeyD')) { ship.a += SHIP_TURN * dt; ship.turn = 1; }
-        if (keys.has('ArrowUp') || keys.has('KeyW')) thrust(dt);
         if (keys.has('Space')) fire();
       }
 
       function thrust(dt) {
         ship.vx += Math.cos(ship.a) * SHIP_ACCEL * dt;
         ship.vy += Math.sin(ship.a) * SHIP_ACCEL * dt;
-        ship.thrusting = true;
         if (Math.random() < 10 * dt) {
           puffWisp(ship.x - Math.cos(ship.a) * 12, ship.y - Math.sin(ship.a) * 12, rand(2.5, 5), 0);
         }
@@ -1056,23 +1073,11 @@
         }
       }
 
-      function updateStreaks(dt, camDx, camDy) {
-        for (const s of streaks) {
-          s.x -= s.v * dt + camDx * s.depth;
-          s.y -= camDy * s.depth;
-          if (s.x + s.len < -60) { s.x = W + 50; s.y = rand(-40, H + 40); }
-          else if (s.x > W + 80) { s.x = -s.len - 50; s.y = rand(-40, H + 40); }
-          if (s.y < -60) s.y = H + 50;
-          else if (s.y > H + 60) s.y = -50;
-        }
-      }
-
       // ---------- draw ----------
 
       function draw() {
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = SKY;
         ctx.fillRect(0, 0, W, H);
-        drawStreaks();
         ctx.save();
         ctx.translate(W / 2 - cam.x, H / 2 - cam.y);
         const visibleClouds = [];
@@ -1082,112 +1087,73 @@
           if (Math.abs(cloud.y - cam.y) > H / 2 + ext) continue;
           visibleClouds.push(cloud);
         }
-        // Solid white bodies cover the distant haze; shared edges stay hidden
-        // so overlapping weather reads as one continuous mass.
-        for (const cloud of visibleClouds) fillCloud(cloud);
         for (const cloud of visibleClouds) drawCloud(cloud);
         drawWisps();
         drawCloudChunks();
-        // Invert the white linework over cloud bodies to keep the pilot and
-        // rounds legible both in open sky and while entering the weather.
-        ctx.save();
-        ctx.globalCompositeOperation = 'difference';
         drawBullets();
         drawShip();
         ctx.restore();
+      }
+
+      // All painted layers share the live, carved silhouette. No decorative
+      // lobe can fill a tunnel or bridge the gap between severed halves.
+      function drawCloud(cloud) {
+        ctx.save();
+        ctx.translate(cloud.x, cloud.y);
+        ctx.scale(cloud.scale, cloud.scale);
+        traceCloud(cloud, 0);
+        ctx.fillStyle = CLOUD_SHADE;
+        ctx.fill();
+        ctx.clip();
+        // Lift the painted body within the live silhouette to leave a blue
+        // scalloped underside, including along newly exposed lower cut edges.
+        traceCloud(cloud, -cloud.size * .065);
+        ctx.fillStyle = CLOUD_TOP;
+        ctx.fill();
+        ctx.clip();
+
+        // Two flat, offset unions make scalloped undersides with white caps,
+        // rather than outlines or a smooth airbrushed lighting gradient.
+        paintPuffs(cloud.puffs, CLOUD_SHADE, .72, 1.02);
+        paintPuffs(cloud.puffs, CLOUD_BODY, .48, .94);
+        // Little overlapping curls break up the large lower masses. The
+        // white lip and blue inset are filled shapes, never outlined rings.
+        for (const p of cloud.puffs) {
+          const r = p.vr * .36;
+          const x = p.x + p.vr * .2;
+          const y = p.y + p.vr * .4;
+          ctx.fillStyle = CLOUD_TOP;
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = CLOUD_BODY;
+          ctx.beginPath();
+          ctx.arc(x - r * .16, y + r * .28, r * 1.04, 0, TAU);
+          ctx.fill();
+        }
         ctx.restore();
       }
 
-      function drawStreaks() {
-        for (const s of streaks) {
-          strokePath([{ x: s.x, y: s.y }, { x: s.x + s.len, y: s.y }], false, .8, s.a);
-        }
-      }
-
-      function drawCloud(cloud) {
-        const w1 = now * 1.15 + cloud.phase;
-        const w2 = now * .63 - cloud.phase;
-        const lift = cloud.flash * .18;
-        for (const loop of cloud.renderContours) {
-          const pts = loopPoints(cloud, loop, w1, w2);
-          for (const run of visibleCloudRuns(cloud, pts)) {
-            strokePath(run.points, run.close, 1, .76 + lift);
-          }
-        }
-      }
-
-      function fillCloud(cloud) {
-        const w1 = now * 1.15 + cloud.phase;
-        const w2 = now * .63 - cloud.phase;
-        ctx.save();
-        ctx.fillStyle = `rgb(${cloud.shade}, ${cloud.shade}, ${cloud.shade})`;
+      function traceCloud(cloud, dy) {
         ctx.beginPath();
         for (const loop of cloud.renderContours) {
-          const pts = loopPoints(cloud, loop, w1, w2);
-          if (!pts.length) continue;
-          ctx.moveTo(pts[0].x, pts[0].y);
-          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+          if (!loop.length) continue;
+          ctx.moveTo(loop[0].x, loop[0].y + dy);
+          for (let i = 1; i < loop.length; i++) ctx.lineTo(loop[i].x, loop[i].y + dy);
           ctx.closePath();
         }
+      }
+
+      function paintPuffs(puffs, color, drop, radius) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        for (const p of puffs) {
+          const r = p.vr * radius;
+          const y = p.y + p.vr * drop;
+          ctx.moveTo(p.x + r, y);
+          ctx.arc(p.x, y, r, 0, TAU);
+        }
         ctx.fill();
-        ctx.restore();
-      }
-
-      // When two bodies overlap, hide every edge that falls inside the other
-      // body. The weather reads as one outer silhouette instead of nested
-      // circles or crossing construction lines.
-      function visibleCloudRuns(cloud, pts) {
-        const n = pts.length;
-        const visible = new Array(n);
-        let firstHidden = -1;
-        for (let i = 0; i < n; i++) {
-          const q = pts[(i + 1) % n];
-          visible[i] = !insideOtherCloud(cloud, (pts[i].x + q.x) * .5, (pts[i].y + q.y) * .5);
-          if (!visible[i] && firstHidden < 0) firstHidden = i;
-        }
-        if (firstHidden < 0) return [{ points: pts, close: true }];
-
-        const runs = [];
-        let run = null;
-        for (let step = 1; step <= n; step++) {
-          const i = (firstHidden + step) % n;
-          const q = pts[(i + 1) % n];
-          if (visible[i]) {
-            if (!run) run = [pts[i]];
-            run.push(q);
-          } else if (run) {
-            if (run.length > 1) runs.push({ points: run, close: false });
-            run = null;
-          }
-        }
-        if (run && run.length > 1) runs.push({ points: run, close: false });
-        return runs;
-      }
-
-      function insideOtherCloud(cloud, wx, wy) {
-        for (const other of clouds) {
-          if (other === cloud) continue;
-          const ext = other.radius * other.scale + 4;
-          if (Math.abs(wx - other.x) > ext || Math.abs(wy - other.y) > ext) continue;
-          const p = { x: (wx - other.x) / other.scale, y: (wy - other.y) / other.scale };
-          for (const loop of other.renderContours) {
-            if (pointInPolygon(p, loop)) return true;
-          }
-        }
-        return false;
-      }
-
-      function loopPoints(cloud, loop, w1, w2) {
-        const s = cloud.scale;
-        const out = new Array(loop.length);
-        for (let i = 0; i < loop.length; i++) {
-          const p = loop[i];
-          out[i] = {
-            x: cloud.x + p.x * s,
-            y: cloud.y + p.y * s,
-          };
-        }
-        return out;
       }
 
       function drawWisps() {
@@ -1237,50 +1203,47 @@
 
       function drawBullets() {
         for (const b of bullets) {
-          strokePath([{ x: b.x - b.vx * .022, y: b.y - b.vy * .022 }, b], false, 1.25, .94);
+          strokePath([{ x: b.x - b.vx * .022, y: b.y - b.vy * .022 }, b], false, 1.25, .94, PILOT_INK);
         }
       }
 
       function drawShip() {
-        const cx = ship.x, cy = ship.y;
-        const nose = pointFrom(cx, cy, ship.a, 13, 0);
-        const left = pointFrom(cx, cy, ship.a, -8, -7.5);
-        const notch = pointFrom(cx, cy, ship.a, -4.5, 0);
-        const right = pointFrom(cx, cy, ship.a, -8, 7.5);
-        strokePath([nose, left, notch, right], true, 1.25, ship.buried > .3 ? .66 : .95);
-        if (ship.thrusting) {
-          const f1 = pointFrom(cx, cy, ship.a, -7, -3.2);
-          const f2 = pointFrom(cx, cy, ship.a, -15 - Math.sin(now * 64) * 4, 0);
-          const f3 = pointFrom(cx, cy, ship.a, -7, 3.2);
-          strokePath([f1, f2, f3], false, .9, .6);
-        }
-      }
-
-      function pointFrom(x, y, angle, forward, side) {
-        const ca = Math.cos(angle), sa = Math.sin(angle);
-        return { x: x + ca * forward - sa * side, y: y + sa * forward + ca * side };
-      }
-
-      function drawHud() {
         ctx.save();
-        ctx.font = '13px ui-monospace, SFMono-Regular, Menlo, monospace';
-        ctx.textBaseline = 'top';
-        ctx.fillStyle = `${LINE}.82)`;
-        ctx.fillText(String(score).padStart(6, '0'), 18, 18);
-        ctx.fillStyle = `${LINE}.55)`;
-        ctx.fillText(`BORED ${String(bored).padStart(2, '0')}   CUT ${String(cuts).padStart(2, '0')}`, 18, 38);
-        ctx.textAlign = 'right';
-        ctx.fillStyle = `${LINE}.82)`;
-        ctx.fillText(playerControl ? 'PILOT' : 'AUTO', W - 18, 18);
-        if (ship.buried > .25) {
-          ctx.textAlign = 'center';
-          ctx.fillStyle = `${LINE}${(.45 * ship.buried).toFixed(3)})`;
-          ctx.fillText('IN THE CUT', W / 2, H - 34);
-        }
+        ctx.translate(ship.x, ship.y);
+        ctx.rotate(ship.a);
+
+        // The yellow engine stays lit behind the cylinder in either mode.
+        ctx.beginPath();
+        ctx.moveTo(-10, -3.2);
+        ctx.lineTo(-21 - Math.sin(now * 64) * 4, 0);
+        ctx.lineTo(-10, 3.2);
+        ctx.closePath();
+        ctx.fillStyle = `${ROCKET_INK}1)`;
+        ctx.fill();
+
+        // A solid, unlabelled blue can: a long body and elliptical end caps.
+        ctx.fillStyle = SHIP_SHADE;
+        ctx.beginPath();
+        ctx.ellipse(-9, 0, 3, 7, 0, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = SHIP_INK;
+        ctx.fillRect(-9, -7, 18, 14);
+        ctx.fillStyle = SHIP_LIGHT;
+        ctx.fillRect(-9, -5, 18, 3);
+        ctx.fillStyle = SHIP_SHADE;
+        ctx.fillRect(-9, 4, 18, 3);
+        ctx.fillStyle = SHIP_CAP;
+        ctx.beginPath();
+        ctx.ellipse(9, 0, 3, 7, 0, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = SHIP_LIGHT;
+        ctx.beginPath();
+        ctx.ellipse(9.5, 0, 1.8, 5, 0, 0, TAU);
+        ctx.fill();
         ctx.restore();
       }
 
-      function strokePath(points, close, width, alpha) {
+      function strokePath(points, close, width, alpha, ink = LINE) {
         if (points.length < 2 || alpha <= .004) return;
         ctx.save();
         ctx.lineJoin = 'round';
@@ -1290,7 +1253,7 @@
         for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
         if (close) ctx.closePath();
         ctx.lineWidth = width;
-        ctx.strokeStyle = `${LINE}${alpha})`;
+        ctx.strokeStyle = `${ink}${alpha})`;
         ctx.stroke();
         ctx.restore();
       }

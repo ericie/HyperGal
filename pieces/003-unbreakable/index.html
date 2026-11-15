@@ -14,7 +14,7 @@
     <canvas
       id="stage"
       role="img"
-      aria-label="Unbreakable: a reverse Breakout machine whose infallible paddle builds an even wall of Renaissance-colored bricks, one low column at a time."
+      aria-label="Unbreakable: a reverse Breakout machine whose infallible paddle builds an even wall, one low column at a time. Each new brick advances through a repeating rainbow."
     ></canvas>
     <script>
       // unbreakable — a Breakout run in reverse.
@@ -45,8 +45,12 @@
       const PHYSICS_STEP = 1 / 120;
       const MAX_SUBSTEPS = 8;
 
-      // Growth Rings' Renaissance palette: warm masonry on deep aubergine.
-      const PALETTE = ['#781f02', '#ce9f69', '#cc241d', '#ffda79', '#f9f7e5'];
+      // Each completed brick advances one swatch around the rainbow.
+      const RAINBOW = [
+        '#ef4545', '#f58335', '#f5ce45', '#a8d948',
+        '#44bd72', '#34b7a0', '#3cbed5', '#478fe0',
+        '#6864d9', '#a05bce', '#d958b0', '#ed5680',
+      ];
       const SCENE = {
         background: '#160f18',
         paper: '#f9f7e5',
@@ -69,7 +73,6 @@
       let brickMap = new Map();
       let pendingDeposit = null;
       let ball = null;
-      let depositColorBag = [];
       let buildCursor = 0;
       let lastCeilingRow = null;
 
@@ -82,7 +85,6 @@
       let impactStats = { hits: 0, cells: 0, misses: 0, recoveries: 0 };
 
       const rand = (a, b) => a + Math.random() * (b - a);
-      const pick = (arr) => arr[(Math.random() * arr.length) | 0];
       const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
       const randInt = (lo, hi) => Math.floor(rand(lo, hi + 1));
       const colOf = (x) => clamp(Math.floor(x / colW), 0, numCols - 1);
@@ -125,11 +127,10 @@
         lastCeilingRow = null;
         for (let c = 0; c < numCols; c++) {
           for (let row = -1; gridY + row * BRICK_H > -BRICK_H * 2; row--) {
-            addBrick(c, row, nextOpeningColor());
+            addBrick(c, row, rainbowColor(row * numCols + c));
           }
         }
 
-        depositColorBag = [];
         buildCursor = randInt(0, numCols - 1);
         impactStats = { hits: 0, cells: 0, misses: 0, recoveries: 0 };
         frameStats = { fps: 0, maxFrameMs: 0, lastSteps: 0 };
@@ -140,11 +141,10 @@
           y: paddleY - BALL_R,
           vx: 0,
           vy: -BALL_SPEED,
-          color: nextDepositColor(),
+          color: RAINBOW[0],
           targetCol: buildCursor,
           phase: 'ascending',
           flash: 0,
-          trail: [],
           paddle: {
             x: startX,
             targetX: startX,
@@ -160,23 +160,8 @@
         raf = requestAnimationFrame(tick);
       }
 
-      function nextOpeningColor(previous = '') {
-        const options = PALETTE.filter((color) => color !== previous);
-        return pick(options.length ? options : PALETTE);
-      }
-
-      function shuffle(colors) {
-        const result = colors.slice();
-        for (let i = result.length - 1; i > 0; i--) {
-          const j = randInt(0, i);
-          [result[i], result[j]] = [result[j], result[i]];
-        }
-        return result;
-      }
-
-      function nextDepositColor() {
-        if (!depositColorBag.length) depositColorBag = shuffle(PALETTE);
-        return depositColorBag.shift();
+      function rainbowColor(index) {
+        return RAINBOW[((index % RAINBOW.length) + RAINBOW.length) % RAINBOW.length];
       }
 
       function hasBrick(c, row) {
@@ -204,7 +189,7 @@
         lastCeilingRow = ceilingRow;
 
         for (let c = 0; c < numCols; c++) {
-          if (!hasBrick(c, ceilingRow)) addBrick(c, ceilingRow, nextOpeningColor());
+          if (!hasBrick(c, ceilingRow)) addBrick(c, ceilingRow, rainbowColor(ceilingRow * numCols + c));
         }
 
         for (let i = bricks.length - 1; i >= 0; i--) {
@@ -240,6 +225,7 @@
       function launchBall() {
         ball.phase = 'ascending';
         ball.targetCol = chooseTargetColumn(ball.x);
+        ball.color = rainbowColor(impactStats.cells);
 
         const desiredX = (ball.targetCol + 0.5) * colW;
         const vertical = Math.max(BRICK_H, (paddleY - BALL_R) - (frontY(ball.targetCol) + BALL_R));
@@ -281,7 +267,6 @@
           row: front[c],
           color: ball.color,
         };
-        ball.color = nextDepositColor();
         return true;
       }
 
@@ -346,7 +331,6 @@
         ball.y = paddleY - BALL_R;
         ball.vx = 0;
         ball.vy = -BALL_SPEED;
-        ball.trail.length = 0;
         launchBall();
       }
 
@@ -413,9 +397,6 @@
           frameStats.maxFrameMs = frameMs;
         }
 
-        ball.trail.push(ball.x, ball.y);
-        if (ball.trail.length > 16) ball.trail.splice(0, ball.trail.length - 16);
-
         draw();
         raf = requestAnimationFrame(tick);
       }
@@ -423,7 +404,7 @@
       function drawBricks() {
         // Batch brick bodies by palette color to avoid hundreds of fill-state
         // changes per frame. Bevels and shadows are two additional batched fills.
-        for (const color of PALETTE) {
+        for (const color of RAINBOW) {
           ctx.fillStyle = color;
           ctx.beginPath();
           for (const brick of bricks) {
@@ -464,20 +445,6 @@
         ctx.fillStyle = SCENE.background;
         ctx.fillRect(0, 0, W, H);
         drawBricks();
-
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.lineCap = 'round';
-        for (let i = 2; i < ball.trail.length; i += 2) {
-          const alpha = (i / ball.trail.length) * 0.5;
-          ctx.strokeStyle = hexA(ball.color, alpha);
-          ctx.lineWidth = (i / ball.trail.length) * BALL_R * 1.6;
-          ctx.beginPath();
-          ctx.moveTo(ball.trail[i - 2], ball.trail[i - 1]);
-          ctx.lineTo(ball.trail[i], ball.trail[i + 1]);
-          ctx.stroke();
-        }
-        ctx.restore();
 
         const paddle = ball.paddle;
         capsule(paddle.x - paddle.w / 2, paddleY - PADDLE_H / 2, paddle.w, PADDLE_H, PADDLE_H / 2);

@@ -5,13 +5,22 @@
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const cellSize = 4;
   const colors = ['#090b10', '#76c9cd', '#d6bb6a', '#af93d4', '#83b995', '#cf7d8a', '#7598cf', '#cf9b74'];
+  function normalizeCells(cells) {
+    const left = Math.min(...cells.map(([x]) => x));
+    const bottom = Math.min(...cells.map(([, y]) => y));
+    return cells.map(([x, y]) => [x - left, y - bottom]).sort(([ax, ay], [bx, by]) => ax - bx || ay - by);
+  }
   const shapes = Array.from({ length: 7 }, (_, i) => {
-    const rotations = new Map();
-    for (const recipe of recipes) for (const piece of recipe) {
-      if (piece.color !== i + 1) continue;
-      rotations.set(JSON.stringify(piece.cells), piece.cells);
+    const rotations = [];
+    let cells = normalizeCells(recipes.flat().find(piece => piece.color === i + 1).cells);
+    for (let turn = 0; turn < 4; turn++) {
+      if (!rotations.some(rotation => JSON.stringify(rotation) === JSON.stringify(cells))) rotations.push(cells);
+      cells = normalizeCells(cells.map(([x, y]) => [y, -x]));
     }
-    return { color: i + 1, rotations: [...rotations.values()] };
+    // Use a low, familiar entry orientation, then retain clockwise turn order.
+    const first = rotations.reduce((best, rotation, index) =>
+      Math.max(...rotation.map(([, y]) => y)) < Math.max(...rotations[best].map(([, y]) => y)) ? index : best, 0);
+    return { color: i + 1, rotations: [...rotations.slice(first), ...rotations.slice(0, first)] };
   });
   let width, height, board;
   let generation = 0;
@@ -70,38 +79,48 @@
   }
   function seedRows() {
     if (width < 5) return;
-    const depth = Math.min(height - 4, Math.ceil(height * .7));
-    const patches = Array.from({ length: Math.max(3, Math.ceil(width * depth / 1600)) }, () => {
-      const radiusX = 9 + Math.random() * 16, radiusY = 6 + Math.random() * 12;
-      return {
-        x: Math.random() * width, y: Math.random() * Math.max(1, depth - radiusY),
-        radiusX, radiusY, strength: .25 + Math.random() * .75,
-        color: 1 + Math.floor(Math.random() * (colors.length - 1))
-      };
-    });
-    const cells = [];
-    for (let y = 0; y < depth; y++) {
-      const gap = Math.floor(Math.random() * width);
-      for (let x = 0; x < width; x++) {
-        if (x === gap) continue;
-        let weight = .002, strongest = 0, color = 1;
-        for (const patch of patches) {
-          const distance = ((x - patch.x) / patch.radiusX) ** 2 + ((y - patch.y) / patch.radiusY) ** 2;
-          const influence = Math.max(0, 1 - distance) ** 2 * patch.strength;
-          weight += influence;
-          if (influence > strongest) { strongest = influence; color = patch.color; }
+    const depth = Math.max(4, Math.floor(height * .1));
+    const skyline = new Uint32Array(width);
+    const turns = Math.max(1, Math.floor(width * height * .005 / 4));
+    for (let turn = 0; turn < turns; turn++) {
+      const shape = shapes[Math.floor(Math.random() * shapes.length)];
+      const mistake = Math.random() < .25;
+      let best = null;
+      // Rehearse imperfect play: try to keep rows level, but sometimes bridge
+      // gaps or choose a poor rotation. Every seeded piece really drops and lands.
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const cells = shape.rotations[Math.floor(Math.random() * shape.rotations.length)];
+        const span = 1 + Math.max(...cells.map(([x]) => x));
+        if (span > width) continue;
+        const x = Math.floor(Math.random() * (width - span + 1));
+        const y = Math.max(0, ...cells.map(([dx, dy]) => skyline[x + dx] - dy));
+        const top = y + 1 + Math.max(...cells.map(([, dy]) => dy));
+        if (top > depth) continue;
+        let holes = 0, unevenness = 0;
+        for (let dx = 0; dx < span; dx++) {
+          const bottom = Math.min(...cells.filter(([cx]) => cx === dx).map(([, dy]) => dy));
+          holes += y + bottom - skyline[x + dx];
+          unevenness += Math.abs(top - skyline[x + dx]);
         }
-        // Nearby squares often share a color; individual positions stay random.
-        // Variable patches and broad empty areas break up the uniform static.
-        if (!strongest || Math.random() < .12) color = 1 + Math.floor(Math.random() * (colors.length - 1));
-        cells.push({ index: y * width + x, color,
-          priority: -Math.log(Math.max(Number.EPSILON, Math.random())) / weight });
+        const score = top + holes * (mistake ? .05 : 1.8) + unevenness * .15 +
+          Math.random() * (mistake ? 8 : 2);
+        if (!best || score < best.score) best = { cells, x, y, score };
+      }
+      if (!best) continue;
+      for (const [dx, dy] of best.cells) {
+        board[(best.y + dy) * width + best.x + dx] = shape.color;
+        skyline[best.x + dx] = Math.max(skyline[best.x + dx], best.y + dy + 1);
+      }
+      // Completed historical lines disappear before the live animation starts.
+      clearRows();
+      if (clearing) {
+        collapseRows();
+        for (let x = 0; x < width; x++) skyline[x] = columnStats(x).height;
       }
     }
-    cells.sort((a, b) => a.priority - b.priority);
-    const count = Math.floor(width * height * .08);
-    for (const cell of cells.slice(0, count)) board[cell.index] = cell.color;
+    cleared = 0;
   }
+
   function columnStats(x) {
     let top = height - 1;
     while (top >= 0 && !board[top * width + x]) top--;
@@ -109,18 +128,31 @@
     for (let y = 0; y < top; y++) if (!board[y * width + x]) holes++;
     return { height: top + 1, holes };
   }
+  function entryPose(shape, rotation) {
+    const piece = { color: shape.color, cells: shape.rotations[rotation] };
+    const span = 1 + Math.max(...piece.cells.map(([x]) => x));
+    return { piece, x: Math.floor((width - span) / 2),
+      y: height - 1 - Math.max(...piece.cells.map(([, y]) => y)) };
+  }
   function planPiece() {
     const available = shapes.filter(shape => shape.rotations.some(cells =>
       Math.max(...cells.map(([x]) => x)) < width));
     const shape = available[Math.floor(Math.random() * available.length)];
     const columns = Array.from({ length: width }, (_, x) => columnStats(x));
+    const startRotation = shape.rotations.findIndex(cells => Math.max(...cells.map(([x]) => x)) < width);
     let best = null;
-    for (const cells of shape.rotations) {
-      const piece = { color: shape.color, cells };
-      const span = 1 + Math.max(...cells.map(([x]) => x));
-      const top = height - 1 - Math.max(...cells.map(([, y]) => y));
-      for (let x = 0; x <= width - span; x++) {
-        if (!fits(piece, x, top)) continue;
+    for (let turns = 0; turns < shape.rotations.length; turns++) {
+      const rotation = (startRotation + turns) % shape.rotations.length;
+      const pose = entryPose(shape, rotation);
+      if (!fits(pose.piece, pose.x, pose.y)) break;
+      const { piece, y: top } = pose;
+      const cells = piece.cells;
+      // Require an open entry corridor. During the actual fall, every move
+      // and turn is checked again at the piece's current height.
+      let left = pose.x, right = pose.x;
+      while (fits(piece, left - 1, top)) left--;
+      while (fits(piece, right + 1, top)) right++;
+      for (let x = left; x <= right; x++) {
         let y = top;
         while (fits(piece, x, y - 1)) y--;
         const touchedColumns = new Set(cells.map(([dx]) => x + dx));
@@ -145,16 +177,86 @@
         }
         score += y * .01 + Math.random() * .001;
         for (const [dx, dy] of cells) board[(y + dy) * width + x + dx] = 0;
-        if (!best || score < best.score) best = { piece, x, y: top, travel: 0, score };
+        if (!best || score < best.score) best = { shape, startRotation, targetRotation: rotation, targetX: x, score };
       }
     }
     return best;
   }
   function spawn() {
     if (clearing) return;
-    active = planPiece();
-    // A fresh scattered field keeps the artwork playing after a top-out.
-    if (!active) reset();
+    const plan = planPiece();
+    // A blocked center is a top-out, even if a remote column is still open.
+    if (!plan) { reset(); return; }
+    const pose = entryPose(plan.shape, plan.startRotation);
+    const nudgeInterval = Math.min(.035, 1.1 / width);
+    const reactionTime = .04 + Math.random() * .08;
+    let detour = null, hesitation = null;
+    if (width >= 5 && Math.random() < .45) {
+      const direction = Math.sign(plan.targetX - pose.x) || (Math.random() < .5 ? -1 : 1);
+      const offset = 2 + Math.floor(Math.random() * Math.min(7, width * .08));
+      const kind = Math.floor(Math.random() * 3);
+      const wrongRotations = plan.shape.rotations.map((_, index) => index)
+        .filter(index => index !== plan.targetRotation && index !== plan.startRotation);
+      if (kind === 2 && wrongRotations.length) {
+        detour = { x: plan.targetX, rotation: wrongRotations[Math.floor(Math.random() * wrongRotations.length)],
+          until: .28 + Math.random() * .18, hold: 0, reachedAt: null };
+      } else if (kind === 1) {
+        detour = { x: plan.targetX + direction * offset, rotation: plan.targetRotation,
+          until: .9, hold: .08 + Math.random() * .09, reachedAt: null };
+      } else {
+        detour = { x: pose.x - direction * offset, rotation: plan.startRotation,
+          until: .2 + Math.random() * .15, hold: 0, reachedAt: null };
+      }
+      if (Math.random() < .5) {
+        const start = .3 + Math.random() * .2;
+        hesitation = { start, end: start + .08 + Math.random() * .1 };
+      }
+    }
+    active = { ...plan, ...pose, rotation: plan.startRotation, phase: 'falling',
+      age: 0, travel: 0, turnTime: 0, nudgeTime: 0, nudgeInterval,
+      turnInterval: .1 + Math.random() * .06, reactionTime, detour, hesitation };
+  }
+  function steer(piece, seconds) {
+    piece.age += seconds;
+    if (piece.age < piece.reactionTime ||
+        (piece.hesitation && piece.age >= piece.hesitation.start && piece.age < piece.hesitation.end)) return;
+    if (piece.detour && (piece.age >= piece.detour.until ||
+        (piece.detour.reachedAt !== null && piece.age >= piece.detour.reachedAt + piece.detour.hold))) {
+      piece.detour = null;
+    }
+    const goal = piece.detour || { x: piece.targetX, rotation: piece.targetRotation };
+    piece.turnTime += seconds;
+    if (piece.rotation !== goal.rotation && piece.turnTime >= piece.turnInterval) {
+      const count = piece.shape.rotations.length;
+      const clockwise = (goal.rotation - piece.rotation + count) % count;
+      const rotation = (piece.rotation + (clockwise <= count / 2 ? 1 : count - 1)) % count;
+      const next = { color: piece.piece.color, cells: piece.shape.rotations[rotation] };
+      const oldSpan = 1 + Math.max(...piece.piece.cells.map(([x]) => x));
+      const newSpan = 1 + Math.max(...next.cells.map(([x]) => x));
+      const top = piece.y + Math.max(...piece.piece.cells.map(([, y]) => y));
+      const x = piece.x + Math.floor((oldSpan - newSpan) / 2);
+      const y = top - Math.max(...next.cells.map(([, dy]) => dy));
+      // A turn keeps the falling top edge fixed; it never lifts the piece.
+      for (const kick of [0, -1, 1]) {
+        if (!fits(next, x + kick, y)) continue;
+        Object.assign(piece, { piece: next, rotation, x: x + kick, y });
+        break;
+      }
+      piece.turnTime = 0;
+    }
+    const span = 1 + Math.max(...piece.piece.cells.map(([x]) => x));
+    const goalX = Math.max(0, Math.min(width - span, goal.x));
+    piece.nudgeTime += seconds;
+    while (piece.x !== goalX && piece.nudgeTime >= piece.nudgeInterval) {
+      const x = piece.x + Math.sign(goalX - piece.x);
+      if (!fits(piece.piece, x, piece.y)) { piece.nudgeTime = 0; break; }
+      piece.x = x;
+      piece.nudgeTime -= piece.nudgeInterval;
+    }
+    // Don't bank movement during a hesitation or while already at the goal.
+    if (piece.x === goalX) piece.nudgeTime = 0;
+    if (piece.detour && piece.detour.hold && piece.x === goalX && piece.rotation === goal.rotation &&
+        piece.detour.reachedAt === null) piece.detour.reachedAt = piece.age;
   }
   function advance(seconds) {
     if (clearing) {
@@ -164,16 +266,23 @@
     }
     if (!active) spawn();
     if (!active) return;
-    // One visible top-to-bottom drop, checking every cell so frames cannot
-    // skip through the stack. A full-height fall takes about 0.8 seconds.
-    active.travel += seconds * height / .8;
-    while (active.travel >= 1) {
-      active.travel--;
-      if (fits(active.piece, active.x, active.y - 1)) active.y--;
-      if (!fits(active.piece, active.x, active.y - 1)) {
-        lock();
-        spawn();
-        break;
+    const falling = active;
+    // Small shared time steps keep controls and gravity concurrent. Thinking,
+    // changing direction, and rotating never suspend or reset the fall clock.
+    let remaining = seconds;
+    while (remaining > 1e-9 && active === falling) {
+      const step = Math.min(remaining, 1 / 120);
+      remaining -= step;
+      steer(falling, step);
+      falling.travel += step * height / 2.4;
+      while (falling.travel >= 1) {
+        falling.travel--;
+        if (fits(falling.piece, falling.x, falling.y - 1)) falling.y--;
+        if (!fits(falling.piece, falling.x, falling.y - 1)) {
+          lock();
+          spawn();
+          break;
+        }
       }
     }
   }

@@ -1,6 +1,6 @@
 // Play native vector films only while their artwork links are in view.
 (() => {
-  const films={asteroids:window.AsteroidsAttract,snake:window.SnakeAttract,warlords:window.WarlordsAttract};
+  const films={asteroids:window.AsteroidsAttract,snake:window.SnakeAttract,warlords:window.WarlordsAttract,command:window.CommandAttract,unbreakable:window.UnbreakableAttract};
   const links=[...document.querySelectorAll('[data-attract]')].filter(link=>films[link.dataset.attract]);
   if(!links.length)return;
   const reduce=matchMedia('(prefers-reduced-motion: reduce)');

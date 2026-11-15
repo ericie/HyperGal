@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-15T10:19:32.711603+00:00",
+  "title": "Design System: Cloudcutter",
+  "extensions": {
+    "colorMeta": {
+      "sky": {
+        "role": "primary",
+        "displayName": "Sky"
+      },
+      "cloud-cap": {
+        "role": "neutral",
+        "displayName": "Cloud cap"
+      },
+      "cloud-body": {
+        "role": "neutral",
+        "displayName": "Cloud body"
+      },
+      "cloud-underside": {
+        "role": "neutral",
+        "displayName": "Cloud underside"
+      },
+      "pilot-ink": {
+        "role": "primary",
+        "displayName": "Pilot ink",
+        "purpose": "Dark blue rounds only."
+      },
+      "ship-ink": {
+        "role": "primary",
+        "displayName": "Ship ink",
+        "purpose": "Solid cobalt cylinder barrel, with no stroked outline or label."
+      },
+      "rocket": {
+        "role": "primary",
+        "displayName": "Rocket",
+        "purpose": "Fully opaque filled yellow flickering triangle, always visible."
+      },
+      "ship-light": {
+        "role": "primary",
+        "displayName": "Ship light",
+        "purpose": "Flat upper highlight and front cap inset."
+      },
+      "ship-shade": {
+        "role": "primary",
+        "displayName": "Ship shade",
+        "purpose": "Rear elliptical end and lower barrel band."
+      },
+      "ship-cap": {
+        "role": "primary",
+        "displayName": "Ship cap",
+        "purpose": "Bright front elliptical end cap."
+      }
+    },
+    "motion": [
+      {
+        "name": "cut-hold",
+        "value": "18s",
+        "purpose": "A fresh cut retains its full shape before healing."
+      },
+      {
+        "name": "cloud-healing",
+        "value": "540–780s",
+        "purpose": "Existing slow quintic closure, with eased live contours."
+      },
+      {
+        "name": "automatic-engine",
+        "value": "once per update",
+        "purpose": "Thrust applies exactly once in autoplay and player control. No thrusting boolean or Up throttle; Up/W takes over with automatic acceleration."
+      },
+      {
+        "name": "shot-cadence",
+        "value": "0.22s",
+        "purpose": "Both control modes use a 45px blast radius, strength 7.5, and 900px range."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Artwork palette and cloud",
+      "kind": "custom",
+      "refersTo": "artwork",
+      "description": "Static tonal preview only; the live Canvas 2D contour remains the source of carving and healing behavior.",
+      "html": "<svg class=\"ds-cloudcutter\" viewBox=\"0 0 320 180\" role=\"img\" aria-label=\"Cloudcutter cloud palette\"><defs><clipPath id=\"ds-cloudcutter-clip\"><path d=\"M72 132a22 22 0 0 1 0-44a36 36 0 0 1 65-32a34 34 0 0 1 62 6a32 32 0 0 1 48 27a22 22 0 0 1 0 43Z\"/></clipPath></defs><g clip-path=\"url(#ds-cloudcutter-clip)\"><path fill=\"#bfe2fa\" d=\"M40 20h235v125H40z\"/><path fill=\"#f7fbff\" d=\"M72 124a22 22 0 0 1 0-44a36 36 0 0 1 65-32a34 34 0 0 1 62 6a32 32 0 0 1 48 27a22 22 0 0 1 0 43Z\"/><path fill=\"#deefff\" d=\"M72 126a17 17 0 0 1 0-34a31 31 0 0 1 65-25a29 29 0 0 1 57 8a28 28 0 0 1 48 20a16 16 0 0 1 5 31Z\"/><path fill=\"#f7fbff\" d=\"M113 106a13 13 0 1 1 25 5a12 12 0 0 0-25-5M172 95a15 15 0 1 1 29 6a14 14 0 0 0-29-6\"/></g></svg>",
+      "css": ".ds-cloudcutter { display: block; width: 100%; background: #48a7f5; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Cloudcutter",
+    "overview": "This local direction applies only to the artwork in this folder. A flat blue sky carries rounded cartoon cumulus, with distinct white caps, pale bodies, and visible blue underside bands. The small ship is a solid blue can with an always-visible yellow rocket flame.",
+    "keyCharacteristics": [
+      "Flat color fields with no cloud outlines.",
+      "Wide cumulus silhouettes with connected base scallops and filled white curls.",
+      "Carved sky channels remain clear through every painted layer."
+    ],
+    "rules": [
+      {
+        "name": "The Live Contour Rule",
+        "body": "Clip every painted cloud layer to the current carved silhouette. Decorative puffs cannot bridge a tunnel or join severed halves.",
+        "section": "shapes"
+      },
+      {
+        "name": "Offscreen cloud reset",
+        "body": "Keep visible cuts; once the entire uncut cloud body is outside the viewport plus a 2px edge margin, clear cuts and eased contours and rebuild the intact cloud. Returning clouds are fresh.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Do keep the underside visible on intact clouds and exposed lower cut edges.",
+      "Do preserve clear sky through the live carved channels.",
+      "Do retain the existing ship and cloud-boring behavior.",
+      "Do keep accessibility descriptions available without visible text."
+    ],
+    "donts": [
+      "Don't add visible titles, captions, labels, counters, or instructions.",
+      "Don't outline clouds or add gradients, haze, or sky streaks.",
+      "Don't let decorative puffs fill a cut or bridge severed halves.",
+      "Don't apply this artwork palette to the gallery or issue interfaces."
+    ]
+  }
+}

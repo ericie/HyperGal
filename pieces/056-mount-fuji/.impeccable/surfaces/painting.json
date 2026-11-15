@@ -1,0 +1,17 @@
+{
+  "mode": "Experience",
+  "direction": "Paint in motion",
+  "authority": "User correction: painterly material and dynamic strokes are essential. The subject is incidental. Reuse original Loaded Brush renderer. Reject the prior postcard interpretation.",
+  "thesis": "A continuously overpainted oil surface; the loaded brush itself is the moving event.",
+  "material": "Original bristle-space pigment and curved pressure ribbons on linen, with height relief, dry trails, pushed paint lips and wet highlights.",
+  "firstViewport": "Layered blue, teal, violet and ochre oil strokes at several scales; exposed linen between passages. No illustrative objects or visible text.",
+  "interaction": "Drag to apply the same real paint. Space pauses, R starts another painting, S exports.",
+  "constraints": [
+    "No literal postcard imagery",
+    "No visible text or controls",
+    "Keep WIP",
+    "Self-contained WebGL2, no dependencies",
+    "Reduced motion and hidden-tab suspension"
+  ],
+  "buildPath": "code-led, original material continuity; user-pinned, no concept selection required"
+}

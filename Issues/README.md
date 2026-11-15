@@ -5,6 +5,11 @@ is the Arcade landing page; `arcade/index.html` is the original
 fifteen-work wall. Open either directly or follow **Issues** from the master
 gallery. No server, build step, CDN, or package installation is required.
 
+For cache-free local editing, run `python3 scripts/preview.py` from the repository
+root and reload the page after edits. Before publishing attract changes, run
+`node scripts/version-arcade-assets.mjs` to refresh content-hash URLs for scripts,
+styles, and preview PNGs across both entry views and the standalone studies.
+
 ## Arcade
 
 Current direction status: the user rejected the street-art/comic/photostat
@@ -50,34 +55,43 @@ remain unchanged. Longer loops within reasonable byte budgets are permitted;
 Asteroids, We're All Snakes, and Warlords are placed on both entry surfaces; further film redesigns
 wait for direction.
 
-Preview the [We're All Snakes attract study](arcade/snake-test.html). Its 18-second
-native loop begins with a first-person snake hunting a pale upright blinking
-cursor across a dim blue grid, amid cyan and acid-green right-angle light-cycle
-trails. The .56-wide, .72-high world plane uses the original game's .24-second
-hard blink with .10 seconds off; the mouse character is removed. From
-4.4–5.8 seconds the camera climbs and turns continuously in 1.4 seconds. The same
-world-coordinate paths form exact **WE'RE ALL SNAKES** in two rows: **WE'RE ALL**
-above **SNAKES**. Fourteen glyph snakes finish growing by 7.1 seconds; their heads
-and bright tail segments keep traveling through dimmer full-letter memory
-trails throughout the title. Flat wireframe ribbon walls recede through the
-pullback. The camera returns from 16.3–18 seconds. **0¢ TO PLAY** remains stationary
-below the field. This is a local classic Atari/vector extension, with no new
-fonts, shared tokens, or gallery identity change. The renderer is 8,817 bytes;
-HTML plus renderer is 10,845 bytes; renderer plus the shared controller is
-12,297 bytes. Its native 1200×900 completed-title fallback at 9 seconds is
-`arcade/assets/snake-attract.png` (79,850 bytes), with updated embedded provenance
-and registry entry. That PNG and the ordinary original-work link remain usable
-in the standalone study without JavaScript. The study stays `"wip": true`.
+Preview the [We're All Snakes attract study](arcade/snake-test.html). Exactly 36
+continuous snakes crawl along safe ground tracks during the perspective opening,
+settling into **WE'RE ALL** above **SNAKES** by 3.8 seconds. The blinking mouse
+stands on clear ground at (-8.4, -1.2), with at least .52 world units of clearance
+around its full footprint. The camera follows an arriving snake, then pulls
+overhead in .65 seconds from 4.4–5.05 seconds. The title stays fixed from 3.8
+until 9.6 seconds, without letter morphs or crossfades. Every body is .8 world
+units wide; all 13 letters share a 5.6-unit cap height, with a 1.6-unit apostrophe.
+Adjoining pieces meet edge-to-edge, closing the glyphs. Fractional body motion
+preserves right-angle interior corners. At 9.6 seconds the bodies hustle
+offscreen without overlaps; all tails clear by 11.2875 seconds. The 15-second
+loop returns the camera at 13.2–15 seconds. No play-price text, footer, heads or eyes.
+Focus, reduced motion and the native 1200×900 fallback show the title at 9s.
+`node scripts/plan-snake-attract.mjs` jointly plans exits offline, reserving old
+and new full bodies through each movement step; arrivals retrace those safe
+tracks. Runtime decodes the compact routes. `--check` verifies routes are current.
+`node scripts/check-snake-attract.mjs` checks moving arrivals, settled geometry
+through the camera rise, uniform widths/heights, 14 edge-connected glyphs and
+mouse safety. Arrivals and exits receive 1,341 overlap/backtrack samples at
+240Hz, with full-width self-segments at 80Hz and a complete-exit assertion.
+Touching edges are allowed; penetration is not. Current native evidence is
+`.impeccable/review/snake-uniform-arrival/`, including the contact sheet,
+800×600 opening and 1200×900 title. Browser
+access is unavailable for a fresh layout/interaction pass. Shared playback
+controls, direct links and all manual statuses remain; the study stays WIP.
 The original game's public title is now We're All Snakes (formerly Snake Pit);
 browser and accessible names, metadata, manifest, and README alias follow the
 rename. Its `pieces/007-hydra/` link, gameplay, rating, and manual `"wip": false`
-remain unchanged; no visible title is added inside the game. Checks in
-`.impeccable/review/snake-cursor-title/checks.json` pass across three surfaces and
-three viewports, and fresh visual review of 23 captures found no material fixes.
+remain unchanged; no visible title is added inside the game. Earlier checks in
+`.impeccable/review/snake-cursor-title/checks.json` cover the prior revision
+across three surfaces and three viewports. The native captures in
+`.impeccable/review/snake-24-exits/` also describe an earlier revision; current
+36-body evidence is linked above.
 
 Preview the [Warlords attract study](arcade/warlords-test.html). Its 24-second
 native loop uses the original four flat colored cannons, curved planet caps,
-star field, and ammunition marks. The camera stays at 2.8× through the firing
+and star field. The camera stays at 2.8× through the firing
 close-ups in north/east/south/west order: pink, orange, mint, then blue. Each
 3.6-second dwell fires seven shots with recoil and color-matched projectiles
 toward the opposite edge; 280ms pans connect the close-ups. At 15.4 seconds,
@@ -89,12 +103,13 @@ behind the word. A dark keyline keeps the lettering readable; the letters
 never fragment. Fire ends 1.6 seconds after contact, smoke/embers dissipate
 within 3.2 seconds, and the intact title holds.
 Only the first close-up returns at 23.4–24 seconds; no four-gun overview appears
-anywhere. **0¢ TO PLAY** stays stationary below the field. The renderer is
-10,728 bytes; the 1,996-byte study HTML plus renderer is 12,724 bytes, and
-renderer plus shared controller is 14,208 bytes. Its native 1200×900
-`arcade/assets/warlords-attract.png` fallback shows the settled intact word with residual smoke at
-18 seconds and is 49,759 bytes, with embedded provenance and an updated registry
-entry. The standalone study and
+anywhere. The ammunition counter and **0¢ TO PLAY** are removed from Warlords
+at the user’s request. Asteroids retains its play message; Snakes has no play-price text.
+The animation now uses the entire 800×600 source frame: the old 68-pixel
+bottom mask is removed, and arena, blast and ember bounds extend to the bottom
+edge. The native 1200×900 `arcade/assets/warlords-attract.png` fallback shows the
+settled title at 18 seconds, with refreshed provenance and cache hashes.
+The standalone study and
 original wall keep that PNG and ordinary work link without JavaScript. The
 study starts with `"wip": true`; the original work retains its manual
 `"wip": false` and unchanged gameplay. Its public title is now Warlords while
@@ -103,7 +118,67 @@ names, manifest metadata, and README alias follow the rename. A fresh native-gam
 900×900 JPG thumbnail (39,459 bytes) replaces the old lettered image and embeds
 its provenance; historical prompts and rejected background images retain their
 original names. No visible title is added inside the original game, and no
-shared font, palette, token, or gallery identity changes.
+shared font, palette, token, or gallery identity changes. The Warlords-only HUD removal is
+recorded by `.impeccable/review/warlords-no-hud/checks.json` and ten captures:
+historical samples verified the former blank footer, firing and intact title blast
+remain, and desktop, mobile, small-study, and wall views have no overflow or
+browser errors. The finish review returned **ship**; the study remains WIP.
+
+Preview the [Mutual Command attract study](arcade/command-test.html). Its
+21.4-second loop shows both consoles at once: upside-down bright pink above and
+upright bright blue below. All text is white at the same 14px source height,
+including **Both**, with no reverse highlight. **MISSILES INCOMING / Response _ /
+ATTACK or DEFEND? / Both** types at 24 characters per second; the bottom console
+leads the top by .35 seconds. Both exchanges finish before the outward exit.
+From 5.2–5.9 seconds, the top panel/text slide off the top and the bottom off the
+bottom. After they clear, both lands enter from their respective vertical edges
+at 5.9–6.7 seconds, in lockstep and without horizontal movement. Brief combat
+runs until 10.9 seconds; both lands leave vertically at 10.9–11.7 seconds.
+The existing title sequence starts at 11.9 seconds: **MUTUAL** descends and
+**COMMAND** rises, M/C first, then U/O, T/M, U/M, A/A, L/N and the final D.
+Pairs arrive .62 seconds apart, contact after .58 seconds and recoil/settle over
+.95 seconds. All 13 letters stop at 17.15 seconds. Focus/reduced motion and the
+provenance-recorded 1200×900 fallback show the settled title at 18.5 seconds.
+`node scripts/check-command-attract.mjs` checks staggered typing, uniform white
+text, saturated panel colors with at least 4.5:1 text contrast, separate bounds,
+complete outward exits before deployment, symmetric
+vertical land entry, combat, six painted-pixel contacts, 1,297 overlap samples
+at 240Hz, opposite rebounds and the stopped title. Completed white text masks
+match after a 180-degree rotation, with zero mismatches and 2,764 white pixels
+per panel. Current native evidence is `.impeccable/review/command-bright-stagger/`,
+including partial typing, complete consoles and a 320×240 title still.
+Browser access remains unavailable for a fresh layout/interaction pass. Shared
+playback, direct original-game links and all manual statuses remain; the study
+stays WIP. No scores, prices, new fonts, dependencies or shared tokens.
+
+Preview the [Unbreakable attract study](arcade/unbreakable-test.html). Its
+24.8-second native loop opens with **UNBRE** above **AKABLE** in eleven heavy
+cream glyphs on the original game's deep purple ground. At 800×600, the title
+has 6px outer margins, 4px seams, a 6px row gap and 291px-high letters; its cream
+silhouette occupies about 80.5% of the frame. The title holds until 2.2 seconds,
+tilts through 3.8 seconds, then the camera travels 128 world units along the
+brick wall through 8.8 seconds. Ball and paddle emerge as projection flattens
+at 8.8–10 seconds. Reverse-Breakout play at 10–17.2 seconds adds whole bricks
+after the ball clears each new cell. The wall and machine retreat at
+17.2–18.7 seconds, expanding empty ground; all eleven letters type back in at
+.32-second intervals from 18.7–21.9 seconds. The completed title matches the
+opening pixels and holds through the loop boundary. No extra artwork copy,
+font or image dependency is added.
+
+`arcade/unbreakable-attract.js` serves the study, landing card and original wall
+through the shared native-film controller. Focus/reduced motion and the
+provenance-recorded 1200×900 `arcade/assets/unbreakable-attract.png` show the
+complete title at 1 second. Pause, hidden/offscreen suspension, direct
+`pieces/003-unbreakable/` links and resolution limits use the existing lifecycle;
+`scripts/version-arcade-assets.mjs` refreshes content-hash URLs. The study starts
+with `"wip": true`; the original manual `"wip": false` and gameplay remain intact.
+`node scripts/check-unbreakable-attract.mjs` passes 2,977 draw samples at 120Hz,
+camera continuity, nine brick hits, nine paddle catches, nine added cells with
+ball clearance, ordered typing, wiring and the exact loop state. Native evidence
+in `.impeccable/review/unbreakable-native/` covers the title, steep wall, arrival
+and gameplay, including a 320×240 still. Browser access was unavailable, so
+these checks do not claim a fresh browser layout or interaction pass. This is
+a local film extension with no shared token or gallery identity change.
 
 `arcade/attract-player.js` is 3,480 bytes and shares the Asteroids, Snake, and Warlords renderers across their landing
 cards and original-wall links, using each film’s duration and still time. It
@@ -119,18 +194,76 @@ current landing keeps its existing noscript link to the Selected Games catalog.
 
 The 1200×900 completed-title `arcade/assets/asteroids-attract.png` is 60,326 bytes,
 with embedded origin metadata and a provenance-registry entry. It includes the
-constant `0¢ TO PLAY`. Current-landing cards other than Asteroids, We're All Snakes, and Warlords keep their original thumbnails
-and existing Selected-only game filter. The landing now shows only the requested
-Arcade heading in local Anybody (650) with pink neon stroke/shadows, actual work
-names, and essential controls. The top metadata band, promotional/editorial copy,
-counts, section heading, closing copy, footer, and decorative numbers are removed
-without reserving blank space. A small native `arcade/assets/linoleum.svg` supplies
-the dark-on-dark patterned ground; it adds no raster registry entry. Public Sans
-remains the utility face. Dark skip-link text stays readable on lime during hover.
-This local cleanup changes no shared tokens, original works, or composition status.
-Do not invent promotional/editorial copy for gallery or issue interfaces.
-The brief is `.impeccable/surfaces/issues-landing-strip-copy.md`; desktop, mobile,
-and small captures plus `checks.json` are in `.impeccable/review/landing-strip-copy/`.
+constant `0¢ TO PLAY`; Snakes and Warlords have no play
+message. The current landing retains four native films (Asteroids, We're All
+Snakes, Warlords and Mutual Command), original thumbnails for the remaining
+works, and the Selected-only game filter. Work names are no longer visible
+beneath the screens: each of the fifteen links retains its actual title as an
+accessible name, with empty image alt text to avoid duplicate announcements.
+
+The requested uppercase **ARCADE** lettering retains six authored SVG glyph
+paths with A/R hairpin-return strokes, without a surrounding rim or box.
+Cyan gas (#73fbff) and a pale hot core (#e4ffff) sit over dark glass (#16464b),
+with ambient cyan emission and a tighter bloom. This is custom stroke geometry
+with no font outlines, raster assets, cursive joins or swashes. The responsive
+`52 50 1020 250` viewBox is bounded at 1180px. The H1 remains named Arcade;
+the SVG is accessibility-hidden and nonfocusable. A single emission group
+pulses smoothly from .4 to 1 and back over 3.2 seconds, reaching full strength
+at the midpoint without flashing. The shared
+pause button, hidden document, reduced motion and fully dimmed sign suspend
+this pulse; reduced motion holds full-strength emission.
+
+The entrance stays sticky at the viewport top on layer zero. Screens occupy
+layer one and scroll over it. Passive scroll updates are coalesced through
+`requestAnimationFrame`; smoothstep progress over .9 entrance height dims the
+sign from full opacity to 0, reversing when scrolling back. Reduced motion
+retains this scroll-linked relationship. The top metadata band, promotional
+copy, counts, section heading, closing copy, footer and decorative numbers
+remain removed without reserving blank space. A small native
+`arcade/assets/linoleum.svg` supplies the dark-on-dark ground, adding no raster
+registry entry. Public Sans remains the utility face; skip-link hover stays
+readable on lime. Do not invent promotional/editorial interface copy.
+
+Borderless sharp screens sit directly on the linoleum, with no card housing,
+inset borders, marquee bands, arrows, shadows, internal padding or visible
+work-name captions. Fifteen Selected Games now form four scroll zones: an
+asymmetric twelve-column entry with shallow parallax; a viewport-sticky
+horizontal crossing; two vertical lanes moving in opposite directions; and a
+sticky deck that peels screens upward while changing their scale. Native
+vertical scrolling drives measured runways, with passive scroll updates through
+requestAnimationFrame and reversible transforms. No wheel or touch interception
+is added. Static thumbnails use square, portrait 3:4, landscape 3:2 and wide
+16:9 crops; all four native films retain undistorted 4:3 frames. Below 700px,
+14px gutters and adapted widths preserve the distinct zones. Keyboard focus
+reveals each screen; reduced motion presents all fifteen links in ordinary
+flow and holds films still. Future Selected Games outside the authored zones
+append in ordinary flow. Utility controls retain frameless 44px targets and
+visible keyboard focus.
+
+The user explicitly promoted Many Frogs (requested as Frogger), Always Moving
+Up, Micro Tetris, and Lunar Founder (requested as Moon Patrol), raising the
+Selected Games count from eleven to fifteen. Their existing public names stay
+unchanged. Only their `"wip": false` status promotes them; their existing
+thumbnails preview the newly included works without adding films. Original
+wall/player behavior, original works, shared film controller, global tokens,
+issue WIP and study WIP statuses remain intact.
+
+The current scroll-zone brief is
+`.impeccable/surfaces/issues-arcade-scroll-zones.md`; the lettering and copy
+constraints remain in `.impeccable/surfaces/issues-landing-strip-copy.md`.
+`.impeccable/review/arcade-scroll-zones/checks.json` verifies fifteen links,
+four zones, visible keyboard targets at 1440/768/390/320px, reversible horizontal
+travel, opposing lanes, reduced-motion flattening and restoration, and mobile
+touch launch/Back scroll restoration, without browser errors. Inspection data
+and desktop/mobile/small start, middle and end captures are in the same folder.
+Fresh finish review returned ship after inspecting all 33 normal-motion captures and four reduced-motion captures, with no material fixes. Earlier copy cleanup, cursive sign, unhoused
+screens and neon revisions remain historical in
+`.impeccable/review/landing-strip-copy/`,
+`.impeccable/review/arcade-cursive-neon/`,
+`.impeccable/review/arcade-unhoused/`,
+`.impeccable/review/arcade-neon-scroll/` and
+`.impeccable/review/arcade-neon-no-box/`; their ship reviews describe those
+revisions.
 
 The following describes the original collection implementation, including the
 twelve remaining rejected raw foreground films:

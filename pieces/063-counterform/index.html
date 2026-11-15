@@ -6,13 +6,18 @@
   <link rel="icon" href="data:,">
   <title>Counterform · Hypermedia Club</title>
   <style>
-    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #f3efda; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #baff00; }
     canvas { display: block; width: 100%; height: 100%; touch-action: manipulation; }
-    canvas:focus-visible { outline: 3px solid #650b79; outline-offset: -6px; }
+    canvas:focus-visible { outline: 3px solid #f000b8; outline-offset: -6px; }
   </style>
 </head>
 <body>
-  <canvas tabindex="0" role="img" aria-label="Counterform. Purple and cream forms rise, sink and stretch like a lava lamp, briefly becoming hearts, cat heads and skulls. Hollow centers and eye sockets reveal the stripes beneath. Click or press Space to pause or resume. Press S to save an image."></canvas>
-  <script src="counterform.js"></script>
+  <canvas tabindex="0" role="img" aria-label="Counterform. Two saturated colors cycle continuously, starting with hot magenta and acid green. Forms gather and disperse over fixed stripes. Nearby bodies reach, pinch and recover; drifting openings detach as smaller forms. Hearts, cat heads and skulls appear briefly, then dissolve. Click or press Space or Enter to pause or resume. Press S to save an image."></canvas>
+  <script>
+    // Refresh the sketch itself: a query on the HTML does not refresh its scripts.
+    const sketch = document.createElement('script');
+    sketch.src = `counterform.js?v=${Date.now()}`;
+    document.body.append(sketch);
+  </script>
 </body>
 </html>

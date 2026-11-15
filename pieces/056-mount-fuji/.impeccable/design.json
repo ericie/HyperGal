@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-15T12:50:21.200829+00:00",
+  "title": "Design System: Painting Together",
+  "extensions": {
+    "colorMeta": {
+      "linen": {
+        "displayName": "Linen",
+        "role": "neutral"
+      },
+      "focus-blue": {
+        "displayName": "Focus Blue",
+        "role": "primary"
+      },
+      "navy": {
+        "displayName": "Navy",
+        "role": "primary"
+      },
+      "steel-blue": {
+        "displayName": "Steel Blue",
+        "role": "primary"
+      },
+      "mist-blue": {
+        "displayName": "Mist Blue",
+        "role": "primary"
+      },
+      "cream": {
+        "displayName": "Cream",
+        "role": "primary"
+      },
+      "deep-teal-blue": {
+        "displayName": "Deep Teal Blue",
+        "role": "primary"
+      },
+      "slate-teal": {
+        "displayName": "Slate Teal",
+        "role": "primary"
+      },
+      "pale-celadon": {
+        "displayName": "Pale Celadon",
+        "role": "primary"
+      },
+      "pale-straw": {
+        "displayName": "Pale Straw",
+        "role": "primary"
+      },
+      "muted-mauve": {
+        "displayName": "Muted Mauve",
+        "role": "tertiary"
+      },
+      "warm-ochre": {
+        "displayName": "Warm Ochre",
+        "role": "tertiary"
+      },
+      "golden-ochre": {
+        "displayName": "Golden Ochre",
+        "role": "tertiary"
+      },
+      "light-yellow": {
+        "displayName": "Light Yellow",
+        "role": "tertiary"
+      },
+      "indigo": {
+        "displayName": "Indigo",
+        "role": "primary"
+      },
+      "muted-violet": {
+        "displayName": "Muted Violet",
+        "role": "primary"
+      },
+      "pale-violet": {
+        "displayName": "Pale Violet",
+        "role": "primary"
+      },
+      "warm-grey": {
+        "displayName": "Warm Grey",
+        "role": "primary"
+      },
+      "deep-teal": {
+        "displayName": "Deep Teal",
+        "role": "secondary"
+      },
+      "sage": {
+        "displayName": "Sage",
+        "role": "secondary"
+      },
+      "olive-grey": {
+        "displayName": "Olive Grey",
+        "role": "secondary"
+      },
+      "light-ochre": {
+        "displayName": "Light Ochre",
+        "role": "secondary"
+      },
+      "red-earth": {
+        "displayName": "Red Earth",
+        "role": "tertiary"
+      },
+      "copper": {
+        "displayName": "Copper",
+        "role": "tertiary"
+      },
+      "sand": {
+        "displayName": "Sand",
+        "role": "tertiary"
+      },
+      "buff": {
+        "displayName": "Buff",
+        "role": "tertiary"
+      }
+    },
+    "shadows": [
+      {
+        "name": "paint-relief-lighting",
+        "value": "Height-field cast shadows, ambient occlusion and two-lobe wet specular; key elevation 28deg; azimuth 225deg + sin(clock × 0.025) × 5deg",
+        "purpose": "Original Loaded Brush material depth; not a CSS elevation token."
+      }
+    ],
+    "motion": [
+      {
+        "name": "stroke-reveal",
+        "value": "1.5 + run / (150 × painting unit) + random × 0.6 seconds; u² × (3 − 2u) travel",
+        "purpose": "Advancing loaded application, with a leading raised bead."
+      },
+      {
+        "name": "new-brush-interval",
+        "value": "0.75–1.6s; at most 4 active paths",
+        "purpose": "Autonomous overpainting while no hand stroke is active."
+      },
+      {
+        "name": "frame-delta-cap",
+        "value": "0.07s",
+        "purpose": "Bounds live simulation steps; hidden and reduced-motion states suspend the loop."
+      },
+      {
+        "name": "resize-debounce",
+        "value": "150ms",
+        "purpose": "Reallocate targets and rebuild painting after viewport changes."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Painting surface",
+      "kind": "custom",
+      "description": "Actual canvas host and keyboard focus treatment only. The original WebGL 2 shaders render the painting; this isolated host preview shows the HTML linen ground.",
+      "html": "<canvas class=\"ds-painting\" role=\"img\" tabindex=\"0\" aria-label=\"Loaded brush painting surface\"></canvas>",
+      "css": ".ds-painting { display: block; width: 100%; height: 100%; background: #ebe6da; touch-action: none; outline: none; } .ds-painting:focus-visible { outline: 2px solid #31508c; outline-offset: -5px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Loaded Brush material",
+    "overview": "The original Loaded Brush material is the visual authority: linen weave, multicolor bristles, curved pressure ribbons, raised pigment and dry edges. The painting is an abstract accumulation of brushwork, with no literal landscape or illustrative subject.\n\nMotion is the application of new paint. Completed strokes stay fixed on the surface while advancing brushes reveal their loaded color and leave a raised leading bead. The inherited material renderer supplies the continuity; this local system does not redefine the gallery interface.",
+    "keyCharacteristics": [
+      "Oklab-mixed pigment carried across individual bristles.",
+      "Curvature-aware ribbons with pressure, pileup and dry run-out.",
+      "Raised paint and linen described by raking light.",
+      "Persistent completed marks with live overpainting and direct drag painting.",
+      "A full-viewport, text-free artwork."
+    ],
+    "rules": [
+      {
+        "name": "The Material Continuity Rule",
+        "body": "Preserve the inherited bristle-space pigment, linen, paint height and relief lighting when extending the work. The dynamic brushwork is the subject.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Deposited Paint Rule",
+        "body": "Completed paint stays fixed. Animate the advancing application and commit each finished stroke once; do not move or repeatedly stamp the deposited surface.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preserve the original Loaded Brush material and multicolor bristles.",
+      "Do mix loaded gradient stops in Oklab before converting back for the GPU texture.",
+      "Do keep the distinct landing, advancing bead, edge lips and hair-by-hair dry trails.",
+      "Do preserve keyboard pause, regeneration and PNG export alongside drag painting.",
+      "Do suspend autonomous application while hidden or under reduced motion."
+    ],
+    "donts": [
+      "Don't replace painterly material with literal scenery or decorative illustration.",
+      "Don't add visible titles, labels, instructions, captions or text controls.",
+      "Don't move completed strokes as floating objects or stamp the advancing stroke repeatedly into the backing store.",
+      "Don't introduce a separate visual language through specimen artwork or extra interface controls.",
+      "Don't infer Selected status from completion; preserve WIP unless the user explicitly changes it."
+    ]
+  }
+}

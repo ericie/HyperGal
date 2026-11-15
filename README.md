@@ -59,6 +59,20 @@ yet sorts as if updated today so fresh work surfaces first.
 - Individual piece: open `pieces/<slug>/index.html` directly. Always works,
   no server, no build.
 
+For local editing, run `python3 scripts/preview.py` and open
+`http://localhost:8000/Issues/index.html`. This server sends `Cache-Control:
+no-store` and returns fresh files even for conditional requests. Reload after
+editing; it does not automatically reload an already-open page. Use `--port 8001`
+to choose a different port.
+
+Arcade scripts, styles, and attract preview PNGs also use content-hash query
+parameters for static hosting. After changing these assets, run
+`node scripts/version-arcade-assets.mjs` before publishing. It updates both
+Arcade views, all four attract studies, and the landing's generated image URLs.
+`node scripts/version-arcade-assets.mjs --check` checks for stale versions without
+writing. These helpers use only Python and Node standard libraries; viewing the
+gallery still requires neither a server nor a build step.
+
 ## Linking gallery states
 
 Gallery filters use validated query parameters: `status`, `theme`, `view`,
@@ -68,9 +82,13 @@ grid remains `/`. For example:
 `/?status=wip&theme=nature&view=list&sort=alpha&dir=asc`
 
 Filter changes create browser-history entries, and Back/Forward restores both
-the results and each control's pressed state. Unrelated parameters are kept.
+the results and each dropdown selection. Unrelated parameters are kept.
 Every loaded or changed state is also sent to Bakalytics as a
 `Gallery filter state` event with all five values in its target.
+
+The header uses Status, Theme, and Sort dropdowns, an Issue dropdown (None or
+Arcade), and a Grid/List dropdown. Sort includes both directions. Choosing Arcade
+opens the issue page; None represents the gallery index.
 
 ## Constraints (the archival rule)
 

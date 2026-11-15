@@ -1,22 +1,15 @@
-/* Mount Fuji — a fixed landscape using Loaded Brush’s paint renderer.
-   Derived from 053-loaded-brush; each mark is laid down by a brush loaded with a
-   gradient of paint and lit as a relief. Three WebGL2 passes: the primed
-   linen (once per resize), the paint deposit (colour + height, drawn as a
-   ribbon along the path) and the lighting (normals, cast shadows, occlusion
-   and wet specular from the height field). */
+/* Painting Together — paint in motion. Loaded Brush material retained: bristle-space
+   pigment, curved pressure ribbons, linen, raised paint and relief lighting.
+   Completed paint stays put. Only the advancing brushes move. */
 (() => {
   'use strict';
   const canvas = document.getElementById('painting');
   const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
   const floatTargets = gl && (gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float'));
-  if (!gl || !floatTargets) {
-    document.getElementById('fallback').hidden = false;
-    document.getElementById('palette').hidden = true;
-    canvas.hidden = true;
-    return;
-  }
+  const fallback = document.getElementById('fallback');
+  function showFallback() { canvas.hidden = true; fallback.hidden = false; }
+  if (!gl || !floatTargets) { showFallback(); return; }
   const params = new URLSearchParams(location.search);
-  const $ = id => document.getElementById(id);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const STRIDE = 28; // x, y, s, t, half width, turn, curvature
 
@@ -24,13 +17,18 @@
   let seed = params.get('seed') || 'fuji';
   const state = {
     points: [],                 // { x, y, pressure } as fractions of the viewport
-    stops: [{ at: 0, color: '#1d3d9b' }, { at: 1, color: '#f7f4ec' }],
+    stops: [{ at: 0, color: '#19355e' }, { at: 1, color: '#f2e5c8' }],
     mode: 'across',             // gradient across the brush face, or along the stroke
     width: 150, thickness: 1, load: 1.2, light: 225,
   };
   let width = 0, height = 0, scale = 1, texW = 0, texH = 0;
   let ribbon = null, length = 0, samples = [];
-  const reveal = Infinity;
+  let active = [], clock = 0, previousTime = null, frame = null, paused = false;
+  let lost = false, revision = 0, nextBrush = 0, strokeId = 0, hand = null;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  let basePaintTex, baseReliefTex, baseFbo;
+  let random = mulberry(1);
+  const TAU = Math.PI * 2;
 
   function seedNumber(text) {
     let n = 2166136261;
@@ -254,10 +252,12 @@
       cov *= mix(1.0, 0.28 + 0.72 * smoothstep(-0.45, 0.45, streak), pivot);
       if (cov < 0.002) discard;
 
+      // Fresh paint piles up under the moving brush before the bristles lift.
+      float freshLip = 0.62 * exp(-pow((s - revealEdge + hw * 0.10) / (hw * 0.15), 2.0));
       float unit = u_thickness * (4.0 + hw * 0.08);
       float ridgeAmp = mix(0.6, 1.0, smoothstep(0.0, hw * 0.9, s));
       float slab = 0.8 + undulate - 0.55 * grooves * ridgeAmp;
-      float h = max(0.0, unit * thin * pile * (slab * landing + 0.9 * lip + frontLip));
+      float h = max(0.0, unit * thin * pile * (slab * landing + 0.9 * lip + frontLip + freshLip));
 
       // each hair drags its own sample of the loaded gradient; streaks of the
       // neighbouring colour cross over, the mixing grows along the stroke, and
@@ -320,20 +320,20 @@
       vec2 dir = normalize(L.xy);
       float tanE = L.z / max(length(L.xy), 1e-4);
       float occ = 0.0;
-      for (int k = 1; k <= 28; k++) {
+      for (int k = 1; k <= 18; k++) {
         float d = float(k) * 1.2;
         occ = max(occ, (heightAt(pf + dir * d * u_scale) - h0 - d * tanE) / (d + 2.0));
       }
       float shadow = 1.0 - smoothstep(0.0, 0.5, occ);
 
       float ao = 0.0;
-      for (int k = 0; k < 8; k++) {
-        float a = float(k) * TAU / 8.0;
+      for (int k = 0; k < 6; k++) {
+        float a = float(k) * TAU / 6.0;
         vec2 d = vec2(cos(a), sin(a));
         ao += max(0.0, heightAt(pf + d * 2.0 * u_scale) - h0) / 2.0;
         ao += max(0.0, heightAt(pf + d * 6.0 * u_scale) - h0) / 6.0;
       }
-      ao = 1.0 - clamp(ao / 16.0 * 1.1, 0.0, 0.6);
+      ao = 1.0 - clamp(ao / 12.0 * 1.1, 0.0, 0.6);
 
       vec3 V = vec3(0.0, 0.0, 1.0);
       vec3 H = normalize(L + V);
@@ -410,7 +410,6 @@
     }
     gl.bindVertexArray(null);
     groundTex = paintTex = reliefTex = groundFbo = depositFbo = null;
-    buildGradient();
     fit();
   }
 
@@ -431,17 +430,18 @@
     height = Math.max(1, innerHeight);
     // Supersample: at least 2 texels per CSS pixel keeps the wet highlights
     // from shimmering, capped so the largest displays stay within reason.
-    scale = clamp(devicePixelRatio || 1, 2, 3);
-    scale = Math.max(1, Math.min(scale, Math.sqrt(10e6 / (width * height))));
+    scale = clamp(devicePixelRatio || 1, 1.5, 2);
+    scale = Math.max(1, Math.min(scale, Math.sqrt(2.6e6 / (width * height))));
     texW = Math.round(width * scale);
     texH = Math.round(height * scale);
     canvas.width = texW;
     canvas.height = texH;
-    for (const t of [groundTex, paintTex, reliefTex]) if (t) gl.deleteTexture(t);
-    for (const f of [groundFbo, depositFbo]) if (f) gl.deleteFramebuffer(f);
+    for (const t of [groundTex, paintTex, reliefTex, basePaintTex, baseReliefTex]) if (t) gl.deleteTexture(t);
+    for (const f of [groundFbo, depositFbo, baseFbo]) if (f) gl.deleteFramebuffer(f);
     groundTex = texture(texW, texH);
     paintTex = texture(texW, texH);
     reliefTex = texture(texW, texH);
+    basePaintTex = texture(texW, texH); baseReliefTex = texture(texW, texH);
     groundFbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, groundFbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, groundTex, 0);
@@ -451,6 +451,12 @@
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, reliefTex, 0);
     gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('incomplete framebuffer');
+    baseFbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, baseFbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, basePaintTex, 0);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, baseReliefTex, 0);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('incomplete paint backing');
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     paintGround();
   }
@@ -570,9 +576,15 @@
       if (limit > 0 ? t <= 0 : t >= 0) return t;
       return limit * Math.tanh(t / limit);
     };
-    const data = new Float32Array(COLUMNS * rows.length * 2 * (STRIDE / 4));
+    const data = new Float32Array((COLUMNS * rows.length * 2 + (COLUMNS - 1) * 2) * (STRIDE / 4));
     let at = 0;
     for (let c = 0; c < COLUMNS; c++) {
+      if (c) {
+        // Degenerate vertices join the twelve strips into one draw call.
+        data.set(data.subarray(at - 7, at), at); at += 7;
+        const r = rows[0], t = (r.hw * 1.45 + 6) * (2 * c / COLUMNS - 1), g = squeeze(r, t);
+        data.set([r.x + r.nx * g, r.y + r.ny * g, r.s, t, r.hw, r.turn, r.curve], at); at += 7;
+      }
       for (const r of rows) {
         const ext = r.hw * 1.45 + 6;
         for (const edge of [c, c + 1]) {
@@ -584,168 +596,231 @@
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, ribbonBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
-    ribbon = { columns: COLUMNS, stride: rows.length * 2 };
+    ribbon = { count: at / 7 };
   }
 
-  // ---------------------------------------------------------------- render
-  function render() {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, depositFbo);
-    gl.viewport(0, 0, texW, texH);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    for (const [index, stroke] of composition().entries()) {
+  // The material renderer above is inherited from the original painting.
+  // A backing store holds completed marks. Every live frame copies that store
+  // and draws only the advancing brushes, so wet edges never get stamped twice.
+  const palettes = [
+    ['#19355e','#426f9a','#8eafbb','#f2e5c8'],
+    ['#254e71','#548d9c','#acd0c5','#e9dfbb'],
+    ['#705f63','#be936b','#e7bf68','#fff0ba'],
+    ['#243e68','#5a6090','#a6a2ba','#e1d9ce'],
+    ['#254c58','#6d8b80','#b1b798','#eadbb7'],
+    ['#8d503f','#c58056','#deb27d','#f0dab0']
+  ];
+
+  function configure(stroke) {
     state.points = stroke.points; state.width = stroke.width;
-    state.stops = stroke.colors.map((color, i, colors) => ({ color, at: i / (colors.length - 1) }));
+    state.stops = stroke.colors.map((color,i,a)=>({color,at:i/(a.length-1)}));
     state.thickness = stroke.thickness; state.load = stroke.load;
-    gl.activeTexture(gl.TEXTURE0);
-    buildGradient(); buildRibbon();
+  }
+  function prepare(stroke) {
+    configure(stroke);
+    stroke.buffer = gl.createBuffer(); ribbonBuffer = stroke.buffer;
+    buildRibbon(); stroke.count = ribbon.count; stroke.length = length;
+    stroke.gradient = gl.createTexture(); gradientTex = stroke.gradient;
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,gradientTex);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    buildGradient();
+    return stroke;
+  }
+  function release(stroke) {
+    if(stroke.buffer)gl.deleteBuffer(stroke.buffer);
+    if(stroke.gradient)gl.deleteTexture(stroke.gradient);
+    stroke.buffer=stroke.gradient=null;
+  }
+  function deposit(stroke, front, target) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER,target);
+    gl.viewport(0,0,texW,texH);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]);
     gl.enable(gl.BLEND);
-    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(depositProgram.p);
-    gl.uniform2f(depositProgram.u.u_size, width, height);
-    gl.uniform1f(depositProgram.u.u_length, Math.max(length, 1));
-    gl.uniform1f(depositProgram.u.u_reveal, Number.isFinite(reveal) ? reveal : length + state.width * 2);
-    gl.uniform1f(depositProgram.u.u_seed, seedNumber(seed + index));
-    gl.uniform1f(depositProgram.u.u_thickness, state.thickness);
-    gl.uniform1f(depositProgram.u.u_load, state.load);
-    gl.uniform1i(depositProgram.u.u_mode, state.mode === 'across' ? 0 : 1);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, gradientTex); gl.uniform1i(depositProgram.u.u_gradient, 0);
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, groundTex); gl.uniform1i(depositProgram.u.u_ground, 1);
-    gl.bindVertexArray(ribbonVao);
-    for (let c = 0; c < ribbon.columns; c++) gl.drawArrays(gl.TRIANGLE_STRIP, c * ribbon.stride, ribbon.stride);
+    gl.uniform2f(depositProgram.u.u_size,width,height);
+    gl.uniform1f(depositProgram.u.u_length,Math.max(stroke.length,1));
+    gl.uniform1f(depositProgram.u.u_reveal,front);
+    gl.uniform1f(depositProgram.u.u_seed,stroke.seed);
+    gl.uniform1f(depositProgram.u.u_thickness,stroke.thickness);
+    gl.uniform1f(depositProgram.u.u_load,stroke.load);
+    gl.uniform1i(depositProgram.u.u_mode,0);
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,stroke.gradient);gl.uniform1i(depositProgram.u.u_gradient,0);
+    gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,groundTex);gl.uniform1i(depositProgram.u.u_ground,1);
+    gl.bindVertexArray(ribbonVao);gl.bindBuffer(gl.ARRAY_BUFFER,stroke.buffer);
+    for(const [name,size,offset] of [['a_position',2,0],['a_st',2,8],['a_hw',1,16],['a_frame',2,20]]) {
+      const loc=gl.getAttribLocation(depositProgram.p,name);
+      gl.vertexAttribPointer(loc,size,gl.FLOAT,false,STRIDE,offset);
+    }
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,stroke.count);
     gl.disable(gl.BLEND);
+  }
+  function copyBacking() {
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER,baseFbo);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,depositFbo);
+    gl.readBuffer(gl.COLOR_ATTACHMENT0);gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.NONE]);
+    gl.blitFramebuffer(0,0,texW,texH,0,0,texW,texH,gl.COLOR_BUFFER_BIT,gl.NEAREST);
+    gl.readBuffer(gl.COLOR_ATTACHMENT1);gl.drawBuffers([gl.NONE,gl.COLOR_ATTACHMENT1]);
+    gl.blitFramebuffer(0,0,texW,texH,0,0,texW,texH,gl.COLOR_BUFFER_BIT,gl.NEAREST);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]);
+  }
+  function render() {
+    if(lost)return;
+    copyBacking();
+    for(const stroke of active) {
+      const u=clamp((clock-stroke.born)/stroke.duration,0,1);
+      // A hand moves through the turn, then eases off as it lifts.
+      const travel=u*u*(3-2*u);
+      deposit(stroke,travel*(stroke.length+stroke.width*.7),depositFbo);
     }
-
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, texW, texH);
-    gl.useProgram(shadeProgram.p);
-    gl.uniform2f(shadeProgram.u.u_size, texW, texH);
-    gl.uniform1f(shadeProgram.u.u_scale, scale);
-    const azimuth = state.light * Math.PI / 180, elevation = 28 * Math.PI / 180;
-    gl.uniform3f(shadeProgram.u.u_light, Math.cos(azimuth) * Math.cos(elevation), -Math.sin(azimuth) * Math.cos(elevation), Math.sin(elevation));
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, paintTex); gl.uniform1i(shadeProgram.u.u_paint, 0);
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, reliefTex); gl.uniform1i(shadeProgram.u.u_relief, 1);
-    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, groundTex); gl.uniform1i(shadeProgram.u.u_ground, 2);
-    gl.bindVertexArray(emptyVao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if(hand)deposit(hand,hand.length+hand.width*2,depositFbo);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,texW,texH);
+    gl.useProgram(shadeProgram.p);gl.uniform2f(shadeProgram.u.u_size,texW,texH);gl.uniform1f(shadeProgram.u.u_scale,scale);
+    // A near-stationary raking light describes paint, not a roaming spotlight.
+    const az=(225+Math.sin(clock*.025)*5)*Math.PI/180,el=28*Math.PI/180;
+    gl.uniform3f(shadeProgram.u.u_light,Math.cos(az)*Math.cos(el),-Math.sin(az)*Math.cos(el),Math.sin(el));
+    for(const [unit,texture,name] of [[0,paintTex,'u_paint'],[1,reliefTex,'u_relief'],[2,groundTex,'u_ground']]) {
+      gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(shadeProgram.u[name],unit);
+    }
+    gl.bindVertexArray(emptyVao);gl.drawArrays(gl.TRIANGLES,0,3);
   }
 
-  // The painting is composed in a 1200 × 800 studio space. Fit the whole
-  // landscape on portrait screens rather than cropping the mountain.
-  function composition() {
-    const unit = Math.min(width / 1200, height / 800);
-    const ox = (width - 1200 * unit) / 2, oy = (height - 800 * unit) / 2;
-    const marks = [];
-    const random = mulberry(Math.floor(seedNumber(seed) * 10000));
-    const stroke = (points, brush, colors, thickness = 0.85, load = 2.2) => marks.push({
-      points: points.map(([x, y, pressure = 1]) => ({ x: (ox + x * unit) / width, y: (oy + y * unit) / height, pressure })),
-      width: brush * unit, colors, thickness, load
-    });
-    // Every mark is a short bent ribbon. No broad base fills or long strokes:
-    // the image is built entirely from overlapping, individually loaded dabs.
-    const pick = palette => palette[Math.floor(random()*palette.length)];
-    const dab = (x,y,angle,len,brush,colors,bend=0.22,thickness=0.85) => {
-      const points=[];
-      for(let k=0;k<5;k++) {
-        const t=k/4, along=(t-0.5)*len, across=Math.sin(t*Math.PI)*len*bend;
-        points.push([x+Math.cos(angle)*along-Math.sin(angle)*across,
-          y+Math.sin(angle)*along+Math.cos(angle)*across, [0.65,1,1,0.85,0.4][k]]);
-      }
-      stroke(points,brush,colors,thickness,1.75);
-    };
-    const sky=[['#193f74','#386fa1','#639cbd'],['#234781','#487eae','#92b6c6'],
-      ['#234f85','#638faa','#b9c9c5'],['#183b70','#30699b','#73a6ba']];
-    const gold=[['#b7822d','#e6bd54','#f9df8c'],['#cc9d39','#f0ce68','#fff0b2']];
-    // A flowing field curls around two eddies. Staggered rows are jittered so
-    // the short marks knit together instead of forming a ruled grid.
-    for(let row=0;row<26;row++) for(let col=0;col<37;col++) {
-      const x=104+col*27+(row%2)*13+random()*12, y=99+row*16+random()*10;
-      const dx=x-822,dy=(y-227)*1.3;
-      const swirl=Math.atan2(dy,dx)+Math.PI/2;
-      const weight=Math.exp(-(dx*dx+dy*dy)/95000);
-      const wave=0.24*Math.sin(x/85+y/65);
-      const angle=wave*(1-weight)+swirl*weight;
-      dab(x,y,angle,33+random()*20,17+random()*5,pick(sky),0.16+random()*0.17,0.7);
-    }
-    // Broken golden curls orbit the sun; each arc remains a separate short mark.
-    for(let ring=0;ring<4;ring++) {
-      const radius=63+ring*20, count=Math.round(radius/4);
-      for(let i=0;i<count;i++) {
-        const angle=i/count*Math.PI*2;
-        if(ring>1 && random()<0.3) continue;
-        dab(848+Math.cos(angle)*radius,211+Math.sin(angle)*radius*0.73,
-          Math.atan2(Math.cos(angle)*0.73,-Math.sin(angle)),23+random()*14,8+random()*4,
-          ring<2?pick(gold):['#548d9f','#9ebbad','#ddd5a0'],0.22,0.95);
-      }
-    }
-    for(let radius=4;radius<49;radius+=10) {
-      const count=Math.max(4,Math.round(radius/3));
-      for(let i=0;i<count;i++) {
-        const angle=i/count*Math.PI*2;
-        dab(848+Math.cos(angle)*radius,211+Math.sin(angle)*radius,
-          angle+Math.PI/2,18+random()*10,13,pick(gold),0.3,1.15);
-      }
-    }
-    const mountain=[['#183665','#365794','#6686b0'],['#284773','#4b72a4','#86a8bf'],
-      ['#283862','#555988','#9293ad'],['#174b72','#327698','#71a3b2']];
-    const snow=[['#8ba7b9','#d9dfd4','#fff0b6'],['#7598b8','#c1d3d4','#f6eed0'],
-      ['#9eaebf','#e9e7d5','#fff5d6']];
-    // Dense little hooks follow the slope. An irregular snow line leaves blue
-    // gullies rather than laying a continuous white cap over the mountain.
-    for(let y=292;y<537;y+=12) {
-      const v=(y-287)/250, left=572-v*337, right=627+v*354;
-      for(let x=left+7;x<right;x+=15) {
-        const px=x+random()*7, py=y+random()*7;
-        const direction=Math.atan2(250,(px-601)*2.4);
-        const snowLine=350+18*Math.sin(px*0.095)+9*Math.sin(px*0.21);
-        const colors=py<snowLine?pick(snow):pick(mountain);
-        dab(px,py,direction,24+random()*17,13+random()*5,colors,
-          (px<600?1:-1)*(0.12+random()*0.14),1.05);
-      }
-    }
-    const hills=[['#173d48','#366663','#759078'],['#244550','#4b7775','#91a089'],
-      ['#253b56','#3b657b','#73989b']];
-    for(let row=0;row<5;row++) for(let col=0;col<46;col++) {
-      const x=102+col*22+random()*10;
-      const y=514+row*12-17*Math.sin(x/96)+random()*7;
-      dab(x,y,-0.17*Math.cos(x/96),25+random()*13,17,pick(hills),0.27,0.95);
-    }
-    const lake=[['#1d506b','#3e849c','#8ab7be'],['#275a7b','#669bb5','#b1c7ca'],
-      ['#24477d','#4a7faa','#91b0c8'],['#286476','#65a2ac','#b4cec2']];
-    for(let row=0;row<12;row++) for(let col=0;col<32;col++) {
-      const x=105+col*31+(row%2)*12+random()*10, y=564+row*13+random()*8;
-      const reflection=Math.abs(x-850)<(19+(y-564)*0.24) && random()<0.65;
-      dab(x,y,0.12*Math.sin(x/65+y/35),30+random()*20,14+random()*5,
-        reflection?pick(gold):pick(lake),(random()<0.5?-1:1)*(0.17+random()*0.14),0.9);
-    }
-    const grasses=[['#283f37','#5b743e','#9ca15a'],['#354b3c','#809059','#c5b96c'],
-      ['#3e543f','#8a9b62','#ddc986']];
-    for(let i=0;i<145;i++) {
-      const left=i<95, x=left?102+random()*267:902+random()*192;
-      const y=702+random()*30-15*Math.sin(x/80);
-      dab(x,y,-1.15+random()*0.8,22+random()*27,8+random()*7,pick(grasses),0.2+random()*0.2,1.05);
-    }
-    return marks;
+  function flow(x,y,epoch=clock) {
+    const nx=x/width,ny=y/height;
+    const cx=.49+.15*Math.sin(epoch*.031),cy=.46+.13*Math.cos(epoch*.023);
+    const dx=(nx-cx)*1.2,dy=(ny-cy);
+    const curl=Math.atan2(dy,dx)+Math.PI*.5;
+    const wave=.45*Math.sin(nx*7+ny*4+epoch*.025)-.23;
+    const weight=.78*Math.exp(-(dx*dx+dy*dy)*2.2);
+    return wave*(1-weight)+curl*weight;
   }
+  function makeStroke(x,y,brush,run,epoch=clock,forcedPalette=-1) {
+    const unit=Math.min(width,height)/900;
+    let angle=flow(x,y,epoch)+(random()-.5)*.48;
+    const points=[],steps=10;
+    const choice=forcedPalette>=0?forcedPalette:paletteAt(x/width,y/height,epoch);
+    for(let i=0;i<=steps;i++) {
+      const u=i/steps;
+      points.push({x:x/width,y:y/height,pressure:(.52+.60*Math.sin(Math.PI*u))*(1-.48*u)+.12*Math.sin(u*9+strokeId)});
+      const direction=flow(x,y,epoch)+Math.sin(i*.6+strokeId)*.11;
+      let diff=Math.atan2(Math.sin(direction-angle),Math.cos(direction-angle));
+      angle+=diff*.30;
+      x+=Math.cos(angle)*run/steps;y+=Math.sin(angle)*run/steps;
+    }
+    const palette=palettes[choice],loaded=random();
+    const colors=loaded<.62?palette.slice(0,3):loaded<.85?[palette[1],palette[2],palette[1]]:[...palette];
+    if(random()<.30)colors.reverse();
+    return {points,width:brush,colors,thickness:.35+random()*.65,load:1.05+random()*.55,seed:seedNumber(seed+revision+'-'+strokeId++),born:clock,duration:1.5+run/(150*unit)+random()*.6};
+  }
+  function paletteAt(x,y,epoch) {
+    // Pigment is placed in broad, irregular passages. No object silhouettes.
+    const band=Math.sin(x*5-y*4+epoch*.027)+.6*Math.sin(y*8+x*2);
+    if(band>.90)return random()<.72?2:5;
+    if(band<-.45)return random()<.75?0:3;
+    return random()<.72?1:4;
+  }
+  function startPainting() {
+    for(const s of active)release(s);active=[];
+    if(hand){release(hand);hand=null;}
+    random=mulberry(Math.floor(seedNumber(seed+revision)*100000));strokeId=0;clock=0;nextBrush=0;
+    gl.bindFramebuffer(gl.FRAMEBUFFER,baseFbo);gl.viewport(0,0,texW,texH);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
+    const unit=Math.min(width,height)/900;
+    // Broad, lean scrubs knit the marks into a painted ground; thicker strokes
+    // can break over it without reading as detached objects on blank cloth.
+    for(let i=0;i<57;i++) {
+      const x=width*(.025+random()*.88),y=height*(.05+random()*.83);
+      const stroke=makeStroke(x,y,(75+random()*90)*unit,(230+random()*300)*unit,0);
+      stroke.thickness=.15+random()*.13;stroke.load=.87+random()*.25;
+      const s=prepare(stroke);deposit(s,s.length+s.width*2,baseFbo);release(s);
+    }
+    // Unequal loaded strokes overlap as a painting, not a regular field of dabs.
+    for(let i=0;i<260;i++) {
+      const x=width*(.04+random()*.84),y=height*(.07+random()*.84);
+      const brush=(22+random()*47)*unit;
+      const run=(75+random()*175)*unit;
+      const s=prepare(makeStroke(x,y,brush,run,0));
+      deposit(s,s.length+s.width*2,baseFbo);release(s);
+    }
+    // Broad final gestures remain legible above the smaller underpainting.
+    for(let i=0;i<13;i++) {
+      const x=width*(.08+random()*.68),y=height*(.12+random()*.70);
+      const s=prepare(makeStroke(x,y,(48+random()*52)*unit,(190+random()*260)*unit,0));
+      deposit(s,s.length+s.width*2,baseFbo);release(s);
+    }
+    previousTime=null;render();document.body.dataset.ready='true';
+  }
+  function update(dt) {
+    clock+=dt;
+    for(let i=active.length-1;i>=0;i--) {
+      const s=active[i];
+      if(clock-s.born>=s.duration) {deposit(s,s.length+s.width*2,baseFbo);release(s);active.splice(i,1);}
+    }
+    if(clock>=nextBrush && active.length<4 && !hand) {
+      const unit=Math.min(width,height)/900;
+      const x=width*(.06+random()*.76),y=height*(.08+random()*.78);
+      active.push(prepare(makeStroke(x,y,(30+random()*65)*unit,(170+random()*310)*unit)));
+      nextBrush=clock+.75+random()*.85;
+    }
+  }
+  function tick(now) {
+    frame=null;
+    if(paused||lost||document.hidden||reduced.matches){previousTime=null;return;}
+    if(previousTime!==null)update(Math.min((now-previousTime)/1000,.07));
+    previousTime=now;render();frame=requestAnimationFrame(tick);
+  }
+  function wake() {
+    if(!frame&&!paused&&!lost&&!document.hidden&&!reduced.matches)frame=requestAnimationFrame(tick);
+  }
+  function stop() {cancelAnimationFrame(frame);frame=null;previousTime=null;}
+  function finishHand() {
+    if(!hand)return;
+    if(!lost){deposit(hand,hand.length+hand.width*2,baseFbo);release(hand);}
+    hand=null;if(!lost)render();wake();
+  }
+  function point(event) {
+    const r=canvas.getBoundingClientRect();return {x:(event.clientX-r.left)/r.width,y:(event.clientY-r.top)/r.height,pressure:event.pointerType==='pen'?clamp(event.pressure,.2,1):.9};
+  }
+  canvas.addEventListener('pointerdown',event=>{
+    if(lost)return;
+    finishHand();canvas.setPointerCapture(event.pointerId);
+    const p=point(event),unit=Math.min(width,height)/900;
+    hand=prepare({points:[p,{...p,x:p.x+.001,y:p.y+.001}],width:65*unit,colors:[...palettes[paletteAt(p.x,p.y,clock)]],thickness:1.0,load:1.25,seed:seedNumber(seed+'hand'+strokeId++),born:clock,duration:1});render();
+  });
+  canvas.addEventListener('pointermove',event=>{
+    if(!hand||lost)return;
+    const p=point(event),last=hand.points[hand.points.length-1];
+    if(Math.hypot((p.x-last.x)*width,(p.y-last.y)*height)<5)return;
+    const points=[...hand.points,p],properties={...hand,points};release(hand);hand=prepare(properties);
+    if(points.length>70){finishHand();return;}render();
+  });
+  canvas.addEventListener('pointerup',finishHand);canvas.addEventListener('pointercancel',finishHand);canvas.addEventListener('lostpointercapture',finishHand);
   function save() {
-    canvas.toBlob(blob => {
-      if (!blob) return;
-      const url=URL.createObjectURL(blob), link=document.createElement('a');
-      link.href=url; link.download=`mount-fuji-${seed}.png`; link.click();
-      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    render();canvas.toBlob(blob=>{
+      if(!blob)return;const url=URL.createObjectURL(blob),a=document.createElement('a');
+      a.href=url;a.download=`painting-together-${seed.replace(/[^a-z0-9_-]/gi,'-')}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
     });
   }
-  $('save').addEventListener('click',save);
-  addEventListener('keydown',event=>{
-    if (event.key.toLowerCase()==='s' && !event.ctrlKey && !event.metaKey) {event.preventDefault();save();}
+  addEventListener('keydown',e=>{
+    if(e.repeat||e.ctrlKey||e.metaKey||e.altKey||lost)return;
+    if(e.code==='Space'){e.preventDefault();paused=!paused;stop();wake();}
+    if(e.code==='KeyS'){e.preventDefault();save();}
+    if(e.code==='KeyR'){e.preventDefault();revision++;startPainting();wake();}
   });
   let resizeTimer;
   addEventListener('resize',()=>{
-    clearTimeout(resizeTimer);
-    resizeTimer=setTimeout(()=>{fit();render();},150);
+    clearTimeout(resizeTimer);stop();
+    resizeTimer=setTimeout(()=>{if(lost)return;fit();startPainting();wake();},150);
   });
-  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();});
-  canvas.addEventListener('webglcontextrestored',()=>{initGL();render();});
-  try { initGL(); render(); document.body.dataset.ready='true'; }
-  catch (error) { $('fallback').hidden=false; canvas.hidden=true; $('palette').hidden=true; console.error(error); }
+  document.addEventListener('visibilitychange',()=>{stop();wake();});
+  reduced.addEventListener('change',()=>{stop();render();wake();});
+  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();lost=true;stop();});
+  canvas.addEventListener('webglcontextrestored',()=>{
+    lost=false;active=[];hand=null;
+    try{initGL();startPainting();wake();}catch(error){showFallback();console.error(error);}
+  });
+  try{initGL();startPainting();wake();}catch(error){showFallback();console.error(error);}
 })();

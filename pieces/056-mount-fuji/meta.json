@@ -1,10 +1,11 @@
 {
-  "title": "Mount Fuji",
+  "title": "Painting Together",
   "year": 2026,
   "date": "2026-09-28",
   "category": "nature",
-  "type": "generative",
+  "type": "interactive",
   "wip": true,
   "thumbnail": "thumbnail.png",
-  "description": "Mount Fuji built entirely from short, curling oil strokes, inspired by Van Gogh. A blue-and-gold sky swirls around a golden sun above ivory snow, cobalt slopes and a shimmering lake. Loaded Brush\u2019s bristle grooves and raised impasto catch the light. S saves a PNG."
+  "description": "An evolving oil painting built from loaded, curved brush strokes. Multicolor bristles leave raised pigment, fine grooves, dry edges and wet highlights on linen. Brushes continuously overpaint the surface. Drag to paint; Space pauses, R starts a new painting, and S saves a PNG.",
+  "updated": "2026-11-15"
 }

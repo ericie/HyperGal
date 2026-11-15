@@ -64,8 +64,17 @@
     range('gravity', 'Gravity', 0, 0, 100, 1, '%'),
     range('flow', 'Liquid current', 50, 0, 150, 1, '%')
   ]);
-  const defaults = Object.fromEntries(definitions.map(d => [d.key, d.value]));
+  // Keep the earlier presets based on their original settings.
+  const originalSettings = Object.fromEntries(definitions.map(d => [d.key, d.value]));
+  const defaults = {...originalSettings,
+    cell:'wand', density:116, size:152, glitter:180, cellAngle:-27,
+    palette:'mineral', lighting:'side', background:'#2d2085', hue:360,
+    saturation:122, exposure:113, glow:28,
+    speed:137, spin:-3.79, cellSpin:7.1, drift:300, viscosity:100
+  };
+  definitions.forEach(d => { d.value = defaults[d.key]; });
   const presets = {
+    initial: {name:'Initial settings', values:defaults},
     original: {name:'Original · glitter & prisms', values:{}},
     brewster: {name:'Brewster · dry glass', values:{mirror:'mandala',points:5,material:'beads',density:160,glitter:10,palette:'stained',background:'#07080e',spin:1.2,cellSpin:2,gravity:45,size:90}},
     oil: {name:'Oil cell · liquid suspension', values:{mirror:'mandala',points:7,cell:'oil',material:'liquid',glitter:8,palette:'lagoon',background:'#060e18',size:165,density:135,spin:0.4,viscosity:84,flow:80,gravity:18,transparency:45,glow:65}},
@@ -83,7 +92,7 @@
   let width = 1, height = 1, radius = 1, scale = 1, time = 0, previous = 0, frame = 0;
   let scopeTurn = 0, cellTurn = 0, paused = motion.matches, repaint = 0;
   let shards = [], prisms = [], glitter = [], films = [], objects = [], image = null;
-  let selectedPreset = 'original', seed = 0;
+  let selectedPreset = 'initial', seed = 0;
   function validate(input) {
     const result = {};
     for (const d of definitions) {
@@ -105,7 +114,7 @@
       if (Number.isFinite(saved.cellTurn)) cellTurn = saved.cellTurn % TAU;
       selectedPreset = 'custom';
     }
-  } catch { /* Invalid links fall back to the original arrangement. */ }
+  } catch { /* Invalid links fall back to the initial settings. */ }
   function reseed(suffix) {
     seed = 2166136261;
     for (const c of seedText + suffix) seed = Math.imul(seed ^ c.charCodeAt(0), 16777619) >>> 0;
@@ -431,10 +440,13 @@
       }
     } else rosette(texture,settings.mirror==='mandala'?r:radius,turn);
     if(settings.vignette) {
-      ctx.setTransform(scale,0,0,scale,width/2,height/2);
-      const g=ctx.createRadialGradient(0,0,Math.min(width,height)*.08,0,0,radius);
+      // Viewport coordinates keep the overlay centered at every pixel density.
+      // Normalize each axis so the falloff follows wide and tall screens alike.
+      ctx.setTransform(scale,0,0,scale,0,0);
+      ctx.translate(width/2,height/2);ctx.scale(width/2,height/2);
+      const g=ctx.createRadialGradient(0,0,.16,0,0,Math.SQRT2);
       g.addColorStop(0,'#00000000');g.addColorStop(1,`rgba(0,0,0,${settings.vignette/100})`);
-      ctx.fillStyle=g;ctx.fillRect(-width/2,-height/2,width,height);
+      ctx.fillStyle=g;ctx.fillRect(-1,-1,2,2);
     }
   }
   function resize() {
@@ -479,7 +491,7 @@
   }
   function preset(key) {
     if(!presets[key]) return;
-    settings={...defaults,...presets[key].values};selectedPreset=key;
+    settings={...originalSettings,...presets[key].values};selectedPreset=key;
     time=scopeTurn=cellTurn=0;arrange();resize();sync();
   }
   function rearrange() {

@@ -15,6 +15,8 @@
       :root {
         --serif: Georgia, "Times New Roman", Times, serif;
         --sans: system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
+        --mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        --label-font-size: .625rem;
         --blue: #0000ee;
         --visited: #551a8b;
         --ink: #111;
@@ -53,76 +55,89 @@
       .skip-link:focus { transform: translateY(0); }
 
       header {
+        --nav-font-size: .875rem;
+        --nav-ink: #fff;
+        --nav-muted: #bbb;
+        --nav-border: #767676;
+        --nav-accent: #a8c7ff;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem 2rem;
+        color-scheme: dark;
+        background: #000;
+        color: var(--nav-ink);
+        margin-bottom: clamp(1.5rem, 4vw, 2.75rem);
         padding: clamp(1.5rem, 5vw, 3.5rem) var(--pad) clamp(1.5rem, 4vw, 2.75rem);
       }
 
       h1 {
+        flex: 0 0 auto;
+        max-width: 100%;
         margin: 0;
-        font-size: clamp(1.9rem, 5.5vw, 3.1rem);
-        font-weight: 700;
+        font-size: calc(var(--nav-font-size) * 1.5);
+        font-weight: 400;
         letter-spacing: -.015em;
         line-height: 1.02;
       }
-      .issues-link { display: inline-block; margin-top: 1rem; font-size: 1.18rem; color: var(--blue); text-underline-offset: 2px; }
-      .issues-link:visited { color: var(--visited); }
-      .issues-link:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; }
       /* Catalog controls */
       .controls {
-        margin-top: clamp(1rem, 2.4vw, 1.6rem);
-        font-size: clamp(1rem, 1.5vw, 1.18rem);
+        flex: 0 1 auto;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: .6rem 1.5rem;
+        width: max-content;
+        max-width: 100%;
+        margin: 0;
+        font-size: var(--nav-font-size);
         line-height: 1.55;
       }
-      .ctl { margin: .12rem 0; }
+      .ctl { display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; max-width: 100%; margin: 0; }
       .ctl .lbl {
+        flex: 0 0 auto;
+        font-family: var(--mono);
+        font-size: var(--label-font-size);
         font-style: normal;
-        font-weight: 700;
-        color: var(--ink);
-        margin-right: .5ch;
+        font-weight: 300;
+        line-height: 1.2;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--nav-muted);
       }
-      .opt {
-        border: 0;
-        padding: 0;
-        background: none;
-        font: inherit;
-        font-style: normal;
-        color: var(--ink);
-        cursor: pointer;
-      }
-      .opt:hover { text-decoration: underline; text-underline-offset: 2px; }
-      .opt[aria-pressed="true"] { color: var(--blue); font-weight: 600; }
-      .opt:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-      /* The theme picker is a real <select> dressed to sit in the sentence. */
+      /* Native dropdowns share the catalog's serif controls. */
       .pick {
+        min-width: 0;
+        min-height: 2rem;
+        max-width: 100%;
         appearance: none;
         -webkit-appearance: none;
-        border: 1px solid var(--ink);
+        border: 1px solid var(--nav-border);
         border-radius: 2px;
         margin: 0;
         padding: .05em 1.5em .05em .45em;
-        /* Hug the chosen theme rather than the widest one. Browsers without
+        /* Hug the chosen option rather than the widest one. Browsers without
            field-sizing just get a box wide enough for every option. */
         field-sizing: content;
         font: inherit;
         font-style: normal;
-        color: var(--ink);
+        color: var(--nav-ink);
         cursor: pointer;
         background: transparent
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='%23111111'/%3E%3C/svg%3E")
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='%23ffffff'/%3E%3C/svg%3E")
           no-repeat right .5em center / .5em auto;
       }
       .pick.is-set {
-        color: var(--blue);
-        border-color: var(--blue);
+        color: var(--nav-accent);
+        border-color: var(--nav-accent);
         font-weight: 600;
         background-image:
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='%230000ee'/%3E%3C/svg%3E");
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='%23a8c7ff'/%3E%3C/svg%3E");
       }
+      .pick option { background: #000; color: var(--nav-ink); }
       .pick:hover { text-decoration: underline; text-underline-offset: 2px; }
-      .pick:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-      .sort-dir {
-        font-size: .68em;
-        vertical-align: .12em;
-      }
+      .pick:focus-visible { outline: 2px solid var(--nav-accent); outline-offset: 2px; }
 
       /* ---- the works ---- */
       main { padding: 0 var(--pad) 4rem; }
@@ -189,10 +204,13 @@
         display: grid;
         gap: .1rem 1ch;
         color: #555;
+        font-family: var(--mono);
+        font-size: var(--label-font-size);
         font-style: italic;
+        text-transform: uppercase;
       }
       .date-item { grid-column: 1; }
-      .cap .dates { margin-top: .18rem; font-size: .88em; }
+      .cap .dates { margin-top: .18rem; }
       .date-label { color: #767676; }
       /* Small bordered tag on the date line, e.g. W.I.P. */
       .tag {
@@ -245,10 +263,11 @@
         white-space: nowrap;
       }
       .row .dates {
+        display: flex;
         flex: 0 0 auto;
         justify-content: flex-end;
-        font-size: .84em;
         line-height: 1.45;
+        white-space: nowrap;
       }
       .row:hover .t { text-decoration-thickness: 2px; }
       .row:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
@@ -280,9 +299,12 @@
 
     <header>
       <h1>Hypermedia Club</h1>
-      <a class="issues-link" href="Issues/index.html">Issues</a>
       <div class="controls">
-        <p class="ctl"><strong class="lbl">Status:</strong><span id="statuses" role="group" aria-label="Status"></span>. <strong class="lbl">Theme:</strong><select id="themes" class="pick" aria-label="Theme"></select>. <strong class="lbl">View:</strong><span id="views" role="group" aria-label="View"></span>. <strong class="lbl">Sort:</strong><span id="sorts" role="group" aria-label="Sort"></span></p>
+        <div class="ctl"><label class="lbl" for="statuses">Status</label><select id="statuses" class="pick"></select></div>
+        <div class="ctl"><label class="lbl" for="themes">Theme</label><select id="themes" class="pick"></select></div>
+        <div class="ctl"><label class="lbl" for="sorts">Sort</label><select id="sorts" class="pick"></select></div>
+        <div class="ctl"><label class="lbl" for="issues">Issue</label><select id="issues" class="pick"><option value="">None</option><option value="arcade">Arcade</option></select></div>
+        <div class="ctl"><label class="lbl" for="views">View</label><select id="views" class="pick"></select></div>
       </div>
     </header>
 
@@ -290,11 +312,13 @@
 
     <script>
       (() => {
+        const loadVersion = Date.now();
         const worksEl = document.getElementById('works');
         const statusesEl = document.getElementById('statuses');
         const themesEl = document.getElementById('themes');
         const viewsEl = document.getElementById('views');
         const sortsEl = document.getElementById('sorts');
+        const issuesEl = document.getElementById('issues');
 
         const DEFAULTS = {
           status: 'selected',
@@ -318,7 +342,7 @@
         // "rejected": true once it is cut; rejection outranks both other
         // states, so a cut piece never shows up under Selected or WIP.
         const STATUSES = [
-          ['selected', 'Selected', p => p.wip === false && !p.rejected],
+          ['selected', 'Approved', p => p.wip === false && !p.rejected],
           ['wip', 'WIP', p => p.wip !== false && !p.rejected],
           ['rejected', 'Rejected', p => p.rejected === true],
           ['all', 'All', () => true]
@@ -332,7 +356,7 @@
         ];
         const VIEWS = [['grid', 'Grid'], ['list', 'List']];
         const SORTS = [
-          ['date', 'Date'], ['alpha', 'Alpha'], ['number', 'Number'],
+          ['date', 'Updated'], ['alpha', 'Alpha'], ['number', 'Created'],
           ['recommended', 'Recommended']
         ];
         const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -367,11 +391,18 @@
           }
           pieces = data.pieces.slice();
           readStateFromUrl();
-          buildGroup(statusesEl, STATUSES, () => status,
+          buildSelect(statusesEl, STATUSES,
             v => { status = v; });
-          buildThemeSelect();
-          buildGroup(viewsEl, VIEWS, () => view, v => { view = v; });
-          buildSortGroup();
+          buildSelect(themesEl, [['', 'All'], ...THEMES], v => { theme = v; });
+          buildSelect(viewsEl, VIEWS, v => { view = v; });
+          buildSortSelect();
+          issuesEl.addEventListener('change', () => {
+            if (issuesEl.value !== 'arcade') return;
+            // Leave None selected when browser Back restores this page.
+            issuesEl.value = '';
+            window.location.assign('Issues/index.html');
+          });
+          window.addEventListener('pageshow', () => { issuesEl.value = ''; });
           syncControls();
           render();
           writeStateToUrl('replaceState');
@@ -488,7 +519,7 @@
         function link(p, cls) {
           const a = document.createElement('a');
           a.className = cls;
-          a.href = `./pieces/${p.slug}/index.html`;
+          a.href = `./pieces/${p.slug}/index.html?v=${loadVersion}`;
           a.setAttribute('aria-label',
             `${title(p)}${p.date ? ', published ' + fmtDate(p.date) : ''}` +
             `${updatedSince(p) ? ', updated ' + fmtDate(updatedSince(p)) : ''}` +
@@ -498,69 +529,44 @@
 
         function thumbImg(p) {
           const img = document.createElement('img');
-          img.src = `./pieces/${p.slug}/${p.thumbnail}`;
+          img.src = `./pieces/${p.slug}/${p.thumbnail}?v=${loadVersion}`;
           img.alt = '';
           img.loading = 'lazy';
           img.decoding = 'async';
           return img;
         }
 
-        function buildGroup(container, items, getCurrent, onPick) {
-          container.replaceChildren();
-          items.forEach((item, i) => {
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'opt';
-            b.textContent = item[1];
-            b.setAttribute('aria-pressed', String(item[0] === getCurrent()));
-            b.addEventListener('click', () => {
-              onPick(item[0]);
-              commitState();
-            });
-            container.append(b);
-            if (i < items.length - 1) container.append(document.createTextNode(', '));
-          });
-        }
-
-        // One theme at a time, with an explicit "All" for the unfiltered grid.
-        function buildThemeSelect() {
-          const options = [['', 'All'], ...THEMES].map(([value, label]) => {
+        function buildSelect(container, items, onPick) {
+          const options = items.map(([value, label]) => {
             const option = document.createElement('option');
             option.value = value;
             option.textContent = label;
             return option;
           });
-          themesEl.replaceChildren(...options);
-          themesEl.addEventListener('change', () => {
-            theme = validValue(THEMES, themesEl.value, DEFAULTS.theme);
+          container.replaceChildren(...options);
+          container.addEventListener('change', () => {
+            onPick(container.value);
             commitState();
           });
         }
 
-        function buildSortGroup() {
-          sortsEl.replaceChildren();
-          SORTS.forEach((item, i) => {
-            const [value, label] = item;
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'opt';
-            b.dataset.value = value;
-            b.dataset.label = label;
-            b.addEventListener('click', () => {
-              if (sort === value) {
-                sortDirections[value] =
-                  sortDirections[value] === 'asc' ? 'desc' : 'asc';
-              } else {
-                sort = value;
-              }
-              commitState();
-            });
-            sortsEl.append(b);
-            if (i < SORTS.length - 1) {
-              sortsEl.append(document.createTextNode(', '));
-            }
+        function buildSortSelect() {
+          const directions = {
+            date: { desc: '↑', asc: '↓' },
+            alpha: { asc: 'A–Z', desc: 'Z–A' },
+            number: { asc: '↓', desc: '↑' },
+            recommended: { desc: '↑', asc: '↓' }
+          };
+          const options = SORTS.flatMap(([value, label]) => {
+            const first = DEFAULT_DIRECTIONS[value];
+            return [first, first === 'asc' ? 'desc' : 'asc'].map(direction =>
+              [`${value}:${direction}`, `${label}: ${directions[value][direction]}`]);
           });
-          updateSortGroup();
+          buildSelect(sortsEl, options, value => {
+            const [key, direction] = value.split(':');
+            sort = key;
+            sortDirections[key] = direction;
+          });
         }
 
         function commitState() {
@@ -577,16 +583,15 @@
         }
 
         function syncControls() {
-          syncGroup(statusesEl, STATUSES, status);
+          statusesEl.value = status;
+          statusesEl.classList.toggle('is-set', status !== DEFAULTS.status);
           themesEl.value = theme;
           themesEl.classList.toggle('is-set', Boolean(theme));
-          syncGroup(viewsEl, VIEWS, view);
-          updateSortGroup();
-        }
-
-        function syncGroup(container, items, current) {
-          container.querySelectorAll('.opt').forEach((button, index) =>
-            button.setAttribute('aria-pressed', String(items[index][0] === current)));
+          viewsEl.value = view;
+          viewsEl.classList.toggle('is-set', view !== DEFAULTS.view);
+          sortsEl.value = `${sort}:${sortDirections[sort]}`;
+          sortsEl.classList.toggle('is-set', sort !== DEFAULTS.sort ||
+            sortDirections[sort] !== DEFAULT_DIRECTIONS[sort]);
         }
 
         function readStateFromUrl() {
@@ -646,24 +651,6 @@
           const send = () => window.bakalytics?.track('Gallery filter state', target);
           if (window.bakalytics?.track) send();
           else window.addEventListener('load', send, { once: true });
-        }
-
-        function updateSortGroup() {
-          sortsEl.querySelectorAll('.opt').forEach(b => {
-            const active = b.dataset.value === sort;
-            const direction = sortDirections[b.dataset.value];
-            b.replaceChildren(document.createTextNode(b.dataset.label));
-            if (active) {
-              const triangle = el('span', 'sort-dir',
-                direction === 'asc' ? ' ▲' : ' ▼');
-              triangle.setAttribute('aria-hidden', 'true');
-              b.append(triangle);
-            }
-            b.setAttribute('aria-pressed', String(active));
-            b.setAttribute('aria-label', active
-              ? `${b.dataset.label}, ${direction === 'asc' ? 'ascending' : 'descending'}`
-              : `Sort by ${b.dataset.label}`);
-          });
         }
 
         function fmtDate(iso) {

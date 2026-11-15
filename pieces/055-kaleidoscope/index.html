@@ -10,14 +10,14 @@
 <body>
   <canvas id="kaleidoscope" role="img" aria-label="An evolving kaleidoscope of luminous objects reflected through adjustable mirrors."></canvas>
   <p class="sr-only">Space pauses or resumes. S saves an image. R rearranges the objects. H hides or shows the controls. Drag the canvas to turn the object cell. Arrow keys on the panel grip move the controls. Animation starts paused when reduced motion is preferred.</p>
-  <aside id="controls" aria-label="Kaleidoscope controls">
+  <aside id="controls" class="collapsed" aria-label="Kaleidoscope settings">
     <div class="panel-bar">
       <button id="move" class="icon-button grip" type="button" aria-label="Move controls" title="Drag to move; arrow keys when focused"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" stroke-width="3"/></svg></button>
-      <button id="hide" class="panel-toggle" type="button" aria-expanded="true" aria-controls="panel-body">Controls<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 14 4-4 4 4"/></svg></button>
+      <button id="hide" class="panel-toggle" type="button" aria-expanded="false" aria-controls="panel-body">Settings<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 14 4-4 4 4"/></svg></button>
       <button id="pause" class="icon-button" type="button" aria-label="Pause kaleidoscope" title="Pause (Space)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg></button>
       <button id="save" class="icon-button" type="button" aria-label="Save image" title="Save image (S)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 16v4h14v-4"/></svg></button>
     </div>
-    <div id="panel-body">
+    <div id="panel-body" hidden>
       <div class="preset-row"><label for="preset">Preset</label><select id="preset"></select></div>
       <div class="tabs" role="tablist" aria-label="Control groups">
         <button id="tab-optics" type="button" role="tab" aria-selected="true" aria-controls="optics">Optics</button>

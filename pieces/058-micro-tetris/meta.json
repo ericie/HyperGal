@@ -4,7 +4,7 @@
   "date": "2026-10-05",
   "category": "games",
   "type": "interactive",
-  "wip": true,
+  "wip": false,
   "thumbnail": "thumbnail.png",
-  "description": "Self-playing Tetris across the entire window, with 4×4 pixel square cells and 8% of the board initially occupied by individual squares in sparse, irregular patches with broad gaps across the lower area. One piece falls from the top at a time and locks on contact. Completed lines blink, then collapse, while the player fills the gaps. Click or Space pauses; R restarts."
+  "description": "Self-playing Tetris across the entire window, with 4×4 pixel square cells and a sparse starting stack occupying at most about 0.5% of the board. Each piece falls from the center while nudging and rotating, sometimes hesitating or correcting a decision without pausing gravity. Completed lines blink, then collapse. Click or Space pauses; R restarts."
 }

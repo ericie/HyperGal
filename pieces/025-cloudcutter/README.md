@@ -1,15 +1,22 @@
 # Cloudcutter
 
-Asteroids on the same black-and-white Vectrex monitor as *Vectrex Asteroids*,
-but flown against weather. A round explosively punches a broad chunk out of a
-cloud, so the only way through a body is to bore a tunnel and fly down it.
+Asteroids flown against weather. A round explosively punches a broad chunk
+out of a cloud, so the only way through a body is to bore a tunnel and fly down it.
+The guns use a 0.22-second cooldown, a 45px blast radius, and a 900px range
+in both autoplay and player control.
 
 ## The clouds
 
-Each cloud keeps its own solid shade of gray against the black sky. Its edge
-uses a finer contour grid with no silhouette blur or animated wobble; a thin
-single stroke and display-resolution rendering keep the outline crisp. Open cuts read as black
-channels; the ship and rounds invert over the gray bodies to stay visible.
+A flat bright blue sky (`#48a7f5`) carries rounded cartoon cumulus with white
+caps (`#f7fbff`), pale blue bodies (`#deefff`), and blue undersides (`#bfe2fa`).
+Smaller scallops and white curls give the larger lobes a layered, fluffy shape.
+There are no cloud outlines, gradients, sky streaks, or visible text. The
+ship is a solid cobalt blue can (`#0047ff`), with shaded sides, elliptical
+end caps, and an always-on yellow
+rocket flame (`#ffe23b`); rounds retain dark blue linework.
+
+Every painted layer is clipped to the live carved contour, so cuts show the
+blue sky and shading stays attached as clouds split and heal.
 
 Each cloud is the **union** of its lobes, not their sum. A summed metaball field
 smears the lobes into one featureless blob and piles the density up in the
@@ -37,9 +44,10 @@ A fresh cut holds its full shape before beginning to close, then takes roughly
 nine to thirteen minutes to **heal** shut. The wound keeps its depth while its
 radius closes on a smooth quintic ease, fading only at the very end. Its
 sampled outline follows the changing field with exponential easing, so repair looks
-like liquid weather flowing inward rather than a sequence of geometry swaps. A
-tunnel outlives the pass that made it and the sky keeps a record of where the
-ship has been.
+like liquid weather flowing inward rather than a sequence of geometry swaps.
+Clouds heal normally while on screen. Once the entire cloud leaves the
+viewport, its cuts and split outlines reset to the intact body.
+Turning back therefore brings fresh clouds into view.
 
 When a bore runs clean through a body, its exact existing outline remains in
 place as two halves divided by the new channel. Samples stay aligned between rebuilds, and new split edges ease from the
@@ -74,7 +82,8 @@ clouds, scaled to the viewport, with no visible counters or labels.
 
 - Autoplay starts immediately
 - Left / right or A / D: take over and turn
-- Up or W: take over and thrust
+- The engine stays on during autoplay and player control
+- Up or W: take over (thrust is automatic)
 - Space or click: take over and fire
 - Enter: restart
 

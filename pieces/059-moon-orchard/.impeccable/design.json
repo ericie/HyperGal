@@ -1,146 +1,340 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-06T09:11:40.560099+00:00",
-  "title": "Design System: Moon Orchard",
+  "generatedAt": "2026-11-15T12:32:44.371967+00:00",
+  "title": "Design System: Lunar Founder",
   "extensions": {
     "colorMeta": {
-      "white": {
-        "role": "primary",
-        "displayName": "Arcade White",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
       "black": {
         "role": "neutral",
         "displayName": "Space Black",
         "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
+          "oklch(15% 0.0000 0.00)",
+          "oklch(26% 0.0000 0.00)",
+          "oklch(38% 0.0000 0.00)",
+          "oklch(49% 0.0000 0.00)",
+          "oklch(61% 0.0000 0.00)",
+          "oklch(72% 0.0000 0.00)",
+          "oklch(84% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "Shot White",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(26% 0.0000 0.00)",
+          "oklch(38% 0.0000 0.00)",
+          "oklch(49% 0.0000 0.00)",
+          "oklch(61% 0.0000 0.00)",
+          "oklch(72% 0.0000 0.00)",
+          "oklch(84% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "blue": {
+        "role": "primary",
+        "displayName": "Facet Blue",
+        "tonalRamp": [
+          "oklch(15% 0.2993 265.22)",
+          "oklch(26% 0.2993 265.22)",
+          "oklch(38% 0.2993 265.22)",
+          "oklch(49% 0.2993 265.22)",
+          "oklch(61% 0.2993 265.22)",
+          "oklch(72% 0.2993 265.22)",
+          "oklch(84% 0.2993 265.22)",
+          "oklch(95% 0.2993 265.22)"
+        ]
+      },
+      "cyan": {
+        "role": "primary",
+        "displayName": "Mountain Cyan",
+        "tonalRamp": [
+          "oklch(15% 0.1154 212.86)",
+          "oklch(26% 0.1154 212.86)",
+          "oklch(38% 0.1154 212.86)",
+          "oklch(49% 0.1154 212.86)",
+          "oklch(61% 0.1154 212.86)",
+          "oklch(72% 0.1154 212.86)",
+          "oklch(84% 0.1154 212.86)",
+          "oklch(95% 0.1154 212.86)"
+        ]
+      },
+      "green": {
+        "role": "primary",
+        "displayName": "Foothill Green",
+        "tonalRamp": [
+          "oklch(15% 0.2296 146.93)",
+          "oklch(26% 0.2296 146.93)",
+          "oklch(38% 0.2296 146.93)",
+          "oklch(49% 0.2296 146.93)",
+          "oklch(61% 0.2296 146.93)",
+          "oklch(72% 0.2296 146.93)",
+          "oklch(84% 0.2296 146.93)",
+          "oklch(95% 0.2296 146.93)"
+        ]
+      },
+      "shade": {
+        "role": "primary",
+        "displayName": "Hill Shade",
+        "tonalRamp": [
+          "oklch(15% 0.2081 142.50)",
+          "oklch(26% 0.2081 142.50)",
+          "oklch(38% 0.2081 142.50)",
+          "oklch(49% 0.2081 142.50)",
+          "oklch(61% 0.2081 142.50)",
+          "oklch(72% 0.2081 142.50)",
+          "oklch(84% 0.2081 142.50)",
+          "oklch(95% 0.2081 142.50)"
+        ]
+      },
+      "peach": {
+        "role": "primary",
+        "displayName": "Road Peach",
+        "tonalRamp": [
+          "oklch(15% 0.1383 58.62)",
+          "oklch(26% 0.1383 58.62)",
+          "oklch(38% 0.1383 58.62)",
+          "oklch(49% 0.1383 58.62)",
+          "oklch(61% 0.1383 58.62)",
+          "oklch(72% 0.1383 58.62)",
+          "oklch(84% 0.1383 58.62)",
+          "oklch(95% 0.1383 58.62)"
+        ]
+      },
+      "earth": {
+        "role": "primary",
+        "displayName": "Earth Brown",
+        "tonalRamp": [
+          "oklch(15% 0.1188 59.89)",
+          "oklch(26% 0.1188 59.89)",
+          "oklch(38% 0.1188 59.89)",
+          "oklch(49% 0.1188 59.89)",
+          "oklch(61% 0.1188 59.89)",
+          "oklch(72% 0.1188 59.89)",
+          "oklch(84% 0.1188 59.89)",
+          "oklch(95% 0.1188 59.89)"
+        ]
+      },
+      "magenta": {
+        "role": "primary",
+        "displayName": "Buggy Magenta",
+        "tonalRamp": [
+          "oklch(15% 0.2733 331.75)",
+          "oklch(26% 0.2733 331.75)",
+          "oklch(38% 0.2733 331.75)",
+          "oklch(49% 0.2733 331.75)",
+          "oklch(61% 0.2733 331.75)",
+          "oklch(72% 0.2733 331.75)",
+          "oklch(84% 0.2733 331.75)",
+          "oklch(95% 0.2733 331.75)"
+        ]
+      },
+      "window": {
+        "role": "secondary",
+        "displayName": "Window Cyan",
+        "tonalRamp": [
+          "oklch(15% 0.1369 222.57)",
+          "oklch(26% 0.1369 222.57)",
+          "oklch(38% 0.1369 222.57)",
+          "oklch(49% 0.1369 222.57)",
+          "oklch(61% 0.1369 222.57)",
+          "oklch(72% 0.1369 222.57)",
+          "oklch(84% 0.1369 222.57)",
+          "oklch(95% 0.1369 222.57)"
+        ]
+      },
+      "yellow": {
+        "role": "secondary",
+        "displayName": "Saucer Yellow",
+        "tonalRamp": [
+          "oklch(15% 0.1923 111.08)",
+          "oklch(26% 0.1923 111.08)",
+          "oklch(38% 0.1923 111.08)",
+          "oklch(49% 0.1923 111.08)",
+          "oklch(61% 0.1923 111.08)",
+          "oklch(72% 0.1923 111.08)",
+          "oklch(84% 0.1923 111.08)",
+          "oklch(95% 0.1923 111.08)"
+        ]
+      },
+      "red": {
+        "role": "secondary",
+        "displayName": "Bomb Red",
+        "tonalRamp": [
+          "oklch(15% 0.2426 32.25)",
+          "oklch(26% 0.2426 32.25)",
+          "oklch(38% 0.2426 32.25)",
+          "oklch(49% 0.2426 32.25)",
+          "oklch(61% 0.2426 32.25)",
+          "oklch(72% 0.2426 32.25)",
+          "oklch(84% 0.2426 32.25)",
+          "oklch(95% 0.2426 32.25)"
+        ]
+      },
+      "rock": {
+        "role": "secondary",
+        "displayName": "Rock Olive",
+        "tonalRamp": [
+          "oklch(15% 0.1143 92.15)",
+          "oklch(26% 0.1143 92.15)",
+          "oklch(38% 0.1143 92.15)",
+          "oklch(49% 0.1143 92.15)",
+          "oklch(61% 0.1143 92.15)",
+          "oklch(72% 0.1143 92.15)",
+          "oklch(84% 0.1143 92.15)",
+          "oklch(95% 0.1143 92.15)"
         ]
       }
     },
-    "typographyMeta": {
-      "title": {
-        "displayName": "Bitmap title",
-        "purpose": "Original 3-by-5 glyphs, two-pixel cells and eight-pixel advance; no font dependency."
-      },
-      "label": {
-        "displayName": "Bitmap label",
-        "purpose": "Original 3-by-5 glyphs, one-pixel cells and four-pixel advance; no font dependency."
-      }
-    },
+    "shadows": [],
+    "breakpoints": [],
     "motion": [
       {
-        "name": "volley-spacing",
-        "value": "0.11s",
-        "purpose": "Interval between the three paired straight shots."
+        "name": "terrain-scroll",
+        "value": "66 internal pixels/s while driving; 0 throughout the death/rebirth sequence",
+        "purpose": "Road and all landscape camera travel stop together during rebirth and resume after the compact-garage exit; atmospheric UFOs continue hovering."
       },
       {
-        "name": "volley-rest",
-        "value": "1.2s",
-        "purpose": "Pause after each three-shot volley."
+        "name": "mountain-parallax",
+        "value": "0.18 \u00d7 terrain speed",
+        "purpose": "Distant cyan/blue mountains and their small skylines."
       },
       {
-        "name": "patrol-speed",
-        "value": "66 internal pixels/s",
-        "purpose": "Ground and obstacle scrolling speed."
+        "name": "foothill-parallax",
+        "value": "0.46 \u00d7 terrain speed",
+        "purpose": "Near green hills and windowed cities with yellow rims."
       },
       {
-        "name": "jump",
-        "value": "180 internal pixels/s launch; 420 internal pixels/s\u00b2 gravity",
-        "purpose": "Short automatic hazard hops."
+        "name": "rover-drift",
+        "value": "One rover, preferred 24s cruise between 30% and 43% of canvas width; \u221210\u202612 internal pixels/s clear-road screen velocity; 54 internal pixels/s\u00b2 acceleration",
+        "purpose": "Gentle bidirectional screen drift keeps clear-road world progress within 56\u201378 internal pixels/s. Predictive hazard avoidance overrides the preference and commits safe ground-hop throttle and launch time through landing; obstacle death or a new incoming projectile cancels the plan."
       },
       {
-        "name": "tree-growth",
-        "value": "18s",
-        "purpose": "Denominator of the growth progression, starting at 15% size and capped at full size."
+        "name": "automatic-hop",
+        "value": "225 internal pixels/s launch; 420 internal pixels/s\u00b2 gravity",
+        "purpose": "Predictive hops with a clearance margin and a checked landing; ground-hazard plans must land beyond the obstacle and unsafe plans do not launch."
       },
       {
-        "name": "moon-rotation",
-        "value": "0.008 rad/s",
-        "purpose": "Slow orbit of the persistent orchard."
+        "name": "crash-recovery",
+        "value": "All parts rest + .35s; 2.6s growth with .045s stagger; 0.5s shutter lift + 1.8s compact-garage exit",
+        "purpose": "Wreckage becomes towers at 3\u00d7 former width and height, with one compact 44x34 garage replacing the former 60px facade. Its shutter lifts for 0.5s, then the buggy rolls out over 1.8s before scrolling resumes."
+      },
+      {
+        "name": "saucer-waves",
+        "value": "3\u20135 ships per formation; .4s stagger; 2.5\u20134s clear gap; 6 ships maximum",
+        "purpose": "Scouts, bombers, darts and carriers differ in speed, path, armor and attacks. Wave arrivals wait during rebirth."
+      },
+      {
+        "name": "wreckage-physics",
+        "value": "300 internal pixels/s\u00b2 gravity; .34 bounce restitution; wheel friction 45 and body friction 115 internal pixels/s\u00b2",
+        "purpose": "Ten recognizable buggy pieces, including the fixed upward barrel and forward cannon, fly out while scrolling is stopped. All must settle before their alien buildings can grow."
+      },
+      {
+        "name": "ufo-hit-flash",
+        "value": ".12s",
+        "purpose": "Brief hull flash makes multi-hit bomber/carrier armor visible."
+      },
+      {
+        "name": "ground-turrets",
+        "value": "2.4 radians/s tracking; 1.9s shot cadence; .13s muzzle flash; 130 internal pixels/s terrain-relative rounds",
+        "purpose": "Primitive deep-rust (#a04018) fixed pedestals and pipe barrels share one paint without perimeter edging and track the rover and its jumps from an 11-pixel-high pivot, with rounds originating 15 pixels along the barrel. At most three turrets/eight rounds; no targeting or new fire during rebirth."
+      },
+      {
+        "name": "depth-atmosphere",
+        "value": "UFOs 6\u20138 \u00d7 3 distant / 9\u201312 \u00d7 4 middle; slow drift 2 \u00d7 scale px/s, sway 3 \u00d7 scale, bob 2 \u00d7 scale",
+        "purpose": "Quiet layer-colored UFOs with no combat. Background cities are static artwork, with no dynamic city growth. Camera stops on foreground death; artwork pause freezes everything."
+      },
+      {
+        "name": "fixed-paired-fire",
+        "value": "0.22s shared trigger; 320 pixels/s; maximum 3 airborne pairs (6 rounds)",
+        "purpose": "The fixed up and forward cannons fire together. A burst slot remains occupied until both rounds are gone. No swivel or independent cannon state."
+      },
+      {
+        "name": "city-ground-fill",
+        "value": "18px foundation margin; one 24-spark blast per reached hazard; holes fill with foundation growth easing",
+        "purpose": "Only growing foreground cities blast nearby turrets, rocks and holes. Rocks/turrets disappear regardless of armor; holes fill into solid ground and building bases rise. Distant hazards remain; later bombs can reopen ground."
       }
     ],
-    "shadows": [],
-    "breakpoints": []
+    "tireShade": {
+      "factor": 0.55,
+      "rule": "Round each body sRGB channel multiplied by the factor; all tires share that darker hue."
+    },
+    "buggyPalette": {
+      "colors": [
+        "#b00070",
+        "#b02030",
+        "#9030a0",
+        "#a04018"
+      ],
+      "rule": "Deep magenta, crimson, plum and rust separate the unoutlined body and fixed barrels from bright terrain. Each has at least 3:1 luminance contrast against main green hills, peach road and black sky; all tires retain the darker body shade."
+    }
   },
   "components": [
     {
       "name": "Artwork pause target",
       "kind": "custom",
       "refersTo": "artwork",
-      "description": "Full-canvas control with inset keyboard focus. This panel sample demonstrates appearance; the artwork implements pause in JavaScript.",
-      "html": "<canvas class=\"ds-artwork\" tabindex=\"0\" role=\"button\" aria-pressed=\"false\" aria-label=\"Moon Orchard pause target\"></canvas>",
-      "css": ".ds-artwork {display:block;width:100%;height:160px;background:#000;image-rendering:pixelated}.ds-artwork:focus-visible {outline:1px solid #fff;outline-offset:-3px}"
+      "description": "Full-canvas focus treatment. This preview is static; pause is implemented by orchard.js.",
+      "html": "<canvas class=\"ds-artwork\" tabindex=\"0\" role=\"button\" aria-pressed=\"false\" aria-label=\"Lunar Founder pause target\"></canvas>",
+      "css": ".ds-artwork{display:block;width:100%;height:160px;background:#000;image-rendering:pixelated}.ds-artwork:focus-visible{outline:1px solid #fff;outline-offset:-3px}"
     },
     {
-      "name": "Straight burst shots",
+      "name": "Fixed paired shots",
       "kind": "custom",
-      "description": "Three vertical and three horizontal shots, drawn at the implemented bullet dimensions.",
-      "html": "<svg class=\"ds-sprite\" viewBox=\"0 0 80 60\" width=\"240\" height=\"180\"><g fill=\"currentColor\"><rect x=\"20\" y=\"8\" width=\"2\" height=\"5\"/><rect x=\"20\" y=\"20\" width=\"2\" height=\"5\"/><rect x=\"20\" y=\"32\" width=\"2\" height=\"5\"/><rect x=\"35\" y=\"45\" width=\"5\" height=\"2\"/><rect x=\"48\" y=\"45\" width=\"5\" height=\"2\"/><rect x=\"61\" y=\"45\" width=\"5\" height=\"2\"/></g></svg>",
-      "css": ".ds-sprite {display:block;background:#000;color:#fff;image-rendering:pixelated}"
+      "description": "Three synchronized up/forward burst pairs; each white trace is five pixels along a fixed axis.",
+      "html": "<svg class=\"ds-sprite\" viewBox=\"0 0 48 36\" width=\"240\" height=\"180\" aria-hidden=\"true\"><g fill=\"#fff\"><rect x=\"9\" y=\"6\" width=\"1\" height=\"5\"/><rect x=\"9\" y=\"16\" width=\"1\" height=\"5\"/><rect x=\"9\" y=\"26\" width=\"1\" height=\"5\"/><rect x=\"18\" y=\"31\" width=\"5\" height=\"1\"/><rect x=\"28\" y=\"31\" width=\"5\" height=\"1\"/><rect x=\"38\" y=\"31\" width=\"5\" height=\"1\"/></g></svg>",
+      "css": ".ds-sprite{display:block;background:#000;shape-rendering:crispEdges;image-rendering:pixelated}",
+      "refersTo": "fixed-shot"
     },
     {
       "name": "Saucer sprite",
       "kind": "custom",
-      "description": "The built saucer silhouette, including black window cutouts.",
-      "html": "<svg class=\"ds-sprite\" viewBox=\"-20 -12 40 24\" width=\"240\" height=\"144\"><g fill=\"currentColor\"><rect x=\"-5\" y=\"-8\" width=\"10\" height=\"2\"/><rect x=\"-8\" y=\"-6\" width=\"16\" height=\"4\"/><rect x=\"-15\" y=\"-2\" width=\"30\" height=\"4\"/><rect x=\"-10\" y=\"2\" width=\"20\" height=\"2\"/><rect x=\"-8\" y=\"6\" width=\"3\" height=\"2\"/><rect x=\"5\" y=\"6\" width=\"3\" height=\"2\"/></g><g fill=\"#000\"><rect x=\"-9\" y=\"-1\" width=\"3\" height=\"2\"/><rect x=\"-1\" y=\"-1\" width=\"3\" height=\"2\"/><rect x=\"7\" y=\"-1\" width=\"3\" height=\"2\"/></g></svg>",
-      "css": ".ds-sprite {display:block;background:#000;color:#fff;image-rendering:pixelated}"
+      "description": "The simple foreground scout dome and disc, using four flat pixel tiers with only a canopy and hull color.",
+      "html": "<svg class=\"ds-sprite\" viewBox=\"-20 -12 40 24\" width=\"240\" height=\"144\" aria-hidden=\"true\"><rect x=\"-5\" y=\"-6\" width=\"9\" height=\"3\" fill=\"#00a4bc\"/><g fill=\"#dce000\"><rect x=\"-10\" y=\"-3\" width=\"19\" height=\"5\"/><rect x=\"-13\" y=\"2\" width=\"26\" height=\"2\"/><rect x=\"-7\" y=\"4\" width=\"14\" height=\"2\"/></g></svg>",
+      "css": ".ds-sprite{display:block;background:#000;shape-rendering:crispEdges;image-rendering:pixelated}"
     },
     {
-      "name": "Terrain hole",
+      "name": "Bomb sprite",
       "kind": "custom",
-      "description": "An outlined pit interrupts the ground stroke; the sample uses a 28-pixel pit within the implemented size range.",
-      "html": "<svg class=\"ds-sprite\" viewBox=\"0 0 80 30\" width=\"240\" height=\"90\"><path d=\"M0 8H26 M54 8H80\" stroke=\"currentColor\" stroke-width=\"2\" fill=\"none\"/><path d=\"M23 8L26 10L31 20H49L54 10L57 8\" stroke=\"currentColor\" stroke-width=\"1\" fill=\"none\"/></svg>",
-      "css": ".ds-sprite {display:block;background:#000;color:#fff;image-rendering:pixelated}"
+      "description": "Red falling bomb with paired magenta pixels.",
+      "html": "<svg class=\"ds-sprite\" viewBox=\"-20 -12 40 24\" width=\"240\" height=\"144\" aria-hidden=\"true\"><rect x=\"-1\" y=\"-7\" width=\"2\" height=\"9\" fill=\"#ff3000\"/><g fill=\"#d500c8\"><rect x=\"-4\" y=\"-7\" width=\"2\" height=\"3\"/><rect x=\"3\" y=\"-7\" width=\"2\" height=\"3\"/></g></svg>",
+      "css": ".ds-sprite{display:block;background:#000;shape-rendering:crispEdges;image-rendering:pixelated}"
     },
     {
-      "name": "Bitmap title",
+      "name": "Impact sparks",
       "kind": "custom",
-      "description": "Original 3-by-5 glyphs at the implemented two-pixel title scale.",
-      "html": "<svg class=\"ds-sprite\" viewBox=\"0 0 88 10\" width=\"352\" height=\"40\"><g fill=\"currentColor\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"4\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"0\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"2\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"4\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"0\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"2\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"4\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"0\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"4\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"0\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"4\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"8\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"10\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"12\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"8\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"12\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"8\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"12\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"8\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"12\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"8\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"10\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"12\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"16\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"18\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"20\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"16\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"20\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"16\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"20\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"16\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"20\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"16\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"18\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"20\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"24\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"28\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"24\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"26\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"28\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"24\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"26\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"28\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"24\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"26\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"28\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"24\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"28\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"40\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"42\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"44\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"40\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"44\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"40\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"44\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"40\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"44\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"40\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"42\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"44\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"48\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"50\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"48\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"52\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"48\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"50\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"48\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"52\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"48\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"52\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"56\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"58\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"60\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"56\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"56\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"56\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"56\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"58\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"60\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"64\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"68\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"64\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"68\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"64\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"66\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"68\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"64\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"68\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"64\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"68\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"74\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"72\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"76\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"72\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"74\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"76\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"72\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"76\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"72\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"76\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"80\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"82\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"80\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"84\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"80\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"82\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"80\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"84\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"80\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"84\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"88\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"90\" y=\"0\" width=\"2\" height=\"2\"/><rect x=\"88\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"92\" y=\"2\" width=\"2\" height=\"2\"/><rect x=\"88\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"92\" y=\"4\" width=\"2\" height=\"2\"/><rect x=\"88\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"92\" y=\"6\" width=\"2\" height=\"2\"/><rect x=\"88\" y=\"8\" width=\"2\" height=\"2\"/><rect x=\"90\" y=\"8\" width=\"2\" height=\"2\"/></g></svg>",
-      "css": ".ds-sprite {display:block;background:#000;color:#fff;image-rendering:pixelated}"
+      "description": "The four foreground spark colors, each rendered as a two-pixel square. Atmospheric background UFOs have no impact sparks.",
+      "html": "<svg class=\"ds-sprite\" viewBox=\"0 0 40 24\" width=\"240\" height=\"144\" aria-hidden=\"true\"><rect x=\"10\" y=\"10\" width=\"2\" height=\"2\" fill=\"#ff3000\"/><rect x=\"17\" y=\"5\" width=\"2\" height=\"2\" fill=\"#dce000\"/><rect x=\"23\" y=\"15\" width=\"2\" height=\"2\" fill=\"#d500c8\"/><rect x=\"29\" y=\"8\" width=\"2\" height=\"2\" fill=\"#fff\"/></svg>",
+      "css": ".ds-sprite{display:block;background:#000;shape-rendering:crispEdges;image-rendering:pixelated}"
     }
   ],
   "narrative": {
-    "northStar": "Monochrome Lunar Arcade",
-    "overview": "A self-playing black-and-white patrol turns gunfire into slow-growing trees on an enormous moon. Sparse pixel sprites and thin outlined landscapes share open black space. This system belongs only to this artwork, not to the surrounding HyperGal gallery.\n\nThe user-pinned arcade direction is implemented directly in code; no approved visual comp exists. The built artifact and its desktop and mobile finish captures establish the reference.",
+    "northStar": "Saturated Pixel Arcade Patrol",
+    "overview": "A self-playing pixel arcade patrol follows the user\u2019s Moon Patrol reference: open black sky, cyan mountains with blue facets, green foothills, peach ground, and one small buggy whose body hue and darker matching tires change with each generation. Original procedural sprites and stepped silhouettes keep the artwork self-contained. This design system applies only to this piece.",
     "keyCharacteristics": [
-      "Two-color marks and open black space.",
-      "A moon clipped above the viewport, with trees along its visible rim.",
-      "Compact sprites, straight three-shot volleys, and short automatic hops.",
-      "Original bitmap lettering and an unobtrusive HUD."
+      "Saturated flat fills and whole-pixel edges.",
+      "Cities mixed into both landscape layers, three scrolling speeds, and one rover that drifts forward and back.",
+      "Automatic hops, synchronized upward/forward burst fire, distinct UFO formations and attacks.",
+      "Death stops landscape scrolling while wreckage grows into buildings and a compact garage releases the next rover; atmospheric UFOs keep hovering.",
+      "A text-free full-viewport canvas with accessible pause and export."
     ],
     "rules": [
       {
-        "name": "The Two-Color Rule",
-        "body": "Author the scene with white and black only; do not introduce colored accents or soft glow. Canvas curve rasterization may produce intermediate edge pixels, but these are not palette tokens.",
+        "name": "The Hard-Pixel Rule",
+        "body": "Use flat palette fills and whole-pixel scan conversion; no smoothing, gradients, or glow.",
         "section": "colors"
       }
     ],
     "dos": [
-      "Do keep the enormous moon clipped above the screen and preserve open sky below it.",
-      "Do retain straight burst shots, short hops, two rock sizes, and bomb impacts that leave holes.",
-      "Do keep interaction, bitmap drawing, and persistent orchard state self-contained and dependency-free."
+      "Do preserve the open black sky, saturated landscape layers, and readable rover separated from the landscape by its paint rather than an outline.",
+      "Do blast hazards near growing foundations once, fill affected holes, and preserve hazards outside that reach.",
+      "Do retain keyboard access, reduced-motion pause, and dependency-free rendering."
     ],
     "donts": [
-      "Don't add color, soft glow, or surrounding app chrome to this artwork.",
-      "Don't substitute a small complete moon for the visible rim.",
-      "Don't replace the original bitmap HUD with a system display font."
+      "Don\u2019t draw titles, scores, labels, controls, or a top bar over the artwork.",
+      "Don\u2019t add a repair saucer, downward repair shots, a moon, orchard growth, or saved scene state.",
+      "Don\u2019t introduce smoothing, glow, gradients, or interface panels."
     ]
   }
 }

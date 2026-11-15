@@ -1,10 +1,10 @@
 {
-  "title": "Moon Orchard",
+  "title": "Lunar Founder",
   "year": 2026,
   "date": "2026-10-05",
   "category": "games",
   "type": "interactive",
-  "wip": true,
+  "wip": false,
   "thumbnail": "thumbnail.png",
-  "description": "A black-and-white lunar arcade patrol. Buggy bullets carve holes in the rotating moon while a patrolling saucer repairs them. Pit jumps fire up, forward and down; downward shots fill the terrain below. Click or Space pauses; S saves a picture."
+  "description": "A self-playing lunar patrol with fixed paired fire limited to three airborne bursts. Darker tires match the buggy\u2019s body hue. Tiny UFOs hover over static parallax cities. Wreckage grows into large towers, and a replacement buggy emerges from a compact garage. Click or Space pauses; S saves a picture."
 }

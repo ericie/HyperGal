@@ -24,7 +24,7 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "rating": 50,
       "thumbnail": "thumbnail.jpg",
-      "description": "Breakout in reverse. An infallible paddle sends one ball on a clean arc to the nearest low column of a level Renaissance-colored wall. Each underside hit reserves one new brick, and only that completed cell creeps the aligned lattice upward. No player, no losing. Click to rebuild.",
+      "description": "Breakout in reverse. An infallible paddle sends one ball on a clean arc to the nearest low column of a level rainbow-colored wall. Each underside hit reserves one new brick, and only that completed cell creeps the aligned lattice upward. No player, no losing. Click to rebuild.",
       "updated": "2026-09-10"
     },
     {
@@ -185,7 +185,7 @@ window.HMC_MANIFEST = {
     },
     {
       "slug": "016-up-mario",
-      "wip": true,
+      "wip": false,
       "title": "Always Moving Up",
       "year": 2026,
       "date": "2026-07-24",
@@ -310,7 +310,7 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "rating": 80,
       "thumbnail": "thumbnail.jpg",
-      "description": "A black-and-white vector Asteroids variant flown against weather instead of rock. Rounds explosively punch broad chunks out of wide, scalloped cumulus, so the only way through a body is to bore a tunnel and fly down it. The ship never targets anything. It holds a wandering course with the guns held down, and where the sky is thick it grinds to a crawl until its own fire has opened the way — an icebreaker, not a hunter. Its hull reams out what the guns began, so it can never wedge itself in a bore too narrow to fly. Sparse cloudscapes pan endlessly left while the ship works up and down through them; the camera follows, keeping it in frame. Bites heal slowly like liquid, and a bore that reaches all the way through leaves the exact same cloud outline divided into two halves.",
+      "description": "An Asteroids variant flown through white cartoon cumulus against a bright blue sky. Rounds explosively punch broad chunks out of wide, scalloped cumulus, so the only way through a body is to bore a tunnel and fly down it. The ship never targets anything. It holds a wandering course with the guns held down, and where the sky is thick it grinds to a crawl until its own fire has opened the way — an icebreaker, not a hunter. Its hull reams out what the guns began, so it can never wedge itself in a bore too narrow to fly. Sparse cloudscapes pan endlessly left while the ship works up and down through them; the camera follows, keeping it in frame. Clouds reset to intact bodies once fully off screen. Bites heal slowly like liquid, and a bore that reaches all the way through leaves the exact same cloud outline divided into two halves.",
       "updated": "2026-10-19"
     },
     {
@@ -471,7 +471,7 @@ window.HMC_MANIFEST = {
     },
     {
       "slug": "038-many-frogs",
-      "wip": true,
+      "wip": false,
       "title": "Many Frogs",
       "year": 2026,
       "date": "2026-09-03",
@@ -697,19 +697,19 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.png",
       "description": "A dense, luminous kaleidoscope of drifting glitter, iridescent polygonal prisms and candy-colored geometric fragments, reflected through twelve mirrored sections. Space pauses, R rearranges, S saves an image.",
-      "updated": "2026-11-12"
+      "updated": "2026-11-15"
     },
     {
       "slug": "056-mount-fuji",
       "wip": true,
-      "title": "Mount Fuji",
+      "title": "Painting Together",
       "year": 2026,
       "date": "2026-09-28",
       "category": "nature",
-      "type": "generative",
+      "type": "interactive",
       "thumbnail": "thumbnail.png",
-      "description": "Mount Fuji built entirely from short, curling oil strokes, inspired by Van Gogh. A blue-and-gold sky swirls around a golden sun above ivory snow, cobalt slopes and a shimmering lake. Loaded Brush’s bristle grooves and raised impasto catch the light. S saves a PNG.",
-      "updated": "2026-10-06"
+      "description": "An evolving oil painting built from loaded, curved brush strokes. Multicolor bristles leave raised pigment, fine grooves, dry edges and wet highlights on linen. Brushes continuously overpaint the surface. Drag to paint; Space pauses, R starts a new painting, and S saves a PNG.",
+      "updated": "2026-11-15"
     },
     {
       "slug": "057-hypermedia-title-03",
@@ -725,26 +725,26 @@ window.HMC_MANIFEST = {
     },
     {
       "slug": "058-micro-tetris",
-      "wip": true,
+      "wip": false,
       "title": "Micro Tetris",
       "year": 2026,
       "date": "2026-10-05",
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.png",
-      "description": "Self-playing Tetris across the entire window, with 4×4 pixel square cells and 8% of the board initially occupied by individual squares in sparse, irregular patches with broad gaps across the lower area. One piece falls from the top at a time and locks on contact. Completed lines blink, then collapse, while the player fills the gaps. Click or Space pauses; R restarts.",
+      "description": "Self-playing Tetris across the entire window, with 4×4 pixel square cells and a sparse starting stack occupying at most about 0.5% of the board. Each piece falls from the center while nudging and rotating, sometimes hesitating or correcting a decision without pausing gravity. Completed lines blink, then collapse. Click or Space pauses; R restarts.",
       "updated": "2026-11-12"
     },
     {
       "slug": "059-moon-orchard",
-      "wip": true,
-      "title": "Moon Orchard",
+      "wip": false,
+      "title": "Lunar Founder",
       "year": 2026,
       "date": "2026-10-05",
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.png",
-      "description": "A black-and-white lunar arcade patrol. Buggy bullets carve holes in the rotating moon while a patrolling saucer repairs them. Pit jumps fire up, forward and down; downward shots fill the terrain below. Click or Space pauses; S saves a picture.",
+      "description": "A self-playing lunar patrol with fixed paired fire limited to three airborne bursts. Darker tires match the buggy’s body hue. Tiny UFOs hover over static parallax cities. Wreckage grows into large towers, and a replacement buggy emerges from a compact garage. Click or Space pauses; S saves a picture.",
       "updated": "2026-11-05"
     },
     {
@@ -792,7 +792,7 @@ window.HMC_MANIFEST = {
       "category": "generative",
       "type": "generative",
       "thumbnail": "thumbnail.png",
-      "description": "Purple and cream forms rise and sink like a lava lamp, briefly becoming hearts, cat heads and skulls before melting back into blobs. Hollow centers reveal the fixed stripes; every boundary reverses the colors. Click or Space pauses. S saves a frame.",
+      "description": "Two saturated colors cycle through a 90-second hue circuit, starting with hot magenta and acid green. Bodies gather, reach and pinch over fixed stripes; openings detach and familiar silhouettes appear briefly. Every boundary reverses the colors. Click, Space or Enter pauses. S saves a frame.",
       "updated": "2026-11-12"
     }
   ]

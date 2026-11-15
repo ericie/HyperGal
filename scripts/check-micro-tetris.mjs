@@ -31,38 +31,54 @@ for (const [width, height] of [[390, 844], [1200, 800], [391, 845], [40, 128], [
   assert.equal(canvas.height, rows * 4);
   assert.equal(canvas.style.width, `${columns * 4}px`);
   assert.equal(canvas.style.height, `${rows * 4}px`);
+  function checkEntry(piece) {
+    const span = 1 + Math.max(...piece.piece.cells.map(([x]) => x));
+    assert.equal(piece.x, Math.floor((columns - span) / 2), 'every piece starts horizontally centered');
+    assert.equal(piece.y + Math.max(...piece.piece.cells.map(([, y]) => y)), rows - 1,
+      'every piece enters at the top');
+    assert.equal(piece.phase, 'falling', 'gravity starts immediately on entry');
+    assert.ok(check.fits(piece.piece, piece.x, piece.y), 'entry never overlaps the stack');
+  }
   function checkStartup() {
     const occupied = check.board.filter(Boolean).length;
     if (columns >= 5) {
-      assert.ok(Math.abs(occupied / check.board.length - .08) <= 1 / check.board.length,
-        '8% of board cells start occupied, rounded to a single square');
+      assert.ok(occupied > 0 && occupied <= columns * rows * .005 + 4,
+        'starts with a sparse stack occupying at most about 0.5% of the board');
       for (let row = 0; row < rows; row++) {
         assert.ok(check.board.subarray(row * columns, (row + 1) * columns).some(value => value === 0),
           'every seeded row has gaps');
       }
-      assert.ok(check.board.subarray((rows - 4) * columns).every(value => value === 0),
-        'leaves room for the first falling shape');
+      const depth = Math.max(4, Math.floor(rows * .1));
+      assert.ok(check.board.subarray(depth * columns).every(value => value === 0),
+        'starting blocks stay close to the floor');
       if (columns > 16) {
-        const seededRows = Array.from({ length: rows }, (_, row) =>
-          check.board.subarray(row * columns, (row + 1) * columns).some(Boolean)).filter(Boolean).length;
-        assert.ok(seededRows >= rows * .2 && seededRows <= rows * .7 + 1,
-          'spreads the sparse squares across a deeper, irregular field');
-        const isolated = check.board.some((color, index) => {
+        const heights = [];
+        for (let x = 0; x < columns; x++) {
+          let top = depth - 1;
+          while (top >= 0 && !check.board[top * columns + x]) top--;
+          heights.push(top + 1);
+        }
+        assert.ok(Math.max(...heights) - Math.min(...heights) >= 2, 'stack has an uneven skyline');
+        const unsupported = check.board.some((color, index) => {
           if (!color) return false;
-          const x = index % columns;
-          return (x === 0 || check.board[index - 1] !== color) &&
-            (x === columns - 1 || check.board[index + 1] !== color) &&
-            check.board[index - columns] !== color && check.board[index + columns] !== color;
+          const x = index % columns, y = Math.floor(index / columns);
+          return (x === 0 || !check.board[index - 1]) &&
+            (x === columns - 1 || !check.board[index + 1]) &&
+            (y === 0 || !check.board[index - columns]) && !check.board[index + columns];
         });
-        assert.ok(isolated, 'startup includes isolated squares instead of only complete shapes');
+        assert.ok(!unsupported, 'settled pieces stay connected instead of becoming isolated pixels');
       }
     } else assert.equal(occupied, 0, 'extremely narrow fields start empty');
     assert.equal(check.locked, 0, 'seed pieces do not count as live drops');
     assert.equal(check.cleared, 0, 'seed rows do not clear on opening');
+    checkEntry(check.active);
     return occupied;
   }
   let initialCells = checkStartup();
-  let totalCleared = 0, totalLocked = 0;
+  let totalCleared = 0, totalLocked = 0, nudges = 0, turns = 0, reversals = 0;
+  let decisiveDrops = 0, uncertainDrops = 0;
+  const observed = new WeakSet();
+  const directions = new WeakMap();
   // Wider fields need more single drops to complete a full-width row.
   for (let i = 0; i < Math.max(6000, columns * 80); i++) {
     if (check.clearing) {
@@ -77,7 +93,14 @@ for (const [width, height] of [[390, 844], [1200, 800], [391, 845], [40, 128], [
     }
     const falling = check.active;
     assert.ok(falling && !Array.isArray(falling), 'exactly one active tetromino');
-    const previousY = falling.y;
+    if (!observed.has(falling)) {
+      observed.add(falling);
+      if (falling.detour) uncertainDrops++;
+      else decisiveDrops++;
+    }
+    const previousX = falling.x, previousTravel = falling.travel;
+    const previousTop = falling.y + Math.max(...falling.piece.cells.map(([, y]) => y));
+    const previousRotation = falling.rotation;
     const lockedBefore = check.locked;
     const generation = check.generation;
     check.advance(.05);
@@ -87,7 +110,24 @@ for (const [width, height] of [[390, 844], [1200, 800], [391, 845], [40, 128], [
     }
     if (check.locked === lockedBefore) {
       assert.equal(check.active, falling, 'no new piece before contact');
-      assert.ok(falling.y < previousY, 'falls down from the top');
+      const top = falling.y + Math.max(...falling.piece.cells.map(([, y]) => y));
+      assert.ok(top <= previousTop, 'moves and rotations never lift the falling piece');
+      assert.ok(Math.abs((previousTop - previousTravel) - (top - falling.travel) - .05 * rows / 2.4) < 1e-6,
+        'gravity advances at the same rate during movement, rotation, and hesitation');
+      if (falling.rotation !== previousRotation) {
+        turns++;
+        const count = falling.shape.rotations.length;
+        const delta = (falling.rotation - previousRotation + count) % count;
+        assert.ok(delta === 1 || delta === count - 1, 'turns one quarter-turn at a time in either direction');
+      }
+      if (falling.x !== previousX) {
+        nudges++;
+        assert.ok(Math.abs(falling.x - previousX) <= Math.ceil(.05 / falling.nudgeInterval) + 2,
+          'horizontal movement stays bounded and never teleports');
+        const direction = Math.sign(falling.x - previousX);
+        if (directions.has(falling) && directions.get(falling) !== direction) reversals++;
+        directions.set(falling, direction);
+      }
       assert.ok(check.fits(falling.piece, falling.x, falling.y), 'never overlaps the stack');
     } else {
       totalLocked++;
@@ -96,8 +136,11 @@ for (const [width, height] of [[390, 844], [1200, 800], [391, 845], [40, 128], [
         assert.equal(check.board[(falling.y + dy) * columns + falling.x + dx], falling.piece.color,
           'all four squares lock at the falling shape’s location');
       }
-      if (check.active) assert.equal(check.active.y + Math.max(...check.active.piece.cells.map(([, y]) => y)), rows - 1,
-        'next piece starts at the top');
+      for (const [dx, dy] of falling.piece.cells) check.board[(falling.y + dy) * columns + falling.x + dx] = 0;
+      assert.ok(check.fits(falling.piece, falling.x, falling.y) &&
+        !check.fits(falling.piece, falling.x, falling.y - 1), 'locks only on real contact after falling');
+      for (const [dx, dy] of falling.piece.cells) check.board[(falling.y + dy) * columns + falling.x + dx] = falling.piece.color;
+      if (check.active) checkEntry(check.active);
       for (let y = 0; y < rows; y++) {
         const row = check.board.subarray(y * columns, (y + 1) * columns);
         assert.ok(row.some(value => value === 0) || check.clearing?.rows.includes(y), 'full rows wait for their blink');
@@ -106,10 +149,14 @@ for (const [width, height] of [[390, 844], [1200, 800], [391, 845], [40, 128], [
         'only completed rows disappear');
     }
   }
-  assert.ok(totalLocked > 100, 'continues dropping and locking pieces from the scattered field');
-  assert.ok(totalCleared > 0 || check.generation > 1,
-    'a scattered field either clears lines or restarts after topping out');
-  console.log(`${width} × ${height}: ${totalLocked} single drops, ${totalCleared} animated cleared rows`);
+  assert.ok(totalLocked > 100, 'continues dropping and locking pieces from the partly played stack');
+  if (columns >= 5) {
+    assert.ok(nudges > 0, 'pieces visibly nudge from center to their destinations');
+    assert.ok(turns > 0, 'pieces visibly rotate while falling');
+    assert.ok(decisiveDrops > 0 && uncertainDrops > 0, 'mixes direct drops with occasional indecision');
+    if (columns > 16) assert.ok(reversals > 0, 'some drops reconsider their horizontal direction');
+  }
+  console.log(`${width} × ${height}: ${totalLocked} single drops, ${totalCleared} cleared rows, ${reversals} direction changes`);
 
   // Nonadjacent full rows blink, then collapse; incomplete rows retain their cells.
   check.reset();
@@ -138,7 +185,7 @@ for (const [width, height] of [[390, 844], [1200, 800], [391, 845], [40, 128], [
   check.board.fill(1);
   const generation = check.generation;
   check.spawn();
-  assert.equal(check.generation, generation + 1, 'top-out starts a fresh scattered field');
+  assert.equal(check.generation, generation + 1, 'top-out starts a fresh partly played stack');
   checkStartup();
   for (let layout = 0; layout < 20; layout++) {
     check.reset();

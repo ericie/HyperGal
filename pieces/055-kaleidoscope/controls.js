@@ -6,7 +6,7 @@
   const preset=document.getElementById('preset'),fields=document.getElementById('fields');
   const feedback=document.getElementById('feedback');
   const tabs=[...document.querySelectorAll('[role="tab"]')],inputs=new Map(),outputs=new Map();
-  let collapsed=matchMedia('(max-width: 600px)').matches,drag=null,feedbackTimer=0;
+  let collapsed=true,drag=null,feedbackTimer=0;
   for(const [key,value] of Object.entries(scope.presets)) preset.add(new Option(value.name,key));
   const custom=new Option('Custom','custom');custom.disabled=true;preset.add(custom);
   function disabled(key,s) {
@@ -100,11 +100,15 @@
     panel.style.top=Math.max(12,Math.min(y,innerHeight-rect.height-12))+'px';panel.style.right='auto';
   }
   function collapse(value) {
+    if(value&&panel.contains(document.activeElement)) toggle.focus();
     collapsed=value;panel.classList.toggle('collapsed',collapsed);body.hidden=collapsed;
     toggle.setAttribute('aria-expanded',String(!collapsed));
     if(panel.style.left) {const r=panel.getBoundingClientRect();clampPosition(r.left,r.top);}
   }
   toggle.addEventListener('click',()=>collapse(!collapsed));
+  document.addEventListener('pointerdown',event=>{
+    if(!collapsed&&!panel.contains(event.target)) collapse(true);
+  });
   grip.addEventListener('pointerdown',event=>{
     if(event.button!==0) return;
     const r=panel.getBoundingClientRect();drag={id:event.pointerId,x:event.clientX-r.left,y:event.clientY-r.top};
@@ -131,7 +135,7 @@
   addEventListener('resize',()=>{if(panel.style.left){const r=panel.getBoundingClientRect();clampPosition(r.left,r.top);}});
   preset.addEventListener('change',()=>{scope.preset(preset.value);sync();});
   document.getElementById('shuffle').addEventListener('click',()=>scope.rearrange());
-  document.getElementById('reset').addEventListener('click',()=>{scope.preset('original');sync();notice('Original settings restored.');});
+  document.getElementById('reset').addEventListener('click',()=>{scope.preset('initial');sync();notice('Initial settings restored.');});
   document.getElementById('share').addEventListener('click',async()=>{
     const link=scope.link();
     try {

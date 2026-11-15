@@ -6,27 +6,56 @@
   <meta name="description" content="Arcade">
   <meta name="theme-color" content="#111010">
   <title>Arcade</title>
-  <link rel="stylesheet" href="arcade.css">
-  <script src="../manifest.js" defer></script>
-  <script src="arcade.js" defer></script>
-  <script src="arcade/asteroids-attract.js" defer></script>
-  <script src="arcade/snake-attract.js" defer></script>
-  <script src="arcade/warlords-attract.js" defer></script>
-  <script src="arcade/attract-player.js" defer></script>
+  <link rel="stylesheet" href="arcade.css?v=5037393377bd">
+  <script src="../manifest.js?v=394f18b06ad6" defer></script>
+  <script src="arcade.js?v=2b7d45625865" defer></script>
+  <script src="arcade/asteroids-attract.js?v=60552bf84f31" defer></script>
+  <script src="arcade/snake-attract.js?v=a2d46b8de967" defer></script>
+  <script src="arcade/warlords-attract.js?v=cc867be0d62b" defer></script>
+  <script src="arcade/command-attract.js?v=080ec658887d" defer></script>
+  <script src="arcade/unbreakable-attract.js?v=51cbafa87c78" defer></script>
+  <script src="arcade/attract-player.js?v=cf74b3643ed4" defer></script>
 </head>
 <body>
   <a class="skip" href="#works">Skip to the artworks</a>
   <div class="room">
     <main>
       <section class="entrance" aria-labelledby="issue-title">
-        <h1 id="issue-title">Arcade</h1>
+        <h1 id="issue-title" aria-label="Arcade">
+          <svg class="neon-sign" viewBox="52 50 1020 250" aria-hidden="true" focusable="false">
+            <defs>
+              <g id="arcade-tubes">
+                <path d="M84 264 137 93Q143 74 153 95L198 191Q204 207 187 207H153C135 207 135 225 153 225H192Q207 225 212 241L220 264"/>
+                <path d="M262 264V86H324C400 86 400 180 319 180H293C276 180 276 199 293 199H321C346 199 355 215 367 240L382 264"/>
+                <path d="M551 139C543 67 427 66 427 141V205C427 284 543 285 551 218"/>
+                <path d="M590 264 643 93Q649 74 659 95L704 191Q710 207 693 207H659C641 207 641 225 659 225H698Q713 225 718 241L726 264"/>
+                <path d="M771 256V111Q771 86 796 86H832C919 86 919 264 832 264H782"/>
+                <path d="M1045 86H971Q949 86 949 108V157M1045 176H973Q949 176 949 200V240Q949 264 973 264H1045"/>
+              </g>
+              <filter id="neon-spill" x="-15%" y="-70%" width="130%" height="240%" color-interpolation-filters="sRGB">
+                <feGaussianBlur stdDeviation="9"/>
+              </filter>
+              <filter id="neon-hotspot" x="-15%" y="-70%" width="130%" height="240%" color-interpolation-filters="sRGB">
+                <feGaussianBlur stdDeviation="2.2"/>
+              </filter>
+            </defs>
+            <use href="#arcade-tubes" class="neon-seat"/>
+            <use href="#arcade-tubes" class="neon-glass"/>
+            <g class="neon-light">
+              <use href="#arcade-tubes" class="neon-halo"/>
+              <use href="#arcade-tubes" class="neon-bloom"/>
+              <use href="#arcade-tubes" class="neon-gas"/>
+              <use href="#arcade-tubes" class="neon-core"/>
+            </g>
+          </svg>
+        </h1>
       </section>
       <section id="works" class="collection" aria-label="Games">
         <div class="collection-tools">
           <a class="gallery-link" href="../index.html" aria-label="Back to gallery" title="Back to gallery"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7M7 12h14"/></svg></a>
           <button class="attract-pause" data-icon type="button" aria-label="Pause attract animations" aria-pressed="false" title="Pause / play" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path class="pause-mark" d="M6 4h4v16H6Zm8 0h4v16h-4Z"/><path class="play-mark" d="m6 3 15 9-15 9Z"/></svg></button>
         </div>
-        <ol class="cabinets" id="cabinets"></ol>
+        <div class="cabinets" id="cabinets"></div>
         <noscript><p>JavaScript is needed to load this collection. <a href="../index.html?theme=games&status=selected">Visit the Game collection.</a></p></noscript>
       </section>
     </main>

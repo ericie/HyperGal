@@ -1,0 +1,34 @@
+---
+version: 1
+slug: "pieces-059-moon-orchard-index-html"
+primary_target: "pieces/059-moon-orchard/index.html"
+related_targets: ["pieces/059-moon-orchard/orchard.js"]
+---
+
+# Lunar Founder surface
+
+Mode: Experience. A portable self-playing canvas artwork, with pause and image export available by keyboard and accessible name.
+
+## Direction contract
+
+THESIS: Rebuild the scene in the user's Moon Patrol screenshot vocabulary: saturated arcade pixels, one small moving buggy, open black sky, and layered landscape. No visible type or top status strip.
+
+OWN-WORLD: Cyan mountains with blue facets, green foothills, cyan skylines and green windowed cities embedded in the two parallax layers, peach ground, a small rover with deep magenta, crimson, plum or rust body paint shared by its fixed cannons, with darker matching tires per generation, simple saucer silhouettes in varied sizes and colors, with different attacks. Each depth layer has small, gently hovering UFOs and static cities in its own palette: cyan/blue in the distance and green/shade in the middle. These ships are atmospheric scenery with no combat or damage. Grown buildings retain their source parts’ paint. Original rectilinear sprites and two-pixel stepped silhouettes; no glow or smoothing.
+
+STORY: Watch the buggy progress steadily with gentle forward-and-back screen drift, fire paired shots straight up and straight forward from fixed cannons, hop scrolling craters with committed takeoff and throttle through landing, explode into recognizable parts while scrolling stops, then watch the settled parts grow into alien towers three times their former width and height. One compact garage opens its shutter and releases the next rover; the patrol and scrolling resume only after its visible exit. While the camera is stopped, the background UFOs continue hovering. Background cities remain static landscape artwork; the background growth function is removed. Growing cities blast nearby turrets, rocks and holes, filling the affected holes; the buggy has no repair mechanic or repair saucer. Keep click/Space pause, focused Enter and S export accessible without drawing controls.
+
+FIRST VIEWPORT: Black sky above jagged cyan peaks, green hills in front, peach road occupying the bottom 16%. One compact readable rover patrols the road; three scouts open the first wave, followed by staggered bomber, dart and carrier formations with quiet gaps and a maximum of six ships. Primitive deep-rust ground turrets use one #a04018 paint without outlines on their squat fixed pedestals and simple pipe barrels to track and fire at the rover among the rocks and craters. The buggy has a simple upward barrel and a forward barrel, both in its single paint; both flash together when fired. One atmospheric UFO starts in each depth plane, among static landscape cities. Distant UFOs are 6–8 × 3 internal pixels at 0.27 scale, rendered between mountains and hills; middle UFOs are 9–12 × 4 at 0.43 scale, rendered between hills and foreground. Both use plain two-tone discs; gentle hover amplitudes use their 0.55/0.82 layer scales. Three parallax speeds establish distance immediately, while quiet hovering ships and paired white foreground shots punctuate the sky.
+
+FORM: User-pinned reference, supplied Moon Patrol screenshots; no concept seed. Procedural canvas rendering is the artwork and uses code directly.
+
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+
+## Fixed armament contract
+
+The buggy cannot aim or swivel its cannons. It moves forward and back and shoots only straight up and straight forward. Both cannons share one trigger and fire together. At most three paired bursts are airborne; a pair keeps its slot until both rounds are gone. Movement, jumping and synchronized firing remain; tires use a darker body shade and depth UFOs are quiet atmospheric scenery.
+
+WRECK BUILDINGS: Newly grown towers retain 3× their former width and height. One fragment instead grows into a compact 44 × 34-pixel garage, narrower than the former 60-pixel facade. The shutter lifts over 0.5 seconds, then the replacement buggy rolls out over 1.8 seconds before scrolling resumes. Background cities never grow.
+
+CITY GROUND: While foreground buildings grow, hazards in or within 18 pixels of the expanding foundation erupt once. Turrets and rocks disappear; holes fill into solid road. Hazards farther away remain. New bombs can crater restored ground again.
+
+BUGGY PALETTE: Buggy generations use deep magenta #b00070, crimson #b02030, plum #9030a0 and rust #a04018. These warm paints contrast with the bright landscape without a body or barrel outline; each has at least 3:1 luminance contrast against the main green hills, peach road and black sky. Tires retain a darker shade of the chosen body hue.

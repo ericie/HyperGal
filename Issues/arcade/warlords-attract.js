@@ -15,11 +15,7 @@
     A:[[[0,6],[0,2],[2,0],[4,2],[4,6]],[[0,3.5],[4,3.5]]],
     R:[[[0,6],[0,0],[3,0],[4,1],[4,2],[3,3],[0,3]],[[2,3],[4,6]]],
     L:[[[0,0],[0,6],[4,6]]],O:[[[1,0],[3,0],[4,1],[4,5],[3,6],[1,6],[0,5],[0,1],[1,0]]],
-    D:[[[0,0],[2,0],[4,2],[4,4],[2,6],[0,6],[0,0]]],S:[[[4,0],[0,0],[0,3],[4,3],[4,6],[0,6]]],
-    '0':[[[0,0],[4,0],[4,6],[0,6],[0,0]]],
-    '¢':[[[4,1],[0,1],[0,5],[4,5]],[[2,0],[2,6]]],
-    T:[[[0,0],[4,0]],[[2,0],[2,6]]],P:[[[0,6],[0,0],[4,0],[4,3],[0,3]]],
-    Y:[[[0,0],[2,3],[4,0]],[[2,3],[2,6]]]
+    D:[[[0,0],[2,0],[4,2],[4,4],[2,6],[0,6],[0,0]]],S:[[[4,0],[0,0],[0,3],[4,3],[4,6],[0,6]]]
   };
   const shots=[];
   for(let side=0;side<4;side++){
@@ -38,16 +34,6 @@
     return{x:origin.x+Math.cos(angle)*27,y:origin.y+Math.sin(angle)*27,dx:Math.cos(angle),dy:Math.sin(angle)};
   }
   shots.forEach(shot=>Object.assign(shot,shotGeometry(shot)));
-  function lettering(ctx,text,x,y,unit,width=2,progress=1){
-    ctx.lineWidth=width;ctx.lineJoin='miter';ctx.lineCap='butt';
-    [...text].forEach((letter,i)=>{
-      const visible=clamp(progress*text.length-i);
-      if(!visible)return;
-      ctx.save();ctx.beginPath();ctx.rect(x+i*5.7*unit-width,y-width,4*unit+width*2,(6*unit+width*2)*visible);ctx.clip();
-      for(const path of glyphs[letter]||[]){ctx.beginPath();path.forEach(([a,b],j)=>j?ctx.lineTo(x+(i*5.7+a)*unit,y+b*unit):ctx.moveTo(x+(i*5.7+a)*unit,y+b*unit));ctx.stroke();}
-      ctx.restore();
-    });
-  }
   const titlePaths=[...'WARLORDS'].flatMap((letter,i)=>glyphs[letter].map(path=>path.map(([x,y])=>[32+(i*5.7+x)*16.75,165+y*33.5])));
   const noise=(x,y,frame)=>{let n=Math.imul(x+frame*73,374761393)^Math.imul(y-frame*31,668265263);n=Math.imul(n^(n>>>13),1274126177);return((n^(n>>>16))>>>0)/4294967295;};
   const embers=Array.from({length:62},(_,i)=>{
@@ -57,7 +43,7 @@
   function blast(ctx,age){
     if(age<0||age>3.2)return 0;
     const cell=8,frame=Math.floor(age*18);let fireCells=0;
-    ctx.save();ctx.beginPath();ctx.rect(0,0,800,532);ctx.clip();
+    ctx.save();ctx.beginPath();ctx.rect(0,0,800,600);ctx.clip();
     // Flat, coarse sprite smoke. No gradients or shaded objects.
     if(age>.25&&age<2.8){
       const p=age-.25,rx=100+140*(1-Math.exp(-p*4)),ry=55+80*(1-Math.exp(-p*3)),cy=350-p*70;
@@ -87,7 +73,7 @@
     for(const ember of embers){
       if(age>ember.life)continue;
       const x=400+Math.cos(ember.angle)*ember.speed*age,y=370+Math.sin(ember.angle)*ember.speed*age+105*age*age;
-      if(x<0||x>800||y<0||y>532)continue;
+      if(x<0||x>800||y<0||y>600)continue;
       ctx.globalAlpha=1-age/ember.life;ctx.fillStyle=age<.25?'#fff4c2':age<1?'#ffae28':'#dd4c19';ctx.fillRect(Math.round(x/4)*4,Math.round(y/4)*4,ember.size,ember.size);
     }
     ctx.restore();return fireCells;
@@ -122,8 +108,8 @@
     const arenaAlpha=tour?1:returning?ease((t-23.4)/.6):0;
     const activeShots=[];let firingMask=0,visibleGuns=0;
     if(arenaAlpha>0){
-    ctx.save();ctx.beginPath();ctx.rect(0,0,800,532);ctx.clip();
-    ctx.globalAlpha=arenaAlpha;ctx.fillStyle='#070a12';ctx.fillRect(0,0,800,532);
+    ctx.save();ctx.beginPath();ctx.rect(0,0,800,600);ctx.clip();
+    ctx.globalAlpha=arenaAlpha;ctx.fillStyle='#070a12';ctx.fillRect(0,0,800,600);
     ctx.translate(400,260);ctx.scale(scale,scale);ctx.translate(-cx,-cy);
     // Stable star coordinates make the camera movement tangible.
     for(const star of stars){ctx.fillStyle=`rgba(200,224,255,${star.alpha})`;ctx.fillRect(star.x,star.y,star.size,star.size);}
@@ -138,7 +124,7 @@
     colors.forEach((color,side)=>{
       const p=position(side,t),aim=position((side+2)%4,t+.8),angle=Math.atan2(aim.y-p.y,aim.x-p.x);
       const screenX=400+(p.x-cx)*scale,screenY=260+(p.y-cy)*scale;
-      if(screenX> -30&&screenX<830&&screenY> -30&&screenY<562)visibleGuns++;
+      if(screenX> -30&&screenX<830&&screenY> -30&&screenY<630)visibleGuns++;
       const ages=shots.filter(s=>s.side===side).map(s=>wrap(t-s.at,duration));
       const age=Math.min(...ages),kick=Math.max(0,1-age/.20),flash=Math.max(0,1-age/.10);
       if(flash>0)firingMask|=1<<side;
@@ -151,20 +137,11 @@
         ctx.save();ctx.translate(p.x+Math.cos(angle)*29,p.y+Math.sin(angle)*29);
         ctx.globalAlpha=flash;ctx.fillStyle='#eff9ee';ctx.beginPath();ctx.arc(0,0,4+flash*3,0,TAU);ctx.fill();ctx.restore();
       }
-      // Forty-three source ammunition marks; empty slots remain as outlines.
-      const horizontal=side%2===0,spent=shots.filter(s=>s.side===side&&s.at<t).length;
-      for(let i=0;i<43;i++){
-        const along=(horizontal?190:75)+i*(horizontal?10:9),x=horizontal?along:side===1?783:10,y=horizontal?(side===0?10:503):along;
-        ctx.fillStyle='#edf1ed';ctx.strokeStyle='#edf1ed44';ctx.lineWidth=.7;
-        if(i<43-spent)ctx.fillRect(x,y,horizontal?7:6,horizontal?6:6);else ctx.strokeRect(x,y,7,6);
-      }
     });
     ctx.restore();
     }
     let impact={fireCells:0,titleOffset:0,blastAge:-1};
     if(t>=titleStart&&!returning)impact=title(ctx,t);
-    ctx.fillStyle='#000';ctx.fillRect(0,532,800,68);
-    ctx.strokeStyle='#d6e9db';lettering(ctx,'0¢ TO PLAY',259,546,5.1,2);
     return{phase:tour?(progress>0?'pan':'turret'):returning?'return':t<blastAt?'drop':t<blastAt+2.8?'blast':'title',turret:tour?index:null,panProgress:progress,scale,firingMask,activeShots:activeShots.length,visibleGuns,titleScale,titleIntact:true,...impact};
   }
   window.WarlordsAttract={draw,duration,still};
