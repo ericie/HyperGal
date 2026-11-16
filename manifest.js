@@ -24,8 +24,8 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "rating": 50,
       "thumbnail": "thumbnail.jpg",
-      "description": "Breakout in reverse. An infallible paddle sends one ball on a clean arc to the nearest low column of a level rainbow-colored wall. Each underside hit reserves one new brick, and only that completed cell creeps the aligned lattice upward. No player, no losing. Click to rebuild.",
-      "updated": "2026-09-10"
+      "description": "Breakout in reverse. An infallible paddle sends one ball on a clean arc to a growing wall, alternating short runs on the left, center, or right with passes that fill lower areas. Each brick advances a gradual hue gradient with randomized saturation and brightness. Each underside hit reserves one new brick, and only that completed cell creeps the aligned lattice upward. No player, no losing. Click to rebuild.",
+      "updated": "2026-11-15"
     },
     {
       "slug": "004-hunt-prey-paint",
@@ -311,7 +311,7 @@ window.HMC_MANIFEST = {
       "rating": 80,
       "thumbnail": "thumbnail.jpg",
       "description": "An Asteroids variant flown through white cartoon cumulus against a bright blue sky. Rounds explosively punch broad chunks out of wide, scalloped cumulus, so the only way through a body is to bore a tunnel and fly down it. The ship never targets anything. It holds a wandering course with the guns held down, and where the sky is thick it grinds to a crawl until its own fire has opened the way — an icebreaker, not a hunter. Its hull reams out what the guns began, so it can never wedge itself in a bore too narrow to fly. Sparse cloudscapes pan endlessly left while the ship works up and down through them; the camera follows, keeping it in frame. Clouds reset to intact bodies once fully off screen. Bites heal slowly like liquid, and a bore that reaches all the way through leaves the exact same cloud outline divided into two halves.",
-      "updated": "2026-10-19"
+      "updated": "2026-11-15"
     },
     {
       "slug": "026-top-of-the-heap",
@@ -479,7 +479,7 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "rating": 30,
       "thumbnail": "thumbnail.png",
-      "description": "Pigment frogs shuttle across a ghost-white highway filling 80% of the screen, touching individual arrival counters at either end while passing cars drag and blend their stains into the asphalt.",
+      "description": "A continuous stream of frogs crosses a pale highway. Survivors grow, deepen their pigment paths, and change departure columns after each pass.",
       "updated": "2026-10-19"
     },
     {
@@ -689,7 +689,7 @@ window.HMC_MANIFEST = {
     },
     {
       "slug": "055-kaleidoscope",
-      "wip": true,
+      "wip": false,
       "title": "Kaleidoscope",
       "year": 2026,
       "date": "2026-09-28",
@@ -733,19 +733,19 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "thumbnail": "thumbnail.png",
       "description": "Self-playing Tetris across the entire window, with 4×4 pixel square cells and a sparse starting stack occupying at most about 0.5% of the board. Each piece falls from the center while nudging and rotating, sometimes hesitating or correcting a decision without pausing gravity. Completed lines blink, then collapse. Click or Space pauses; R restarts.",
-      "updated": "2026-11-12"
+      "updated": "2026-11-15"
     },
     {
       "slug": "059-moon-orchard",
       "wip": false,
-      "title": "Lunar Founder",
+      "title": "Lunar Landgrab",
       "year": 2026,
       "date": "2026-10-05",
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.png",
-      "description": "A self-playing lunar patrol with fixed paired fire limited to three airborne bursts. Darker tires match the buggy’s body hue. Tiny UFOs hover over static parallax cities. Wreckage grows into large towers, and a replacement buggy emerges from a compact garage. Click or Space pauses; S saves a picture.",
-      "updated": "2026-11-05"
+      "description": "A self-playing lunar patrol with fixed paired fire limited to three airborne bursts. Darker tires match the buggy’s body hue. Tiny UFOs hover and drop occasional bombs over static parallax cities. Wreckage grows into large towers, and a replacement buggy emerges from a compact garage. Click or Space pauses; S saves a picture.",
+      "updated": "2026-11-15"
     },
     {
       "slug": "060-apical",
@@ -793,7 +793,7 @@ window.HMC_MANIFEST = {
       "type": "generative",
       "thumbnail": "thumbnail.png",
       "description": "Two saturated colors cycle through a 90-second hue circuit, starting with hot magenta and acid green. Bodies gather, reach and pinch over fixed stripes; openings detach and familiar silhouettes appear briefly. Every boundary reverses the colors. Click, Space or Enter pauses. S saves a frame.",
-      "updated": "2026-11-12"
+      "updated": "2026-11-15"
     }
   ]
 };

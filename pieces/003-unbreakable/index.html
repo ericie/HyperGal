@@ -14,13 +14,13 @@
     <canvas
       id="stage"
       role="img"
-      aria-label="Unbreakable: a reverse Breakout machine whose infallible paddle builds an even wall, one low column at a time. Each new brick advances through a repeating rainbow."
+      aria-label="Unbreakable: a reverse Breakout machine whose infallible paddle builds a growing wall, sometimes concentrating on the left, right, or center before filling lower areas. Each brick advances a gradual hue gradient, with independently varied saturation and brightness."
     ></canvas>
     <script>
       // unbreakable — a Breakout run in reverse.
       //
       // One ball makes one brick per trip. The paddle sends it toward the
-      // nearest low column, the exposed underside returns it, and the new brick
+      // chosen column, the exposed underside returns it, and the new brick
       // locks in only after the ball has cleared the cell. No alternate build
       // modes, side-face pinball, destructive recovery, or losing state.
 
@@ -44,13 +44,15 @@
       const COLLISION_EPS = 0.05;
       const PHYSICS_STEP = 1 / 120;
       const MAX_SUBSTEPS = 8;
+      const MAX_FRONT_LEAD = 4;
 
-      // Each completed brick advances one swatch around the rainbow.
-      const RAINBOW = [
-        '#ef4545', '#f58335', '#f5ce45', '#a8d948',
-        '#44bd72', '#34b7a0', '#3cbed5', '#478fe0',
-        '#6864d9', '#a05bce', '#d958b0', '#ed5680',
-      ];
+      // A slow sweep through the tertiary hues, with varied pigment strength.
+      const HUE_START = 30;
+      const HUE_STEP = 3;
+      const SATURATION_MIN = 0.38;
+      const SATURATION_MAX = 0.72;
+      const BRIGHTNESS_MIN = 0.60;
+      const BRIGHTNESS_MAX = 0.95;
       const SCENE = {
         background: '#160f18',
         paper: '#f9f7e5',
@@ -73,7 +75,11 @@
       let brickMap = new Map();
       let pendingDeposit = null;
       let ball = null;
-      let buildCursor = 0;
+      let plannedColor = '';
+      let plannedColorCount = -1;
+      let buildFocus = null;
+      let focusRegion = -1;
+      let focusUntil = 0;
       let lastCeilingRow = null;
 
       let raf = 0;
@@ -127,22 +133,27 @@
         lastCeilingRow = null;
         for (let c = 0; c < numCols; c++) {
           for (let row = -1; gridY + row * BRICK_H > -BRICK_H * 2; row--) {
-            addBrick(c, row, rainbowColor(row * numCols + c));
+            addBrick(c, row, openingColor(c, row));
           }
         }
 
-        buildCursor = randInt(0, numCols - 1);
+        plannedColor = '';
+        plannedColorCount = -1;
+        const startCol = randInt(0, numCols - 1);
+        buildFocus = null;
+        focusRegion = -1;
+        focusUntil = randInt(numCols, numCols * 2);
         impactStats = { hits: 0, cells: 0, misses: 0, recoveries: 0 };
         frameStats = { fps: 0, maxFrameMs: 0, lastSteps: 0 };
 
-        const startX = (buildCursor + 0.5) * colW;
+        const startX = (startCol + 0.5) * colW;
         ball = {
           x: startX,
           y: paddleY - BALL_R,
           vx: 0,
           vy: -BALL_SPEED,
-          color: RAINBOW[0],
-          targetCol: buildCursor,
+          color: SCENE.paper,
+          targetCol: startCol,
           phase: 'ascending',
           flash: 0,
           paddle: {
@@ -160,8 +171,31 @@
         raf = requestAnimationFrame(tick);
       }
 
-      function rainbowColor(index) {
-        return RAINBOW[((index % RAINBOW.length) + RAINBOW.length) % RAINBOW.length];
+      function gradientColor(index) {
+        const hue = ((HUE_START + index * HUE_STEP) % 360 + 360) % 360;
+        const saturation = rand(SATURATION_MIN, SATURATION_MAX);
+        const brightness = rand(BRIGHTNESS_MIN, BRIGHTNESS_MAX);
+        const chroma = brightness * saturation;
+        const x = chroma * (1 - Math.abs((hue / 60) % 2 - 1));
+        const offset = brightness - chroma;
+        const channels = [
+          [chroma, x, 0], [x, chroma, 0], [0, chroma, x],
+          [0, x, chroma], [x, 0, chroma], [chroma, 0, x],
+        ][Math.floor(hue / 60)];
+        return '#' + channels.map(channel => Math.round((channel + offset) * 255).toString(16).padStart(2, '0')).join('');
+      }
+
+      function openingColor(c, row) {
+        return gradientColor(row * numCols + c);
+      }
+
+      function colorForDeposit(count) {
+        // Relaunches reuse the planned shade; only a completed brick advances it.
+        if (count !== plannedColorCount) {
+          plannedColorCount = count;
+          plannedColor = gradientColor(count);
+        }
+        return plannedColor;
       }
 
       function hasBrick(c, row) {
@@ -189,7 +223,7 @@
         lastCeilingRow = ceilingRow;
 
         for (let c = 0; c < numCols; c++) {
-          if (!hasBrick(c, ceilingRow)) addBrick(c, ceilingRow, rainbowColor(ceilingRow * numCols + c));
+          if (!hasBrick(c, ceilingRow)) addBrick(c, ceilingRow, openingColor(c, ceilingRow));
         }
 
         for (let i = bricks.length - 1; i >= 0; i--) {
@@ -200,32 +234,102 @@
         }
       }
 
+      function updateBuildFocus() {
+        const spread = Math.max(...front) - Math.min(...front);
+        if (buildFocus !== null && spread >= MAX_FRONT_LEAD) {
+          buildFocus = null;
+          focusUntil = impactStats.cells + randInt(numCols, numCols * 2);
+        }
+        if (impactStats.cells < focusUntil) return;
+        if (buildFocus !== null) {
+          buildFocus = null;
+          focusUntil = impactStats.cells + randInt(numCols, numCols * 2);
+        } else {
+          // Finish catching up before starting another concentrated run.
+          if (spread > 1) return;
+          // Move among left, center, and right; never repeat the last region.
+          focusRegion = focusRegion < 0 ? randInt(0, 2) : (focusRegion + randInt(1, 2)) % 3;
+          buildFocus = [0.18, 0.5, 0.82][focusRegion] + rand(-0.06, 0.06);
+          focusUntil = impactStats.cells + randInt(Math.max(8, numCols), Math.max(12, Math.round(numCols * 1.6)));
+        }
+      }
+
+      function crossesBrickStrip(startX, startY, dx, dy, left, right, bottom) {
+        let entry = 0;
+        let exit = 1;
+        if (Math.abs(dx) < 1e-9) {
+          if (startX < left || startX > right) return false;
+        } else {
+          const a = (left - startX) / dx;
+          const b = (right - startX) / dx;
+          entry = Math.max(0, Math.min(a, b));
+          exit = Math.min(1, Math.max(a, b));
+          if (entry > exit) return false;
+        }
+        return startY + dy * (dy < 0 ? exit : entry) <= bottom + COLLISION_EPS;
+      }
+
+      function canReachColumn(c, fromX, checkReturn = true) {
+        const startY = paddleY - BALL_R;
+        const contactY = frontY(c) + BALL_R;
+        const vertical = startY - contactY;
+        const dx = (c + 0.5) * colW - fromX;
+        if (vertical <= 0 || Math.abs(dx) > vertical * MAX_VX_FRAC / Math.sqrt(1 - MAX_VX_FRAC ** 2)) return false;
+
+        // Reject shots that would pass through a neighboring overhang on the
+        // way to a recessed column. The expanded strips include ball clearance.
+        for (let other = 0; other < numCols; other++) {
+          if (other === c) continue;
+          const left = other * colW - BALL_R;
+          const right = (other + 1) * colW + BALL_R;
+          const bottom = frontY(other) + BALL_R;
+          if (crossesBrickStrip(fromX, startY, dx, -vertical, left, right, bottom)) return false;
+          if (!checkReturn) continue;
+
+          // Mirror neighboring strips at the side walls to test the return
+          // arc too, including any side-wall bounce before reaching the paddle.
+          const targetX = fromX + dx;
+          const span = W - BALL_R * 2;
+          for (let copy = -1; copy <= 1; copy++) {
+            const offset = copy * span * 2;
+            if (crossesBrickStrip(targetX, contactY, dx, vertical, left + offset, right + offset, bottom) ||
+                crossesBrickStrip(targetX, contactY, dx, vertical, BALL_R * 2 - right + offset, BALL_R * 2 - left + offset, bottom)) return false;
+          }
+        }
+        return true;
+      }
+
       function chooseTargetColumn(fromX) {
+        updateBuildFocus();
         const shallowest = Math.min(...front);
         let best = -1;
-        let bestDistance = Infinity;
-        let bestOrder = Infinity;
+        let bestScore = Infinity;
+        let fallback = -1;
 
         for (let c = 0; c < numCols; c++) {
-          if (front[c] !== shallowest) continue;
-          const distance = Math.abs((c + 0.5) * colW - fromX);
-          const order = (c - buildCursor + numCols) % numCols;
-          if (distance < bestDistance - 0.01 || (Math.abs(distance - bestDistance) <= 0.01 && order < bestOrder)) {
+          const clearReturn = canReachColumn(c, fromX);
+          if (!clearReturn && !canReachColumn(c, fromX, false)) continue;
+          if (fallback < 0 || front[c] < front[fallback]) fallback = c;
+          const lead = front[c] - shallowest;
+          if (lead >= MAX_FRONT_LEAD) continue;
+          const x = (c + 0.5) / numCols;
+          const focusDistance = buildFocus === null ? 0 : Math.max(0, Math.abs(x - buildFocus) - 0.07);
+          const travel = Math.abs(x - fromX / W);
+          const score = lead * (buildFocus === null ? 4 : 0.3) + focusDistance * 10 + travel * 0.4 + (clearReturn ? 0 : 0.6) + rand(0, 0.12);
+          if (score < bestScore) {
             best = c;
-            bestDistance = distance;
-            bestOrder = order;
+            bestScore = score;
           }
         }
 
-        if (best < 0) best = colOf(fromX);
-        buildCursor = (best + 1) % numCols;
-        return best;
+        return best >= 0 ? best : fallback >= 0 ? fallback : colOf(fromX);
       }
 
       function launchBall() {
         ball.phase = 'ascending';
         ball.targetCol = chooseTargetColumn(ball.x);
-        ball.color = rainbowColor(impactStats.cells);
+        ball.retraceReturn = !canReachColumn(ball.targetCol, ball.x);
+        ball.color = colorForDeposit(impactStats.cells);
 
         const desiredX = (ball.targetCol + 0.5) * colW;
         const vertical = Math.max(BRICK_H, (paddleY - BALL_R) - (frontY(ball.targetCol) + BALL_R));
@@ -256,8 +360,7 @@
 
       function queueDeposit(c) {
         if (pendingDeposit || c < 0 || c >= numCols) return false;
-        const shallowest = Math.min(...front);
-        if (front[c] !== shallowest) {
+        if (!hasBrick(c, front[c] - 1) || hasBrick(c, front[c])) {
           impactStats.misses++;
           return false;
         }
@@ -305,6 +408,9 @@
         ball.y = contactY + COLLISION_EPS;
         ball.vy = Math.abs(ball.vy);
         ball.phase = 'descending';
+        // A recessed cell may need a return along the incoming arc to clear
+        // its raised neighbors, rather than forcing another brick onto them.
+        if (ball.retraceReturn) ball.vx = -ball.vx;
         ball.flash = 1;
         queueDeposit(ball.targetCol);
         impactStats.hits++;
@@ -402,20 +508,15 @@
       }
 
       function drawBricks() {
-        // Batch brick bodies by palette color to avoid hundreds of fill-state
-        // changes per frame. Bevels and shadows are two additional batched fills.
-        for (const color of RAINBOW) {
-          ctx.fillStyle = color;
-          ctx.beginPath();
-          for (const brick of bricks) {
-            if (brick.color !== color) continue;
-            const y = snapPx(brickY(brick));
-            if (y > H || y + BRICK_H < 0) continue;
-            const left = snapPx(brick.c * colW);
-            const right = snapPx((brick.c + 1) * colW);
-            ctx.rect(left + 1, y + 1, right - left - 2, BRICK_H - 2);
-          }
-          ctx.fill();
+        // Each brick has its own shade. Draw bodies once, then batch the bevels
+        // and shadows instead of scanning the wall for every unique color.
+        for (const brick of bricks) {
+          const y = snapPx(brickY(brick));
+          if (y > H || y + BRICK_H < 0) continue;
+          const left = snapPx(brick.c * colW);
+          const right = snapPx((brick.c + 1) * colW);
+          ctx.fillStyle = brick.color;
+          ctx.fillRect(left + 1, y + 1, right - left - 2, BRICK_H - 2);
         }
 
         ctx.fillStyle = SCENE.bevel;

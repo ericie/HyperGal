@@ -7,8 +7,8 @@ inverts cleanly: the paddle's job stops being *defense* and becomes *supply*.
 A single paddle patrols the floor — shadowing the ball, physically incapable of
 missing — and lobs it upward over and over. Where the original game chips a
 brick away on contact, this one lays a brick down. An underside hit extends a
-column and returns the ball to the paddle. Each trip follows one clean arc to
-one chosen column and back.
+column and returns the ball to the paddle. Each trip follows one clear arc to
+one reachable column and back.
 
 The wall grows *downward* toward the paddle. Each newly completed brick creeps
 the shared lattice upward, carrying old bricks off the top. The opening wall
@@ -31,9 +31,12 @@ its character away:
   reserves the next block beneath that column and sends the ball down. The new
   brick locks in only after the ball clears its cell, so growth never embeds or
   teleports the ball.
-- **The paddle always chooses a nearest low column.** Each completed column is
-  excluded until the rest catch up, so the front advances in even passes while
-  the ball avoids wild cross-screen routes.
+- **The build alternates between regional runs and catch-up passes.** Sustained
+  runs favor a patch on the left, center, or right, allowing sections to build
+  about four rows ahead before lower columns catch up. The front stays broadly
+  level without requiring every row to finish first. Shots need clear outgoing
+  and return paths; recessed columns can send the ball back along its incoming
+  arc to clear raised neighbors instead of building those neighbors higher.
 
 Every newly completed cell advances the shared lattice upward by one column's
 fraction of a brick. A bounce that cannot add a genuinely empty cell does not
@@ -41,12 +44,14 @@ move the grid. No timer or invisible boundary moves the wall.
 
 ## Color
 
-Each newly completed brick advances one step through a twelve-color rainbow:
-red, orange, yellow, lime, green, teal, cyan, blue, indigo, violet, magenta, and
-rose, then back to red. The opening wall uses the same ordered palette against
-a deep aubergine field. Existing bricks keep their colors as the wall scrolls.
-The ball and paddle take the next brick's color when the ball launches, with no
-ball trail. Click to rebuild the wall and restart the rainbow at red.
+The color moves gradually through tertiary hues, starting at orange and
+advancing three degrees per completed brick, circling the hue wheel every 120
+bricks. Each brick independently randomizes its HSV saturation between 38–72%
+and brightness between 60–95%, giving the gradient lighter, darker, muted, and
+richer shades. The opening wall uses the same gradient against a deep aubergine
+field. Existing bricks keep their colors as the wall scrolls. The ball and
+paddle take the next brick's color when the ball launches, with no ball trail.
+Click to rebuild and restart the hue sweep with fresh saturation and brightness.
 
 ## Interaction
 

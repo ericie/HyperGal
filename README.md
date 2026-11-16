@@ -55,6 +55,16 @@ yet sorts as if updated today so fresh work surfaces first.
 
 ## Viewing
 
+To rebuild gallery thumbnails from the running artworks, start the preview
+server and run `node scripts/build-thumbnails.mjs`. This development command
+requires Playwright; use `--playwright /path/to/playwright/index.mjs` when it is
+installed outside the project. Captures and backups are staged under
+`output/thumbnails-<timestamp>/`. After reviewing them, install that batch with
+`node scripts/build-thumbnails.mjs --output <capture-directory> --publish`.
+The command preserves thumbnail filenames and composition status, embeds capture
+provenance, and hides control panels only during capture. `--only <slug,slug>`
+limits a rebuild to specific pieces.
+
 - Master gallery: open `index.html` in any browser.
 - Individual piece: open `pieces/<slug>/index.html` directly. Always works,
   no server, no build.

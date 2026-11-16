@@ -1,7 +1,8 @@
 // A type slab becomes a long brick wall, then the reverse-Breakout machine.
 (() => {
   'use strict';
-  const duration=24.8,still=1,tiltAt=2.2,diveAt=3.8,flattenAt=8.8,playAt=10,clearAt=17.2,typeAt=18.7,cadence=.32;
+  const duration=20.2,still=1,tiltAt=2.2,diveAt=3.8,flattenAt=4.5,playAt=5.4,clearAt=12.6,typeAt=14.1,cadence=.32;
+  const titleCenter=-126,wallTop=titleCenter-6,firstWallRow=Math.ceil((wallTop+4)*50/24);
   const palette=['#781f02','#ce9f69','#cc241d','#ffda79','#f9f7e5'],ground='#160f18';
   const clamp=n=>Math.max(0,Math.min(1,n));
   const ease=n=>{n=clamp(n);return n*n*(3-2*n);};
@@ -12,7 +13,7 @@
   const cuts={
     U:[rect(.39,-.01,.22,.79)],
     N:[[[.32,0],[.49,0],[.68,.63]],[[.32,.37],[.51,1],[.68,1]]],
-    B:[rect(.44,.19,.15,.22),rect(.44,.59,.15,.22)],
+    B:[rect(.44,.19,.15,.22),rect(.44,.59,.15,.22),[[1.01,.44],[.83,.5],[1.01,.56]]],
     R:[rect(.43,.18,.17,.23),[[.36,1],[.49,.65],[.67,1]],[[1,.47],[.82,.54],[1,.86]]],
     E:[rect(.39,.285,.62,.065),rect(.39,.65,.62,.065)],
     A:[rect(.435,.18,.13,.31),rect(.405,.69,.19,.32)],
@@ -62,14 +63,18 @@
     }
   }
   function gameState(t){
-    const age=clamp((t-6.8)/15)*15,index=Math.min(frames.length-2,Math.floor(age/step)),p=age/step-index;
+    const age=clamp((t-(playAt-3.2))/15)*15,index=Math.min(frames.length-2,Math.floor(age/step)),p=age/step-index;
     const a=frames[index],b=frames[index+1];
     return {...a,x:mix(a.x,b.x,p),y:mix(a.y,b.y,p),paddleX:mix(a.paddleX,b.paddleX,p),age,placed:deposits.filter(d=>d.at<=age)};
   }
   function cameraState(t){
-    const tilt=ease((t-tiltAt)/(diveAt-tiltAt)),travel=ease((t-diveAt)/(flattenAt-diveAt)),flat=ease((t-flattenAt)/(playAt-flattenAt));
-    return {pitch:mix(Math.PI/2,.24,tilt)+(Math.PI/2-.24)*flat,
-      z:mix(-126,2,travel),distance:mix(12,18,tilt)-6*flat,roll:-.12*tilt*(1-flat),travel,flat};
+    const tilt=ease((t-tiltAt)/(diveAt-tiltAt)),travel=ease((t-diveAt)/(playAt-diveAt)),flat=ease((t-flattenAt)/(playAt-flattenAt));
+    const pitch=mix(Math.PI/2,.24,tilt)+(Math.PI/2-.24)*flat,distance=mix(12,18,tilt)-6*flat;
+    // Move the eye itself toward the machine while flattening, rather than
+    // pushing it beyond the paddle and only then rotating back overhead.
+    const eye=mix(titleCenter+18*Math.cos(.24),2,travel);
+    const z=t<diveAt?titleCenter:eye-distance*Math.cos(pitch);
+    return {pitch,z,distance,eyeZ:z+distance*Math.cos(pitch),roll:-.12*tilt*(1-flat),travel,flat};
   }
   function draw(canvas,seconds){
     const t=wrap(seconds),ctx=canvas.getContext('2d'),camera=cameraState(t),game=gameState(t);
@@ -102,8 +107,8 @@
     const masonry=[];
     const wallShift=-clear*17;
     // Cull rows behind the eye, and tiny far masonry, before emitting polygons.
-    const first=Math.max(-310,Math.floor((camera.z-100-2)*50/24)+2);
-    const last=Math.min(9,Math.ceil((camera.z+camera.distance/Math.max(.01,cos)-2)*50/24));
+    const first=Math.max(firstWallRow,Math.floor((camera.z-100+4)*50/24)+2);
+    const last=Math.min(9,Math.ceil((camera.z+camera.distance/Math.max(.01,cos)+4)*50/24));
     function brick(col,y,color){
       const [x,z]=world(col*50+1,y+1);
       const points=quad(x,z+wallShift,.96,.44);if(!points)return;
@@ -125,12 +130,12 @@
       for(const b of masonry)path(quad(b.x,b.z+.40,.96,.04));ctx.fill();
     }
     // The title is painted on a real plane in the wall, not a screen-space layer.
-    const typing=t>=typeAt,title=titleState(t),titleCenter=typing?2:-126;
+    const typing=t>=typeAt,title=titleState(t),titleZ=typing?2:titleCenter;
     if(typing||t<playAt){
-      patch(-8,titleCenter-6,16,12,ground,.025);
+      patch(-8,titleZ-6,16,12,ground,.025);
       for(const letter of title.letters){
         if(!letter.visible)continue;
-        const x=(letter.x-400)/50,z=titleCenter+(letter.y-300)/50,w=letter.width/50,h=letter.height/50;
+        const x=(letter.x-400)/50,z=titleZ+(letter.y-300)/50,w=letter.width/50,h=letter.height/50;
         patch(x,z,w,h,palette[4],.03);
         for(const cut of cuts[letter.char]){
           const points=cut.map(([a,b])=>project(x+a*w,z+b*h,.032));

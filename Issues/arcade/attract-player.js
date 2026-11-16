@@ -1,13 +1,13 @@
 // Play native vector films only while their artwork links are in view.
 (() => {
-  const films={asteroids:window.AsteroidsAttract,snake:window.SnakeAttract,warlords:window.WarlordsAttract,command:window.CommandAttract,unbreakable:window.UnbreakableAttract};
+  const films={asteroids:window.AsteroidsAttract,snake:window.SnakeAttract,warlords:window.WarlordsAttract,command:window.CommandAttract,unbreakable:window.UnbreakableAttract,landgrab:window.LandgrabAttract,onward:window.OnwardAttract};
   const links=[...document.querySelectorAll('[data-attract]')].filter(link=>films[link.dataset.attract]);
   if(!links.length)return;
   const reduce=matchMedia('(prefers-reduced-motion: reduce)');
   const toggle=document.querySelector('.attract-toggle, .attract-pause');
   const sharedToggle=toggle?.classList.contains('attract-toggle');
   const player=document.querySelector('.player');
-  const states=links.map(link=>({link,art:films[link.dataset.attract],canvas:link.querySelector('canvas'),visible:false,focused:false,time:0,size:''}));
+  const states=links.map(link=>({link,art:films[link.dataset.attract],canvas:link.querySelector('canvas'),visible:false,focused:false,loading:false,time:0,size:''}));
   let paused=false,timer=null,last=0;
   function stopped(){return paused||reduce.matches||document.hidden||player?.open||toggle?.getAttribute('aria-pressed')==='true';}
   function render(s){
@@ -16,7 +16,10 @@
     const width=Math.max(1,Math.round(Math.min(1400,bounds.width*scale))),height=Math.round(width*.75),size=`${width}:${height}`;
     if(s.size!==size){s.canvas.width=width;s.canvas.height=height;s.size=size;}
     const time=reduce.matches||s.focused?s.art.still:s.time;
-    s.art.draw(s.canvas,time);s.canvas.dataset.time=time.toFixed(3);
+    const result=s.art.draw(s.canvas,time);
+    if(result?.ready===false){s.loading=true;s.link.classList.remove('attract-ready');return;}
+    s.loading=false;
+    s.canvas.dataset.time=time.toFixed(3);
     s.link.classList.add('attract-ready');
   }
   function schedule(){
@@ -25,7 +28,7 @@
   }
   function tick(){
     const now=performance.now(),elapsed=Math.min(.15,(now-last)/1000);
-    for(const s of states)if(s.visible&&!s.focused){s.time=(s.time+elapsed)%s.art.duration;render(s);}
+    for(const s of states)if(s.visible&&!s.focused){if(!s.loading)s.time=(s.time+elapsed)%s.art.duration;render(s);}
     schedule();
   }
   const visibility=new IntersectionObserver(entries=>{
@@ -40,6 +43,7 @@
     for(const entry of entries)render(states.find(s=>s.canvas===entry.target));
   });
   for(const s of states){
+    if(s.art.ready?.then)s.art.ready.then(()=>{render(s);schedule();});
     visibility.observe(s.link);resize.observe(s.canvas);
     s.link.addEventListener('focus',()=>{s.focused=true;render(s);schedule();});
     s.link.addEventListener('blur',()=>{s.focused=false;render(s);schedule();});

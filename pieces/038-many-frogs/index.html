@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="description" content="Autonomous frogs touch arrival counters across a ghost-white highway filling 80% of the screen, leaving pigment that passing traffic drags and blends into the asphalt." />
+    <meta name="description" content="Autonomous frogs trace pigment paths across a ghost-white highway. Survival deepens their color and enlarges their death splashes; each completed crossing grows the frog." />
     <link rel="icon" href="data:," />
     <title>Many Frogs · Hypermedia Club</title>
     <style>
@@ -22,7 +22,7 @@
     <script defer src="https://bakalytics.com/bakalytics.js" data-property="8c7d566e-6125-40d6-8921-d634e1d7f0ea"></script>
   </head>
   <body>
-    <canvas id="game" role="img" aria-label="Autonomous frogs crossing traffic. Each frog has an arrival counter at the top and bottom of its column."></canvas>
+    <canvas id="game" role="img" aria-label="Autonomous frogs crossing traffic, leaving paths that strengthen as they survive. Older frogs grow more vivid and leave larger death splashes. Frogs start small and grow with each completed crossing. Cars remain pale and leave the pigment undisturbed. New frogs enter continuously, and survivors shift columns between crossings."></canvas>
     <script>
       (() => {
         'use strict';
@@ -32,28 +32,24 @@
         // across it, turn around at the far field, and shuttle back.
         const TILE = 22;
         const FIELD_FRACTION = 0.1;
-        const COUNTER_HIT_RADIUS = 0.32;
+        const TURNAROUND_RADIUS = 0.32;
         const HOP_TIME = 0.18;
-        const OPENING_HOLD = 0.68;
-        const RESTART_PAUSE = 1.9;
         const HAZARD_COLLISION_Y = 0.58;
         const FROG_HIT_RADIUS = 0.24;
         const FROG_CLEARANCE = 0.52;
         const FLY_HIT_RADIUS = 0.38;
         const ROUTE_DEPTH = 3;
         const ROUTE_BEAM_WIDTH = 7;
+        const MAX_PATHS = 128;
+        const MAX_PATH_POINTS = 1024;
         const TAU = Math.PI * 2;
         const COURSE_SEED = hashString('many-frogs-038-course');
         const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
         const canvas = document.querySelector('#game');
         const ctx = canvas.getContext('2d', { alpha: false });
 
-        // A ghost field. Every surface, machine, and obstacle is printed in
-        // whites and light grays at low contrast, so the only real color left
-        // on the board belongs to the frogs and the marks they leave.
-        // A ghost field. Every surface and machine is printed in whites and light
-        // grays at low contrast, so the only real color on the board belongs to
-        // the frogs and the marks they leave.
+        // The ghost field stays pale. All color belongs to frogs and the
+        // paths and stationary impressions they leave behind.
         const palette = {
           void: '#dadbd4', verge: '#c6c7bf', paper: '#fdfdfb',
           shade: '#d9dad2', shadeDeep: '#c8c9c0', shadow: '#c2c3b9',
@@ -61,7 +57,7 @@
           road: '#e0e1dd', roadEdge: '#cbccc4', roadMark: '#fbfbf7',
           carA: '#f7f7f4', carB: '#eff0ea', glass: '#dadddb',
           rock: '#f5f5f1', rockLight: '#fcfcf9',
-          flyWing: '#fbfbf8', flyBody: '#c7c8c0', ink: '#b2b3aa', tire: '#c0c1b8'
+          flyWing: '#fbfbf8', flyBody: '#c7c8c0', ink: '#b2b3aa'
         };
 
         // One camera angle and one light for the whole field: a solid keeps its
@@ -113,19 +109,22 @@
         let ROWS = 12;
         let fieldRows = 2;
         let roadRows = 8;
-        let frogCount = 12;
-        let round = 0;
-        let roundSeed = 1;
-        let nextRoundSeed = 0;
+        let populationLimit = 32;
+        let streamSeed = 1;
+        let streamArrivals = 0;
+        let nextArrivalAt = 0;
+        let totalDeaths = 0;
         let frogs = [];
-        let waitingFrogs = [];
         let particles = [];
         let bloodStains = [];
+        let frogPaths = [];
+        let pathPrint = null;
+        let pathPrintDirty = true;
+        let pathPrintedAt = -Infinity;
         let collectedFlies = new Set();
-        let nextFrogId = 12;
+        let nextFrogId = 0;
         let elapsed = 0;
         let lastTime = performance.now();
-        let gameOverAt = -1;
         const laneCache = new Map();
         const obstacleCache = new Map();
         const surfacePrints = new Map();
@@ -133,7 +132,7 @@
         let frame = 0;
 
         resize();
-        startRound();
+        startStream();
         frame = requestAnimationFrame(loop);
 
         window.addEventListener('resize', resize, { passive: true });
@@ -147,31 +146,41 @@
         });
 
 
-        function startRound() {
-          round += 1;
-          roundSeed = nextRoundSeed || hashString(`many-frogs-${round}-${Math.floor(Date.now() / 1000)}`);
-          nextFrogId = frogCount;
-          collectedFlies.clear();
-          gameOverAt = -1;
+        function arrivalInterval() {
+          return clamp(48 / COLS, 0.9, 1.8);
+        }
+
+        function startStream() {
+          frogs.forEach(frog => { if (frog.path) frog.path.alive = false; });
+          frogs = [];
           particles = [];
-          frogs = waitingFrogs.length ? waitingFrogs : createFrogs(roundSeed, false);
-          frogs.forEach((frog, index) => {
-            frog.nextMoveAt = elapsed + OPENING_HOLD + index * 0.03 + hash(roundSeed + index * 613) * 0.08;
-          });
-          waitingFrogs = [];
-          nextRoundSeed = 0;
+          collectedFlies.clear();
+          streamSeed = hashString(`many-frogs-stream-${Math.floor(Date.now() / 1000)}`);
+          streamArrivals = 0;
+          admitFrog();
+          nextArrivalAt = elapsed + arrivalInterval();
         }
 
-
-        function createFrogs(seed, waiting) {
-          return Array.from({ length: frogCount }, (_, index) => {
-            const margin = COLS * 0.08;
-            const spread = margin + index * ((COLS - margin * 2) / Math.max(1, frogCount - 1));
-            return createFrog(index, spread, 0, frogPigments[index % frogPigments.length], seed, waiting);
-          });
+        function admitFrog() {
+          if (frogs.filter(frog => frog.alive).length >= populationLimit) return false;
+          const id = nextFrogId;
+          const seed = hash(streamSeed + id * 8191);
+          const start = Math.floor(mod(id * 0.61803398875 + seed, 1) * COLS);
+          const frog = createFrog(id, 0.5, 0, frogPigments[id % frogPigments.length], streamSeed + id * 8191);
+          for (let offset = 0; offset < COLS; offset++) {
+            const x = mod(start + offset, COLS) + 0.5;
+            if (frogSpaceBlocked(frog, x, 0, elapsed + HOP_TIME, x, 0)) continue;
+            frog.x = frog.fromX = frog.toX = x;
+            frog.turnaroundU = x / COLS;
+            frogs.push(frog);
+            nextFrogId++;
+            streamArrivals++;
+            return true;
+          }
+          return false;
         }
 
-        function createFrog(id, x, y, pigment, seed, waiting = false) {
+        function createFrog(id, x, y, pigment, seed) {
           return {
             id,
             x,
@@ -188,16 +197,18 @@
             deathPhase: '',
             color: pigment.frog,
             pigment,
+            basePigment: pigment,
+            age: 0,
+            maturity: 0,
+            pigmentStep: -1,
+            path: null,
             decision: 0,
             waitStreak: 0,
             heading: 1,
             crossings: 0,
-            homeU: x / COLS,
-            topTouches: 0,
-            bottomTouches: 0,
-            topTouchedAt: -Infinity,
-            bottomTouchedAt: -Infinity,
-            nextMoveAt: waiting ? Infinity : elapsed + OPENING_HOLD + id * 0.03 + hash(seed + id * 613) * 0.08,
+            turnaroundU: x / COLS,
+            repositioning: false,
+            nextMoveAt: elapsed + 0.12 + hash(seed + id * 613) * 0.08,
             boldness: hash(seed + id * 1709),
             patience: hash(seed + id * 2347),
             lateralPreference: hash(seed + id * 4517) < 0.5 ? -1 : 1
@@ -220,6 +231,8 @@
 
           frogs.forEach((frog) => {
             if (!frog.alive) return;
+            ageFrog(frog, dt);
+            if (!frog.path) recordFrogPath(frog);
 
             if (frog.hop < 1) {
               const nextHop = Math.min(1, frog.hop + dt / HOP_TIME);
@@ -233,6 +246,7 @@
               frog.hop = nextHop;
               frog.x = nextX;
               frog.y = nextY;
+              recordFrogPath(frog);
               const hazard = hazardAt(frog.x, frog.y, elapsed);
               if (hazard) {
                 killFrog(frog, hazard);
@@ -255,7 +269,7 @@
           frogs.slice().forEach((frog) => {
             if (frog.alive) collectFlyAt(frog);
           });
-          updateBloodStains(dt);
+          updateBloodStains();
 
           particles = particles.filter((particle) => elapsed - particle.born < particle.life);
           particles.forEach((particle) => {
@@ -264,12 +278,71 @@
             particle.vy -= 0.5 * dt;
           });
 
-          if (gameOverAt >= 0 && elapsed - gameOverAt >= RESTART_PAUSE) startRound();
+          // A clock drives admission, independently of deaths and crossings.
+          frogs = frogs.filter(frog => frog.alive);
+          if (elapsed >= nextArrivalAt) {
+            const admitted = admitFrog();
+            nextArrivalAt = elapsed + (admitted ? arrivalInterval() : 0.15);
+          }
         }
 
 
+        function pigmentComponents(color) {
+          return color.match(/[\d.]+/g).map(Number);
+        }
+
+        function vividPigment(pigment, maturity) {
+          const enrich = (color, amount) => {
+            const [light, chroma, hue] = pigmentComponents(color);
+            return `oklch(${light + maturity * 0.025 * amount} ${chroma * (1 + maturity * 0.85 * amount)} ${hue})`;
+          };
+          return { frog: enrich(pigment.frog, 1), wash: enrich(pigment.wash, 1), rim: enrich(pigment.rim, 0.4) };
+        }
+
+        function ageFrog(frog, dt) {
+          frog.age += dt;
+          frog.maturity = 1 - Math.exp(-frog.age / 30);
+          const step = Math.floor(frog.age * 2);
+          if (step === frog.pigmentStep) return;
+          frog.pigmentStep = step;
+          frog.pigment = vividPigment(frog.basePigment, frog.maturity);
+          frog.color = frog.pigment.frog;
+          if (frog.path) {
+            frog.path.pigment = frog.pigment;
+            frog.path.strength = frog.maturity;
+            pathPrintDirty = true;
+          }
+        }
+
+        function recordFrogPath(frog) {
+          if (!frog.path) {
+            frog.path = { points: [{ x: frog.x, y: frog.y }], pigment: frog.pigment,
+              strength: frog.maturity, seed: streamSeed + frog.id * 8191, alive: true };
+            frogPaths.push(frog.path);
+            if (frogPaths.length > MAX_PATHS) {
+              const oldest = frogPaths.findIndex(path => !path.alive);
+              if (oldest >= 0) frogPaths.splice(oldest, 1);
+            }
+          }
+          const path = frog.path, points = path.points;
+          const last = points[points.length - 1], point = { x: frog.x, y: frog.y };
+          if (Math.hypot(point.x - last.x, point.y - last.y) < 0.0001) return;
+          const before = points[points.length - 2];
+          // Extend straight strokes instead of keeping one point per frame.
+          const dx = point.x - last.x, dy = point.y - last.y;
+          if (before && Math.abs((last.x - before.x) * dy - (last.y - before.y) * dx) < 0.00001 &&
+              (last.x - before.x) * dx + (last.y - before.y) * dy > 0) {
+            points[points.length - 1] = point;
+          } else points.push(point);
+          if (points.length > MAX_PATH_POINTS) {
+            points.splice(0, MAX_PATH_POINTS / 2);
+          }
+          path.samples = null;
+          pathPrintDirty = true;
+        }
+
         function chooseMove(frog) {
-          if (!frog.alive || frog.hop < 1 || gameOverAt >= 0) return;
+          if (!frog.alive || frog.hop < 1) return;
 
           const currentLane = getLane(Math.round(frog.y));
           const evaluated = [];
@@ -286,7 +359,7 @@
             const danger = moveDanger(frog, choice, x, y, arrival, dwell);
             const riskWeight = lerp(2.3, 1.55, frog.boldness);
             let score = moveBase(frog, choice) - danger * riskWeight;
-            score += counterApproachScore(frog, frog.x, frog.y, x, y);
+            score += shoreApproachScore(frog, frog.x, frog.y, x, y);
             const forward = choice.dy === frog.heading;
 
             if (forward) score += frog.boldness * 1.2;
@@ -431,13 +504,13 @@
             ? 12
             : move.dy === -frog.heading ? -10 : move.direction === 'wait' ? -0.8 : 1.1;
           localScore -= danger * 1.8;
-          localScore += counterApproachScore(frog, state.x, state.y, targetX, targetY);
+          localScore += shoreApproachScore(frog, state.x, state.y, targetX, targetY);
           if (targetLane.type === 'grass') localScore += 1.2;
           if (targetX < 0.8 || targetX > COLS - 0.8) localScore -= 5;
           if (isReverseMove(state.previousDirection, move.direction)) localScore -= 3.5;
           if (move.direction === 'wait' && currentLane.type !== 'grass') localScore -= 2.5;
           localScore += hash(
-            roundSeed + frog.id * 8191 + depth * 1193 + moveIndex * 379 +
+            streamSeed + frog.id * 8191 + depth * 1193 + moveIndex * 379 +
             Math.round(targetX * 31) + Math.round(targetY * 101)
           ) * 0.12;
 
@@ -497,6 +570,7 @@
         function cancelHop(frog) {
           frog.x = frog.fromX;
           frog.y = frog.fromY;
+          recordFrogPath(frog);
           frog.toX = frog.fromX;
           frog.toY = frog.fromY;
           frog.hop = 1;
@@ -567,6 +641,7 @@
             frog.hop = 1;
             frog.x = frog.toX;
             frog.y = frog.toY;
+            recordFrogPath(frog);
             checkLanding(frog);
           } else {
             frog.hop = 0;
@@ -593,77 +668,63 @@
             return;
           }
 
-          touchCounter(frog);
+          completeCrossing(frog);
+          if (frog.repositioning && Math.abs(frog.x - turnaroundX(frog)) <= TURNAROUND_RADIUS) {
+            frog.repositioning = false;
+          }
 
           const urgency = lane.type === 'grass' ? 0.24 : 0.035;
           const variation = lane.type === 'grass' ? 0.3 : 0.045;
           frog.nextMoveAt = elapsed + urgency + brainRandom(frog, 117) * variation;
         }
 
-        function counterX(frog) {
-          return clamp(frog.homeU * COLS, 0.45, COLS - 0.45);
+        function turnaroundX(frog) {
+          return clamp(frog.turnaroundU * COLS, 0.5, COLS - 0.5);
         }
 
-        function inDestinationField(frog, y) {
-          return frog.heading > 0 ? y >= ROWS - fieldRows : y < fieldRows;
+        function onDepartureBank(frog, y) {
+          return frog.heading > 0 ? y < fieldRows : y >= ROWS - fieldRows;
         }
 
         function moveTargetX(frog, x, y, dx) {
-          const home = counterX(frog);
-          // A final partial sideways hop lands exactly on the frog's marker.
-          if (dx && inDestinationField(frog, y) && Math.sign(home - x) === dx && Math.abs(home - x) < 1) {
-            return home;
-          }
+          const target = turnaroundX(frog);
+          if (dx && frog.repositioning && onDepartureBank(frog, y) &&
+              Math.sign(target - x) === dx && Math.abs(target - x) < 1) return target;
           return x + dx;
         }
 
-        function counterApproachScore(frog, x, y, nextX, nextY) {
-          if (!inDestinationField(frog, y) || !inDestinationField(frog, nextY)) return 0;
-          const before = Math.abs(x - counterX(frog));
-          const after = Math.abs(nextX - counterX(frog));
-          return (before - after) * 24;
+        function shoreApproachScore(frog, x, y, nextX, nextY) {
+          if (!frog.repositioning || !onDepartureBank(frog, y)) return 0;
+          const before = Math.abs(x - turnaroundX(frog));
+          if (!onDepartureBank(frog, nextY)) return before > TURNAROUND_RADIUS ? -35 : 0;
+          const after = Math.abs(nextX - turnaroundX(frog));
+          return (before - after) * 24 - (before > TURNAROUND_RADIUS && nextY !== y ? 12 : 0);
         }
 
-        function touchCounter(frog) {
-          if (!frog.alive || Math.abs(frog.x - counterX(frog)) > COUNTER_HIT_RADIUS) return;
+        function completeCrossing(frog) {
+          if (!frog.alive) return;
           const top = frog.heading > 0 && frog.y >= ROWS - 1;
           const bottom = frog.heading < 0 && frog.y <= 0;
           if (!top && !bottom) return;
-          const end = top ? 'top' : 'bottom';
-          frog[`${end}Touches`] += 1;
-          frog[`${end}TouchedAt`] = elapsed;
-          frog.crossings += 1;
-          // Flipping heading latches the contact until a full return crossing.
+          frog.crossings++;
           frog.heading = top ? -1 : 1;
-        }
-
-        function assignBroodCounter(child) {
-          const occupied = [0.02, ...frogs.map(frog => frog.homeU), 0.98].sort((a, b) => a - b);
-          let best = child.homeU, bestScore = -Infinity;
-          for (let index = 1; index < occupied.length; index += 1) {
-            const gap = occupied[index] - occupied[index - 1];
-            const middle = (occupied[index] + occupied[index - 1]) * 0.5;
-            const score = gap / (1 + Math.abs(middle - child.homeU));
-            if (score > bestScore) { bestScore = score; best = middle; }
+          // Move to a distant departure column on this safe bank before the
+          // next crossing, so a survivor does not retrace its previous route.
+          const minimumShift = Math.max(2, COLS * 0.24);
+          let target = frog.x < COLS / 2 ? COLS - 0.5 : 0.5;
+          for (let attempt = 0; attempt < 12; attempt++) {
+            const candidate = Math.floor(hash(streamSeed + frog.id * 8191 + frog.crossings * 1193 + attempt * 379) * COLS) + 0.5;
+            if (Math.abs(candidate - frog.x) >= minimumShift) { target = candidate; break; }
           }
-          child.homeU = best;
-        }
-
-        function spaceCounterColumns(cohort) {
-          if (cohort.length < 2) return;
-          const ordered = [...cohort].sort((a, b) => a.homeU - b.homeU);
-          const gap = Math.min(0.8, (COLS - 0.9) / (ordered.length - 1));
-          if (ordered.every((frog, index) => !index || counterX(frog) - counterX(ordered[index - 1]) >= gap)) return;
-          // Keep every counter legible when an existing large cohort is resized
-          // onto a phone, or a brood fills the remaining gaps. Preserve order.
-          ordered.forEach((frog, index) => {
-            frog.homeU = (0.45 + index * (COLS - 0.9) / (ordered.length - 1)) / COLS;
-          });
+          frog.turnaroundU = target / COLS;
+          frog.repositioning = true;
         }
 
         function killFrog(frog, kind) {
           if (!frog.alive) return;
+          recordFrogPath(frog);
           frog.alive = false;
+          frog.path.alive = false;
           frog.deathAt = elapsed;
           frog.deathKind = kind;
           frog.deathPhase = frog.hop < 1 ? 'hop' : 'ground';
@@ -673,7 +734,7 @@
             const count = 7;
             for (let i = 0; i < count; i += 1) {
               const angle = (i / count) * TAU + hash(i + frog.id * 31) * 0.7;
-              const speed = 0.65 + hash(i * 7 + frog.id) * 1.3;
+              const speed = (0.65 + hash(i * 7 + frog.id) * 1.3) * (1 + frog.maturity * 1.8);
               particles.push({
                 x: frog.x,
                 y: frog.y,
@@ -682,20 +743,16 @@
                 born: elapsed,
                 life: 0.55 + hash(i * 19) * 0.35,
                 color: frog.color,
-                size: 0.03 + hash(i * 13) * 0.045
+                size: (0.03 + hash(i * 13) * 0.045) * (1 + frog.maturity)
               });
             }
           }
 
-          if (!frogs.some((item) => item.alive) && gameOverAt < 0) {
-            gameOverAt = elapsed;
-            nextRoundSeed = hashString(`many-frogs-${round + 1}-${Math.floor(Date.now() / 1000)}`);
-            waitingFrogs = createFrogs(nextRoundSeed, true);
-          }
+          totalDeaths++;
         }
 
         function addBloodStain(frog, kind) {
-          const seed = hashString(`${round}-${frog.id}-${Math.round(elapsed * 1000)}-${kind}`);
+          const seed = hashString(`${streamSeed}-${frog.id}-${Math.round(elapsed * 1000)}-${kind}`);
           const surface = stainSurfaceAt(frog, kind);
           const layerCount = reducedMotion.matches ? 14 : 22;
           const edgePoints = Array.from({ length: 24 }, (_, index) => {
@@ -751,18 +808,8 @@
             pigment: frog.pigment,
             surfaceType: surface.type,
             surfaceRow: surface.row,
-            opacity: 1,
-            poolStrength: 1,
-            smearPasses: 0,
-            lastVehicleKey: null,
-            dragDistance: 0,
-            dragX: 0,
-            dragFromX: 0,
-            dragTargetX: 0,
-            smearBorn: -Infinity,
-            smearPrint: null,
             rotation: hash(seed + 17) * TAU,
-            scale: 0.82 + hash(seed + 29) * 0.48,
+            scale: (0.82 + hash(seed + 29) * 0.48) * (1 + frog.maturity * 2.8),
             layers,
             droplets,
             stipple,
@@ -789,42 +836,9 @@
         }
 
 
-        function updateBloodStains(dt) {
-          const traffic = new Map();
-          bloodStains.forEach((stain) => {
-            if (stain.surfaceType !== 'road') return;
-            const progress = reducedMotion.matches ? 1 : easeOutQuart(clamp((elapsed - stain.smearBorn) / 0.45, 0, 1));
-            stain.dragX = lerp(stain.dragFromX, stain.dragTargetX, progress);
-            const lane = getLane(stain.surfaceRow);
-            if (lane.type !== 'road') return;
-            if (!traffic.has(lane.row)) traffic.set(lane.row, laneObjectsAt(lane, elapsed));
-            traffic.get(lane.row).forEach((vehicle) => {
-              const previousX = vehicle.x - lane.speed * dt;
-              const contactX = stain.x + stain.dragX;
-              // Swept contact catches a car crossing the pool between frames.
-              const touching = contactX >= Math.min(vehicle.x, previousX) - 0.38 &&
-                contactX <= Math.max(vehicle.x, previousX) + vehicle.length + 0.38;
-              if (touching) addVehicleSmear(stain, lane, vehicle);
-            });
-          });
-
+        function updateBloodStains() {
+          // Traffic leaves the record untouched; only bound its retained history.
           if (bloodStains.length > 640) bloodStains.splice(0, bloodStains.length - 640);
-        }
-
-        function addVehicleSmear(stain, lane, vehicle) {
-          const vehicleKey = `${lane.row}:${vehicle.id}`;
-          if (stain.lastVehicleKey === vehicleKey) return;
-          stain.lastVehicleKey = vehicleKey;
-          stain.smearPasses += 1;
-          stain.smearDirection = Math.sign(lane.speed);
-          stain.smearBorn = elapsed;
-          stain.dragFromX = stain.dragX;
-          stain.dragTargetX = stain.smearDirection * Math.min(1.8, Math.abs(stain.dragTargetX) + 0.18);
-          stain.dragDistance = Math.min(6.5, 1.2 + vehicle.length * 0.45 + stain.smearPasses * 0.38);
-          stain.poolStrength = Math.max(0.08, stain.poolStrength * 0.67);
-          stain.opacity = Math.max(0.16, stain.opacity * 0.96);
-          // Only a fresh tire pass rebuilds the cached, blended impression.
-          stain.smearPrint = null;
         }
 
         function getLane(row) {
@@ -934,23 +948,21 @@
 
           let born = 0;
           for (const candidate of candidates) {
-            if (born >= 3) break;
+            if (born >= 3 || frogs.filter(frog => frog.alive).length >= populationLimit) break;
             const { x, y } = candidate;
             if (x < 0.25 || x > COLS - 0.25) continue;
             if (blockedByGrassObstacle(y, x)) continue;
             if (frogs.some((frog) => frog.alive && frogsTooClose(x, y, frog.x, frog.y))) continue;
 
             const id = nextFrogId++;
-            const seed = hashString(`${round}-${fly.id}-${parent.id}-${id}`);
-            const child = createFrog(id, x, y, parent.pigment, seed);
-            assignBroodCounter(child);
+            const seed = hashString(`${streamSeed}-${fly.id}-${parent.id}-${id}`);
+            const child = createFrog(id, x, y, parent.basePigment, seed);
             child.facing = parent.facing;
             child.heading = parent.heading;
             child.nextMoveAt = elapsed + 0.2 + born * 0.08 + hash(seed + 31) * 0.08;
             frogs.push(child);
             born += 1;
           }
-          spaceCounterColumns(frogs);
 
           if (!reducedMotion.matches) {
             for (let index = 0; index < 12; index += 1) {
@@ -1035,6 +1047,7 @@
           ctx.rect(boardLeft, boardBaseY - (ROWS - 0.5) * tile, COLS * tile, ROWS * tile);
           ctx.clip();
           rows.forEach(drawLaneSurface);
+          drawFrogPaths();
           drawBloodStains();
           rows.forEach(drawLaneObjects);
           drawFlies(rows);
@@ -1042,43 +1055,90 @@
 
           drawBoardEdges();
           drawParticles();
-          waitingFrogs.forEach(drawFrog);
           frogs.forEach(drawFrog);
-          drawCounters();
         }
 
-        function drawCounters() {
+        function drawFrogPaths() {
+          if (!pathPrint) {
+            pathPrint = document.createElement('canvas');
+            pathPrint.width = canvas.width;
+            pathPrint.height = canvas.height;
+            pathPrintedAt = -Infinity;
+          }
+          // Whole routes deepen together as their owner survives. Reuse the
+          // combined pigment impression between these small, paced updates.
+          if (pathPrintDirty && elapsed - pathPrintedAt >= 0.1) {
+            const ink = pathPrint.getContext('2d');
+            ink.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ink.clearRect(0, 0, width, height);
+            ink.lineCap = 'round';
+            ink.lineJoin = 'round';
+            frogPaths.forEach(path => {
+              if (path.points.length < 2) return;
+              const samples = path.samples || [];
+              let distance = 0;
+              for (let i = 1; !path.samples && i < path.points.length; i++) {
+                const a = path.points[i - 1], b = path.points[i];
+                const length = Math.hypot(b.x - a.x, b.y - a.y);
+                if (length < 0.0001) continue;
+                const steps = Math.max(1, Math.ceil(length * 5));
+                const nx = -(b.y - a.y) / length, ny = -(b.x - a.x) / length;
+                for (let step = 0; step <= steps; step++) {
+                  const progress = Math.min(length, step * 0.2) / length;
+                  const along = distance + length * progress;
+                  const seed = path.seed + Math.floor(along * 17) * 197;
+                  const wobble = (hash(seed) - 0.5) * tile * 0.065;
+                  samples.push({ x: worldToScreenX(lerp(a.x, b.x, progress)) + nx * wobble,
+                    y: worldToScreenY(lerp(a.y, b.y, progress)) + ny * wobble,
+                    nx, ny, grain: hash(seed + 431), seed });
+                }
+                distance += length;
+              }
+              path.samples = samples;
+              if (!samples.length) return;
+              // Ragged pigment ribbons follow the actual route. Their fixed
+              // variations belong to distance along the stroke, not frame time.
+              const ribbon = (radius, color, alpha) => {
+                ink.beginPath();
+                for (const side of [1, -1]) {
+                  const edge = side === 1 ? samples : [...samples].reverse();
+                  edge.forEach((point, index) => {
+                    const spread = radius * (0.45 + point.grain * 0.7);
+                    const x = point.x + point.nx * spread * side, y = point.y + point.ny * spread * side;
+                    if (side === 1 && index === 0) ink.moveTo(x, y); else ink.lineTo(x, y);
+                  });
+                }
+                ink.closePath();
+                ink.fillStyle = color;
+                ink.globalAlpha = alpha;
+                ink.fill();
+              };
+              // Young paths are barely deposited; survivors gradually build
+              // enough density to give their whole route a stronger presence.
+              const density = path.strength * path.strength;
+              ribbon(tile * (0.13 + path.strength * 0.13), path.pigment.wash, 0.008 + density * 0.18);
+              ribbon(tile * (0.045 + path.strength * 0.065), path.pigment.frog, 0.012 + density * 0.42);
+              ink.strokeStyle = path.pigment.rim;
+              ink.lineWidth = Math.max(0.45, tile * 0.018);
+              ink.globalAlpha = 0.005 + density * 0.18;
+              ink.beginPath();
+              samples.forEach((point, index) => {
+                const x = point.x + point.nx * tile * 0.035;
+                const y = point.y + point.ny * tile * 0.035;
+                if (!index || point.grain < 0.25) ink.moveTo(x, y); else ink.lineTo(x, y);
+              });
+              ink.stroke();
+            });
+            ink.setLineDash([]);
+            ink.globalAlpha = 1;
+            pathPrintDirty = false;
+            pathPrintedAt = elapsed;
+          }
           ctx.save();
-          ctx.font = `600 ${Math.max(11, Math.min(13, tile * 0.56))}px ui-monospace, monospace`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          const ordered = [...frogs].sort((a, b) => a.homeU - b.homeU);
-          ordered.forEach((frog, index) => {
-            const x = worldToScreenX(counterX(frog));
-            const leftGap = index ? counterX(frog) - counterX(ordered[index - 1]) : Infinity;
-            const rightGap = index + 1 < ordered.length ? counterX(ordered[index + 1]) - counterX(frog) : Infinity;
-            const markerWidth = Math.min(0.76, Math.min(leftGap, rightGap) * 0.82) * tile;
-            for (const top of [false, true]) {
-              const end = top ? 'top' : 'bottom';
-              const y = worldToScreenY(top ? ROWS - 1 : 0);
-              const inward = top ? 1 : -1;
-              const pulse = reducedMotion.matches ? 0 : Math.max(0, 1 - (elapsed - frog[`${end}TouchedAt`]) / 0.7);
-              ctx.fillStyle = palette.paper;
-              ctx.globalAlpha = 0.88;
-              ctx.fillRect(x - markerWidth * 0.5, y - tile * 0.36, markerWidth, tile * 0.72);
-              ctx.fillStyle = frog.color;
-              ctx.globalAlpha = 0.12 + pulse * 0.2;
-              ctx.fillRect(x - markerWidth * 0.5, y - tile * 0.36, markerWidth, tile * 0.72);
-              ctx.globalAlpha = frog.alive ? 0.9 : 0.45;
-              ctx.fillRect(x - markerWidth * 0.5, y + inward * tile * 0.4, markerWidth, 1);
-              ctx.globalAlpha = 1;
-              ctx.fillStyle = frog.pigment.rim;
-              ctx.fillText(String(frog[`${end}Touches`]), x, y, markerWidth * 0.95);
-            }
-          });
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.drawImage(pathPrint, 0, 0, width, height);
           ctx.restore();
         }
-
 
         function drawLaneSurface(row) {
           const lane=getLane(row),top=worldToScreenY(row+.5);
@@ -1191,21 +1251,6 @@
           return [dx, dy];
         }
 
-        function dryLines(x, y, w, h, seed, color, count = 7) {
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 0.55;
-          ctx.beginPath();
-          for (let i = 0; i < count; i++) {
-            const a = hash(seed + i * 197), b = hash(seed + i * 431);
-            const sx = x + a * w, sy = y + b * h;
-            ctx.moveTo(sx, sy);
-            ctx.lineTo(Math.min(x + w, sx + w * (0.04 + hash(seed + i * 653) * 0.18)), sy + (a - 0.5) * h * 0.09);
-          }
-          ctx.stroke();
-        }
-
-
-
         function drawGrassObstacles(row, top) {
           grassObstacles(row).forEach((rock, index) => {
             const x = worldToScreenX(rock.x), y = top + tile * 0.5, r = tile * 0.36 * rock.scale;
@@ -1297,59 +1342,39 @@
 
 
         function drawVehicle(lane, vehicle, top) {
-          const w = vehicle.length * tile, h = tile * .3;
+          const w = vehicle.length * tile, h = tile * 0.58;
           const x = boardLeft + (vehicle.x + vehicle.length / 2) * tile;
           if (x < -w || x > width + w) return;
-          const fine = w > 40;
-          isoFlip = lane.direction < 0 ? -1 : 1;
-          ctx.save(); ctx.translate(x, top + tile * .5);
+          ctx.save();
+          ctx.translate(x, top + tile * 0.5);
           if (lane.direction < 0) ctx.scale(-1, 1);
-          const seed = lane.row * 117 + vehicle.id * 431;
-          const shell = hash(seed) > .5 ? palette.carA : palette.carB;
-          // Tires print on the asphalt, the body rises clear of them.
-          ctx.fillStyle = palette.tire;
-          for (const side of [-1,1]) { ctx.fillRect(-w*.34,side*h-h*.17,w*.14,h*.34); ctx.fillRect(w*.23,side*h-h*.17,w*.13,h*.34); }
-          const body = [[-w*.49,-h*.74],[-w*.4,-h],[w*.32,-h*.95],[w*.48,-h*.6],[w*.49,h*.64],[w*.32,h*.97],[-w*.43,h*.92]];
-          const [bx, by] = risenShape(body, .17, shell, palette.shade, fine ? palette.shadeDeep : null);
-          ctx.save(); ctx.translate(bx, by);
-          // The cabin rises again off the hood, glass facing the camera.
-          const cabin = [[-w*.2,-h*.66],[w*.14,-h*.62],[w*.21,-h*.4],[w*.2,h*.48],[-w*.19,h*.6]];
-          const [cx, cy] = risenShape(cabin, .13, shell, palette.shadeDeep, fine ? palette.shade : null);
+          // One pale body and a single window; traffic stays visually quiet.
+          ctx.fillStyle = hash(lane.row * 117 + vehicle.id * 431) > 0.5 ? palette.carA : palette.carB;
+          ctx.shadowColor = palette.shadow;
+          ctx.shadowBlur = tile * 0.05;
+          ctx.shadowOffsetY = tile * 0.04;
+          polyPath([[-w * 0.48, -h * 0.5], [w * 0.35, -h * 0.5],
+            [w * 0.48, -h * 0.3], [w * 0.48, h * 0.3],
+            [w * 0.35, h * 0.5], [-w * 0.48, h * 0.5]]);
+          ctx.fill();
+          ctx.shadowColor = 'transparent';
           ctx.fillStyle = palette.glass;
-          polyPath([[-w*.13,-h*.48],[w*.08,-h*.45],[w*.09,h*.42],[-w*.12,h*.48]], cx, cy); ctx.fill();
-          if (fine) {
-            dryLines(-w*.4,-h*.7,w*.75,h*1.4,seed,palette.shade,8);
-            ctx.strokeStyle = palette.shadeDeep; ctx.lineWidth = .7;
-            ctx.beginPath(); ctx.moveTo(-w*.45,-h*.5); ctx.lineTo(-w*.45,-h*.2); ctx.moveTo(-w*.45,h*.22); ctx.lineTo(-w*.45,h*.52); ctx.stroke();
-          }
-          // Lamps at the nose.
-          ctx.fillStyle = palette.paper;
-          ctx.fillRect(w*.42,-h*.62,Math.max(1,w*.055),h*.3); ctx.fillRect(w*.42,h*.32,Math.max(1,w*.055),h*.3);
+          ctx.fillRect(-w * 0.12, -h * 0.32, w * 0.26, h * 0.64);
           ctx.restore();
-          ctx.restore(); isoFlip = 1;
         }
-
-
-
-
-
-
-
-
 
         function drawBloodStains() {
           bloodStains.forEach(stain=>{
-            const x=worldToScreenX(stain.x+stain.dragX),y=worldToScreenY(stain.y);
+            const x=worldToScreenX(stain.x),y=worldToScreenY(stain.y);
             if(y < -tile*2 || y > height+tile*2)return;
             const age=elapsed-stain.born;
             const progress=reducedMotion.matches ? 1 : easeOutQuart(clamp(age/1.65,0,1));
             if(!stain.print)stain.print=makePigmentPrint(stain);
-            if(stain.smearPasses)drawVehicleSmears(stain,x,progress);
             ctx.save();ctx.translate(x,y);ctx.rotate(stain.rotation);
             const bloom=.4+.6*progress;
             ctx.scale(stain.scale*bloom,stain.scale*bloom);
             ctx.globalCompositeOperation='multiply';
-            ctx.globalAlpha=stain.opacity*stain.poolStrength*progress;
+            ctx.globalAlpha=progress;
             ctx.drawImage(stain.print,-tile,-tile,tile*2,tile*2);
             ctx.restore();
           });
@@ -1381,55 +1406,6 @@
           return print;
         }
 
-        function makeSmearPrint(stain) {
-          const resolution = 48;
-          const print = document.createElement('canvas');
-          print.width = Math.ceil((stain.dragDistance + 3) * resolution);
-          print.height = resolution;
-          const ink = print.getContext('2d');
-          ink.translate(resolution, resolution * 0.5);
-          // Many translucent pulls of the actual pigment form a continuous,
-          // feathered blend. Rasterize once per pass, never once per frame.
-          ink.filter = 'blur(1px)';
-          for (let tap = 0; tap < 40; tap += 1) {
-            const t = tap / 39;
-            const w = resolution * stain.scale * (2 + t * 1.2);
-            const h = resolution * stain.scale * (1.25 - t * 0.65);
-            ink.globalAlpha = 0.075 * Math.pow(1 - t, 1.3);
-            ink.drawImage(stain.print, t * stain.dragDistance * resolution - w * 0.5, -h * 0.5, w, h);
-          }
-          ink.filter = 'none';
-          ink.strokeStyle = stain.pigment.wash;
-          ink.lineCap = 'round';
-          // A little residual tire grain lives inside the broad wash.
-          for (let track = 0; track < 5; track += 1) {
-            const y = (track - 2) * resolution * 0.055;
-            ink.globalAlpha = 0.14;
-            ink.lineWidth = resolution * (track % 2 ? 0.018 : 0.035);
-            ink.beginPath();
-            ink.moveTo(0, y);
-            ink.lineTo(stain.dragDistance * resolution * (0.45 + hash(track * 733 + stain.frogId) * 0.4), y);
-            ink.stroke();
-          }
-          return print;
-        }
-
-        function drawVehicleSmears(stain, x, stainProgress) {
-          if (!stain.smearPrint) stain.smearPrint = makeSmearPrint(stain);
-          const reveal = reducedMotion.matches ? 1 : easeOutQuart(clamp((elapsed - stain.smearBorn) / 0.45, 0, 1));
-          const y = worldToScreenY(stain.surfaceRow);
-          ctx.save();
-          ctx.beginPath();
-          ctx.rect(boardLeft, y - tile * 0.5, COLS * tile, tile);
-          ctx.clip();
-          ctx.translate(x, y);
-          ctx.scale(stain.smearDirection * (0.65 + reveal * 0.35), 1);
-          ctx.globalCompositeOperation = 'multiply';
-          ctx.globalAlpha = stain.opacity * stainProgress * (0.7 + reveal * 0.3);
-          ctx.drawImage(stain.smearPrint, -tile, -tile * 0.5, stain.smearPrint.width / 48 * tile, tile);
-          ctx.restore();
-        }
-
         function drawBoardEdges() {
           ctx.fillStyle=palette.verge;
           const top=boardBaseY-(ROWS-.5)*tile,bottom=boardBaseY+tile*.5;
@@ -1437,15 +1413,21 @@
           ctx.fillRect(boardLeft,top-2,COLS*tile,2);ctx.fillRect(boardLeft,bottom,COLS*tile,2);
         }
 
+        function frogBodyScale(frog) {
+          // Every completed crossing adds size; diminishing steps keep long-lived
+          // winners legible on the same board without changing the route planner.
+          return 0.24 + 0.065 * Math.sqrt(frog.crossings);
+        }
+
         function drawFrog(frog) {
           if(!frog.alive)return;
           const x=worldToScreenX(frog.x),y=worldToScreenY(frog.y);
           if(y < -tile || y > height+tile)return;
           const extension=!reducedMotion.matches && frog.hop<1 ? Math.sin(frog.hop*Math.PI) : 0;
-          const size=tile*.39, asymmetry=(hash(frog.id*117+33)-.5)*.12;
+          const size=tile*frogBodyScale(frog), asymmetry=(hash(frog.id*117+33)-.5)*.12;
           ctx.save();ctx.translate(x,y);
           ctx.globalAlpha=.34;ctx.fillStyle=palette.shadow;
-          ctx.beginPath();ctx.ellipse(tile*.06,tile*.07,tile*.2,tile*.15,0,0,TAU);ctx.fill();
+          ctx.beginPath();ctx.ellipse(size*.15,size*.18,size*.51,size*.38,0,0,TAU);ctx.fill();
           ctx.globalAlpha=1;
           ctx.rotate({up:0,right:Math.PI/2,down:Math.PI,left:-Math.PI/2}[frog.facing]);
           ctx.scale(size,size);
@@ -1503,7 +1485,7 @@
           COLS = Math.max(9, Math.floor(width / tile));
           fieldRows = Math.round(ROWS * FIELD_FRACTION);
           roadRows = ROWS - fieldRows * 2;
-          frogCount = clamp(Math.round(COLS * 0.35), 10, 24);
+          populationLimit = clamp(Math.round(COLS * 1.2), 24, 80);
           boardLeft = (width - COLS * tile) / 2;
           boardBaseY = (height + ROWS * tile) / 2 - tile * 0.5;
 
@@ -1511,7 +1493,16 @@
           laneCache.clear();
           obstacleCache.clear();
           surfacePrints.clear();
-          [...frogs, ...waitingFrogs].forEach((frog) => {
+          pathPrint = null;
+          pathPrintDirty = true;
+          frogPaths.forEach(path => {
+            path.samples = null;
+            path.points.forEach(point => {
+              point.x *= COLS / previousCols;
+              point.y *= (ROWS - 1) / (previousRows - 1);
+            });
+          });
+          frogs.forEach((frog) => {
             frog.x = clamp(frog.x * COLS / previousCols, 0.25, COLS - 0.25);
             frog.y = clamp(Math.round(frog.y * (ROWS - 1) / (previousRows - 1)), 0, ROWS - 1);
             frog.fromX = frog.toX = frog.x;
@@ -1519,8 +1510,6 @@
             frog.hop = 1;
             frog.nextMoveAt = Math.min(frog.nextMoveAt, elapsed + 0.12);
           });
-          spaceCounterColumns(frogs);
-          spaceCounterColumns(waitingFrogs);
           bloodStains.forEach(stain => {
             stain.x *= COLS / previousCols;
             if (stain.surfaceType === 'road') {
@@ -1529,9 +1518,6 @@
                 (stain.surfaceRow - previousFieldRows) / previousRoadRows * roadRows
               ), 0, roadRows - 1);
               stain.y = stain.surfaceRow + withinLane;
-              // Existing pigment belongs to the resized road; new tires should
-              // be able to work it regardless of the previous lane's car IDs.
-              stain.lastVehicleKey = null;
             } else {
               stain.y *= (ROWS - 1) / (previousRows - 1);
               stain.surfaceRow = Math.round(stain.y);
@@ -1543,7 +1529,7 @@
         function worldToScreenY(y) { return boardBaseY - y * tile; }
 
         function brainRandom(frog, salt) {
-          return hash(roundSeed + frog.id * 8191 + frog.decision * 131 + salt * 977);
+          return hash(streamSeed + frog.id * 8191 + frog.decision * 131 + salt * 977);
         }
 
         function hash(value) {
@@ -1567,9 +1553,12 @@
         function lerp(a, b, t) { return a + (b - a) * t; }
         function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
         window.__manyFrogs = {
-          restart: startRound,
+          restart: startStream,
           getState: () => ({
-            round,
+            streamArrivals,
+            totalDeaths,
+            populationLimit,
+            arrivalInterval: arrivalInterval(),
             live: frogs.filter((frog) => frog.alive).length,
             columns: COLS,
             rows: ROWS,
@@ -1577,23 +1566,26 @@
             roadRows,
             roadHeightFraction: roadRows * tile / height,
             topFrogY: frogs.filter((frog) => frog.alive).reduce((top, frog) => Math.max(top, frog.y), -1),
-            gameOver: gameOverAt >= 0,
-            waiting: waitingFrogs.length,
-            totalFrogs: frogs.length,
+            totalFrogs: nextFrogId,
             fliesCollected: collectedFlies.size,
             bloodStains: bloodStains.length,
+            paths: frogPaths.length,
+            pathPoints: frogPaths.reduce((count, path) => count + path.points.length, 0),
             frogs: frogs.map((frog) => ({
               id: frog.id,
               alive: frog.alive,
+              age: frog.age,
+              maturity: frog.maturity,
+              color: frog.color,
               x: frog.x,
               y: frog.y,
               decisions: frog.decision,
               waitStreak: frog.waitStreak,
               heading: frog.heading,
               crossings: frog.crossings,
-              counterX: counterX(frog),
-              topTouches: frog.topTouches,
-              bottomTouches: frog.bottomTouches,
+              bodyScale: frogBodyScale(frog),
+              turnaroundX: turnaroundX(frog),
+              repositioning: frog.repositioning,
               deathKind: frog.deathKind,
               deathPhase: frog.deathPhase
             }))

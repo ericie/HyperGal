@@ -1,13 +1,13 @@
 (() => {
   'use strict';
-  const filmVersions = {"asteroids":"90329faa21f5","snake":"fe104eaab242","warlords":"9f7d3e93c329","command":"29c81dfcea06","unbreakable":"16cfd4faefdd"};
+  const filmVersions = {"asteroids":"90329faa21f5","snake":"fe104eaab242","warlords":"9f7d3e93c329","command":"29c81dfcea06","unbreakable":"360b62235a24","landgrab":"57655fd5af65","onward":"dcfe310424e6"};
   const pieces = (window.HMC_MANIFEST?.pieces || [])
     .filter(piece => piece.category === 'games' && piece.wip === false && !piece.rejected)
     .sort((a,b) => a.slug.localeCompare(b.slug));
   const floor = document.getElementById('cabinets');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
   const clamp = n => Math.max(0,Math.min(1,n));
-  const films = {'008-vectrex-asteroids':'asteroids','007-hydra':'snake','005-only-invaders':'warlords','009-mutual-command':'command','003-unbreakable':'unbreakable'};
+  const films = {'008-vectrex-asteroids':'asteroids','007-hydra':'snake','005-only-invaders':'warlords','009-mutual-command':'command','003-unbreakable':'unbreakable','059-moon-orchard':'landgrab','016-up-mario':'onward'};
   const layouts = [
     {kind:'entry',slugs:['008-vectrex-asteroids','003-unbreakable','005-only-invaders']},
     {kind:'crossing',slugs:['038-many-frogs','059-moon-orchard','009-mutual-command','012-happiness-hunter']},

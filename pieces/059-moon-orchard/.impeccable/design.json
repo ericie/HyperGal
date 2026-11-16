@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-11-15T12:32:44.371967+00:00",
-  "title": "Design System: Lunar Founder",
+  "title": "Design System: Lunar Landgrab",
   "extensions": {
     "colorMeta": {
       "black": {
@@ -207,23 +207,23 @@
       },
       {
         "name": "rover-drift",
-        "value": "One rover, preferred 24s cruise between 30% and 43% of canvas width; \u221210\u202612 internal pixels/s clear-road screen velocity; 54 internal pixels/s\u00b2 acceleration",
+        "value": "One rover, preferred 24s cruise between 19% and 28% of canvas width; \u221210\u202612 internal pixels/s clear-road screen velocity; 54 internal pixels/s\u00b2 acceleration; avoidance bounded to left 42%",
         "purpose": "Gentle bidirectional screen drift keeps clear-road world progress within 56\u201378 internal pixels/s. Predictive hazard avoidance overrides the preference and commits safe ground-hop throttle and launch time through landing; obstacle death or a new incoming projectile cancels the plan."
       },
       {
         "name": "automatic-hop",
         "value": "225 internal pixels/s launch; 420 internal pixels/s\u00b2 gravity",
-        "purpose": "Predictive hops with a clearance margin and a checked landing; ground-hazard plans must land beyond the obstacle and unsafe plans do not launch."
+        "purpose": "Beginner reacts to nearby hazards and can jump a simple ditch; after the first death the driver rehearses takeoff, landing and future bomb craters. No opening ditch or forced crash."
       },
       {
         "name": "crash-recovery",
         "value": "All parts rest + .35s; 2.6s growth with .045s stagger; 0.5s shutter lift + 1.8s compact-garage exit",
-        "purpose": "Wreckage becomes towers at 3\u00d7 former width and height, with one compact 44x34 garage replacing the former 60px facade. Its shutter lifts for 0.5s, then the buggy rolls out over 1.8s before scrolling resumes."
+        "purpose": "Wreckage becomes varied towers at 90% of the previous large-city size (2.7\u00d7 original small towers), with one compact 44x34 garage replacing the former 60px facade. Its shutter lifts for 0.5s, then the buggy rolls out over 1.8s before scrolling resumes. Towers mix five silhouettes with no white rooftop crossbars."
       },
       {
         "name": "saucer-waves",
-        "value": "3\u20135 ships per formation; .4s stagger; 2.5\u20134s clear gap; 6 ships maximum",
-        "purpose": "Scouts, bombers, darts and carriers differ in speed, path, armor and attacks. Wave arrivals wait during rebirth."
+        "value": "3\u20135 ships from ahead; .4s stagger; 6\u201311s clear gap; 6 ships maximum",
+        "purpose": "Scouts, bombers, darts and carriers differ in speed, path and armor. All bombs fall vertically while ahead of the buggy, with 2.8\u20134.4s between drops. Arrivals pause during rebirth."
       },
       {
         "name": "wreckage-physics",
@@ -237,13 +237,13 @@
       },
       {
         "name": "ground-turrets",
-        "value": "2.4 radians/s tracking; 1.9s shot cadence; .13s muzzle flash; 130 internal pixels/s terrain-relative rounds",
+        "value": "Singles or pairs; 1.8\u20133.4s within pairs, 16\u201332s gaps; 3.2\u20134.8s shots; 105px/s rounds; .13s flash",
         "purpose": "Primitive deep-rust (#a04018) fixed pedestals and pipe barrels share one paint without perimeter edging and track the rover and its jumps from an 11-pixel-high pivot, with rounds originating 15 pixels along the barrel. At most three turrets/eight rounds; no targeting or new fire during rebirth."
       },
       {
         "name": "depth-atmosphere",
         "value": "UFOs 6\u20138 \u00d7 3 distant / 9\u201312 \u00d7 4 middle; slow drift 2 \u00d7 scale px/s, sway 3 \u00d7 scale, bob 2 \u00d7 scale",
-        "purpose": "Quiet layer-colored UFOs with no combat. Background cities are static artwork, with no dynamic city growth. Camera stops on foreground death; artwork pause freezes everything."
+        "purpose": "Small layer-colored UFOs occasionally drop harmless vertical bombs with brief ground flickers. No foreground damage, visible bullet hits or city growth. Pause freezes everything."
       },
       {
         "name": "fixed-paired-fire",
@@ -262,12 +262,23 @@
     },
     "buggyPalette": {
       "colors": [
-        "#b00070",
-        "#b02030",
-        "#9030a0",
-        "#a04018"
+        "#ff00b8",
+        "#ff2548",
+        "#d43bff",
+        "#ff5a00"
       ],
-      "rule": "Deep magenta, crimson, plum and rust separate the unoutlined body and fixed barrels from bright terrain. Each has at least 3:1 luminance contrast against main green hills, peach road and black sky; all tires retain the darker body shade."
+      "rule": "Hot magenta, scarlet, electric violet and orange stay bright and saturated without outlines. Tires use the darker body hue; exclude blue/cyan/green landscape paints."
+    },
+    "cityArchitecture": {
+      "scale": 0.9,
+      "styles": [
+        "stacked pods",
+        "stepped terraces",
+        "twin spires",
+        "broad domes",
+        "offset stacks"
+      ],
+      "rule": "Stable fragment/generation styles and world-tile variation; no white roof bars. Garage stays 44x34 to retain buggy clearance."
     }
   },
   "components": [
@@ -276,7 +287,7 @@
       "kind": "custom",
       "refersTo": "artwork",
       "description": "Full-canvas focus treatment. This preview is static; pause is implemented by orchard.js.",
-      "html": "<canvas class=\"ds-artwork\" tabindex=\"0\" role=\"button\" aria-pressed=\"false\" aria-label=\"Lunar Founder pause target\"></canvas>",
+      "html": "<canvas class=\"ds-artwork\" tabindex=\"0\" role=\"button\" aria-pressed=\"false\" aria-label=\"Lunar Landgrab pause target\"></canvas>",
       "css": ".ds-artwork{display:block;width:100%;height:160px;background:#000;image-rendering:pixelated}.ds-artwork:focus-visible{outline:1px solid #fff;outline-offset:-3px}"
     },
     {

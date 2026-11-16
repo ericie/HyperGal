@@ -7,5 +7,5 @@
   "rating": 50,
   "wip": false,
   "thumbnail": "thumbnail.jpg",
-  "description": "Breakout in reverse. An infallible paddle sends one ball on a clean arc to the nearest low column of a level rainbow-colored wall. Each underside hit reserves one new brick, and only that completed cell creeps the aligned lattice upward. No player, no losing. Click to rebuild."
+  "description": "Breakout in reverse. An infallible paddle sends one ball on a clean arc to a growing wall, alternating short runs on the left, center, or right with passes that fill lower areas. Each brick advances a gradual hue gradient with randomized saturation and brightness. Each underside hit reserves one new brick, and only that completed cell creeps the aligned lattice upward. No player, no losing. Click to rebuild."
 }

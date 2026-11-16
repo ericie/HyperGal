@@ -7,7 +7,7 @@ const source = fs.readFileSync(new URL('../pieces/059-moon-orchard/orchard.js', 
     update, draw, resize, toggle, crater, collision, explode, updateWreck, terrainY, partBounds, makeRover, beginWave, updateWaves, spawnSaucer, ufoY, UFO_TYPES, spawnTurret, updateTurrets, fireWeapons, gunMuzzles, activeBurstCount, firingOpportunity, targetPosition, segmentBox, updateDepthLayers, drawDepthLayer, depthBase, buildingExit, fillCityGround,
     stepWreck(dt, moving=false) {const travel=moving?SPEED*dt:0; scroll+=travel; obstacles.forEach(o=>o.x-=travel); updateWreck(dt,travel);},
     buggyX: () => rovers[0].x,
-    quiet() { obstacleClock=ufoClock=turretClock=1e6; ufos=[]; turretShots=[]; waveQueue=[]; obstacles=obstacles.filter(o=>o.kind!=='turret'&&!o.intro); rovers.forEach(r=>r.shotClock=1e6); },
+    quiet() { obstacleClock=ufoClock=turretClock=1e6; ufos=[]; turretShots=[]; waveQueue=[]; obstacles=obstacles.filter(o=>o.kind!=='turret'); rovers.forEach(r=>r.shotClock=1e6); },
     isolate() { rovers=[rovers[0]]; },
     get state() { const r=rovers[0]; return {w,h,ground,scroll,shots,sparks,obstacles,ufos,bombs,time,jump:r.jump,jumps,craters,paused,roverX:r.x,roverVX:r.vx,crashTime:r.crashTime,deaths,wreck,lastCrash:r.lastCrash,rovers,phase,cycle,grownBuildings,waveNumber,waveQueue,turretShots,depthLayers}; },
     set scene(s) { const r=rovers[0]; if(s.obstacles) obstacles=s.obstacles; if(s.bombs) bombs=s.bombs; if(s.shots) shots=s.shots; if(s.ufos) ufos=s.ufos; if(s.turretShots) turretShots=s.turretShots; if(s.time !== undefined) time=s.time; if(s.roverX !== undefined) r.x=s.roverX; if(s.roverVX !== undefined) r.vx=s.roverVX; if(s.jump !== undefined) r.jump=s.jump; if(s.velocity !== undefined) r.velocity=s.velocity; },
@@ -34,12 +34,17 @@ for (const [width,height] of [[1280,720],[390,844],[844,390]]) {
   assert.equal(check.state.rovers.length,1,'exactly one buggy');
   assert.ok(check.state.ufos.length===3,'opening three-scout formation');
   let aliveSum=0, saucerSum=0; const encounteredTypes=new Set(); let sawTurret=false, sawTurretShot=false;
-  const shotLog=[];
+  const shotLog=[],crashTimes=[],turretTimes=[];let priorDeaths=0;const seenTurrets=new Set();let rearFrames=0,drivingFrames=0;
   let previous = new Set(), maxJump = 0, sawSmall = false, sawBig = false;
   let minX = Infinity, maxX = -Infinity, previousX = check.buggyX(), forward = false, backward = false;
   for(let i=0;i<60*180;i++) {
     check.update(1/60);
     const s = check.state, x = check.buggyX();
+    if(s.deaths>priorDeaths){crashTimes.push(s.time);priorDeaths=s.deaths;}
+    if(s.phase==='driving'){drivingFrames++;rearFrames+=x<=s.w*.34;assert.ok(x<=s.w*.42+.01,'avoidance stays in the back portion of the screen');}
+    for(const t of s.obstacles.filter(o=>o.kind==='turret'))if(!seenTurrets.has(t)){seenTurrets.add(t);turretTimes.push(s.time);}
+    for(const b of s.bombs){assert.equal(b.vx,0,'foreground bombs fall vertically');}
+    for(const u of s.ufos)assert.ok(u.vx<0,'attack waves come from ahead');
     s.ufos.forEach(u=>encounteredTypes.add(u.type));
     sawTurret ||= s.obstacles.some(o=>o.kind==='turret'); sawTurretShot ||= s.turretShots.length>0;
     assert.ok(s.obstacles.filter(o=>o.kind==='turret').length<=3 && s.turretShots.length<=8,'turret traffic is bounded');
@@ -70,7 +75,11 @@ for (const [width,height] of [[1280,720],[390,844],[844,390]]) {
   assert.ok(forward && backward && maxX-minX > check.state.w*.08, 'rover travels both directions over a substantial range');
   assert.ok(maxJump > 55 && maxJump < 64, 'controlled automatic hops');
   assert.ok(sawSmall && sawBig, 'both rock sizes spawn');
-  assert.ok(check.state.deaths > 0 && check.state.deaths <= 30, 'occasional crashes rather than repeated routine collisions');
+  assert.ok(check.state.deaths > 0 && check.state.deaths <= 6, 'occasional crashes rather than repeated routine collisions');
+  assert.ok(crashTimes.length===0 || crashTimes[0]>6,'no scripted drive into an opening ditch');
+  assert.ok(crashTimes.length<2 || crashTimes[1]-crashTimes[0]>25,'learned driver gets a longer patrol after the first death');
+  assert.ok(rearFrames/drivingFrames>.9,'buggy spends almost all driving time toward the rear');
+  assert.ok(turretTimes.slice(1).some((t,i)=>t-turretTimes[i]>16),'turret pacing includes long empty stretches');
   for (const color of ['#000000','#1024ff','#00a4bc','#00d950','#ffa65c','#ff00b8']) assert.ok(sim.colors.has(color), 'reference palette is rendered');
   assert.equal(sim.textCalls,0,'no canvas text or score');
   sim.events.keydown({code:'Space', repeat:false, preventDefault(){}});
@@ -121,7 +130,7 @@ console.log('Crater permanence, moving hazard detection, rock durability, reduce
 // A visible hazard must be cleared while moving either forward or backward.
 for (const width of [390, 1280]) for (const phase of [0,2,4,6,8,10]) for (const kind of ['pit','rock']) {
   const c=setup(width,720).check;
-  c.isolate(); c.quiet();
+  c.isolate(); c.quiet();c.state.rovers[0].generation=1;
   const x=c.state.w*.3;
   c.scene={time:phase,roverX:x,roverVX:phase<6?30:-30,obstacles:[{x:x+160,kind,size:kind==='pit'?38:26,hp:3}],ufos:[],bombs:[],shots:[]};
   for(let i=0;i<360;i++) c.update(1/60);
@@ -162,7 +171,7 @@ assert.equal(pausedCrash.check.state.crashTime,remaining,'pause freezes explosio
 console.log('Fatal pit/rock/bomb hits, safe clearance, wreckage, one explosion per crash, automatic recovery and paused crashes passed.');
 for (const dt of [1/30,1/25]) for (const kind of ['pit','rock']) {
   const c=setup().check;
-  c.isolate(); c.quiet();
+  c.isolate(); c.quiet();c.state.rovers[0].generation=1;
   c.scene={time:8,roverX:150,roverVX:-30,obstacles:[{x:310,kind,size:kind==='pit'?38:26,hp:3}],ufos:[],bombs:[],shots:[]};
   for(let t=0;t<6;t+=dt)c.update(dt);
   assert.equal(c.state.deaths,0,`${kind} is cleared at ${Math.round(1/dt)}fps`);
@@ -182,6 +191,22 @@ assert.equal(recovery.state.rovers.length,1,'exactly one buggy after recovery');
 console.log('Single-buggy population and recovery passed.');
 
 }
+// The first buggy reacts to a ditch; experience adds actual landing foresight.
+for(const generation of [0,1]) {
+ const c=setup().check;c.quiet();const r=c.state.rovers[0];r.generation=generation;
+ c.scene={obstacles:[{kind:'pit',x:r.x+150,size:32}],bombs:[],shots:[],ufos:[]};
+ for(let i=0;i<6*60;i++)c.update(1/60);
+ assert.equal(c.state.deaths,0,'even the beginner jumps a simple first ditch');
+ assert.ok(c.state.jumps>0,'the first ditch is cleared by a real hop');
+}
+for(const generation of [0,1]) {
+ const c=setup().check;c.quiet();const r=c.state.rovers[0];r.generation=generation;
+ c.scene={obstacles:[{kind:'pit',x:r.x+150,size:28},{kind:'pit',x:r.x+195,size:28}],bombs:[],shots:[],ufos:[]};
+ for(let i=0;i<7*60 && !c.state.deaths;i++)c.update(1/60);
+ assert.equal(c.state.deaths,generation===0?1:0,'landing foresight improves the same close-pit encounter after learning');
+}
+console.log('Beginner clears a simple ditch; learned driver clears the close-pit encounter the beginner misjudges.');
+
 // Wreckage uses actual buggy parts, travels in every direction, and stays put
 // in terrain coordinates after friction brings it to rest.
 for (const dt of [1/60,1/30,1/25]) {
@@ -245,9 +270,10 @@ for (const dt of [1/60,1/30,1/25]) {
       assert.equal(s.cycle.buildings.length,s.cycle.parts.length,'each piece becomes a building');
       assert.equal(s.cycle.buildings.filter(b=>b.spawn).length,1,'exactly one compact garage releases the rover');
       origin=s.cycle.origin;
+      assert.ok(new Set(s.cycle.buildings.filter(b=>!b.spawn).map(b=>b.style)).size>=4,'each city mixes several building silhouettes');
       s.cycle.buildings.forEach((b,i)=>{
-        assert.equal(b.height,b.spawn?34:3*(b.source.kind==='wheel'?64+i*8:36+i%4*8),'compact garage preserves the large neighboring towers');
-        assert.equal(b.width,b.spawn?44:3*(14+i%3*4),'garage is narrower than its former 60px width');
+        assert.equal(b.height,b.spawn?34:.9*3*(b.source.kind==='wheel'?64+i*8:36+i%4*8),'wreck towers are ten percent smaller; garage preserves buggy clearance');
+        assert.equal(b.width,b.spawn?44:.9*3*(14+i%3*4),'garage is narrower than its former 60px width');
         assert.equal(b.door,0,'garage shutter stays closed while buildings grow');
       });
     }
@@ -437,7 +463,7 @@ ground.scene={obstacles:[]};const blasted=ground.spawnTurret(300);ground.crater(
 assert.equal(blasted.dead,true,'a bomb crater can destroy an emplacement');
 console.log('Turret placement, tracking, aimed shots, three-hit armor, interception, physical impact, crater destruction and rebirth ceasefire passed.');
 for(const width of [390,1280]) for(const dt of [1/60,1/25]) {
- const c=setup(width,720).check;c.quiet();const x=c.state.w*.3;
+ const c=setup(width,720).check;c.quiet();c.state.rovers[0].generation=1;const x=c.state.w*.3;
  c.scene={roverX:x,roverVX:30};const turret=c.spawnTurret(x+160);turret.fireClock=1e6;
  for(let t=0;t<6;t+=dt)c.update(dt);
  assert.equal(c.state.deaths,0,'autopilot clears an emplacement at desktop and phone frame rates');
@@ -487,12 +513,13 @@ console.log('Fixed up/forward paired shots, shared trigger, three airborne burst
 
 // Depth ships hover and occasionally drop tiny decorative bombs in their own plane.
 for(const [width,height] of [[1280,720],[390,844],[844,390]]) for(const dt of [1/60,1/25]) {
- const sim=setup(width,height),c=sim.check,foreground=c.state.ufos.slice();
+ const sim=setup(width,height),c=sim.check,foreground=c.state.ufos.slice(),depthDrops=new Set(),positions=new WeakMap();
  for(let t=0;t<60;t+=dt) {
   c.updateDepthLayers(dt,66*dt);
   for(const layer of c.state.depthLayers) {
    assert.ok(layer.ufos.length<=2,'atmospheric scenery stays bounded');
    for(const key of ['shots','debris','sparks','fired','kills','cities','cityClock','sprouts'])assert.ok(!(key in layer),'depth planes have no combat damage or growing cities');
+   for(const b of layer.bombs){depthDrops.add(b);if(positions.has(b))assert.equal(b.x,positions.get(b),'atmospheric bombs fall vertically');positions.set(b,b.x);}
    assert.ok(layer.bombs.length<=2 && layer.impacts.length<=3,'decorative drops and impacts stay bounded');
    for(const u of layer.ufos)assert.ok(Number.isFinite(u.x)&&Number.isFinite(u.y),'hovering positions stay finite');
   }
@@ -502,6 +529,7 @@ for(const [width,height] of [[1280,720],[390,844],[844,390]]) for(const dt of [1
   const allowed=new Set([layer.body,layer.shade,layer.light,'#000000']);
   for(const color of sim.colors)assert.ok(allowed.has(color),`${layer.name} scenery retains its palette`);
  }
+ assert.ok(depthDrops.size>0,'background UFOs occasionally drop bombs');
  assert.deepEqual(c.state.ufos,foreground,'atmosphere does not touch foreground UFOs');
  assert.equal(sim.env.Math.random(),setup(width,height).env.Math.random(),'atmosphere does not consume foreground randomness');
  if(dt===1/60)console.log(`${width} × ${height}: hovering layers, rare decorative drops, no damage or city growth, and palette isolation passed.`);

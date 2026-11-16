@@ -10,6 +10,21 @@ root and reload the page after edits. Before publishing attract changes, run
 `node scripts/version-arcade-assets.mjs` to refresh content-hash URLs for scripts,
 styles, and preview PNGs across both entry views and the standalone studies.
 
+## About
+
+Both pages have a right-aligned top navigation with [Games](index.html) and
+[About](about.html), marking the current page. The About page's four
+paragraphs explain the user-supplied concept: start with influential games and
+ask “What if?”, change their rules to explore underlying systems through
+satire, and make works that can be both played and watched. The final paragraph
+connects the user's earlier interactive art and arcade projects to Hypermedia
+Club, a current solo venture with AI agents as thought and coding partners.
+It makes no claim about collaboration or AI use in the earlier work. Hypermedia Arcade
+remains the provisional page name, with Arcade dominant in the heading.
+The latest navigation revision removes the Hypermedia title and About's former
+Arcade navigation link. Page headings, About copy, layout, original works and
+manual statuses remain unchanged.
+
 ## Arcade
 
 Current direction status: the user rejected the street-art/comic/photostat
@@ -152,16 +167,19 @@ playback, direct original-game links and all manual statuses remain; the study
 stays WIP. No scores, prices, new fonts, dependencies or shared tokens.
 
 Preview the [Unbreakable attract study](arcade/unbreakable-test.html). Its
-24.8-second native loop opens with **UNBRE** above **AKABLE** in eleven heavy
+20.2-second native loop opens with **UNBRE** above **AKABLE** in eleven heavy
 cream glyphs on the original game's deep purple ground. At 800×600, the title
 has 6px outer margins, 4px seams, a 6px row gap and 291px-high letters; its cream
-silhouette occupies about 80.5% of the frame. The title holds until 2.2 seconds,
-tilts through 3.8 seconds, then the camera travels 128 world units along the
-brick wall through 8.8 seconds. Ball and paddle emerge as projection flattens
-at 8.8–10 seconds. Reverse-Breakout play at 10–17.2 seconds adds whole bricks
+silhouette occupies about 80.3% of the frame. Both B glyphs have a right-edge
+notch. The title caps the wall, with no masonry above its upper edge. It holds
+until 2.2 seconds, tilts through 3.8 seconds, then the camera travels 128 world
+units along the restored tall wall at 3.8–5.4 seconds. Projection flattens during
+arrival at 4.5–5.4 seconds; the camera eye approaches monotonically and stops
+before the paddle plane, without overshooting and returning. Reverse-Breakout
+play at 5.4–12.6 seconds adds whole bricks
 after the ball clears each new cell. The wall and machine retreat at
-17.2–18.7 seconds, expanding empty ground; all eleven letters type back in at
-.32-second intervals from 18.7–21.9 seconds. The completed title matches the
+12.6–14.1 seconds, expanding empty ground; all eleven letters type back in at
+.32-second intervals from 14.1–17.3 seconds. The completed title matches the
 opening pixels and holds through the loop boundary. No extra artwork copy,
 font or image dependency is added.
 
@@ -172,13 +190,79 @@ complete title at 1 second. Pause, hidden/offscreen suspension, direct
 `pieces/003-unbreakable/` links and resolution limits use the existing lifecycle;
 `scripts/version-arcade-assets.mjs` refreshes content-hash URLs. The study starts
 with `"wip": true`; the original manual `"wip": false` and gameplay remain intact.
-`node scripts/check-unbreakable-attract.mjs` passes 2,977 draw samples at 120Hz,
-camera continuity, nine brick hits, nine paddle catches, nine added cells with
+`node scripts/check-unbreakable-attract.mjs` passes 2,425 draw samples at 120Hz,
+B notches, the wall's upper limit, restored wall span and fast travel, camera-eye continuity
+and limits, nine brick hits, nine paddle catches, nine added cells with
 ball clearance, ordered typing, wiring and the exact loop state. Native evidence
-in `.impeccable/review/unbreakable-native/` covers the title, steep wall, arrival
-and gameplay, including a 320×240 still. Browser access was unavailable, so
+in `.impeccable/review/unbreakable-tall-wall-fast/` covers the title, upper wall edge,
+descent, arrival and flat view, including a 320×240 still. Browser access was unavailable, so
 these checks do not claim a fresh browser layout or interaction pass. This is
 a local film extension with no shared token or gallery identity change.
+
+Preview the [Lunar Landgrab attract study](arcade/landgrab-test.html). The
+provisional name (formerly Lunar Founder) and stable `pieces/059-moon-orchard/`
+link remain. The corrected film builds eight broad structures in two rows:
+terraces, a residential slab, linked civic towers, a stepped observatory, a
+hangar, glazed atrium, sawtooth workshop and offset offices. Their separated
+62–82px footprints, foundations, roof caps, dark side faces, floor bands and
+regular window grids replace the rejected thin crowded architecture. Orange,
+cyan, magenta and yellow facades retain the original black sky, cyan/blue
+mountains, green hills and peach road. Steel frames precede facade construction;
+floors rise in six-pixel steps under two working cranes. The attract contains
+no rover, debris, sparks, explosions, projectiles or combat. The original game
+retains its crash/rebirth behavior and manual `"wip": false`; the study remains WIP.
+
+The 23.4-second loop starts construction at .2 seconds; all eight buildings
+finish by 11.7. Cranes work through 13.7. The hangar finishes at 4.8 and opens
+at 6–6.8, without producing a rover. **LUNAR** above **LANDGRAB** assembles at
+14.8–16.17, then holds above the finished city. Camera travel at 19.4–23.4
+brings in a fresh construction site and returns to the exact opening pixels.
+The native 400×300 buffer scales without smoothing. Focus/reduced motion and
+the provenance-recorded 1200×900 fallback hold the city/title at 18 seconds.
+Shared playback, direct links, suspension, resolution limits and content hashes
+remain; no font, image dependency or extra artwork copy is added.
+
+`node scripts/check-landgrab-attract.mjs` passes 2,809 time samples and 4,174
+construction samples for eight distinct profiles, broad separated footprints,
+monotonic floors, doors/cranes, absence of destruction, title, exact loop,
+wiring, current name and statuses. Current native evidence is
+`.impeccable/review/lunar-landgrab-construction/`, including early/late
+construction, full title and a contact sheet with a 320×240 still. The older
+`lunar-landgrab-native` captures record rejected architecture. Browser host is
+unavailable; no fresh browser layout or interaction pass is claimed. Shared
+gallery tokens and the original game remain unchanged by this correction.
+
+Preview the [Onward & Upward attract study](arcade/onward-test.html). Its
+22.4-second loop flies upward into a deep course of 210 floating platforms,
+continuously flattens at 3.8–5.8 seconds, then follows fourteen independent
+jumpers until 12.8 seconds. Mint/plum ledges, pink crumbly tiles, lilac moving
+shelves and three floppy navy bag shapes with high white eyes adapt the source
+game. Jumpers take supported ballistic routes between real ledges. At
+12.8–14.8 seconds the camera rushes to the title's actual course position:
+**ONWARD** / **&** / **UPWARD**. The title holds before a gentle sky reset at
+20.8–22.4 seconds. Only the requested title appears in the artwork.
+
+Three existing painted cloud images are reused through provenance-recorded,
+content-addressed copies with identical RGBA pixels; original assets remain
+untouched. The native title PNG fallback and focus/reduced-motion still show
+the finished composition at 17.5 seconds. Study, landing and original wall
+share `arcade/onward-attract.js` and the existing controller/version helper.
+The controller keeps the fallback visible and holds the opening clock while
+clouds load; readiness also renders the reduced-motion still without starting
+an animation timer. Synchronous films retain their existing playback behavior.
+Pause, focus, hidden/player/offscreen suspension, resolution caps and direct
+`pieces/016-up-mario/` links remain. The original work stays **Always Moving
+Up** with manual `"wip": false`; the new study starts `"wip": true`.
+
+`node scripts/check-onward-attract.mjs` passes 2,689 samples and 224 supported
+landings, with at least eleven jumpers visible during flat play and maximum
+lateral air speed 282.97 below the 320-unit limit.
+`node scripts/check-attract-playback.mjs` passes readiness/fallback, held opening
+clock, synchronous-film behavior, reduced-motion loading and shared lifecycle
+checks. Native evidence in `.impeccable/review/onward-native/` covers perspective,
+crowd, rush and title at 800×600, 1200×900 and 320×240. Browser host was
+unavailable; no fresh browser layout or interaction pass is claimed. No shared
+gallery token or original-piece change follows from this local extension.
 
 `arcade/attract-player.js` is 3,480 bytes and shares the Asteroids, Snake, and Warlords renderers across their landing
 cards and original-wall links, using each film’s duration and still time. It
@@ -219,12 +303,26 @@ layer one and scroll over it. Passive scroll updates are coalesced through
 sign from full opacity to 0, reversing when scrolling back. Reduced motion
 retains this scroll-linked relationship. The top metadata band, promotional
 copy, counts, section heading, closing copy, footer and decorative numbers
-remain removed without reserving blank space. A small native
-`arcade/assets/linoleum.svg` supplies the dark-on-dark ground, adding no raster
-registry entry. Public Sans remains the utility face; skip-link hover stays
-readable on lime. Do not invent promotional/editorial interface copy.
+remain removed without reserving blank space. The Games page now uses four
+original static SVG floors: `blacklight-carpet.svg` behind the title/entry,
+`violet-ribbons.svg` in crossing, `woven-checks.svg` in counterflow and
+`plum-studs.svg` in the deck, all under `arcade/assets/`. The supplied
+blacklight-carpet photo informs the entrance colors and geometry only; no
+photographed pixels, people or shoes are reproduced. About and future
+extra-work zones retain `arcade/assets/linoleum.svg`. Public Sans remains the
+utility face; skip-link hover stays readable on lime. Do not invent
+promotional/editorial interface copy.
 
-Borderless sharp screens sit directly on the linoleum, with no card housing,
+`node scripts/build-arcade-patterns.mjs` optionally regenerates these four
+original SVGs from seeded geometry and seamless edge copies. They total
+98,496 bytes (26,678 gzip). This is a development utility: viewing the static
+site needs no generation or build step, new runtime dependency, raster asset
+or raster provenance-registry entry. Later zone backgrounds sit behind the
+screens, ignore pointer events and cover the measured runways plus half the
+inter-zone gaps. Reduced motion keeps the distinct floors full-width across
+mobile gutters without adding animation.
+
+Borderless sharp screens sit directly on the zone floors, with no card housing,
 inset borders, marquee bands, arrows, shadows, internal padding or visible
 work-name captions. Fifteen Selected Games now form four scroll zones: an
 asymmetric twelve-column entry with shallow parallax; a viewport-sticky
@@ -248,7 +346,18 @@ thumbnails preview the newly included works without adding films. Original
 wall/player behavior, original works, shared film controller, global tokens,
 issue WIP and study WIP statuses remain intact.
 
-The current scroll-zone brief is
+The current floor-material brief is
+`.impeccable/surfaces/issues-arcade-floor-patterns.md`. Evidence in
+`.impeccable/review/arcade-patterns/` includes ten current captures and two
+before captures. `checks.json` and `keyboard.json` record distinct loaded
+floors, fifteen links, six current native films, four zones, Games/About
+isolation, no overflow or browser/network errors and all fifteen keyboard
+destinations visible and unobstructed at 1440/390px. Small-screen captures
+include the 320px title and reduced-motion crossing. The fresh floor-pattern
+finish review returned **ship** after inspecting all ten current captures,
+with no material fixes; its scoped verdict is in `review.md` in that folder.
+
+The preceding scroll-zone brief is
 `.impeccable/surfaces/issues-arcade-scroll-zones.md`; the lettering and copy
 constraints remain in `.impeccable/surfaces/issues-landing-strip-copy.md`.
 `.impeccable/review/arcade-scroll-zones/checks.json` verifies fifteen links,

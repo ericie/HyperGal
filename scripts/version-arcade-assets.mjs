@@ -6,10 +6,10 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const check = process.argv.includes('--check');
-const films = ['asteroids', 'snake', 'warlords', 'command', 'unbreakable'];
-const pages = ['Issues/index.html', 'Issues/arcade/index.html',
+const films = ['asteroids', 'snake', 'warlords', 'command', 'unbreakable', 'landgrab', 'onward'];
+const pages = ['Issues/index.html', 'Issues/about.html', 'Issues/arcade/index.html',
   'Issues/arcade/attract-test.html', 'Issues/arcade/snake-test.html',
-  'Issues/arcade/warlords-test.html', 'Issues/arcade/command-test.html', 'Issues/arcade/unbreakable-test.html'];
+  'Issues/arcade/warlords-test.html', 'Issues/arcade/command-test.html', 'Issues/arcade/unbreakable-test.html', 'Issues/arcade/landgrab-test.html', 'Issues/arcade/onward-test.html'];
 const pending = new Map();
 const read = path => pending.get(path) ?? readFileSync(path, 'utf8');
 const hash = path => createHash('sha256').update(pending.get(path) ?? readFileSync(path)).digest('hex').slice(0, 12);

@@ -7,6 +7,7 @@
     magenta: '#d500c8', window: '#00bce8', yellow: '#dce000', red: '#ff3000', rock: '#8c7100', turret: '#a04018'
   };
   const SPEED = 66, GRAVITY = 420, LIFT = 225, ACCELERATION = 54, BUGGY_COUNT = 1, MAX_SAUCERS = 6;
+  const CITY_SCALE = .9;
   const SHOT_SPEED = 320, MAX_BURSTS = 3, FIRE_GAP = .22;
   // Vivid warm arcade paints; no perimeter outline.
   const ROVER_COLORS = ['#ff00b8', '#ff2548', '#d43bff', '#ff5a00'];
@@ -238,17 +239,25 @@
     return null;
   }
   function drive(r, dt) {
+    const patrolX=x=>Math.max(20,Math.min(w*.42,x));
     if(r.maneuver) {
       const plan=r.maneuver;
       const newThreat=bombs.some(b=>!b.dead && !plan.seen.has(b) && Number.isFinite(incomingTime(r,b,'bomb')))
         || turretShots.some(s=>!s.dead && !plan.seen.has(s) && Number.isFinite(incomingTime(r,s,'turret-shot')));
       if(time>plan.until || (plan.launched && r.jump===0) || plan.focus?.dead || newThreat)r.maneuver=null;
     }
-    // The opening crater introduces the death/building cycle once. Later
-    // generations use the full planner; every death still needs real contact.
-    if(deaths===0 && obstacles.some(o=>o.intro)) {
-      r.vx=approach(r.vx,Math.max(-10,Math.min(12,(cruiseX(time)-r.x)*.5)),ACCELERATION*dt);
-      r.x=boundX(r.x+r.vx*dt);r.wheelTravel+=r.vx*dt;return;
+    if(r.generation===0) {
+      // The beginner reacts to nearby hazards, but does not rehearse landings
+      // or predict the craters that airborne bombs will leave.
+      const preferred=Math.max(-10,Math.min(12,(cruiseX(time)-r.x)*.5));
+      r.vx=approach(r.vx,preferred,ACCELERATION*dt);
+      r.x=patrolX(r.x+r.vx*dt);r.wheelTravel+=r.vx*dt;
+      const near=obstacles.filter(o=>!o.dead && (o.kind!=='pit'||pitDepth(o)>3) && o.x>r.x-18)
+        .sort((a,b)=>a.x-b.x)[0];
+      const danger=near && near.x-r.x<(near.kind==='pit'?32:45)+near.size*.25;
+      const overhead=bombs.some(b=>Math.abs(b.x-r.x)<28 && b.y>ground-65 && b.y<ground-r.jump-28);
+      if(r.jump===0 && (danger||overhead)) {r.velocity=LIFT;r.jump=.1;jumps++;r.jumps++;}
+      return;
     }
     let best=null;
     if(!r.maneuver) {
@@ -259,16 +268,16 @@
         || turretShots.some(s=>!s.dead && Number.isFinite(incomingTime(r,s,'turret-shot')));
       // Rehearse takeoff AND landing. Backing off is useful when a second pit
       // would arrive during descent, while accelerating helps clear wide gaps.
-      for (const speed of [preferred, -20, -10, 8, 16, 24]) {
+      for (const speed of [preferred, -20, -10, 8, 16, 24, 36, 48]) {
         for (const delay of [Infinity, 0, .12, .28, .48, .72, 1]) {
-          if (r.jump > 0 && delay !== Infinity) continue;
+          if ((r.jump > 0 || (!focus && !evading)) && delay !== Infinity) continue;
           let x = r.x, vx = r.vx, lift = r.jump, vy = r.velocity, unsafe = 0, launched = false;
           let flight = r.jump > 0, settled = 0, elapsed = 0;
           const horizon = delay === Infinity ? 1.6 : delay + 2 * LIFT / GRAVITY + .2;
           for (let t = .04; t <= horizon; t += .04) {
             elapsed = t;
             vx = approach(vx, speed, ACCELERATION * .04);
-            x = boundX(x + vx * .04);
+            x = patrolX(x + vx * .04);
             if (!launched && lift === 0 && t >= delay) {vy = LIFT; lift = .1; launched = true; flight = true;}
             if (lift > 0) {
               lift = Math.max(0, lift + vy * .04 - GRAVITY * .04 * .04 / 2);
@@ -295,7 +304,7 @@
     }
     const plan=r.maneuver;
     r.vx = approach(r.vx, plan ? plan.speed : best.speed, ACCELERATION * dt);
-    r.x = boundX(r.x + r.vx * dt);
+    r.x = patrolX(r.x + r.vx * dt);
     r.wheelTravel += r.vx*dt;
     if (r.jump === 0 && (plan ? !plan.launched && time>=plan.launchAt : best.delay === 0 && best.score<100000)) {
       r.velocity = LIFT; r.jump = .1; jumps++; r.jumps++;if(plan)plan.launched=true;
@@ -337,8 +346,8 @@
       const x = spawn ? Math.max(44, Math.min(w*.23, part.x)) : part.x;
       const deck = spawn ? Math.max(14, ...obstacles.filter(o => !o.dead && (o.kind === 'rock' || o.kind === 'turret') && o.x > x-35 && o.x < x+90).map(o => o.size+7)) : 0;
       const b = {x, base: part.y + partBounds(part)[1]/2, source: part,
-        color: part.color, height: spawn ? 34 : 3*(part.kind === 'wheel' ? 64+i*8 : 36+i%4*8),
-        width: spawn ? 44 : 3*(14 + i%3*4), tiers: part.kind === 'wheel' ? 2 : 3,
+        color: part.color, height: spawn ? 34 : CITY_SCALE*3*(part.kind === 'wheel' ? 64+i*8 : 36+i%4*8),
+        width: spawn ? 44 : CITY_SCALE*3*(14 + i%3*4), style:mod(i*3+deaths+Math.floor(scroll/200),5), tiers: part.kind === 'wheel' ? 2 : 3,
         spawn, deck, door: 0, growth: 0, delay: spawn ? 0 : i*.045};
       part.building = b;
       if (spawn) cycle.origin = b;
@@ -427,7 +436,6 @@
       rovers.forEach(r => r.x = boundX(cruiseX(0, r)));
       // Open into an occupied sky rather than waiting for a single visitor.
       beginWave(true);
-      obstacles.push({kind:'pit',x:w*.78,size:32,intro:true});
       makeDepthLayers();
     }
     draw();
@@ -664,10 +672,14 @@
   }
   function distantCity(x, base, height, variant) {
     // Compact blue/cyan skylines sit in mountain valleys, behind the hills.
-    for (let i = 0; i < 6; i++) {
-      const bx = x + i * 11, width = 8 + (i % 2) * 3;
+    height*=CITY_SCALE;
+    const theme=mod(variant,7),count=4+theme%3;
+    for (let i = 0; i < count; i++) {
+      const bx = x + i*(10+theme%3)*CITY_SCALE, width = (8 + (i+theme)%3*2)*CITY_SCALE;
       const tall = height * (.48 + mod(i * 3 + variant, 5) * .13);
-      rect(bx + 2, base - tall - 4, width - 4, 4, C.window);
+      const roof=mod(i+theme,3);
+      if(roof===0)rect(bx+2,base-tall-4,width-4,4,C.cyan);
+      else if(roof===1)rect(bx+width*.5,base-tall-6,2,6,C.blue);
       rect(bx, base - tall, width, tall, C.blue);
       rect(bx + 2, base - tall + 2, width - 2, tall - 2, C.cyan);
       if (i % 3 === 0) rect(bx + 4, base - tall - 12, 1, 8, C.window);
@@ -675,10 +687,48 @@
         for (let wx = 3; wx < width - 1; wx += 4) rect(bx + wx, y, 2, 2, C.blue);
       }
     }
-    rect(x - 3, base - 4, 73, 5, C.blue);
+    rect(x-3,base-4,(count*(10+theme%3)+3)*CITY_SCALE,5,C.blue);
   }
-  function cityTower(x, base, height, width, tiers, paint = null) {
+  function cityTower(x, base, height, width, tiers, paint = null, style = 0) {
     const body = paint?.body ?? C.green, edge = paint?.edge ?? C.yellow, shadow = paint?.shadow ?? C.shade;
+    const windows=(left,top,span,tall,gap=7)=>{
+      for(let y=top+6;y<top+tall-3;y+=gap)for(let px=left+3;px<left+span-3;px+=6)rect(px,y,2,2,C.black);
+    };
+    if(style!==0) {
+      if(style===1) {
+        // Terraces step inward rather than repeating round balconies.
+        for(let i=0;i<4;i++) {
+          const span=width*(1-i*.19),tall=height*(.27+i*.22),left=x-span*.5;
+          rect(left,base-tall,span,tall,body);
+          windows(left,base-tall,span,height*.2,8);
+        }
+      } else if(style===2) {
+        // Unequal twin spires share a short elevated bridge.
+        const span=width*.3;
+        rect(x-width*.46,base-height*.82,span,height*.82,body);
+        rect(x+width*.14,base-height,span,height,body);
+        rect(x-width*.3,base-height*.4,width*.6,height*.07,body);
+        windows(x-width*.46,base-height*.82,span,height*.82);
+        windows(x+width*.14,base-height,span,height);
+      } else if(style===3) {
+        // A broad stepped dome on a narrow column.
+        rect(x-width*.14,base-height*.72,width*.28,height*.72,body);
+        const dome=[[x-width*.5,base-height*.58],[x-width*.5,base-height*.78],
+          [x-width*.34,base-height*.94],[x-width*.1,base-height],[x+width*.2,base-height],
+          [x+width*.45,base-height*.86],[x+width*.5,base-height*.64],[x+width*.3,base-height*.53],[x-width*.3,base-height*.53]];
+        shape(dome,body,2);windows(x-width*.42,base-height*.9,width*.84,height*.3);
+        rect(x-width*.22,base-height*.65,width*.44,2,shadow);
+      } else {
+        // Narrow offset stacks, with ledges at different heights.
+        rect(x-width*.2,base-height,width*.4,height,body);
+        for(let i=0;i<3;i++) {
+          const left=x-width*(i%2?.48:.12),top=base-height*(.25+i*.28);
+          rect(left,top,width*.6,height*.13,body);windows(left,top,width*.6,height*.13,6);
+        }
+      }
+      rect(x-width*.45,base-7,width,8,body);
+      return;
+    }
     rect(x - 3, base - height, 8, height, edge);
     rect(x - 4, base - height, 6, height, body);
     rect(x, base - height - 10, 2, 12, edge);
@@ -697,13 +747,15 @@
     rect(x - width*.45, base - 7, width, 8, body);
   }
   function hillCity(x, base, height, variant) {
-    // Stacked windowed pods and antennae echo the reference's lunar cities.
-    cityTower(x, base, height * .8, 27, 3);
-    cityTower(x + 30, base, height * .58, 34, 2);
-    cityTower(x + 62, base, height * (variant ? 1 : .92), 29, 3);
-    rect(x - 6, base - height*.2, 76, 4, C.yellow);
-    rect(x - 8, base - height*.2, 76, 3, C.green);
-    for (let wx = 0; wx < 63; wx += 7) rect(x + wx, base - height*.2 + 1, 4, 1, C.black);
+    const theme=mod(variant,7),scale=CITY_SCALE;
+    height*=scale;
+    cityTower(x,base,height*(.64+theme%3*.08),(24+theme%2*5)*scale,2,null,theme%5);
+    cityTower(x+(28+theme%3*3)*scale,base,height*(.48+theme%4*.09),32*scale,3,null,(theme+2)%5);
+    cityTower(x+(58+theme%2*7)*scale,base,height*(.82+theme%2*.15),27*scale,3,null,(theme+4)%5);
+    if(theme%2===0) {
+      rect(x-6*scale,base-height*.2,70*scale,3,C.shade);
+      rect(x-6*scale,base-height*.2,70*scale,2,C.green);
+    }
   }
   const buildingExit = b => b.x+b.width*(b.spawn ? .5 : .55);
   function alienBuilding(b) {
@@ -724,11 +776,10 @@
       for(let y=floor-29*g+3;y<floor-29*g+shutter-1;y+=4)rect(right-24*g,y,20*g,1,C.black);
       return;
     }
-    cityTower(b.x,floor,height,width,b.tiers,{body:b.color,edge:C.black,shadow:C.black});
+    cityTower(b.x,floor,height,width,b.tiers,{body:b.color,edge:C.black,shadow:C.black},b.style);
     // The other wreck fragments retain their large windowed towers.
     rect(b.x-width*.45,floor-28*g,width,28*g+Math.max(0,b.base-floor),b.color);
     for(let x=b.x-width*.35;x<b.x+width*.45;x+=9)rect(x,floor-22*g,3,3,C.black);
-    rect(b.x-width*.4,floor-height+2,width*.8,2,C.white);
     if(b.source.kind==='wheel' && g>.35)wreckPart({...b.source,x:b.x,y:floor-height*.54,angle:0});
   }
   function landscape() {
@@ -747,7 +798,7 @@
         const px = (i * 47 + 11) % 330, py = base - height * (.12 + (i % 4) * .055);
         rect(x + px, py, 3 + i % 4, 2, C.blue);
       }
-      distantCity(x + 236, ground - nearHeight*.22, Math.min(54, h*.16), mod(tile + Math.floor(scroll*.18/340), 3));
+      distantCity(x + 236, ground - nearHeight*.22, Math.min(54, h*.16), tile + Math.floor(scroll*.18/340));
     }
     drawDepthLayer(depthLayers[0]);
     const nearOffset = mod(scroll * .46, 290);
@@ -755,7 +806,7 @@
       const x = tile * 290 - nearOffset;
       const worldTile = tile + Math.floor(scroll*.46/290);
       // Draw before the hill silhouette so foothills conceal the foundations.
-      if (mod(worldTile, 2) === 0) hillCity(x + 132, ground + 4, Math.min(98, h*.29), mod(worldTile, 4) === 0);
+      if (mod(worldTile, 2) === 0) hillCity(x + 132, ground + 4, Math.min(98, h*.29), worldTile);
       const hills = [[-12,0],[23,.23],[61,.78],[76,.87],[95,.62],[126,.46],[145,.07],[180,.24],[214,.59],[229,.68],[255,.3],[290,0]];
       shape([...hills.map(([px, py]) => [x + px, ground - nearHeight * py]), [x+290, ground+8], [x-12,ground+8]], C.green, 2);
       shape([[x+76,ground-nearHeight*.87],[x+126,ground-nearHeight*.46],[x+96,ground-nearHeight*.44],[x+104,ground-nearHeight*.52]], C.shade, 2);
@@ -904,7 +955,7 @@
   canvas.addEventListener('click', toggle);
   addEventListener('keydown', e => {
     if (e.code === 'Space' || (e.code === 'Enter' && document.activeElement === canvas)) {e.preventDefault(); if (!e.repeat) toggle();}
-    if (e.code === 'KeyS') {draw(); const a = document.createElement('a'); a.download = 'lunar-founder.png'; a.href = canvas.toDataURL('image/png'); a.click();}
+    if (e.code === 'KeyS') {draw(); const a = document.createElement('a'); a.download = 'lunar-landgrab.png'; a.href = canvas.toDataURL('image/png'); a.click();}
   });
   addEventListener('resize', resize);
   document.addEventListener('visibilitychange', () => {last = 0;});

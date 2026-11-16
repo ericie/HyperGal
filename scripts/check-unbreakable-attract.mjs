@@ -5,8 +5,12 @@ import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const source=fs.readFileSync(root+'Issues/arcade/unbreakable-attract.js','utf8');
-const env={window:{}};vm.createContext(env);vm.runInContext(source,env);
+const env={window:{}};vm.createContext(env);vm.runInContext(source.replace('window.UnbreakableAttract={','window.testGeometry={cuts,firstWallRow,wallTop};window.UnbreakableAttract={'),env);
 const art=env.window.UnbreakableAttract;
+const geometry=env.window.testGeometry;
+assert.equal(geometry.cuts.B.length,3,'both B glyphs need two counters plus a right-edge notch');
+assert(geometry.cuts.B[2].some(([x])=>x>=1)&&geometry.cuts.B[2].some(([x])=>x<.9),'notch must bite into the right edge');
+assert((geometry.firstWallRow*24+1-300)/50+2>=geometry.wallTop,'no masonry can extend above the title plane');
 const context=new Proxy({},{get:(obj,key)=>obj[key]||((...args)=>{
  for(const value of args)if(typeof value==='number')assert(Number.isFinite(value),`nonfinite ${key}`);
 }),set:(obj,key,value)=>(obj[key]=value,true)});
@@ -21,12 +25,15 @@ for(const row of [0,1]){
  assert(letters.every(l=>l.height===291));
  for(let i=1;i<letters.length;i++)assert(Math.abs(letters[i].x-letters[i-1].x-letters[i-1].width-4)<1e-9);
 }
-let samples=0,lastCamera=art.cameraState(0);
+let samples=0,lastCamera=art.cameraState(0),maxEyeZ=-Infinity;
 for(let t=0;t<art.duration;t+=1/120){
  const state=art.draw(canvas,t),c=state.camera;
  assert(c.pitch>=.24-1e-9&&c.pitch<=Math.PI/2+1e-9);
- assert(Math.abs(c.z-lastCamera.z)<.34,'continuous bounded camera travel');
+ assert(Math.abs(c.z-lastCamera.z)<1.2,'continuous bounded camera travel');
  assert(Math.abs(c.pitch-lastCamera.pitch)<.02,'no projection snap');
+ assert(c.eyeZ<7,'camera must never pass below the paddle');
+ maxEyeZ=Math.max(maxEyeZ,c.eyeZ);
+ if(t>art.diveAt)assert(c.eyeZ>=lastCamera.eyeZ-1e-8,'camera eye approaches without backing away');
  if(t>art.playAt&&t<art.clearAt){
   assert(Math.abs(c.pitch-Math.PI/2)<1e-9);assert(state.ballPoint&&state.paddlePoints);
   assert(state.ballPoint.every(Number.isFinite));
@@ -34,13 +41,16 @@ for(let t=0;t<art.duration;t+=1/120){
  lastCamera=c;samples++;
 }
 assert(art.cameraState(art.diveAt).pitch<.25,'steep wall');
-assert(art.cameraState(art.flattenAt).z-art.cameraState(art.diveAt).z>120,'long dolly');
+const distance=art.cameraState(art.playAt).z-art.cameraState(art.diveAt).z;
+assert.equal(distance,128,'restore the tall wall span while preserving fast timing');
+assert(art.playAt-art.diveAt<2,'travel and flatten should complete quickly');
+assert(art.flattenAt<art.playAt&&art.cameraState(art.flattenAt+.1).flat>0,'flattening must begin during approach');
 for(const boundary of [art.tiltAt,art.diveAt,art.flattenAt,art.playAt,art.clearAt]){
  const a=art.cameraState(boundary-1e-7),b=art.cameraState(boundary+1e-7);
- for(const key of ['pitch','z','distance','roll'])assert(Math.abs(a[key]-b[key])<1e-5,`camera boundary ${boundary} ${key}`);
+ for(const key of ['pitch','z','distance','roll'])assert(Math.abs(a[key]-b[key])<(key==='z'?3e-5:1e-5),`camera boundary ${boundary} ${key}`);
 }
 let lastBricks=0,lastHits=0,lastBounces=0;
-for(let t=6.8;t<art.typeAt;t+=1/240){
+for(let t=art.playAt-3.2;t<art.typeAt;t+=1/240){
  const g=art.gameState(t);assert(g.x>=7-1e-6&&g.x<=793+1e-6);assert(g.y<=543+1e-6);
  assert(g.placed.length>=lastBricks&&g.placed.length-lastBricks<=1,'only add one brick per contact');
  assert(g.placed.length<=g.hits&&g.hits>=lastHits&&g.bounces>=lastBounces);
@@ -55,7 +65,7 @@ for(let t=6.8;t<art.typeAt;t+=1/240){
 assert(lastHits>=8&&lastBounces>=7&&lastBricks>=8,'sustained reverse gameplay');
 for(let i=0;i<11;i++)assert.equal(art.titleState(art.typeAt+i*art.cadence+.001).count,i+1,'ordered title typing');
 assert.equal(art.draw(canvas,art.typeAt-.001).visibleBricks,0,'empty field before retyping');
-assert(art.draw(canvas,23).title.complete);
+assert(art.draw(canvas,art.duration-.5).title.complete);
 assert.deepEqual(art.draw(canvas,art.duration),opening,'loop repeats exact state');
 assert.deepEqual(art.draw(canvas,-1),art.draw(canvas,art.duration-1));
 assert.deepEqual(art.draw(canvas,1),art.draw(canvas,art.still));
@@ -68,4 +78,4 @@ assert(fs.readFileSync(root+'Issues/arcade/attract-player.js','utf8').includes('
 assert(fs.readFileSync(root+'Issues/arcade/index.html','utf8').includes('data-game="unbreakable" data-attract="unbreakable"'));
 assert.equal(JSON.parse(fs.readFileSync(root+'Issues/arcade/unbreakable-test.meta.json','utf8')).wip,true);
 assert.equal(JSON.parse(fs.readFileSync(root+'pieces/003-unbreakable/meta.json','utf8')).wip,false);
-console.log({samples,hits:lastHits,paddleBounces:lastBounces,addedBricks:lastBricks,letters:11,rows:['UNBRE','AKABLE'],loop:art.duration});
+console.log({samples,hits:lastHits,paddleBounces:lastBounces,addedBricks:lastBricks,letters:11,rows:['UNBRE','AKABLE'],travel:distance,approachSeconds:art.playAt-art.diveAt,maxEyeZ,loop:art.duration});

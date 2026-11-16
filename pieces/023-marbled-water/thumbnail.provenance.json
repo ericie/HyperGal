@@ -1,8 +1,7 @@
 {
   "type": "runtime-screenshot",
-  "source": "index.html?seed=water-v14&panel=0",
-  "rendererVersion": "V14",
-  "capturedAt": "2026-09-16",
-  "processing": "Center crop to 720 by 720 pixels; JPEG quality 88",
-  "description": "Actual evolving procedural pigment surface, captured from the local running artwork. No generated image assets."
+  "source": "/pieces/023-marbled-water/index.html?seed=water-v14&panel=0",
+  "capturedAt": "2026-11-15T14:51:26.315Z",
+  "reducedMotion": "no-preference",
+  "processing": "Direct 720 x 720 browser capture; control panels hidden; JPEG quality 88"
 }

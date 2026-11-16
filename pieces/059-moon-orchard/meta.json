@@ -1,10 +1,10 @@
 {
-  "title": "Lunar Founder",
+  "title": "Lunar Landgrab",
   "year": 2026,
   "date": "2026-10-05",
   "category": "games",
   "type": "interactive",
   "wip": false,
   "thumbnail": "thumbnail.png",
-  "description": "A self-playing lunar patrol with fixed paired fire limited to three airborne bursts. Darker tires match the buggy\u2019s body hue. Tiny UFOs hover over static parallax cities. Wreckage grows into large towers, and a replacement buggy emerges from a compact garage. Click or Space pauses; S saves a picture."
+  "description": "A self-playing lunar patrol with fixed paired fire limited to three airborne bursts. Darker tires match the buggy\u2019s body hue. Tiny UFOs hover and drop occasional bombs over static parallax cities. Wreckage grows into large towers, and a replacement buggy emerges from a compact garage. Click or Space pauses; S saves a picture."
 }
