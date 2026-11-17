@@ -16,7 +16,7 @@
     paddle: { title:['PADDLE'], ink:'#d4ffff', acid:'#f63523', color:'#e93621', crop:[.5,.65], font:'Permanent Marker', cut:1 },
     mario: { title:['MANY','MARIO'], ink:'#fff226', acid:'#ed261e', color:'#253ced', crop:[.5,.66], font:'Bangers', cut:0 },
     unbreakable: { title:['UNBREAKABLE'], ink:'#d5ffff', acid:'#fa22a1', color:'#eb2998', crop:[.5,.63], font:'Rubik Dirt', cut:1 },
-    tetris: { title:['MICRO','TETRIS'], ink:'#caff2c', acid:'#7d28f4', color:'#7034d9', crop:[.53,.64], font:'Bangers', cut:2 }
+    tetris: { title:['BITSY','BLOCKS'], ink:'#caff2c', acid:'#7d28f4', color:'#7034d9', crop:[.53,.64], font:'Bangers', cut:2 }
   };
   const images = new Map(), pending = new Map();
   function load(key) {

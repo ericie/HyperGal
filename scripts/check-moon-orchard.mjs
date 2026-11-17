@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const source = fs.readFileSync(new URL('../pieces/059-moon-orchard/orchard.js', import.meta.url), 'utf8').replace(/\}\)\(\);\s*$/, `
   globalThis.check = {
-    update, draw, resize, toggle, crater, collision, explode, updateWreck, terrainY, partBounds, makeRover, beginWave, updateWaves, spawnSaucer, ufoY, UFO_TYPES, spawnTurret, updateTurrets, fireWeapons, gunMuzzles, activeBurstCount, firingOpportunity, targetPosition, segmentBox, updateDepthLayers, drawDepthLayer, depthBase, buildingExit, fillCityGround,
+    update, draw, resize, toggle, crater, collision, explode, updateWreck, terrainY, partBounds, makeRover, beginWave, updateWaves, spawnSaucer, ufoY, UFO_TYPES, spawnTurret, updateTurrets, fireWeapons, gunMuzzles, activeBurstCount, firingOpportunity, targetPosition, segmentBox, updateDepthLayers, drawDepthLayer, depthBase, buildingExit, fillCityGround, spawnGroundPattern, GROUND_PATTERNS,
     stepWreck(dt, moving=false) {const travel=moving?SPEED*dt:0; scroll+=travel; obstacles.forEach(o=>o.x-=travel); updateWreck(dt,travel);},
     buggyX: () => rovers[0].x,
     quiet() { obstacleClock=ufoClock=turretClock=1e6; ufos=[]; turretShots=[]; waveQueue=[]; obstacles=obstacles.filter(o=>o.kind!=='turret'); rovers.forEach(r=>r.shotClock=1e6); },
@@ -68,19 +68,19 @@ for (const [width,height] of [[1280,720],[390,844],[844,390]]) {
     if(i % 120 === 0) check.draw();
   }
   assert.ok(aliveSum/10800>=.25 && saucerSum/10800<=6,'the patrol and slower rebirth sequence both run with fewer saucers');
-  assert.equal(encounteredTypes.size,4,'all four UFO types appear during natural waves');
+  assert.equal(encounteredTypes.size,5,'all five UFO types appear during natural waves');
   assert.ok(sawTurret && sawTurretShot,'ground turrets spawn and fire during natural play');
   assert.ok(shotLog.length>30,'paired fixed firing occurs throughout natural play');
   assert.ok(shotLog.filter(s=>s.hit).length/shotLog.length>.1,'fixed paired bursts connect with real threats');
   assert.ok(forward && backward && maxX-minX > check.state.w*.08, 'rover travels both directions over a substantial range');
-  assert.ok(maxJump > 55 && maxJump < 64, 'controlled automatic hops');
+  assert.ok(maxJump > 40 && maxJump < 46, 'lower controlled hops');
   assert.ok(sawSmall && sawBig, 'both rock sizes spawn');
   assert.ok(check.state.deaths > 0 && check.state.deaths <= 6, 'occasional crashes rather than repeated routine collisions');
   assert.ok(crashTimes.length===0 || crashTimes[0]>6,'no scripted drive into an opening ditch');
   assert.ok(crashTimes.length<2 || crashTimes[1]-crashTimes[0]>25,'learned driver gets a longer patrol after the first death');
-  assert.ok(rearFrames/drivingFrames>.9,'buggy spends almost all driving time toward the rear');
+  assert.ok(rearFrames/drivingFrames>.8,'buggy stays toward the rear while advancing through denser ground phrases');
   assert.ok(turretTimes.slice(1).some((t,i)=>t-turretTimes[i]>16),'turret pacing includes long empty stretches');
-  for (const color of ['#000000','#1024ff','#00a4bc','#00d950','#ffa65c','#ff00b8']) assert.ok(sim.colors.has(color), 'reference palette is rendered');
+  for (const color of ['#25232b','#dcc3f5','#b7a8c9','#7fc9ba','#ffedca','#ff792e']) assert.ok(sim.colors.has(color), 'reference palette is rendered');
   assert.equal(sim.textCalls,0,'no canvas text or score');
   sim.events.keydown({code:'Space', repeat:false, preventDefault(){}});
   const frozen = check.state.time, frozenX = check.buggyX();
@@ -191,6 +191,33 @@ assert.equal(recovery.state.rovers.length,1,'exactly one buggy after recovery');
 console.log('Single-buggy population and recovery passed.');
 
 }
+// Lower peak, preserved airtime: ground rhythm must not stretch or compress.
+for(const dt of [1/60,1/30,1/25]) {
+ const c=setup().check;c.quiet();c.scene={obstacles:[],bombs:[],ufos:[],shots:[],jump:.1,velocity:157.5};
+ c.state.rovers[0].generation=1;let peak=0,airtime=0;
+ while(c.state.jump>0&&airtime<2){c.update(dt);airtime+=dt;peak=Math.max(peak,c.state.jump);}
+ assert.ok(peak>41&&peak<43,'hop peaks near42 logical units, thirty percent below the prior60');
+ assert.ok(airtime>1.03&&airtime<1.12,'jump airtime keeps the ground phrases on their existing beat');
+}
+console.log('Lower hop peak and preserved airtime passed at60/30/25fps.');
+
+// Authored ground phrases are playable shooting/jumping sequences, not random walls.
+for(const width of [390,1280])for(const dt of [1/60,1/25])for(let pattern=0;pattern<5;pattern++) {
+ const c=setup(width,720).check;c.quiet();c.scene={obstacles:[],bombs:[],ufos:[],shots:[]};
+ const r=c.state.rovers[0];r.generation=1;r.shotClock=0;const rest=c.spawnGroundPattern(pattern);
+ const sequence=c.state.obstacles.slice();
+ assert.ok(sequence.length>=3,'each phrase has several real ground hazards');
+ assert.ok(rest>sequence.at(-1).beat/66+1.6,'phrase ends with landing/recovery space');
+ if(pattern===1)assert.ok(sequence.filter(o=>o.chip&&o.size<10).length>=2,'short low chips require hopping');
+ for(let t=0;t<16;t+=dt)c.update(dt);
+ assert.equal(c.state.deaths,0,`learned driver can clear ${c.GROUND_PATTERNS[pattern].name} at ${Math.round(1/dt)}fps`);
+ assert.ok(c.state.jumps>=2,'ground phrase calls for repeated timed hops');
+ assert.equal(c.state.obstacles.length,0,'phrase is cleared by gunfire and jumps');
+}
+const lowChips=setup().check;lowChips.quiet();lowChips.scene={obstacles:[{kind:'rock',size:6,x:lowChips.buggyX()+100,hp:1,chip:true}],bombs:[],ufos:[],turretShots:[]};
+assert.equal(lowChips.firingOpportunity(),false,'fixed forward barrel does not waste bursts on chips below its lane');
+console.log('Five ground phrases, low chips, repeated hops, landing rests and 60/25fps clearance passed.');
+
 // The first buggy reacts to a ditch; experience adds actual landing foresight.
 for(const generation of [0,1]) {
  const c=setup().check;c.quiet();const r=c.state.rovers[0];r.generation=generation;
@@ -370,9 +397,9 @@ const paintContrast = (a,b) => (Math.max(paintLuminance(a),paintLuminance(b))+.0
 let lastColor=null;
 for(let generation=0;generation<32;generation++) {
   const r=colored.makeRover(0,generation);
-  assert.ok(['#ff00b8','#ff2548','#d43bff','#ff5a00'].includes(r.color),'every buggy generation contrasts with the blue/cyan/green landscape');
+  assert.ok(['#ff792e','#ed4c95','#b271e5','#ed5949'].includes(r.color),'every buggy generation contrasts with the blue/cyan/green landscape');
   assert.ok(paintLuminance(r.color)>.18,'buggy paint stays vivid instead of muddy');
-  const rgb=[1,3,5].map(i=>parseInt(r.color.slice(i,i+2),16));assert.equal(Math.max(...rgb),255,'every paint has a fully saturated arcade channel');
+  const rgb=[1,3,5].map(i=>parseInt(r.color.slice(i,i+2),16));assert.ok(Math.max(...rgb)>=220,'every generation keeps bright illustrated paint');
   assert.equal(new Set(r.tireColors).size,1,'all tires share one darker shade');
   assert.notEqual(r.color,r.tireColors[0],'tires are darker than the body');
   for(const i of [1,3,5])assert.ok(Math.abs(parseInt(r.tireColors[0].slice(i,i+2),16)-parseInt(r.color.slice(i,i+2),16)*.55)<=.5,'tire RGB channels preserve the body hue at lower brightness');
@@ -397,7 +424,7 @@ lineage.forEach(({b,color})=>assert.equal(b.color,color,'old buildings keep thei
 
 // UFO variants really differ in flight, armor and ordnance, and shots consume
 // their armor one hit at a time rather than merely changing sprite color.
-for(const type of ['scout','bomber','dart','carrier']) {
+for(const type of ['scout','bomber','dart','carrier','triad']) {
  const c=setup().check;c.quiet();
  c.spawnSaucer({type,x:c.state.w*.65,direction:-1,slot:0});
  const u=c.state.ufos[0],hp=u.hp;u.drop=1e6;
@@ -406,6 +433,24 @@ for(const type of ['scout','bomber','dart','carrier']) {
   assert.equal(c.state.ufos.includes(u),i<hp-1,`${type} needs its full armor hit count`);
  }
 }
+// Three-sphere ships bypass the ordinary drop gap, retaining the shared bomb cap.
+const dropRuns={};
+for(const type of ['bomber','triad']) {
+ const c=setup().check;c.quiet();c.scene={obstacles:[],bombs:[],ufos:[],shots:[]};
+ c.spawnSaucer({type,x:c.state.w*.85,direction:-1});c.state.ufos[0].vx=0;
+ const seen=new Set(),drops=[];
+ for(let i=0;i<6*60;i++) {
+  c.update(1/60);assert.ok(c.state.bombs.length<=3,'rapid drops retain the shared three-bomb cap');
+  for(const b of c.state.bombs)if(!seen.has(b)){seen.add(b);drops.push(c.state.time);assert.equal(b.vx,0,'new variant bombs fall vertically');if(type==='triad')assert.ok(b.vy>=50,'triad bombs descend faster');}
+ }
+ dropRuns[type]=drops;
+}
+assert.equal(dropRuns.triad.length,4,'three-sphere ship uses its larger bomb payload');
+assert.ok(dropRuns.bomber.length>=2);
+for(let i=1;i<dropRuns.triad.length;i++)assert.ok(dropRuns.triad[i]-dropRuns.triad[i-1]<1.15,'rapid cadence actually bypasses the ordinary shared cooldown');
+assert.ok(dropRuns.bomber[1]-dropRuns.bomber[0]>3,'ordinary ships retain their slower cadence');
+assert.ok(setup().check.UFO_TYPES.triad.hp>setup().check.UFO_TYPES.carrier.hp,'three-sphere ship has heavier armor than a carrier');
+console.log('Three-sphere UFO: four-hit armor, rapid vertical drops, larger payload and shared bomb cap passed.');
 const formation=setup().check;formation.quiet();formation.beginWave();
 assert.equal(formation.state.waveQueue.length,3,'bomber wave schedules a formation');
 formation.updateWaves(.01);assert.equal(formation.state.ufos.length,1,'first wave member enters');
@@ -419,7 +464,7 @@ assert.equal(formation.state.waveNumber,wave+1,'quiet gap ends with a new wave')
 const delays=formation.state.waveQueue.map(u=>u.delay);
 formation.explode(formation.state.rovers[0],{kind:'rock'});formation.updateWaves(10);
 assert.deepEqual(formation.state.waveQueue.map(u=>u.delay),delays,'wave arrivals pause through the rebirth sequence');
-console.log('Body hues, darker matching tires, wreck/building color inheritance, four UFO armor types, staggered waves, quiet gaps and rebirth-safe arrivals passed.');
+console.log('Body hues, darker matching tires, wreck/building color inheritance, five UFO armor types, staggered waves, quiet gaps and rebirth-safe arrivals passed.');
 
 // Real ground emplacements aim in both directions, fire, take damage and stop
 // fighting while the death/building/origin sequence is being played out.

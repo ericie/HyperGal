@@ -1,109 +1,85 @@
 # Many Frogs
 
-A Frogger variation on one fixed screen with a continuous stream of autonomous
-frogs entering from the bottom edge. A field runs along the bottom, a field runs along the top, and a
-road band between them takes eighty percent of the screen height. Every frog acts as an
-independent player, weighing progress in its own heading, nearby traffic,
-lateral escape routes, and its own appetite for risk before making each move.
-Frogs also reserve their routes and landing spaces, so they wait or reroute
-instead of stacking or passing through one another. They occasionally encounter
-flies hovering over the fields. Catching one immediately adds three new frogs in
-the collector's exact pigment, placed in nearby open turf before joining the
-same route planner. Each fly can be caught only once per run.
+A close view of one lane of traffic. A finite group starts evenly split between
+the two banks, attempts one crossing, and leaves through the far side when successful.
+A surviving count decreases only when a frog is hit. There are no return
+journeys, replacements, labels, or controls.
 
-New frogs enter on a timed cadence, independently of wins, deaths, or surviving
-frogs. The interval is `clamp(48 / columns, 0.9, 1.8)` seconds. Entrants use
-varied horizontal positions and reserve a clear landing space; a crowded entry
-retries after 0.15 seconds. Live population is limited to
-`clamp(round(columns * 1.2), 24, 80)` to keep the simulation bounded. Dead bodies
-are retired while their pigment histories remain. Flies can still add offspring
-within the same population limit.
+## Crossing
 
-The crossing never ends. Reaching the opposite edge at any horizontal position
-counts as one completed crossing, grows the frog, and reverses its heading.
-The survivor then shifts along that safe bank to a new departure column at least
-24% of the board width away (and at least two tiles). It favors that relocation
-before entering traffic again, so successive crossings use different columns.
-Newborns start at 0.24 tile body scale; wins increase it with diminishing steps,
-using `0.24 + 0.065 * sqrt(crossings)`. Spawning and resting at an edge do not
-count as wins. There are no visible counters, markers, controls, or other text.
+The single lane fills the middle 78% of the viewport, with 11% grass banks
+above and below. Five logical rows are projected into those bands. Horizontal
+scale remains one fifth of the viewport height, while vertical positions use
+a matching inverse projection. Hops interpolate in screen space so frogs take
+normal-sized steps across the wide road and narrow banks.
 
-Before committing, a frog checks the full landing window—including its complete
-path through moving traffic—and runs a rolling three-move search across the
-safest future routes. The planner weighs hazard timing, escape options, edge
-risk, boulders, shore relocation, and spaces reserved by the other frogs before
-every hop. Cars remain lethal throughout a hop.
+A finite group of `clamp(ceil(columns * 7 / 2) * 2, 24, 112)` frogs starts together
+with half on each bank, facing the road. All are visible immediately and can begin crossing after a
+short individual hesitation of 0.12–1.32 seconds. No frogs are released later or
+replaced. Frogs may overlap freely while waiting and crossing.
 
-The board uses tiles close to twenty-two pixels. Rows come in groups of ten and
-the tile fits their total to the screen height, keeping the road at exactly 80%
-and each field at 10%. At 1440 × 900 the board has sixty-four columns, forty rows,
-and thirty-two road lanes. Lanes alternate heading down the band, and pace and
-gaps are drawn per row so no two read as one moving block. Gaps are wide—a frog
-has dozens of lanes to thread and needs a readable window in every one. Boulders
-create route-planning obstacles on the fields, clear of the two turnaround rows.
-Each frog leaves a persistent, irregular pigment path along its actual movement,
-including partial hops and retreats. Paths begin as barely deposited pigment.
-Survival strengthens the whole existing route, broadening its wash and deepening
-its pigment. Density follows maturity squared, making early marks much fainter
-while allowing long-lived frogs to build strong routes. The frog itself becomes
-more vivid in the same hue. Age follows a gradual curve with a thirty-second
-time constant; newborns start from their family's original pigment. A dead
-frog's route freezes at its final strength and remains as later frogs arrive.
+The only visible text is a bare surviving count on the upper bank. It starts
+at the number of frogs in the group and decreases once per traffic death.
+Successful crossings and exits do not reduce it. Resize preserves the group
+and count; a new round resets both.
 
-Each death slowly blooms into a stationary layered watercolor stain with a
-feathered edge, dried tide line, stipple, and angular event marks. Longer-lived
-frogs leave larger death splashes, approaching 3.8 times a newborn's linear
-splash size. Passing cars leave paths and splashes untouched and stay pale.
-Arrivals continue on the same cadence even after the last living frog dies;
-there is no cohort reset or aftermath pause.
+Each frog chooses among up, down, left, right, and wait moves.
+Each hop covers 9–12% of the road height and takes 0.24 seconds, requiring
+roughly nine to twelve jumps to cross the road. Continuous landing
+positions, boldness, and patience
+produce different attempts. Hops stay strictly horizontal or vertical, without
+sideways or vertical drift. The planner uses a three-move look-ahead with beam
+width five. Cars travel in one direction through the single lane. Each car has
+its own deterministic body size, length, entry time, and speed. Body sizes vary
+from 0.72 to 1.28 times the base shape and desired speeds from 2.4 to 6.2 scale
+units per second. Entries are spaced about 2.7 seconds apart with timing variation.
+A faster follower's travel speed is capped when necessary to preserve a 0.35-unit
+gap until its predecessor leaves the visible road. The resulting per-car
+trajectory is shared by drawing, planning, and collision detection.
 
-The drawing uses a ghost field-print language. Every surface, machine, and
-obstacle starts in whites and light grays at low contrast. Frogs, their marks,
-and their death splashes supply all color. The view stays
-overhead, but each solid rises off the ground on one shallow isometric angle: it
-keeps the footprint the simulation gave it, sweeps walls up to a lit face offset
-toward the same corner, and casts one soft print away from the light. Cars are simplified overhead silhouettes with one pale body, one window, and
-a small soft shadow. They have no tires, lamps, raised cabins, or surface marks.
-Boulders taper as they rise and take facets on the lit cap. The turf keeps mown
-bands and scattered clover, and the road keeps polished wheel tracks and patched
-seams. Frogs have narrow anatomical bodies and articulated folded legs, without
-smiles or white eye discs. Fixed substrate pits, irregular contours, incised
-lines, and worn road paint belong to the objects and terrain instead of
-flickering over the screen. The frogs use a close family of natural
-pigments—madder, oxblood, oxide, umber, and plum—instead of a spectral rainbow.
-Every bloodstain keeps the pigment of the frog that left it.
+Cars use a transparent top-down schematic with neutral outlines for the body,
+tires, roof, windows, and hood. Death marks remain visible through them.
+Drivers look 1.4 seconds ahead for crossing frogs, steer toward the clearer side,
+and return toward the center afterward. Waiting frogs on the bank do not trigger
+evasion. Steering is gradual, stays inside the road, and can still fail to avoid
+a collision. The body turns with its lateral movement.
 
-The frogs play continuously on their own. Reduced-motion preferences remove the
-limb extension and death particles while preserving the simulation.
+Collision checks use each car's translated and rotated footprint, with sampled
+steering forecasts for future landing windows. The bounded traffic cache retains
+256 profiles; old longitudinal profiles can be reconstructed deterministically.
+Actual hop positions are checked throughout an attempt.
 
-The piece is one self-contained HTML file with no runtime dependencies. Open
-`index.html` directly in a modern browser.
+Reaching the far bank records one success. The frog keeps its original crossing direction and
+walks out through the opposite edge; it is then retired without making a death mark.
+Traffic hits end an attempt immediately and leave a stationary impression.
+Rocks, flies, reproduction, return targets, and repeated crossings are absent.
 
-## Performance
+## Marks
 
-Terrain definitions and obstacles are cached, and a resize clears them because
-the board size decides the layout. Traffic clearance is solved over the complete
-swept interval of each landing window; the planner never allocates a full row of
-traffic for each sample. Distant frog reservations are rejected before predicting
-their positions. The three-move look-ahead remains.
+Frogs leave no movement trails, pause deposits, or revisit marks. A frog's body
+becomes more vivid with survival, using maturity `1 - exp(-age / 12)`. It starts
+at 0.24 tile body scale and grows once on crossing successfully, before leaving
+through the opposite edge.
 
-Terrain impressions are cached per row as rasters. Each stationary death
-impression is printed to a small offscreen canvas once and reused. The latest
-640 stains are retained, bounding long-running history. The path
-archive retains up to 128 routes, retiring completed routes first, with at most
-1,024 turning points per route. Straight movement extends a segment rather than
-storing every frame. Sample geometry is cached, and the combined path impression
-refreshes at most ten times per second. Resize rebases stored routes and rebuilds
-the impression. Vehicles outside the viewport are skipped before drawing.
-Hidden tabs stop animation frames completely and resume without catching up.
+Each traffic death leaves one small X at the hit position in the frog's color.
+Every X has the same size and stroke weight, with no splatter, bloom, texture,
+or particles. Cars neither smear nor collect these marks. The most recent
+640 marks are retained. Resize rebases live frogs and marks. Hidden tabs pause
+the round without time catch-up.
 
-Run `node scripts/check-many-frogs.mjs` from the repository root for layout,
-collision, continuous arrivals before any win, changing departure columns,
-growth per winning pass, wordless rendering, path density buildup,
-stationary pigment under traffic, pale cars, shuttle turnaround, cache,
-visibility, resize, and lifecycle checks.
-Add `--benchmark` for a seeded 60-second simulation-only timing run.
-`--baseline=/path/to/old/index.html` compares an earlier self-contained version
-and verifies the same final state. The timing test does not measure browser
-rasterization; an earlier version's live sample of update plus draw at 1440 × 900 recorded
-a 2.6 ms median, 3.4 ms p95, and 6.3 ms worst frame over 1940 frames.
+The piece is one self-contained HTML file with no renderer dependencies. Open
+`index.html` directly in a modern browser. Reduced-motion mode makes hops
+immediate while retaining the simulation.
+
+## Verification
+
+Run `node scripts/check-many-frogs.mjs` from the repository root. It checks the
+78% single-lane layout, per-car size/speed variation, following gaps, swept
+collisions, a finite initial group and death-only countdown, single-pass success
+and exit in both directions, traffic deaths, cardinal-only hops, neutral
+cars, stationary X marks, retained death marks, visibility, responsive resize,
+counter-only visible text, and normal/reduced-motion lifecycle.
+
+Add `--benchmark` for a seeded 60-second simulation-only timing run. This excludes
+browser rasterization. Historical timing results elsewhere in the repository
+predate this single-lane version.

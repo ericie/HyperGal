@@ -6,16 +6,16 @@
   const clamp=n=>Math.max(0,Math.min(1,n)),mix=(a,b,p)=>a+(b-a)*p;
   const ease=n=>{n=clamp(n);return n*n*(3-2*n);};
   const wrap=n=>{const t=n%duration;return t<0?t+duration:t;};
-  // Broad, distinct footprints: four civic blocks behind four low workplaces.
+  // Low pressure habitats, service modules and observatories in two depth planes.
   const buildings=[
-    {id:'terraces',site:0,x:12,width:68,base:244,height:116,style:'terrace',color:'#ff5a00',shade:'#a93215',start:.2,buildFor:4.4},
-    {id:'apartments',site:0,x:104,width:64,base:244,height:136,style:'slab',color:C.cyan,shade:C.blue,start:2.2,buildFor:4.8},
-    {id:'civic',site:1,x:202,width:62,base:244,height:108,style:'bridge',color:'#ff00b8',shade:'#8c0065',start:4.6,buildFor:4.4},
-    {id:'observatory',site:1,x:302,width:80,base:244,height:128,style:'pyramid',color:C.yellow,shade:'#898c00',start:6.4,buildFor:5},
-    {id:'hangar',site:0,x:20,width:82,base:260,height:54,style:'hangar',color:'#ff5a00',shade:'#a93215',start:1,buildFor:3.8},
-    {id:'atrium',site:0,x:126,width:66,base:260,height:68,style:'atrium',color:'#ff00b8',shade:'#8c0065',start:3.2,buildFor:4.1},
-    {id:'workshop',site:1,x:218,width:75,base:260,height:57,style:'sawtooth',color:C.cyan,shade:C.blue,start:5.4,buildFor:4},
-    {id:'offices',site:1,x:315,width:64,base:260,height:76,style:'offset',color:'#ff5a00',shade:'#a93215',start:7.4,buildFor:4.3}
+    {id:'habitat',x:12,width:74,base:244,height:80,style:'barrel',start:.2,buildFor:4.4},
+    {id:'command',x:108,width:72,base:244,height:102,style:'dome',start:2.2,buildFor:4.8},
+    {id:'laboratory',x:202,width:72,base:244,height:74,style:'pods',start:4.6,buildFor:4.4},
+    {id:'observatory',x:300,width:82,base:244,height:106,style:'dish',start:6.4,buildFor:5},
+    {id:'hangar',x:20,width:82,base:260,height:48,style:'hangar',start:1,buildFor:3.8},
+    {id:'greenhouse',x:122,width:72,base:260,height:43,style:'greenhouse',start:3.2,buildFor:4.1},
+    {id:'power',x:216,width:76,base:260,height:45,style:'solar',start:5.4,buildFor:4},
+    {id:'airlock',x:314,width:66,base:260,height:48,style:'airlock',start:7.4,buildFor:4.3}
   ];
   const glyphs={
     A:['01110','11011','11011','11111','11011','11011','11011'],
@@ -32,7 +32,7 @@
     const structures=buildings.map(b=>{
       const progress=clamp((t-b.start)/b.buildFor),height=Math.floor(b.height*ease(progress)/6)*6;
       return {...b,progress,builtHeight:progress===1?b.height:height,
-        foundation:clamp((t-b.start+.6)/.6),door:b.style==='hangar'?ease((t-6)/.8):0};
+        foundation:clamp((t-b.start+.6)/.6),door:b.style==='hangar'?ease((t-11.8)/.8):0};
     });
     const letters=['LUNAR','LANDGRAB'].flatMap((word,row)=>[...word].map((char,i)=>{
       const age=t-titleAt-i*.08-row*.18;
@@ -45,7 +45,9 @@
       return [{...crane,index,roof:100,hook:mix(crane.left+10,crane.right-10,.5+.5*Math.sin(age*1.4+crane.phase)),
         reach:22+(.5+.5*Math.cos(age*1.8+crane.phase))*65}];
     });
-    return {t,pan,structures,letters,cranes,phase:t<12?'construction':t<titleAt?'finishing':t<panAt?'city-title':'next-site'};
+    const departure=clamp((t-12.6)/6.4),apron=clamp((t-12.6)/1.1);
+    const buggy={visible:t>=12.6&&t<19,x:mix(61,438,departure**1.15),y:mix(259,281,ease(apron)),travel:377*departure**1.15};
+    return {t,pan,structures,letters,cranes,buggy,phase:t<11.8?'construction':t<12.6?'airlock':t<titleAt?'departure':t<panAt?'city-title':'next-site'};
   }
 
   let buffer;
@@ -88,62 +90,79 @@
     }
     rect(0,ground,400,46,C.peach);rect(0,ground+4,400,2,C.earth);
     ctx.save();ctx.translate(-Math.round(s.pan),0);
-    function windowGrid(x,y,w,h,columns=4){
-      const step=(w-12)/columns;
-      for(let yy=y+9;yy<y+h-8;yy+=14)for(let col=0;col<columns;col++){
-        const xx=x+6+col*step;
-        rect(xx,yy,step-4,6,C.blue);rect(xx,yy,step-4,1,C.cyan);
-        if((Math.floor(t*1.5)+col+Math.floor(yy/14))%7<2)rect(xx+1,yy+2,Math.max(2,step-6),3,C.yellow);
+    const M={shell:'#f5e7cb',light:'#fff7e5',seam:'#acb8c8',shadow:'#59678b',glass:'#78f0ef',dark:'#15275e',orange:'#ff750d'};
+    function pressureHull(x,y,w,h){
+      shape([[x,y+h],[x,y+12],[x+5,y+5],[x+14,y],[x+w-14,y],[x+w-5,y+5],[x+w,y+12],[x+w,y+h]],M.shell);
+      rect(x+5,y+h-7,w-10,7,M.shadow);rect(x+5,y+7,3,h-14,M.light);
+      rect(x+w-7,y+10,4,h-17,M.seam);
+    }
+    function ports(x,y,count,step=13){
+      for(let i=0;i<count;i++){
+        const xx=x+i*step;rect(xx,y,8,9,M.shadow);rect(xx+2,y+2,4,5,M.dark);rect(xx+2,y+2,4,2,M.glass);
       }
     }
-    function block(x,y,w,h,b,columns=4){
-      rect(x,y,w,h,b.color);rect(x+w-5,y+3,5,h-3,b.shade);
-      rect(x+3,y,Math.max(1,w-8),2,C.peach);
-      for(let yy=y+19;yy<y+h-4;yy+=14)rect(x+2,yy,w-7,2,b.shade);
-      windowGrid(x,y,w-3,h,columns);
-      rect(x-2,y+h-5,w+4,5,b.shade);
+    function hatch(x,y,w,h){
+      rect(x-2,y-2,w+4,h+2,M.shadow);rect(x,y,w,h,M.dark);
+      rect(x+2,y+2,w-4,2,M.glass);rect(x+w-4,y+h-8,2,4,C.yellow);
+    }
+    function ribs(x,y,w,h,count){
+      for(let i=1;i<count;i++){const xx=x+w*i/count;rect(xx,y+5,2,h-12,M.seam);rect(xx-1,y+5,1,h-12,M.light);}
+    }
+    function dish(x,y){
+      rect(x-2,y+12,4,24,M.shadow);
+      shape([[x-21,y],[x-16,y+12],[x-8,y+18],[x+3,y+17],[x+17,y+5],[x+21,y-4],[x+10,y+3],[x,y+7],[x-10,y+6]],M.shell);
+      line(x-16,y+2,x+12,y-5,M.light,2);line(x-5,y+8,x+7,y-10,M.seam,2);rect(x+5,y-12,5,4,M.orange);
     }
     function facade(b){
       const {x,base:y,width:w,height:h}=b,top=y-h;
-      if(b.style==='terrace'){
-        block(x,top+44,w,h-44,b,5);block(x+7,top+22,w-14,29,b,4);block(x+15,top,w-30,29,b,3);
-        rect(x+20,top-4,w-40,4,b.shade);
-      }else if(b.style==='slab'){
-        block(x,top,w,h,b,4);rect(x-3,top-3,w+6,4,b.shade);
-        rect(x+8,top-9,15,6,b.color);rect(x+40,top-7,12,4,b.color);
-        rect(x+w*.44,y-19,10,15,C.blue);rect(x+w*.44,y-19,10,2,C.yellow);
-      }else if(b.style==='bridge'){
-        block(x,top+14,25,h-14,b,2);block(x+35,top,27,h,b,2);
-        block(x+21,top+42,21,19,b,2);rect(x+25,y-25,10,25,C.blue);
-        rect(x+2,top+10,21,4,b.shade);rect(x+38,top-4,21,4,b.shade);
-      }else if(b.style==='pyramid'){
-        block(x,top+72,w,h-72,b,6);block(x+8,top+48,w-16,29,b,5);
-        block(x+18,top+24,w-36,29,b,3);block(x+27,top,w-54,29,b,2);
-        rect(x+33,top-5,w-66,5,C.peach);
+      if(b.style==='barrel'){
+        pressureHull(x,top+16,w,h-16);ribs(x,top+16,w,h-16,5);
+        ports(x+11,top+39,4);rect(x+15,top+13,w-30,5,M.shadow);
+        pressureHull(x+18,top,w-36,17);rect(x+23,top+5,w-46,3,C.cyan);
+        hatch(x+29,y-26,16,20);
+      }else if(b.style==='dome'){
+        pressureHull(x+4,top+47,w-8,h-47);
+        shape([[x,top+49],[x+3,top+32],[x+12,top+18],[x+24,top+10],[x+w-24,top+10],[x+w-12,top+18],[x+w-3,top+32],[x+w,top+49]],M.shell);
+        rect(x+2,top+45,w-4,6,M.shadow);
+        line(x+24,top+12,x+17,top+44,M.seam,2);line(x+w-24,top+12,x+w-17,top+44,M.seam,2);
+        rect(x+w/2-2,top+1,3,12,M.seam);rect(x+w/2-4,top,7,3,C.yellow);
+        ports(x+13,top+57,4);hatch(x+w/2-8,y-25,16,19);
+      }else if(b.style==='pods'){
+        pressureHull(x,top+4,28,h-4);pressureHull(x+w-28,top+4,28,h-4);
+        pressureHull(x+22,top+32,w-44,25);ribs(x+23,top+33,w-46,24,4);
+        ports(x+10,top+24,1);ports(x+w-18,top+24,1);
+        rect(x+8,top,12,5,M.orange);rect(x+w-20,top,12,5,M.orange);
+        hatch(x+8,y-23,12,17);hatch(x+w-20,y-23,12,17);
+      }else if(b.style==='dish'){
+        pressureHull(x,top+58,w,h-58);ribs(x,top+58,w,h-58,5);ports(x+13,top+70,4);
+        rect(x+33,top+45,15,14,M.seam);dish(x+40,top+11);
+        rect(x+w-10,top+22,2,37,M.seam);rect(x+w-14,top+27,10,2,M.shell);rect(x+w-13,top+34,8,2,M.shell);
       }else if(b.style==='hangar'){
-        shape([[x,y],[x,top+18],[x+9,top+6],[x+20,top],[x+w-20,top],[x+w-9,top+6],[x+w,top+18],[x+w,y]],b.color);
-        rect(x+3,top+20,w-6,5,b.shade);rect(x+20,top+20,w-40,h-20,C.blue);
-        rect(x+20,top+20,w-40,(h-20)*(1-b.door),b.shade);
-        for(let yy=top+24;yy<top+20+(h-20)*(1-b.door);yy+=5)rect(x+22,yy,w-44,1,C.peach);
-        rect(x+23,top+10,w-46,5,C.yellow);rect(x-3,y-4,w+6,4,b.shade);
-      }else if(b.style==='atrium'){
-        block(x,top+10,w,h-10,b,4);rect(x-3,top+7,w+6,4,b.shade);
-        rect(x+13,top,40,9,b.color);rect(x+18,top+2,30,3,C.peach);
-        rect(x+23,top+24,21,h-24,C.blue);rect(x+25,top+26,17,h-28,C.cyan);
-        for(let yy=top+34;yy<y-2;yy+=11)rect(x+24,yy,19,2,C.blue);
-        rect(x+32,top+25,2,h-25,C.blue);
-      }else if(b.style==='sawtooth'){
-        rect(x,top+14,w,h-14,b.color);
-        for(let i=0;i<3;i++){
-          const xx=x+i*25;shape([[xx,top+15],[xx+21,top],[xx+25,top+3],[xx+25,top+15]],b.color);
-          rect(xx+21,top+3,3,12,C.peach);rect(xx+4,top+20,15,7,C.blue);rect(xx+4,top+20,15,2,C.yellow);
+        pressureHull(x,top,w,h);ribs(x,top,w,h,6);
+        rect(x+15,top+11,w-30,h-11,M.shadow);rect(x+20,top+14,w-40,h-14,M.dark);
+        rect(x+20,top+14,w-40,(h-14)*(1-b.door),M.seam);
+        for(let yy=top+18;yy<top+14+(h-14)*(1-b.door);yy+=5)rect(x+22,yy,w-44,1,M.light);
+        rect(x+19,top+10,w-38,3,M.orange);rect(x+10,y-12,3,6,C.green);rect(x+w-13,y-12,3,6,C.green);
+      }else if(b.style==='greenhouse'){
+        shape([[x,y-5],[x,top+18],[x+8,top+6],[x+18,top],[x+w-18,top],[x+w-8,top+6],[x+w,top+18],[x+w,y-5]],M.glass);
+        rect(x,y-7,w,7,M.shadow);rect(x+2,y-15,w-4,8,C.shade);
+        for(let i=0;i<6;i++){const xx=x+7+i*10;rect(xx,y-22-(i%2)*3,4,10,C.green);rect(xx-2,y-24-(i%2)*3,8,3,C.green);}
+        for(let i=0;i<5;i++){const xx=x+8+i*14;line(xx,top+7,xx,y-7,M.shell,2);}
+        rect(x,top+20,w,2,M.shell);line(x+18,top,x+w-18,top,M.light,2);
+      }else if(b.style==='solar'){
+        pressureHull(x+18,top+25,40,h-25);rect(x+29,top+32,18,4,C.cyan);
+        for(let i=0;i<2;i++){
+          const xx=x+i*42;rect(xx+15,top+17,3,18,M.shadow);
+          shape([[xx,top],[xx+31,top],[xx+35,top+20],[xx+4,top+20]],M.seam);
+          shape([[xx+2,top+2],[xx+29,top+2],[xx+32,top+18],[xx+5,top+18]],C.blue);
+          for(let j=1;j<4;j++)line(xx+2+j*7,top+2,xx+5+j*7,top+18,C.cyan);
+          line(xx+4,top+10,xx+30,top+10,C.cyan);
         }
-        rect(x,top+32,w,3,b.shade);rect(x+w-17,y-19,12,19,C.blue);
-        rect(x-3,y-4,w+6,4,b.shade);
-      }else{
-        block(x,top+28,w,h-28,b,4);block(x+14,top,w-14,34,b,3);
-        rect(x+10,top+25,w-6,4,b.shade);rect(x+20,top-4,w-20,4,b.shade);
-        rect(x+8,y-17,12,17,C.blue);rect(x+7,y-20,14,3,C.yellow);
+      }else if(b.style==='airlock'){
+        pressureHull(x,top+8,w,h-8);ribs(x,top+8,w,h-8,5);
+        pressureHull(x+21,top,26,h);hatch(x+26,top+11,16,h-16);
+        rect(x+29,top+14,10,7,C.cyan);rect(x+24,top+1,20,3,M.orange);
+        ports(x+7,top+21,1);ports(x+w-15,top+21,1);
       }
     }
     function building(b){
@@ -163,6 +182,10 @@
     }
     function district(state,offset=0){
       ctx.save();ctx.translate(offset,0);
+      if(state.structures[4].progress===1){
+        shape([[40,260],[82,260],[96,282],[40,282]],M.seam);
+        line(43,263,43,279,M.light);line(81,263,91,279,M.light);
+      }
       state.structures.slice(0,4).forEach(building);
       state.structures.slice(4).forEach(building);
       // Crane trolleys carry construction beams between broad active sites.
@@ -176,6 +199,20 @@
       ctx.restore();
     }
     district(s);
+    if(s.buggy.visible){
+      const b=s.buggy;ctx.save();ctx.translate(Math.round(b.x),Math.round(b.y));
+      // Original compact three-wheel silhouette, now leaving its working outpost.
+      shape([[-16,-5],[-16,-10],[-12,-12],[-5,-12],[-1,-16],[6,-16],[12,-12],[17,-11],[18,-7],[14,-5]],M.light);
+      rect(0,-15,6,1,C.cyan);rect(-2,-14,10,1,C.cyan);rect(9,-11,6,4,M.dark);
+      rect(-11,-11,4,1,M.orange);rect(-13,-23,1,12,M.seam);rect(-14,-24,3,2,C.yellow);
+      rect(-16,-7,31,2,M.orange);
+      for(const x of [-10,0,12]){
+        shape([[x-3,-5],[x-1,-7],[x+2,-7],[x+4,-4],[x+3,0],[x-2,0],[x-4,-2]],M.dark);
+        rect(x-1,-5,3,3,M.seam);rect(x,-4,1,1,C.cyan);
+        if(Math.floor(b.travel/3)%2)rect(x-3,-4,1,2,M.light);else rect(x+1,-6,2,1,M.light);
+      }
+      ctx.restore();
+    }
     // The next construction site rolls in, giving the camera move a clean loop.
     if(s.pan>0)district(stateAt(0),400);
     // Letter floors are erected from the baseline upward in the cleared sky.

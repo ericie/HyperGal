@@ -1,6 +1,6 @@
 .about-content{display:grid;grid-template-columns:1fr 1.15fr;gap:clamp(48px,8vw,140px);align-items:start;padding:clamp(64px,13svh,150px) var(--pad) 80px;max-width:1440px}
-.about-content h1{font-size:clamp(58px,7vw,96px);font-weight:600;line-height:1;letter-spacing:-.035em;color:#73fbff}
-.about-content h1 span{display:block;font-size:.42em;line-height:1.4;font-weight:400;letter-spacing:-.02em;color:var(--ink)}
+.about-content h1{font-family:'Bungee','Public Sans',sans-serif;font-size:clamp(58px,7vw,96px);font-weight:400;line-height:1;letter-spacing:0;color:var(--ink);font-synthesis:none}
+.about-content h1 span{display:block;font-family:'Public Sans',sans-serif;font-size:.42em;line-height:1.4;font-weight:400;letter-spacing:-.02em;color:var(--ink)}
 .about-copy{max-width:42ch;font-size:clamp(18px,1.6vw,23px);line-height:1.55;padding-top:4px}
 .about-copy p{margin:0 0 1.4em;text-wrap:pretty}
 .about-copy p a{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px}

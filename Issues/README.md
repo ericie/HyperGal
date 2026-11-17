@@ -12,8 +12,8 @@ styles, and preview PNGs across both entry views and the standalone studies.
 
 ## About
 
-Both pages have a right-aligned top navigation with [Games](index.html) and
-[About](about.html), marking the current page. The About page's four
+Both pages have [Hypermedia Club](../index.html) on the left of the top bar,
+with [Games](index.html) and [About](about.html) on the right, marking the current page. Games also has a small Pause/Play text button for the title pulse and attract films; the brand link replaces the separate back arrow. The About page's four
 paragraphs explain the user-supplied concept: start with influential games and
 ask “What if?”, change their rules to explore underlying systems through
 satire, and make works that can be both played and watched. The final paragraph
@@ -21,24 +21,27 @@ connects the user's earlier interactive art and arcade projects to Hypermedia
 Club, a current solo venture with AI agents as thought and coding partners.
 It makes no claim about collaboration or AI use in the earlier work. Hypermedia Arcade
 remains the provisional page name, with Arcade dominant in the heading.
-The latest navigation revision removes the Hypermedia title and About's former
-Arcade navigation link. Page headings, About copy, layout, original works and
-manual statuses remain unchanged.
+The user restored Hypermedia Club as a link to the master gallery. Page headings,
+About copy, layout, original works and manual statuses remain unchanged.
 
 ## Arcade
 
-Current direction status: the user rejected the street-art/comic/photostat
+Current integration: all fifteen Selected Games have continuous native films
+on the current landing and original wall. The static wall retains fifteen
+provenance-recorded PNG fallbacks and direct work links without JavaScript;
+the landing offers its Selected Games catalog link. The user rejected the
+eight-film batch: three unchanged studies and the batch overview have explicit
+rejected status; the new user-directed Pac, Cloudcutter, Paddle, Bitsy Blocks and Top of the Heap replacements
+and earlier studies remain WIP. Original manual Selected statuses and gameplay
+remain unchanged.
+
+Historical direction record: the user rejected the street-art/comic/photostat
 foreground described below and a later glossy 3D exploration, which was not
-applied. Twelve wall films still use that raw foreground. The user has now
-approved placing the Asteroids native film on the current landing card and the
-first original-wall link to review it in context. We're All Snakes now extends that
-native direction on both entry surfaces with the local cursor-hunt and moving-title film
-below. Warlords adds the requested four-turret firing tour and public rename
-on both entry surfaces. The remaining films have not been redesigned; these
-placements do not promote composition status. All three studies stay WIP, and the
-original Asteroids, We're All Snakes, and Warlords works retain their manual `"wip": false`. The supplied GIF references
-are now clarified toward classic Atari attract screens; only still previews
-were available, so their motion has not been inspected.
+applied. Asteroids, We're All Snakes and Warlords were the first three native
+integrations; twelve raw films and the remaining original thumbnails belonged
+to that former stage. The supplied GIF references were clarified toward classic
+Atari attract screens; only still previews were available, so their motion was
+not inspected. The historical raw implementation below is not the current film bank.
 
 Preview the [Asteroids attract study](arcade/attract-test.html). In its
 twenty-second native canvas loop, rigid brackets and hinged multisegment strokes
@@ -67,8 +70,8 @@ original Asteroids Assemble work. The wall and three old raw images remain as
 permitted dim background posters. No new fonts or shared tokens are introduced.
 The test metadata starts with `"wip": true`; original piece content and status
 remain unchanged. Longer loops within reasonable byte budgets are permitted;
-Asteroids, We're All Snakes, and Warlords are placed on both entry surfaces; further film redesigns
-wait for direction.
+Asteroids, We're All Snakes, and Warlords were the first entry-surface placements;
+the complete fifteen-film integration is recorded below.
 
 Preview the [We're All Snakes attract study](arcade/snake-test.html). Exactly 36
 continuous snakes crawl along safe ground tracks during the perspective opening,
@@ -201,36 +204,37 @@ a local film extension with no shared token or gallery identity change.
 
 Preview the [Lunar Landgrab attract study](arcade/landgrab-test.html). The
 provisional name (formerly Lunar Founder) and stable `pieces/059-moon-orchard/`
-link remain. The corrected film builds eight broad structures in two rows:
-terraces, a residential slab, linked civic towers, a stepped observatory, a
-hangar, glazed atrium, sawtooth workshop and offset offices. Their separated
-62–82px footprints, foundations, roof caps, dark side faces, floor bands and
-regular window grids replace the rejected thin crowded architecture. Orange,
-cyan, magenta and yellow facades retain the original black sky, cyan/blue
-mountains, green hills and peach road. Steel frames precede facade construction;
-floors rise in six-pixel steps under two working cranes. The attract contains
-no rover, debris, sparks, explosions, projectiles or combat. The original game
-retains its crash/rebirth behavior and manual `"wip": false`; the study remains WIP.
+link remain. Eight low ivory pressure modules replace the terrestrial facades:
+a ribbed barrel habitat, command dome, connected laboratory pods, dish
+observatory, hangar, greenhouse, solar station and airlock. Blue shadows, cyan
+glass and small orange/yellow service details sit against the unchanged black
+sky, cyan/blue mountains, green hills and peach road. Separated footprints in
+two rows are 66–82px wide and 43–106px high. Frames and six-pixel construction
+steps reveal the modules under working cranes. No destruction, debris,
+explosions, projectiles or combat appear; original crash/rebirth gameplay and
+manual `"wip": false` remain unchanged, and the study stays WIP.
 
-The 23.4-second loop starts construction at .2 seconds; all eight buildings
-finish by 11.7. Cranes work through 13.7. The hangar finishes at 4.8 and opens
-at 6–6.8, without producing a rover. **LUNAR** above **LANDGRAB** assembles at
-14.8–16.17, then holds above the finished city. Camera travel at 19.4–23.4
-brings in a fresh construction site and returns to the exact opening pixels.
-The native 400×300 buffer scales without smoothing. Focus/reduced motion and
-the provenance-recorded 1200×900 fallback hold the city/title at 18 seconds.
-Shared playback, direct links, suspension, resolution limits and content hashes
-remain; no font, image dependency or extra artwork copy is added.
+The 23.4-second loop starts construction at .2 seconds; all modules finish by
+11.7 and cranes work through 13.7. The completed hangar opens at 11.8–12.6.
+At 12.6 a compact original-style three-wheel buggy, without guns, emerges from
+its actual hatch at (61, 259), follows the apron to road level y=281, then drives
+right and fully leaves by 19 seconds. **LUNAR** above **LANDGRAB** assembles at
+14.8–16.17. Camera travel at 19.4–23.4 brings in a fresh site and returns to the
+exact opening pixels. The native 400×300 buffer scales without smoothing;
+focus/reduced motion and the provenance-recorded 1200×900 fallback show the
+finished outpost, title and departing buggy at 18 seconds. Shared playback,
+direct links, suspension, resolution caps and content hashes remain unchanged.
 
 `node scripts/check-landgrab-attract.mjs` passes 2,809 time samples and 4,174
-construction samples for eight distinct profiles, broad separated footprints,
-monotonic floors, doors/cranes, absence of destruction, title, exact loop,
-wiring, current name and statuses. Current native evidence is
-`.impeccable/review/lunar-landgrab-construction/`, including early/late
-construction, full title and a contact sheet with a 320×240 still. The older
-`lunar-landgrab-native` captures record rejected architecture. Browser host is
-unavailable; no fresh browser layout or interaction pass is claimed. Shared
-gallery tokens and the original game remain unchanged by this correction.
+construction samples for eight lunar profiles, broad separated footprints,
+monotonic construction, completed/open hatch and vehicle fit, apron/road path,
+full offscreen departure, cranes, title, exact loop, wiring and statuses.
+`node scripts/check-attract-playback.mjs` passes the existing shared lifecycle.
+Current evidence is `.impeccable/review/lunar-landgrab-departure/`, including
+city, hatch exit, apron, full title and a contact sheet with a 320×240 still.
+Earlier `lunar-landgrab-construction` and `lunar-landgrab-native` captures show
+rejected architecture. No fresh browser layout or interaction pass is claimed.
+No font, asset dependency, shared token or original-game change is introduced.
 
 Preview the [Onward & Upward attract study](arcade/onward-test.html). Its
 22.4-second loop flies upward into a deep course of 210 floating platforms,
@@ -264,79 +268,345 @@ crowd, rush and title at 800×600, 1200×900 and 320×240. Browser host was
 unavailable; no fresh browser layout or interaction pass is claimed. No shared
 gallery token or original-piece change follows from this local extension.
 
-`arcade/attract-player.js` is 3,480 bytes and shares the Asteroids, Snake, and Warlords renderers across their landing
-cards and original-wall links, using each film’s duration and still time. It
+Preview the [current Pac attract study](arcade/pacman-test.html). The exact
+three-line title **TO BIG / FOR THIS / WORLD** appears as uniform blue
+double-rail strokes on black/purple, with one row of 27 small warm dots at
+y=530 below all letters. There are no surrounding maze rails or other dots.
+The 14.8-second fixed-camera loop keeps small Pac at radius 10: it feeds at
+95 units/second, pauses at 4 seconds, looks backward from 4.4, then accelerates
+right from 5.1 toward 390 units/second. Its whole body exits by about 6.592
+seconds, before the giant's pass starts at 6.9. The radius-800 giant (1600px
+diameter, twice the native screen width) consumes the title and remaining dots
+with a persistent mouth sweep; small Pac is already offscreen. The pass ends
+at 10.5, empty space holds briefly, and letters redraw from 11.2 before dots
+return. Focus/reduced motion and the native 1200×900 fallback hold the complete
+title/dot row with small Pac at 2.2 seconds.
+
+`node scripts/check-pacman-attract.mjs` passes 1,777 samples for exact phrase,
+only one dot row below the title, clear small-Pac passage, stop/look/escape
+beats, full-body exit before giant entry, giant size, permanent consumption,
+letter/dot return, loop/seek and status preservation. Native evidence is
+`.impeccable/review/pacman-title-escape/`, including `native-contact.png` and
+`native-still.png` at native/full-title/card scopes. Exact loop pixels and
+deterministic seeking are checked across 356 native frames. Updated batch checks
+pass 9,012 draws and shared playback passes. No fresh browser layout or
+interaction pass is claimed. Original **To Big for This World**, gameplay and manual
+`"wip": false` remain; the study stays WIP. The earlier TOO word-maze/chase
+captures in `pacman-word-chase` are superseded history, not a new rejection.
+The original eight-film batch's Pac captures remain rejected historical work.
+No other film, shared token, font/image dependency or original-piece change
+is introduced by this revision.
+
+Preview the [current Cloudcutter attract study](arcade/cloudcutter-test.html).
+**CLOUD / CUTTER** now uses 216 larger scalloped lobes, radii 25.5–30.5px,
+forming eleven taller, thicker cloud letters with open counters. White caps,
+pale bodies and blue undersides retain the original blue sky. The cobalt can
+is scaled to 80% across body, muzzle and collision geometry, with one centered
+barrel. Its downward-curved left-to-right pass remains at 3–9.4 seconds.
+Twenty-four sequential rounds cause sixteen real cloud hits; each shot waits
+until the previous round hits or exits, plus .08 seconds, so at most one bullet
+is in flight. Broad shot cuts and the hull channel remain after the can leaves.
+Healing at 10.4–17.2 restores the same original cloud pixels within the fixed
+19.8-second loop. Focus/reduced motion and the native 1200×900 fallback hold
+the intact title at 2.2 seconds.
+
+`node scripts/check-cloudcutter-attract.mjs` passes 2,377 samples for fuller
+letter bounds/open counters, coordinated can scaling, centered muzzle and
+sequential emission, single active projectile, real impacts, persistent damage,
+monotonic healing and exact restoration. Occupied cloud-area samples rise from
+6,237 to 7,709 during healing. Current native evidence is
+`.impeccable/review/cloudcutter-puffier/`, including intact title, single-shot
+detail, firing, damage, healing and restoration plus a 320×240 contact still.
+Native coverage is 476 frames with exact loop/seek pixels and healed/intact PNG
+equality. Updated batch checks pass 9,012 draws and shared playback passes.
+No fresh browser layout or interaction verification is claimed.
+Original **Cloudcutter** identity, gameplay, slow game healing and manual
+`"wip": false` remain unchanged; the study stays WIP and other study decisions
+remain. Earlier twin-gun `cloudcutter-cloud-type` evidence is superseded history,
+without a new rejection; original batch evidence remains rejected history.
+No font/image dependency, extra artwork copy or shared-system change is added.
+
+Preview the [current Paddle attract study](arcade/paddle-test.html). The
+cylinder's side is now exactly the letters' 126px height. From frame zero,
+**PADDLE** curves around its black/white wire surface, with dimmed rear faces.
+One full spin at 1.4–5 seconds returns the six glyphs to the front. They then
+accelerate as whole letters into the center line at 5–5.48, keeping their 18px
+cell sizes and internal relationships through impact. Their overlapping
+90×126 shapes squash at 5.48–6.05, briefly narrowing/stretching beyond the
+settled dimensions before becoming a solid 32×203 paddle. Compressed glyph
+cells broaden internally to fill counters; there is no independent tile-grid
+packing. All 145 identities remain.
+
+The existing three-ball rally follows from 7 seconds at 920/1120/1320 units
+per second, above the original game's maximum of 560. Real face contacts and
+screen wrapping use the same paddle. Balls fade/clear at 15.8–16.2; recentering
+finishes by 16.7 and reverse formation opens the same material back to the
+cylinder at 16.7–18.2. The fixed-camera loop remains 20 seconds, with a legible
+cylinder focus/reduced-motion/native fallback still at .8 seconds. Original
+**Paddle**, gameplay and manual `"wip": false` remain unchanged; this study
+stays WIP and other study decisions remain.
+
+`node scripts/check-paddle-attract.mjs` passes 2,401 samples for matching
+cylinder/glyph heights, whole-letter impact, preserved identities, controlled
+squash overshoot, solid paddle coverage, continuous phases, three faster balls,
+38 face contacts, 37 wraps, no tunneling and loop/seek/status preservation.
+Current native evidence is `.impeccable/review/paddle-crash/`, covering still,
+spin, approach, impact, squash, rally and reset at native/full-title/card scopes.
+All 480 frames have exact loop/seek pixels checked. Updated batch checks pass
+9,012 draws and shared playback passes. Earlier `paddle-cylinder`
+gather evidence is superseded history without a new rejection; original batch
+Paddle evidence remains rejected history. No fresh browser layout or interaction
+claim, font/image dependency, extra artwork copy or shared-token change is added.
+
+Preview the [current Bitsy Blocks attract study](arcade/tetris-test.html).
+The camera now stays at 5× from the opening through the title and Tetris play:
+each source 4px cell projects to 20px, with an 18px solid face and 2px seam.
+The same seven muted colors fill 113,163 wall cells. Culled visible cells are
+drawn directly with the same rectangle geometry as the falling blocks, keeping
+the close view crisp. The crack and **BITSY / BLOCKS** remain actual omitted
+cells; the title is recut at one-cell scale to fit the close frame. The camera
+pans up the crack at 1–5.2 seconds, holds the complete title (still at 6.5), then
+pans to the 20×24-cell game pocket at 8.2–9 without changing zoom.
+
+The existing legal T/O/vertical-I drops at 9.2–12.9 complete rows 20–23 for the
+real four-line clear. The fault begins at 13.25, but no pullback starts until
+crumbling begins at 14.2. The camera then pulls from 5× to 1× through 15.4 while
+28,383 world-space blocks fall under the same camera; the cleared support strip
+is excluded and remaining game-board blocks join the particles. Every block
+clears by 17.2. Camera reset occurs offscreen at 17.2–17.8, then the close wall
+rebuilds at 17.8–20.2 within the unchanged 22.2-second loop.
+
+`node scripts/check-bitsy-attract.mjs` passes 2,665 samples for title/crack
+voids, constant close scale and title fit, legal supported drops/four-row clear,
+pullback starting with collapse, complete particle coverage/gravity, original
+name/status and loop/seek. Current native evidence is
+`.impeccable/review/bitsy-close/`, covering close opening/title/gameplay, fault
+and simultaneous crumble/pullback, including a 320×240 still. Native coverage
+is 533 frames with exact loop/seek and identical pixels across collapse onset.
+Updated batch checks pass 9,012 draws and shared playback passes. No fresh
+browser layout or interaction verification is claimed. Existing **Bitsy Blocks** identity,
+`pieces/058-micro-tetris/` link, original gameplay/manual `"wip": false`, study
+WIP and all other study decisions remain. Earlier `bitsy-blocks-wall` evidence
+is superseded history without a new rejection; former Micro Tetris batch
+proofs remain rejected history. No shared token, sidecar, asset dependency or
+other film change is introduced.
+
+Preview the [current Top of the Heap attract study](arcade/heap-test.html).
+A fixed close-up shows exactly six already-present isometric cubes in rows
+1+2+3, forming a 600px-wide summit. A plain yellow 232×106 flag flies on a
+172px pole. The current game's smiling yellow sun has a 42px body and rays
+reaching 59px; blue teardrop climbers replace the old spring characters.
+There is no assembly, zoom, title or artwork text.
+
+Two attacks climb the lower left and right routes toward row one. The sun takes
+legal adjacent hops, lands on each climber at 2.95 and 6.75 seconds, squashes it,
+repaints the lower path yellow and returns to the apex at 4.45 and 8.25.
+The summit is never lost; all six blocks start and end gold. The loop lasts
+10 seconds, with focus/reduced motion and the native fallback at 2.7 seconds.
+Original **Top of the Heap** identity, gameplay, stable
+`pieces/026-top-of-the-heap/` link and manual `"wip": false` remain; the new
+study is WIP. The earlier twenty-row assembly/title film remains rejected
+historical work. Shared player and other film details remain unchanged.
+
+`node scripts/check-heap-attract.mjs` passes 1,200 samples for six blocks,
+dominant flag, legal sun routes, two actual interceptions/squashes, ownership,
+return, exact loop/seek, zero font text calls and statuses. Updated batch checks
+pass 9,012 draws and shared playback passes. Native evidence in
+`.impeccable/review/heap-summit/` includes the summit, still and both defenses,
+with a 320×240 contact still. Native rendering covers 241 frames with exact
+loop/seek pixels. No fresh browser layout or interaction verification is claimed.
+No dependency, extra artwork copy, shared token or original-piece change follows.
+
+The [eight-film batch overview](arcade/remaining-test.html) is rejected.
+The user rejected all eight original batch films; Only Centipede, Happiness
+Hunter and Many Frogs remain
+unchanged rejected studies, and the overview has `"rejected": true`. The new Pac, Cloudcutter, Paddle, Bitsy Blocks and Heap
+revisions above are WIP. Rejection takes precedence over any retained WIP
+field and does not alter original Selected statuses or gameplay. The other
+three sequence descriptions below are historical records of rejected films.
+
+| Study / original work | Loop / focus still | Sequence |
+| --- | --- | --- |
+| [Only Centipede](arcade/centipede-test.html) | 20.4s / 16s | Macro chain pullback; defender fire removes a segment at 6s, adds a mushroom and splits the chain; luminous ONLY / CENTIPEDE. |
+| [Happiness Hunter](arcade/happiness-test.html) | 21s / 17s | Close yellow car pulls back into gray traffic, makes three clear-gap lane changes and overtakes, then passes beneath a green HAPPINESS / HUNTER sign. |
+| [Paddle — current film](arcade/paddle-test.html) | 20s / .8s | WIP refinement: letter-height cylinder spins; six whole glyphs crash into one line and squash into a solid oversized paddle, then rally and reverse formation. |
+| [To Big for This World — current Pac film](arcade/pacman-test.html) | 14.8s / 2.2s | WIP revision: TO BIG / FOR THIS / WORLD above one dot row; small Pac feeds, looks back and fully escapes before the giant consumes the title, which returns. |
+| [Cloudcutter — current film](arcade/cloudcutter-test.html) | 19.8s / 2.2s | WIP refinement: puffier CLOUD / CUTTER; smaller blue can with one centered barrel and one round in flight, then identical cloud healing. |
+| [Top of the Heap — current film](arcade/heap-test.html) | 10s / 2.7s | WIP replacement: fixed six-block summit, large plain flag and smiling ray-sun intercepting two blue teardrop climbers; no artwork text. |
+| [Many Frogs](arcade/frogs-test.html) | 22s / 18s | Sixteen pigment frogs cross moving traffic on reserved routes to the far bank; cars part for pigment MANY / FROGS. |
+| [Bitsy Blocks — current film](arcade/tetris-test.html) | 22.2s / 6.5s | WIP refinement: 5× close crack/title/Tetris, with pullback beginning only when world-space blocks crumble, then a close-scale rebuild. |
+
+`arcade/film-kit.js` shares geometry and title cells; each renderer owns its
+scene, camera and pacing. Frogs routes are baked by
+`scripts/build-frogs-attract-routes.mjs`, avoiding startup path searches.
+Source palettes, characters and materials stay local. The films have no image
+or font dependency and add no slogans, counters or other artwork copy.
+Native 1200×900 still PNGs carry embedded origin and registry records. The
+existing controller retains pause, focus/reduced-motion stills, hidden/player
+suspension, offscreen release and resolution caps; the version helper covers
+all new renderers, fallbacks, studies and the overview.
+
+`node scripts/check-remaining-attracts.mjs` passes 9,012 draw samples at 60Hz,
+841 highway samples and 500 frog-crossing windows, plus specific mechanics,
+mechanics, deterministic state, wiring and WIP/rejection/manual-status checks, with
+zero font text calls. Existing playback, Onward and Landgrab checks also pass.
+Historical rejected-batch evidence in `.impeccable/review/remaining-attracts/` includes each
+`key-contact.png`, title/scene captures and `title-overview.png`, covering
+800×600, 1200×900 and 320×240. That original batch recorded 4,081 native frames at
+24fps; its Pac/Cloudcutter/Paddle/Bitsy Blocks/Heap captures and earlier reviews do not describe the replacements. Browser host is
+unavailable; these checks do not claim fresh browser layout or interaction
+verification. Original pieces, previous films and shared gallery tokens remain.
+
+`arcade/attract-player.js` shares all fifteen native renderers across landing
+cards, original-wall links and individual studies, using each film’s duration
+and still time. It
 renders only visible films at 24fps; offscreen canvases shrink
 to 1×1 and show the PNG fallback. Hidden, pause, and player-open states suspend
 timing. Focus/reduced motion holds Asteroids at 11s, Snake at 9s, and Warlords at 18s; rendering caps DPR 1.5 and width 1400px.
-The original wall’s shared pause controls both native and raw films, while
-`arcade/attract.js` excludes native-marked links. Landing uses 44px back and pause
-icon buttons outside artwork, with accessible names. The controller preserves
+The original wall’s shared pause controls all native films, while
+`arcade/attract.js` excludes native-marked links. Landing uses a Pause/Play text button in the top navigation with a 44px target and an accessible name; Hypermedia Club links back to the gallery. The controller preserves
 SVG content on `data-icon` buttons and retains text controls in standalone studies. Ordinary artwork links survive controller
-failure. The original wall also retains all three native PNG links without JavaScript; the
-current landing keeps its existing noscript link to the Selected Games catalog.
+failure. The static wall and individual studies retain all fifteen native PNG
+fallbacks and ordinary work links without JavaScript. The dynamic landing
+retains its Selected Games catalog link when JavaScript is unavailable.
 
 The 1200×900 completed-title `arcade/assets/asteroids-attract.png` is 60,326 bytes,
 with embedded origin metadata and a provenance-registry entry. It includes the
 constant `0¢ TO PLAY`; Snakes and Warlords have no play
-message. The current landing retains four native films (Asteroids, We're All
-Snakes, Warlords and Mutual Command), original thumbnails for the remaining
-works, and the Selected-only game filter. Work names are no longer visible
+message. The current landing uses native films and PNG fallbacks for all fifteen
+Selected Games, retaining the Selected-only game filter. Work names are no longer visible
 beneath the screens: each of the fifteen links retains its actual title as an
 accessible name, with empty image alt text to avoid duplicate announcements.
 
-The requested uppercase **ARCADE** lettering retains six authored SVG glyph
-paths with A/R hairpin-return strokes, without a surrounding rim or box.
-Cyan gas (#73fbff) and a pale hot core (#e4ffff) sit over dark glass (#16464b),
-with ambient cyan emission and a tighter bloom. This is custom stroke geometry
-with no font outlines, raster assets, cursive joins or swashes. The responsive
-`52 50 1020 250` viewBox is bounded at 1180px. The H1 remains named Arcade;
-the SVG is accessibility-hidden and nonfocusable. A single emission group
-pulses smoothly from .4 to 1 and back over 3.2 seconds, reaching full strength
-at the midpoint without flashing. The shared
-pause button, hidden document, reduced motion and fully dimmed sign suspend
-this pulse; reduced motion holds full-strength emission.
+The current Games/About frame is explicitly monochrome: solid `#080808`
+ground, `#f5f5f5` ink, `#a3a3a3` muted text and white focus/selection. Source
+artwork and native films retain their full colors. No background patterns,
+linoleum, glow, tubing or title pulse load on either page.
 
-The entrance stays sticky at the viewport top on layer zero. Screens occupy
-layer one and scroll over it. Passive scroll updates are coalesced through
-`requestAnimationFrame`; smoothstep progress over .9 entrance height dims the
-sign from full opacity to 0, reversing when scrolling back. Reduced motion
-retains this scroll-linked relationship. The top metadata band, promotional
-copy, counts, section heading, closing copy, footer and decorative numbers
-remain removed without reserving blank space. The Games page now uses four
-original static SVG floors: `blacklight-carpet.svg` behind the title/entry,
-`violet-ribbons.svg` in crossing, `woven-checks.svg` in counterflow and
-`plum-studs.svg` in the deck, all under `arcade/assets/`. The supplied
-blacklight-carpet photo informs the entrance colors and geometry only; no
-photographed pixels, people or shoes are reproduced. About and future
-extra-work zones retain `arcade/assets/linoleum.svg`. Public Sans remains the
-utility face; skip-link hover stays readable on lime. Do not invent
-promotional/editorial interface copy.
+The real one-line **ARCADE** H1 uses self-hosted Bungee Regular 400; About
+uses Bungee for Arcade only. Public Sans supplies Games/About navigation,
+Hypermedia, existing prose and four modest H2 section names. Bungee's heavy
+geometric signage is the local arcade-lettering authority, without copying a
+proprietary logo. `arcade/assets/Bungee-Regular.ttf` is 118,996 bytes and ships
+with `Bungee-OFL.txt` from the official Google Fonts repository. Public Sans is
+variable 100–900, with that range declared in its font-face descriptor. Both
+pages preload Bungee and require no external font service.
 
-`node scripts/build-arcade-patterns.mjs` optionally regenerates these four
-original SVGs from seeded geometry and seamless edge copies. They total
-98,496 bytes (26,678 gzip). This is a development utility: viewing the static
-site needs no generation or build step, new runtime dependency, raster asset
-or raster provenance-registry entry. Later zone backgrounds sit behind the
-screens, ignore pointer events and cover the measured runways plus half the
-inter-zone gaps. Reduced motion keeps the distinct floors full-width across
-mobile gutters without adding animation.
+The user-requested ARCADE color-scale experiment is the sole title-only
+exception to the neutral frame. A five-stop blue/mint/yellow/amber/pink
+vertical gradient is clipped inside the real Games H1, repeats blue and moves
+top→bottom→top over six seconds while brightness varies .82→1.08→.82. Frame,
+Hypermedia Club/Games/About navigation, plain controls, About and source art
+stay unchanged. No glow, shadow, font, geometry or copy changes are added.
+CSS defaults paused; H1 visibility, document hidden state, reduced motion and
+the shared pause button gate animation. Reduced motion is a static middle
+fill, forced colors uses CanvasText, and unsupported clipping stays white.
+Current authority/evidence is `.impeccable/surfaces/issues-arcade-spectrum.md`
+and `.impeccable/review/arcade-spectrum/`: nine parent-inspected cool/warm/
+reduced captures at 1440/390/320 and checks for pause/resume, settled timing,
+offscreen suspension, reduced still and stable title bounds pass without
+errors. Forced-color fallback is verified as CanvasText with no
+gradient/animation. Minimum sampled contrast is 4.86:1 on black at brightness
+.82. The detector’s two gradient-text warnings in index/CSS are the intentional
+user-requested title exception, scoped to those two files with evidence; no
+second scan. Fresh finish review returned **ship** after all nine captures, source and
+checks/fallback/detector evidence were reviewed, with no material fixes
+(`finish-review.md`).
 
-Borderless sharp screens sit directly on the zone floors, with no card housing,
-inset borders, marquee bands, arrows, shadows, internal padding or visible
-work-name captions. Fifteen Selected Games now form four scroll zones: an
-asymmetric twelve-column entry with shallow parallax; a viewport-sticky
-horizontal crossing; two vertical lanes moving in opposite directions; and a
-sticky deck that peels screens upward while changing their scale. Native
-vertical scrolling drives measured runways, with passive scroll updates through
-requestAnimationFrame and reversible transforms. No wheel or touch interception
-is added. Static thumbnails use square, portrait 3:4, landscape 3:2 and wide
-16:9 crops; all four native films retain undistorted 4:3 frames. Below 700px,
-14px gutters and adapted widths preserve the distinct zones. Keyboard focus
-reveals each screen; reduced motion presents all fifteen links in ordinary
-flow and holds films still. Future Selected Games outside the authored zones
-append in ordinary flow. Utility controls retain frameless 44px targets and
-visible keyboard focus.
+Use these requested names for feedback: Title for the masthead, Opening
+(`#opening`) for the first three works, Side Scroll (`#side-scroll`) for the
+horizontal crossing, Counterflow (`#counterflow`) for desktop opposed lanes /
+large staggered mobile works, and Grid (`#grid`) for the final four works.
+The four actual H2 headings name regions outside artwork frames. Work names
+remain accessible link names without visible work captions. Their measured
+heading heights participate in pinned runways, progress origins and keyboard
+focus mapping.
+
+Games now uses a full-width normal-flow technical machine profile. The user
+explicitly rejected the fixed cabinet simulation, joystick/deck, coin panel
+and locked scroll display. The browser window is the only scroll root;
+`#works` is relative, overflow-visible and auto height. The real Bungee ARCADE
+titleboard scrolls away naturally with the page. The separate back arrow and icon toolbar are removed. Hypermedia Club returns to the gallery, and a 44px Pause/Play text control sits in the Games top bar.
+
+Section names are now accessibility labels only; Opening, Side Scroll and Counterflow have no visible headings or heading spacer. Stable section anchors remain.
+
+The side-board edges and bezel rails share one centered 1px stroke; collection and footer reserve transparent borders rather than drawing duplicate offset lines. The screen frame closes with a bottom bezel rail. Below it, a white-line coin collector schematic sits left of the Hypermedia Club / Games / About footer menu. A full-width stepped base with two feet closes the cabinet. This is a decorative SVG front elevation; it adds no physical controls or internal scroll pane.
+
+The current Opening / Side Scroll / Counterflow sequence keeps
+3/2/10 works and all fifteen native films. Grid’s four screens have moved into Counterflow, giving five works per opposing desktop lane; mobile keeps its ordinary flow. Window vw/svh dimensions and
+scroll/progress/focus math are restored; there is no container viewport,
+wheel forwarding, ResizeObserver, fixed-height root or cqw/cqh sizing. Side
+Scroll holds, taller Counterflow, Grid, native touch/keyboard flow and reduced
+motion remain; the shared overlap returns to
+`clamp(-260px,-24svh,-120px)`. About is independent and unchanged.
+
+Current authority is `.impeccable/surfaces/issues-arcade-profile.md`. The
+supplied JAMMA drawing now informs an inset marquee face/housing, a separate
+black underside sloping into the bezel, a distinct closed rectangular bezel-top rail and
+full-height side-board faces. Side boards are 3.4% wide with 1.5px inner/outer
+lines; face and primary frame joins use 1px lines; the underside return-joint stays
+.5px. The former separate bezel lip is removed.
+The collection shares the side-board inset and inner bezel line while the
+machine remains edge-to-edge and normally scrollable. Pre-corner joinery
+evidence in `.impeccable/review/arcade-joinery/` includes eight inspected
+captures and seven-view checks: full width, contiguous frame joins, native
+window scroll/no nested pane, all fifteen links, preserved groups/motion,
+reduced restoration and touch/Back pass without errors. Fresh finish review
+returned **ship** after all eight captures, source and checks were reviewed,
+with no material fixes (`finish-review.md`);
+the earlier eight-capture profile review covers only the outline pass.
+The current corner correction uses one closed rectangular rail path
+(`M0 0H1000V24H0Z`) in place of the two open chamfer/lip paths, fixing both
+mirrored joins while dimensions, native scroll and artwork remain unchanged.
+Seven inspected PNGs and `checks.json` in
+`.impeccable/review/arcade-corner/` confirm joints within .1px and aligned
+side-board/collection edges with normal full-width flow and no page errors.
+Fresh corner finish review returned **ship** after all seven captures and
+source/checks were reviewed, with no material fixes (`finish-review.md`).
+
+The rejected cabinet experiment and its old technical ship review remain
+historical, with supersession recorded in
+`.impeccable/review/arcade-cabinet/superseded.md`. They do not authorize
+restoring a locked internal display or rejected furniture.
+
+Counterflow above 700px now gives its opposed lanes the full available width,
+with a narrower `clamp(20px,4vw,72px)` gap and full-width lane contents. Removing
+the former 1240px container / 50svh lane caps makes the native-ratio screens
+taller without cropping or stretching. Its desktop travel multiplier rises
+from 1.1 to 1.65. In the preceding four-work revision at 1440×1000, cards grew from 490px to
+619px wide, travel
+from 702px to 1426px and total zone height from 1736px to 2460px. At 768×900,
+travel grows from 396px to 627px. That four-work mobile revision at 700px and below was unchanged:
+the 390×844 zone remained 1410px tall. Grid and the other regions are preserved.
+
+That size/pacing revision is documented in
+`.impeccable/surfaces/issues-arcade-counterflow-taller.md`; `before.json`,
+`after.json` and `checks.json` in
+`.impeccable/review/arcade-counterflow-taller/` record the geometry changes and
+seven-view checks for all fifteen keyboard targets, preserved Side Scroll and
+reveal, reduced-motion restoration, normal Grid and touch launch/Back without
+page errors. The pre-edit B detector reports zero findings. Parent inspected
+all seven responsive captures, including the 1800×600 short viewport and Grid
+entry. Fresh finish review returned **ship** after all seven captures plus
+source/checks were reviewed, with no material fixes (see `finish-review.md`); prior verdicts remain scoped to
+their recorded revisions.
+
+Side Scroll now keeps only its first two works: `038-many-frogs` and
+`059-moon-orchard`. Both screens use Moon Patrol’s larger dimensions: desktop `min(76vw,112svh,1100px)`, mobile `min(90vw,100svh)`, preserving native 4:3 media and the second screen’s vertical offset. Mutual Command and Happiness Hunter move to the start of
+Counterflow, followed by `016-up-mario`, `013-paddle`, `058-micro-tetris` and
+`006-only-centipede`. Counterflow retains its name and has three works per
+desktop lane / six in mobile ordinary flow. All fifteen works keep their
+overall DOM order; Grid, native ratios and size/travel functions are unchanged.
+The six-work zone remeasures naturally, so the preceding four-work height and
+travel figures are historical. Current grouping is recorded in
+`.impeccable/surfaces/issues-arcade-regroup.md` and
+`.impeccable/review/arcade-regroup/checks.json`: seven viewports, exact 2/6
+memberships, all fifteen keyboard targets, Side Scroll holds/reversal, reveal,
+reduced restoration, Grid and touch launch/Back pass without page errors.
+Parent inspected all six captures: two Side Scroll holds and three Counterflow
+positions at 1440px, plus mobile Counterflow at 390px. Fresh finish review
+returned **ship** after all six captures, source arrays and checks were
+reviewed, with no material fixes; see that folder’s `finish-review.md`.
 
 The user explicitly promoted Many Frogs (requested as Frogger), Always Moving
 Up, Micro Tetris, and Lunar Founder (requested as Moon Patrol), raising the
@@ -346,36 +616,47 @@ thumbnails preview the newly included works without adding films. Original
 wall/player behavior, original works, shared film controller, global tokens,
 issue WIP and study WIP statuses remain intact.
 
-The current floor-material brief is
-`.impeccable/surfaces/issues-arcade-floor-patterns.md`. Evidence in
-`.impeccable/review/arcade-patterns/` includes ten current captures and two
-before captures. `checks.json` and `keyboard.json` record distinct loaded
-floors, fifteen links, six current native films, four zones, Games/About
-isolation, no overflow or browser/network errors and all fifteen keyboard
-destinations visible and unobstructed at 1440/390px. Small-screen captures
-include the 320px title and reduced-motion crossing. The fresh floor-pattern
-finish review returned **ship** after inspecting all ten current captures,
-with no material fixes; its scoped verdict is in `review.md` in that folder.
+Current local style authority is
+`.impeccable/surfaces/issues-arcade-monochrome.md`. Evidence in
+`.impeccable/review/arcade-monochrome/` records the preceding frame revision: real Bungee, solid grounds, no
+pattern requests/shadows and exact names/IDs at 1440/390/320/700px, with fifteen
+works and no page errors. Six-viewport functional checks pass holds, reversal,
+centered arrivals, shared reveal, all fifteen keyboard targets, reduced-motion
+restoration and touch launch/Back. Loaded and blocked-font fallback titles
+fit at 320px. Parent inspected all 23 captures; two reduced captures were
+recaptured after lazy assets loaded (harness correction only). The final type
+detector returned zero findings. Fresh finish review returned **ship** after inspecting all 23 captures plus
+source/diff and evidence, with no material fixes; see `finish-review.md` in
+that folder.
+Independent pre-edit typography assessment supports the Bungee/Public Sans
+roles; the second type-only detector reported zero findings. Bungee is
+explicitly declared in DESIGN.md and matching sidecar metadata.
 
-The preceding scroll-zone brief is
-`.impeccable/surfaces/issues-arcade-scroll-zones.md`; the lettering and copy
-constraints remain in `.impeccable/surfaces/issues-landing-strip-copy.md`.
-`.impeccable/review/arcade-scroll-zones/checks.json` verifies fifteen links,
-four zones, visible keyboard targets at 1440/768/390/320px, reversible horizontal
-travel, opposing lanes, reduced-motion flattening and restoration, and mobile
-touch launch/Back scroll restoration, without browser errors. Inspection data
-and desktop/mobile/small start, middle and end captures are in the same folder.
-Fresh finish review returned ship after inspecting all 33 normal-motion captures and four reduced-motion captures, with no material fixes. Earlier copy cleanup, cursive sign, unhoused
-screens and neon revisions remain historical in
-`.impeccable/review/landing-strip-copy/`,
-`.impeccable/review/arcade-cursive-neon/`,
-`.impeccable/review/arcade-unhoused/`,
-`.impeccable/review/arcade-neon-scroll/` and
-`.impeccable/review/arcade-neon-no-box/`; their ship reviews describe those
-revisions.
+The later Grid refinement is documented in
+`.impeccable/surfaces/issues-arcade-grid.md`. Four parent-inspected captures in
+`.impeccable/review/arcade-grid/` show the desktop two-column / mobile
+one-column layout; the wide capture uses 1440×1600 to include the whole grid.
+`checks.json` passes all six sizes, normal flow without overlap, all fifteen
+keyboard targets, preserved Side Scroll holds/reversal/centering and reveal,
+reduced-motion restoration and Grid touch launch/Back, without page errors.
+The pre-edit B detector and active hooks reported no new findings. Fresh
+finish review returned **ship** after all four captures plus source/checks were
+reviewed, with no material fixes; see that folder’s `finish-review.md`. Earlier ship reviews describe their recorded revisions. The other zones, frame, About,
+native links/films and manual statuses remain unchanged.
 
-The following describes the original collection implementation, including the
-twelve remaining rejected raw foreground films:
+Earlier neon, original floor, lowered carpet and motion-phrasing reviews
+remain historical in `.impeccable/review/arcade-neon-no-box/`,
+`.impeccable/review/arcade-patterns/`,
+`.impeccable/review/arcade-carpet-lowered/` and
+`.impeccable/review/arcade-motion-phrasing/`. The motion choreography carries
+forward, with section-heading offsets; those prior ship verdicts do not
+approve this style replacement. The four original SVG patterns, linoleum and
+`node scripts/build-arcade-patterns.mjs` remain unused historical materials.
+No generation/build step is needed to view the current static site.
+
+Historical record of the former three-native-film integration follows. Its
+twelve raw foreground films have since been replaced; the implementation details
+and rejected visual history are retained here:
 
 `arcade/index.html` presents fifteen Games works: the three native films
 above plus twelve remaining raw illustrated attract films. Oversized
@@ -430,7 +711,7 @@ to the player; when a file-origin browser isolates the frame, use the visible
 return arrow. Closing restores issue focus and scroll; closing a deep link
 returns to its film. Each work switch replaces the previous iframe so the old
 artwork stops running. With JavaScript disabled or native dialog unavailable,
-raw JPG plates and ordinary work links remain usable; enhanced controls stay
+native PNG fallbacks and ordinary work links remain usable; enhanced controls stay
 absent or disabled.
 
 `arcade/attract-art.js` owns plate loading, the three-state collage edits, title
@@ -449,9 +730,9 @@ keys; the linked panels follow that order. Membership is an explicit editable
 snapshot, not a live filter that rearranges the composition. Arcade remains WIP;
 issue membership never changes an individual work’s status or original content.
 
-Twelve `arcade/assets/raw/*.jpg` files remain both state zero and their
-no-JavaScript fallback. The retained Asteroids, Snake, and Warlords raw plates no longer
-drive their foregrounds; the native completed-title PNGs replace those fallbacks.
+At that historical three-film stage, twelve `arcade/assets/raw/*.jpg` files served
+as state zero and no-JavaScript fallbacks. All fifteen foreground fallbacks are
+now native title PNGs; the raw plates remain retained historical material.
 Of all fifteen retained plates, fourteen are newly generated original game-inspired
 illustrations. Many Mario is an original code-authored photostat collage using
 its own `pieces/016-up-mario/thumbnail.jpg`: independent crops, duotone pixel
@@ -463,9 +744,9 @@ Each shipping raster has embedded provenance and an entry in
 `arcade/assets/prompts.json`. The earlier fourteen generated poster JPEGs,
 authored Many Mario geometric print, generated transparent slot prop, and
 generated dark `wall-wear.jpg` texture retain their original records. The
-registry contains thirty-five shipping rasters: fifteen retained raw plates,
-fifteen background prints, the slot, the wall texture, and the native Asteroids,
-We're All Snakes, and Warlords completed-title PNGs.
+current registry contains fifty shipping rasters: fifteen retained historical raw
+plates, fifteen background prints, the slot, the wall texture, fifteen native
+film PNG fallbacks and the three source-cloud copies used by Onward & Upward.
 
 Bangers, Rubik Dirt, and Permanent Marker are uppercase-subset WOFF2 additions
 for expressive film lettering; Permanent Marker also draws the wordmark.

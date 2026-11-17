@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Arcade attract studies — Hypermedia Club</title>
+  <style>
+    @font-face{font-family:'Public Sans';src:url('assets/public-sans.ttf');font-display:swap}
+    :root{color-scheme:dark}
+    *{box-sizing:border-box}
+    body{margin:0;min-width:320px;background:#080909;color:#e3d7bf;font:14px 'Public Sans',sans-serif}
+    nav{display:flex;justify-content:space-between;align-items:center;max-width:1120px;margin:auto;padding:22px 24px}
+    a{color:inherit;text-underline-offset:.25em}
+    button{min-height:44px;padding:12px 16px;border:1px solid #8d8269;background:#080909;color:inherit;font:inherit;cursor:pointer}
+    :is(a,button):focus-visible{outline:3px solid #c9dc64;outline-offset:6px}
+    ::selection{background:#c9dc64;color:#11140e}
+    main{min-height:calc(100dvh - 90px);display:grid;place-items:center;padding:24px 24px 60px}
+    .screen{position:relative;display:block;width:min(100%,960px);aspect-ratio:4/3;background:#000}
+    .screen img,.screen canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
+    .screen canvas{opacity:0}.attract-ready canvas{opacity:1}.attract-ready img{opacity:0}
+    main.studies{max-width:1680px;margin:auto;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px;align-content:start}.studies .screen{width:100%}
+    @media(max-width:650px){main.studies{grid-template-columns:1fr}}
+    @media(max-width:650px){nav{padding:12px 18px}main{padding:24px 12px 60px;min-height:calc(100dvh - 70px)}}
+  </style>
+  <script defer src="film-kit.js?v=3d906c056648"></script>
+  <script defer src="centipede-attract.js?v=1330b7adaf66"></script>
+  <script defer src="happiness-attract.js?v=47cb9e1c9ff1"></script>
+  <script defer src="paddle-attract.js?v=5b567c172643"></script>
+  <script defer src="pacman-attract.js?v=7e22cc847bbf"></script>
+  <script defer src="cloudcutter-attract.js?v=98e6390d1cef"></script>
+  <script defer src="heap-attract.js?v=974928e2c23b"></script>
+  <script defer src="frogs-attract.js?v=4ae7d196b3cb"></script>
+  <script defer src="tetris-attract.js?v=25406b4b4acc"></script>
+  <script defer src="attract-player.js?v=d0f4ffc6d1f7"></script>
+</head>
+<body>
+  <nav aria-label="Study controls"><a href="index.html">Arcade</a><button class="attract-pause" type="button" aria-pressed="false" hidden>Pause animation</button></nav>
+  <main class="studies">
+    <a class="screen" data-attract="centipede" href="centipede-test.html" aria-label="Only Centipede attract study"><img src="assets/centipede-attract.png?v=d5c4f416b0e2" width="1200" height="900" alt="Only Centipede — attract screen"><canvas width="1" height="1" aria-hidden="true"></canvas></a>
+    <a class="screen" data-attract="happiness" href="happiness-test.html" aria-label="Happiness Hunter attract study"><img src="assets/happiness-attract.png?v=744b06920848" width="1200" height="900" alt="Happiness Hunter — attract screen"><canvas width="1" height="1" aria-hidden="true"></canvas></a>
+    <a class="screen" data-attract="paddle" href="paddle-test.html" aria-label="Paddle attract study"><img src="assets/paddle-attract.png?v=508f9333e3b4" width="1200" height="900" alt="PADDLE wrapped around the side of a wire cylinder."><canvas width="1" height="1" aria-hidden="true"></canvas></a>
+    <a class="screen" data-attract="pacman" href="pacman-test.html" aria-label="To Big for This World attract study"><img src="assets/pacman-attract.png?v=843dd2d97acd" width="1200" height="900" alt="TO BIG, FOR THIS, WORLD above one row of small dots."><canvas width="1" height="1" aria-hidden="true"></canvas></a>
+    <a class="screen" data-attract="cloudcutter" href="cloudcutter-test.html" aria-label="Cloudcutter attract study"><img src="assets/cloudcutter-attract.png?v=99103cf9d917" width="1200" height="900" alt="CLOUD above CUTTER formed from scalloped white clouds against blue sky."><canvas width="1" height="1" aria-hidden="true"></canvas></a>
+    <a class="screen" data-attract="heap" href="heap-test.html" aria-label="Top of the Heap attract study"><img src="assets/heap-attract.png?v=e92e5eecfbc1" width="1200" height="900" alt="Six summit blocks beneath a large yellow flag, defended by a smiling sun."><canvas width="1" height="1" aria-hidden="true"></canvas></a>
+    <a class="screen" data-attract="frogs" href="frogs-test.html" aria-label="Many Frogs attract study"><img src="assets/frogs-attract.png?v=019fe98558e3" width="1200" height="900" alt="Many Frogs — attract screen"><canvas width="1" height="1" aria-hidden="true"></canvas></a>
+    <a class="screen" data-attract="tetris" href="tetris-test.html" aria-label="Bitsy Blocks attract study"><img src="assets/tetris-attract.png?v=b069bb5745c8" width="1200" height="900" alt="BITSY BLOCKS cut out of a wall of tiny blocks."><canvas width="1" height="1" aria-hidden="true"></canvas></a>
+  </main>
+</body>
+</html>

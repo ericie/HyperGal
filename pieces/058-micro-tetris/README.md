@@ -1,4 +1,4 @@
-# Micro Tetris
+# Bitsy Blocks
 
 A self-playing, full-window Tetris field. Each tetromino consists of four **4×4 CSS pixel square cells**, including on high-density displays. One-pixel seams separate the four squares within each shape and the settled pile. The board has one column for every four CSS pixels of window width. No grid across the empty field, score overlay, or external dependencies.
 

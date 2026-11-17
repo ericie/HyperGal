@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cloudcutter attract study — Hypermedia Club</title>
+  <style>
+    @font-face{font-family:'Public Sans';src:url('assets/public-sans.ttf');font-display:swap}
+    :root{color-scheme:dark}
+    *{box-sizing:border-box}
+    body{margin:0;min-width:320px;background:#080909;color:#e3d7bf;font:14px 'Public Sans',sans-serif}
+    nav{display:flex;justify-content:space-between;align-items:center;max-width:1120px;margin:auto;padding:22px 24px}
+    a{color:inherit;text-underline-offset:.25em}
+    button{min-height:44px;padding:12px 16px;border:1px solid #8d8269;background:#080909;color:inherit;font:inherit;cursor:pointer}
+    :is(a,button):focus-visible{outline:3px solid #c9dc64;outline-offset:6px}
+    ::selection{background:#c9dc64;color:#11140e}
+    main{min-height:calc(100dvh - 90px);display:grid;place-items:center;padding:24px 24px 60px}
+    .screen{position:relative;display:block;width:min(100%,960px);aspect-ratio:4/3;background:#000}
+    .screen img,.screen canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
+    .screen canvas{opacity:0}.attract-ready canvas{opacity:1}.attract-ready img{opacity:0}
+    @media(max-width:650px){nav{padding:12px 18px}main{padding:24px 12px 60px;min-height:calc(100dvh - 70px)}}
+  </style>
+  <script defer src="film-kit.js?v=3d906c056648"></script>
+  <script defer src="cloudcutter-attract.js?v=98e6390d1cef"></script>
+  <script defer src="attract-player.js?v=d0f4ffc6d1f7"></script>
+</head>
+<body>
+  <nav aria-label="Study controls"><a href="index.html">Arcade</a><button class="attract-pause" type="button" aria-pressed="false" hidden>Pause animation</button></nav>
+  <main>
+    <a class="screen" data-attract="cloudcutter" href="../../pieces/025-cloudcutter/index.html" aria-label="Play Cloudcutter"><img src="assets/cloudcutter-attract.png?v=99103cf9d917" width="1200" height="900" alt="CLOUD above CUTTER formed from scalloped white clouds against blue sky."><canvas width="1" height="1" aria-hidden="true"></canvas></a>
+  </main>
+</body>
+</html>

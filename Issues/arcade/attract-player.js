@@ -1,6 +1,6 @@
 // Play native vector films only while their artwork links are in view.
 (() => {
-  const films={asteroids:window.AsteroidsAttract,snake:window.SnakeAttract,warlords:window.WarlordsAttract,command:window.CommandAttract,unbreakable:window.UnbreakableAttract,landgrab:window.LandgrabAttract,onward:window.OnwardAttract};
+  const films={asteroids:window.AsteroidsAttract,snake:window.SnakeAttract,warlords:window.WarlordsAttract,command:window.CommandAttract,unbreakable:window.UnbreakableAttract,landgrab:window.LandgrabAttract,onward:window.OnwardAttract,centipede:window.CentipedeAttract,happiness:window.HappinessAttract,paddle:window.PaddleAttract,pacman:window.PacmanAttract,cloudcutter:window.CloudcutterAttract,heap:window.HeapAttract,frogs:window.FrogsAttract,tetris:window.TetrisAttract};
   const links=[...document.querySelectorAll('[data-attract]')].filter(link=>films[link.dataset.attract]);
   if(!links.length)return;
   const reduce=matchMedia('(prefers-reduced-motion: reduce)');
@@ -52,7 +52,8 @@
     if(toggle&&!sharedToggle){
       toggle.hidden=false;toggle.disabled=reduce.matches;
       toggle.setAttribute('aria-pressed',String(paused||reduce.matches));
-      if(!toggle.hasAttribute('data-icon'))toggle.textContent=reduce.matches?'Motion paused':paused?'Play animation':'Pause animation';
+      if(toggle.hasAttribute('data-short-label'))toggle.textContent=reduce.matches?'Paused':paused?'Play':'Pause';
+      else if(!toggle.hasAttribute('data-icon'))toggle.textContent=reduce.matches?'Motion paused':paused?'Play animation':'Pause animation';
       toggle.setAttribute('aria-label',reduce.matches?'Attract animations paused for reduced motion':paused?'Play attract animations':'Pause attract animations');
     }
     states.forEach(render);schedule();

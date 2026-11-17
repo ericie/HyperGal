@@ -1,108 +1,157 @@
 ---
 name: Lunar Landgrab
-description: A self-playing saturated pixel arcade patrol.
+description: A self-playing illustrated lunar patrol.
 colors:
-  black: "#000000"
-  white: "#ffffff"
-  blue: "#1024ff"
-  cyan: "#00a4bc"
-  green: "#00d950"
-  shade: "#00a000"
-  peach: "#ffa65c"
-  earth: "#bf7838"
-  magenta: "#d500c8"
-  window: "#00bce8"
-  yellow: "#dce000"
-  red: "#ff3000"
-  rock: "#8c7100"
-  turret: "#a04018"
-spacing:
-  pixel: "1px"
-  double-pixel: "2px"
+  ink: "#25232b"
+  paper: "#fff0d3"
+  sky: "#dcc3f5"
+  distant-body: "#b7a8c9"
+  distant-ink: "#89769e"
+  middle-body: "#7fc9ba"
+  middle-ink: "#428e83"
+  road: "#ffedca"
+  earth: "#8f7565"
+  pipe: "#eee6d5"
+  orange: "#ff792e"
+  pink: "#ed4c95"
+  violet: "#b271e5"
+  coral: "#ed5949"
+  yellow: "#f8ec4e"
+  spark-orange: "#f4773b"
+  rock: "#b9b0a4"
+  turret: "#ae5f3a"
+  triad-body: "#a8dcd5"
 components:
   artwork:
-    backgroundColor: "{colors.black}"
+    backgroundColor: "{colors.sky}"
     width: "100%"
     height: "100%"
-  fixed-shot:
-    backgroundColor: "{colors.white}"
-    size: "5px"
+  fixed-pipe:
+    backgroundColor: "{colors.orange}"
+  fixed-pipe-pink:
+    backgroundColor: "{colors.pink}"
+  fixed-pipe-violet:
+    backgroundColor: "{colors.violet}"
+  fixed-pipe-coral:
+    backgroundColor: "{colors.coral}"
 ---
 
 # Design System: Lunar Landgrab
 
 ## Overview
 
-**Creative North Star: "Saturated Pixel Arcade Patrol"**
+**Creative North Star: "Illustrated Lunar Patrol"**
 
-A self-playing pixel arcade patrol follows the user’s Moon Patrol reference: open black sky, cyan mountains with blue facets, green foothills, peach ground, and one small buggy whose body hue and darker matching tires change with each generation. Original procedural sprites and stepped silhouettes keep the artwork self-contained. This design system applies only to this piece.
+A self-playing lunar patrol rendered as smooth ink contours and flat color. The approved illustrated world uses a spacious lavender sky, jagged lavender mountains, turquoise hills, whimsical alien architecture, classic saucers and a low three-wheel rover. This design system applies only to this piece.
+
+Distance is organized by palette as well as overlap and motion. Mountains and distant buildings share one lavender family; hills and middle buildings share one turquoise family. Foreground wreckage grows into architecture that retains its source paint, making the crash and replacement cycle visible without a HUD.
 
 **Key Characteristics:**
-- Saturated flat fills and whole-pixel edges.
-- Cities mixed into both landscape layers, three scrolling speeds, and one rover that drifts forward and back.
-- Automatic hops, synchronized upward/forward burst fire, distinct UFO formations and attacks.
-- Death stops landscape scrolling while wreckage grows into buildings and a compact garage releases the next rover; atmospheric hovering continues.
-- A text-free full-viewport canvas with accessible pause and export.
+- Smooth outlined procedural drawing at display resolution.
+- Two quiet, color-isolated background planes and an inherited-color foreground.
+- Flattened alien pods, substantial uneven stems, irregular apertures, balconies and framed bays.
+- Fixed paired fire, recognizable tumbling parts and a compact garage exit.
+- Full-viewport, text-free artwork with accessible pause and image export.
 
 ## Colors
 
+The frontmatter owns the literal palette. `orchard.js` is the implementation source; its legacy variable names do not describe the new hues (`C.cyan` is distant lavender and `C.green` is middle turquoise).
+
 ### Primary
 
-- **Generation paints:** Body and fixed barrels share one generation paint. All three tires use the same darker shade, calculated by rounding each body sRGB channel multiplied by 0.55. Black windows, hubs and treads remain. Body debris keeps body paint; wheel debris and its resulting buildings keep the tire shade. Replacement generations cycle through hot magenta `#ff00b8`, scarlet `#ff2548`, electric violet `#d43bff` and orange `#ff5a00`. The body and fixed barrels have no perimeter outline. Keep full saturation and bright warm hues rather than darkening the paint to meet a luminance ratio against the hills. Blue, cyan and green landscape colors are excluded from buggy paint.
-- **Mountain Cyan / Facet Blue:** Distant mountain silhouettes and their hard facets. Distant cities and atmospheric UFOs stay within cyan, blue and window cyan; cyan also appears in foreground UFO canopies.
-- **Foothill Green / Hill Shade:** Nearer hills, road-edge pixels, and crater interiors. Middle-distance cities and atmospheric UFOs stay within green, shade and yellow, with black window detail.
-- **Road Peach / Earth Brown:** Ground field and crater under-edge; brown also highlights rocks.
+- **Orange, pink, violet and coral:** Replacement body paints cycle in that order. Dark ink contours, windows and hubs provide foreground definition. Fixed guns use the exact generation body paint, with flared roots merging into the chassis. The `fixed-pipe` token is the initial orange state; its sibling variants follow replacement generations.
+- **Distant body / distant ink:** One muted lavender family covers mountains, their ridge marks, distant towers, quiet saucers and their tiny harmless drops. Buildings use the same body fill and contour ink as the mountains.
+- **Middle body / middle ink:** One turquoise family covers hills, embedded middle towers, quiet saucers and their drops. Background portholes and architectural details stay within the plane's contour ink.
 
 ### Secondary
 
-- **Window Cyan:** Dart hulls and distant-layer detail.
-- **UFO paints:** Yellow scouts, red bombers, window-cyan darts and magenta carriers use simple dome-and-disc silhouettes in different proportions. Foreground ships have only hull and canopy colors; engines, windows, trim and white carrier outlines are removed. Projectile paint follows the firing type.
-- **Rock Olive:** Solid angular rocks.
+- **Pipe:** Rotating enemy turret barrels, foreground bombs, dart hulls and small rover mechanical details. Rover gun bodies use generation paint.
+- **Yellow:** Scout hulls, foreground paired-shot cores, bomb bands, muzzle flashes and sparks.
+- **Orange / pink:** Bomber and carrier hulls respectively; foreground saucer canopies are tinted from their hull paint.
+- **Triad body:** Pale turquoise spheres with orange cores and dark ink links distinguish the fifth foreground UFO type from the four classic saucers. This foreground paint does not expand either background plane's palette.
+- **Spark orange:** One of the foreground spark paints, alongside yellow, pink and paper.
+- **Rock / turret:** Warm gray angular rocks and rust turret pedestals, outlined in foreground ink.
 
 ### Neutral
 
-- **Space Black:** Sky, windows, hubs, treads and internal sprite cutouts.
-- **Shot White:** Foreground projectiles travel only straight up or forward as five one-pixel samples; also one of the foreground square spark colors.
+- **Sky:** The uninterrupted lavender background and page fallback.
+- **Road / earth:** Cream ground with sparse brown surface marks and crater under-edges. Crater interiors use middle body paint. Stroke only the descending sides and bottom; never close the ink contour across the open mouth. The physical pit profile stays unchanged.
+- **Ink / paper:** Warm dark outlines, windows, hubs and openings; cream paper for hit flashes, sparks and generated foreground tints. Foreground window rims and small architectural accents use flat inherited-paint tints toward paper, not shiny edge streaks or lighting gradients.
 
-**The Hard-Pixel Rule.** Use flat palette fills and whole-pixel scan conversion; no smoothing, gradients, or glow.
+**The Layer Family Rule.** Keep distant terrain, buildings, saucers and decorative drops within the distant body/ink family, and middle scenery within the middle body/ink family. Do not borrow foreground accents for either plane.
+
+**The Material Inheritance Rule.** Derive each tire channel by rounding the body sRGB channel multiplied by 0.55. Wheel fragments and their buildings retain that darker paint; other fragments and their buildings retain body paint.
 
 ## Typography
 
-There is no visible typography. Keep the document title, description, and accessible canvas name outside the drawing. Do not introduce a title, score, captions, labels, or text controls.
+There is no visible typography or display type scale. The HTML title, description and canvas accessible name live outside the artwork. Do not introduce a typeface or typography tokens for a drawing that contains no text.
+
+**The Text-Free Rule.** Keep titles, instructions, counts and status outside the drawing. Use accessible names and machine-readable data for this information.
 
 ## Layout
 
-One canvas fills the viewport without scrolling or surrounding chrome. Its internal width is `min(480, innerWidth)`; its height is `round(innerHeight × internalWidth / innerWidth)`. CSS stretches the bitmap to the viewport with pixelated rendering, and the 2D context disables image smoothing. Measurements below use internal canvas pixels. There are no breakpoint swaps.
+One canvas fills the viewport without scrolling or surrounding chrome. CSS uses `image-rendering: auto`. The backing bitmap is `round(innerWidth × ratio)` by `round(innerHeight × ratio)`, where `ratio = min(2, devicePixelRatio || 1)`. A context transform maps the full backing bitmap to the existing logical physics space: width `min(480, innerWidth)` and height `round(innerHeight × logicalWidth / innerWidth)`. Image smoothing is enabled; line caps and joins are round. All following dimensions and velocities use logical units, not backing-store pixels. There are no responsive breakpoint swaps.
 
-The ground begins at 84% of canvas height. Mountain height is capped at 174 pixels or 48% of height, whichever is smaller; foothill height is capped at 85 pixels or 25% of height. Resizing preserves the aspect ratio and adjusts active scene objects to the new ground position.
+The road begins at 84% of logical height. Mountain height is capped at 174 or 48% of height; hill height is capped at 85 or 25%. Resizing preserves the viewport aspect ratio and reanchors active objects to the new ground and their depth-layer bases. The buggy's preferred 24-second cruise spans 19–28% of viewport width, with avoidance limited to the left 42%.
 
 ## Elevation & Depth
 
-Depth comes from overlapping flat silhouettes and parallax, without shadows or raised surfaces. Terrain and obstacles scroll at 66 pixels/s; mountains use 0.18 of that speed (11.88 pixels/s), foothills use 0.46 (30.36 pixels/s). Mountain and hill contours are scan-converted in two-pixel steps; the black sky remains spacious above them. Small cyan and blue skylines share the mountain speed; green cities with yellow rims share the foothill speed. Hills overlap their foundations to embed the buildings in the terrain. Distant UFOs use 0.27 scale and measure 6–8 × 3 internal pixels; middle UFOs use 0.43 scale and measure 9–12 × 4. They have no combat hitboxes. Hover amplitudes use the existing 0.55 distant and 0.82 middle layer scales. Distant activity renders after mountains, before hills; middle activity renders after hills, before the foreground. City foundations and camera drift belong to their layer. Foreground death freezes camera travel while the atmospheric UFOs continue hovering; artwork pause freezes everything.
+Depth comes from flat tonal planes, contour weight, overlap, scale and parallax. There are no UI shadows or raised surfaces. Terrain moves at 66 units/s while driving; distant mountains and cities move at 0.18 of that speed and middle hills and cities at 0.46. Distant contours are lavender ink, middle contours turquoise ink and foreground contours warm dark ink. Hills overlap middle city foundations.
+
+Distant skylines repeat with 340-unit mountain tiles; middle clusters occupy alternating 290-unit hill tiles. Stable world tile indices keep architectural variants consistent during scrolling. Distant saucers use 0.27 drawing scale (roughly 6–8 × 3); middle saucers use 0.43 (roughly 9–12 × 4). Hover amplitudes use the respective 0.55 and 0.82 layer scales. Distant activity draws after the mountains. Middle saucers, bombs and impact effects draw before the middle hill loop, so hills occlude them as they descend behind the terrain.
+
+Death freezes camera travel and city scrolling while atmospheric UFOs continue hovering and dropping harmless tiny bombs. Pause freezes simulation across every layer. Background cities remain static artwork; only foreground wreckage grows.
+
+**The Flat Ink Rule.** Use flat fills and drawn contours; do not introduce gradients, glow or baked lighting.
 
 ## Shapes
 
-Rectilinear sprite parts and filled angular silhouettes define the scene. Landscape, rocks, and crater edges use two-pixel steps; rover details, saucers, and projectiles use whole-pixel rectangles. Wheels have angular tires in a darker shade of the body paint, black hubs and moving black tread pixels. Grown cities mix stacked pods, stepped terraces, twin spires, domes and offset stacks, with stable style choices per fragment and generation. They have no white rooftop crossbars. The compact garage retains its buggy clearance. Foreground sparks are two-pixel squares; the background layers contain no combat sparks. No rounded interface surfaces are present.
+Use continuous ink paths, ellipses and Bézier curves rather than scan-converted sprites. Thin strokes vary with the feature: shared path defaults are 0.75, ellipses 0.7 and lines 0.65 logical units. Smaller architectural marks use lighter weights. Authored angular mountain peaks and shoulders contrast with broad smooth hills and curved alien buildings. The mountain silhouette uses one continuous fill and open skyline across matching 340-unit repeats, with no sinusoidal noise or visible tile seams. Sparse connected summit/shoulder folds replace detached slash marks. The distant lavender palette, height limits, 0.18 parallax and cities remain unchanged.
+
+Close architecture mixes flattened asymmetric pods, thicker uneven bottle stems, twin towers, offset stacks, broad domes, asymmetric balconies, restrained side pipe loops, framed bays and occasional checkerboard panels. Kidney-shaped, tapered and mullioned apertures use unequal heights and offset groupings, thin inherited-paint rims and sparse short seams. Avoid uniform eye-like porthole rows, mouth underlines, shiny edge streaks and knob antenna tips. The former large loop bridge is a framed bay. Background architecture remains simpler and within its two-color family. Distant and middle city stems have open stroked contours, and their foundations fill without strokes; neither background city plane has a bottom baseline. Foreground foundation outlines remain unchanged. No white rooftop crossbars. Foreground non-garage towers and background cities retain the 0.9 city scale; the garage remains 44 × 34.
+
+The rover has a low curved chassis and three smooth elliptical tires with rotating tread marks. Broad body-painted gun pipes flare continuously into the chassis and point strictly upward and forward. Tumbling wreckage uses continuous rotation and recognizable wheel, panel, chassis, cockpit and barrel forms. The four classic saucer types use an elliptical disc and a simple dome, with proportions varying by type. Triads instead use three pale-turquoise spheres with orange cores connected by dark ink links. Rocks retain angular outlines; sparks are short ink-edged strokes rather than pixel squares.
 
 ## Components
 
-- **Artwork pause target:** Click or Space toggles pause; Enter also toggles when the canvas is focused. The canvas has a button role, accessible description, and an `aria-pressed` state reflecting pause. Keyboard focus is a white one-pixel outline inset by three pixels. Reduced-motion preference starts paused. S downloads the current frame as `lunar-landgrab.png`; no visible controls are drawn.
-- **Buggy and weapons:** One compact rover has a preferred position between 19% and 28% of the canvas width over a 24-second cycle, with basic nearby-hazard reactions initially, then a predictive jump planner after its first death. Original whole-pixel sprites are about 57% of the previous rover width. Clear-road screen velocity is limited to −10…12 pixels/s and approaches its target at 54 pixels/s², keeping world progress within 56–78 pixels/s against the 66-pixel/s camera. Terrain can override that preference within the left 42% of the screen. Safe ground-hazard maneuvers commit their throttle and launch time through landing; plans cancel if their obstacle dies or a new incoming projectile appears. Two fixed barrels point straight up and straight forward. A single trigger always emits both rounds together. One shared 0.22-second firing interval and a limit of three airborne paired bursts control both cannons. Each pair retains its burst slot until both rounds disappear, so losing one round cannot enable independent fire. Rounds travel at 320 pixels/s along the two fixed axes. The sprite has simple fixed pipes and no swivel housing. Relative swept collision checks resolve real impacts. Hops launch at 225 pixels/s with gravity of 420 pixels/s². Collision bounds match the smaller wheels and chassis.
-- **Background cities:** Distant four-to-six-building skylines use cyan walls, blue facets and windows, and cyan roof highlights. Nearer clusters mix green pods, terraces, spires, domes and offset stacks, with yellow pod rims, occasional antennae and short bridges. Mountain cities repeat with the 340-pixel mountain tiles; green city clusters occupy alternating 290-pixel hill tiles. World tile indices keep their variants stable across scrolling wraps. All background city dimensions are 90% of their previous size. Roof profiles, heights, spacing and silhouettes vary by world-tile index. These repeating clusters remain scenery; no additional cities spawn or grow in the background.
-- **Atmospheric UFOs:** Up to two small saucers per depth plane drift at 2 × layer scale pixels/s, with a gentle 3 × scale horizontal sway and 2 × scale vertical bob. They occasionally drop small vertical bombs: first after 5–10 seconds, then 11–20 seconds apart per ship. At most two bombs and three brief ground flickers exist per layer; all stay in layer colors and remain outside foreground collisions. Background cities are static drawing functions inside the mountain and hill layers; no dynamic city objects, growth function or growth timer remains. Private random streams preserve foreground behavior.
-- **UFO waves:** The opening formation has three scouts. Successive formations add bombers, fast weaving darts, and mixed carrier groups, with staggered 0.4-second arrivals. A wave clears before a varying 6–11-second quiet interval. Six ships and three airborne bombs are the limits. Scouts/darts need one hit, bombers two, carriers three; hits briefly flash the hull. All attacking formations enter from the right. All types drop bombs with zero horizontal velocity while at least 65 pixels ahead of the rover, separated by a shared 2.8–4.4-second drop interval. Later waves increase speed gradually within a fixed bound. Arrivals and attacks pause during rebirth; existing ships still fly.
-- **Ground turrets:** Primitive deep-rust mounts use a squat fixed pedestal and a pipe barrel in one #a04018 paint with no perimeter outline, with no tracks, windows or sensors. Their aiming pivot is 11 pixels above the ground and rounds originate 15 pixels along the barrel direction. There is no starting turret. New emplacements arrive as singles or pairs, 1.8–3.4 seconds apart within a pair, followed by a 16–32-second gap. At most three can remain alive. Barrels turn at 2.4 radians/s toward the rover and its jump height. A brief charge precedes red rounds, with a varying 3.2–4.8-second firing interval, muzzle flash and recoil. Turrets need three buggy shots, and their shots can be intercepted; nearby city growth destroys them outright. Shots travel at 105 internal pixels/s relative to terrain, with at most eight alive. Turrets and shells scroll with the road. Targeting and firing stop during rebirth while existing shells finish flying; muzzle flashes fade. Bomb craters can destroy turrets.
-- **Crashes and rebirth:** Fatal contact stops all scrolling. Ten recognizable parts scatter, tumble and settle. After all parts rest and bombs finish falling, a 0.35-second resting beat precedes 2.6 seconds of growth with a 0.045-second stagger. Wreck-grown towers use 90% of the previous large-city width and height (2.7× the old small towers), preserving their source paint or darker tire shade. One part instead becomes a compact garage, 44 pixels wide and 34 high, compared with the former 60-pixel-wide garage. Its shutter lifts during the first 0.5 seconds of emergence; the buggy waits inside, then rolls out over 1.8 seconds. Scrolling resumes only after the buggy clears the garage. Growing foundations blast nearby turrets, rocks and holes within an 18-pixel margin of the expanding footprint. Each hazard explodes once per encounter; rocks and turrets disappear regardless of remaining armor, while holes fill gradually. The visible crater and collision floor rise together, the completed hole is removed, and sunken building foundations rise with the restored ground. The compact garage stays in the left part of the city and retains a raised floor for nearby hazards. Its exit no longer adds forward speed or an upward impulse. Buildings remain world-anchored and scroll with the road.
-- **Hazards:** Small rocks take one buggy shot; large rocks take three. UFO formations enter from ahead and release vertically falling bombs that can be intercepted. Bomb impacts make green stepped craters with brown under-edges. Craters remain until they scroll offscreen or a growing city foundation reaches them or comes within 18 pixels of their edge. Each affected hole bursts once and fills completely as the foundation grows. Hazards farther from the city stay intact, and later bomb hits can damage the restored ground again. There is no opening crater or forced death. The beginner jumps nearby hazards without rehearsing landings or predicting bomb craters; after the first death, later generations use the full avoidance planner. Ground obstacles arrive 4.8–8.2 seconds apart and hazard timers ease after each garage exit. Nothing persists between reloads.
+### Artwork canvas
+
+Click or Space toggles pause; Enter toggles when the canvas is focused. The canvas is keyboard focusable, has a button role, an accessible description and an `aria-pressed` pause state. Keyboard focus uses a one-CSS-pixel ink outline inset three pixels. Reduced-motion preference starts paused. S exports the current backing bitmap as `lunar-landgrab.png`. Diagnostics remain canvas dataset fields. No visible controls or HUD are drawn.
+
+### Rover and fixed paired fire
+
+One rover initially uses nearby-hazard reactions, then replacement generations gain predictive avoidance after the first death. There is no forced opening crash. Clear-road screen velocity approaches its target at 54 units/s² and is limited to −10…12 units/s. Hops launch at 157.5 units/s with gravity 294 units/s², lowering peak height by 30% from 60.27 to 42.19 units while preserving 1.071 seconds of level-ground airtime. Predictive collision padding remains 6 units normally and 7 during easing, but is capped at 2 for tall rocks (size > 18); physical collision padding stays 0. Safe ground-hop plans commit their launch timing and throttle; the mature planner may rehearse deceleration from a committed jump boost when the entire remaining flight and landing stay safe. Obstacle destruction or a new incoming projectile can cancel a plan.
+
+The forward muzzle center is `(rover.x + 25, ground − jump − 10)` and the upward center is `(rover.x − 4, ground − jump − 28)`. The body-painted pipes merge into the chassis through flared roots. Their illustrated openings align exactly with `gunMuzzles`; pipes do not swivel. One trigger emits both rounds together at 320 units/s, subject to a shared 0.22-second interval and at most three airborne paired bursts. A pair keeps its slot until both rounds disappear. Shots are short yellow strokes edged in ink; relative swept collision checks resolve impacts. Ground targets trigger paired fire only when ahead and within the fixed forward barrel height. Low chips below the barrel require hops rather than wasted bursts; pairing and the three-burst limit stay unchanged.
+
+### Saucers, bombs and turrets
+
+Foreground waves enter from ahead and move right to left. The five repeating formations are three scouts; bomber/scout/bomber; three darts and a scout; carrier/triad/dart/scout; then triad/bomber/triad. Maximum active UFOs is six. Scouts and darts take one hit, bombers two, carriers three and triads four. Wave gaps vary from 6–11 seconds after the preceding wave clears. Ordinary vertical bombs use a shared varying 2.8–4.4-second drop gap. Triads bypass that cooldown, carry four bombs and use a 1.1-second per-ship drop interval, initially ready after `0.55 + slot × 0.24` seconds. All drops still require a ship more than 65 units ahead and share the maximum of three airborne bombs. Triad bombs start 14 units below the ship with downward speed 50, rather than the ordinary 8-unit offset and speed 32; all have zero horizontal velocity and gravity 48 units/s². Triads move at base speed 34 with an 8-unit hover amplitude and frequency 2.8, and a 26 × 20 collision envelope. Bombs open real craters. Quiet depth saucers and their tiny decorative drops have no foreground combat effects.
+
+Rust turrets have rounded inked pedestals and cream rotating pipe barrels. They take three hits, track and elevate toward the rover, and fire interceptable rounds at 105 units/s, 3.2–4.8 seconds apart. New turrets appear on clear ground in singles or pairs; pair members are 1.8–3.4 seconds apart, followed by 16–32-second gaps. Turrets stop firing during rebirth. Medium rocks (11–14 units) and low chips (6–8 units) take one hit; heavy rocks (24 units) take three. Chips use a broken, low angular profile. Five cyclic authored ground phrases—step-hop, rattle, double-hop, heavy and offbeat—each place 3–5 real hazards at fixed world offsets, including pits 24–32 units wide. `spawnGroundPattern(index = groundPattern++)` adds each phrase together as offscreen world objects. After the last beat, a rest of 198–264 world units gives 3–4 driving seconds. The first phrase starts after 0.6 seconds; its clock pauses with the camera and preserves post-garage grace. Bomb-created craters retain their existing sizes and behavior.
+
+### Wreckage, towers and garage
+
+A fatal hit stops scrolling and scatters three wheels plus chassis, cockpit, barrel, axle and panel pieces. Every piece settles against the terrain before growth begins; existing foreground bombs must also finish falling. After 0.35 seconds of rest, source-colored structures grow over 2.6 seconds with small staggered starts. Body fragments retain body paint and wheels retain their darker paint. Wheel-derived towers keep a wheel detail.
+
+One suitable fragment becomes the compact 44 × 34 garage with one offset mullioned window; the other structures use varied silhouettes at the established 90% city scale. Growing foundations blast nearby turrets and rocks, gradually fill nearby holes and rise with repaired ground. Hazards outside their reach remain; later bombs may create new holes. The garage shutter opens over 0.5 seconds, then the replacement emerges over 1.8 seconds. It clears the garage before camera travel and combat resume, without an extra shove or forced hop. The replacement cycles to the next body paint; prior buildings retain their inherited colors and scroll with the road.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** preserve the open black sky, saturated landscape layers, and readable rover separated from the landscape by its paint rather than an outline.
-- **Do** blast hazards near growing foundations once, fill affected holes, and preserve hazards outside that reach.
-- **Do** retain keyboard access, reduced-motion pause, and dependency-free rendering.
+
+- Do keep the distant and middle palette families isolated across terrain, cities and atmospheric activity.
+- Do preserve smooth ink contours, round rotating tires and recognizable rotating debris.
+- Do merge body-painted guns into the chassis while aligning openings with the actual fixed projectile origins.
+- Do preserve body and tire paint through wreckage and foreground city growth.
+- Do keep the compact garage clearance and the existing gameplay coordinate space.
 
 ### Don't:
-- **Don’t** draw titles, scores, labels, controls, or a top bar over the artwork.
-- **Don’t** add a repair saucer, downward repair shots, a moon, orchard growth, or saved scene state.
-- **Don’t** introduce smoothing, glow, gradients, or interface panels.
+
+- Don't restore the discarded black sky, saturated cyan/green landscape or pixelated rendering.
+- Don't add visible titles, scores, captions, labels, instructions or text controls.
+- Don't add gradients, glow, baked lighting or white rooftop crossbars.
+- Don't cap pit mouths with an ink line or give close buildings uniform eye rows and mouth curves.
+- Don't draw middle-layer UFO activity over the hills or add bottom baselines to distant or middle buildings.
+- Don't turn background cities into growing structures or atmospheric UFOs into combat targets.
+- Don't replace live procedural drawing with the approved still image.

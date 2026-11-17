@@ -1,31 +1,43 @@
 # Top of the Heap
 
 A two-sided, self-playing arcade match built for a portrait screen. The board is
-a twenty-storey pyramid of equal-size cubes. A bright ball character enters
-from above, lands on the summit, and stays on the board. Its springy legs carry
-it both upward and downward along the pyramid's valid cube connections. A face
-looks into each jump while the body squashes on landing.
+a twenty-storey pyramid of equal-size cubes. A smiling yellow sun enters
+from above, lands on the summit, and stays on the board. Golden rays surround
+its round face as it bounces upward and downward along valid cube connections.
+Its face looks into each jump while the sun squashes on landing.
 
-The ball reassesses the field at every landing. It always defends against the
-spring-snake with the fewest jumps remaining to the summit, using distance only
-to break a tie. A new leader immediately replaces a safer target. If no snake
-is present, the ball finds the shortest route to a cube it has not claimed.
-Every ball landing paints a cube yellow, including cubes previously claimed by
-the snakes.
+The sun reassesses the field at every landing. It prioritizes the hazard with
+the earliest possible arrival at the summit and takes a shortest route along
+connected cubes toward its next landing. It avoids descending so far that it
+cannot climb back before the hazards. Every defensive move uses an ordinary hop;
+it never skips cubes or redirects a hop in midair. At the summit it can bounce
+in place while hazards approach. If no hazard
+is present, the sun finds the shortest route to a cube it has not claimed.
+Every sun landing paints a cube yellow, including cubes previously claimed by
+the hazards. Route choices favor fresh territory with further unclaimed neighbors
+and discourage immediately retracing a hop. Normal hops take 0.35–0.43 seconds;
+reduced-motion timing stays slower.
 
-Wide, coiled spring-snakes attack in frequent waves. Three to five arrive in a
+Skulls, daggers, guns, whiskey bottles, and cigarettes ride on little coiled
+springs. The five symbols cycle through each wave, drawn as local Canvas shapes
+without text or external images. Their palette is dark gray-brown. They bounce
+between cubes, compressing and extending their springs as they land and jump.
+Their shadows stay on the cubes beneath them; reduced motion removes the hops
+and deformation. Three to five arrive in a
 compact burst, share a related hue, and choose their own random routes upward.
-A six-to-ten-second lull separates each group, and no more than six snakes may
-occupy the board at once. Every snake landing paints its cube green, replacing
-yellow territory when necessary. Every snake reserves
-both its current cube and its destination. No two snakes can occupy or move
-through the same square; a blocked snake bounces in place until one of its two
-upward routes opens. A snake that crosses the summit leaves the board; reaching
-the top is not itself a win. The scoreboard continuously reports the percentage
-of cubes claimed by Yellow, claimed by Green, and still unclaimed. Yellow or
-Green wins only by claiming 100% of the heap. A win flashes the screen and
-starts a fresh heap. When the ball character catches a snake, its feet flatten
-that attacker but do not score separately. The character never falls from the
+A six-to-ten-second lull separates each group, and no more than six hazards may
+occupy the board at once. Every hazard landing paints its cube dark gray-brown, replacing
+yellow territory when necessary. Every hazard reserves
+both its current cube and its destination. No two hazards can occupy or move
+through the same square; a blocked hazard waits in place until one of its two
+upward routes opens. The sun intercepts hazards before they reach the summit.
+A yellow flag with two eyes and a simple smiling mouth is planted in the center of
+the summit cube, with open space above it. Three percentages stack in the
+top-left corner without labels: yellow territory, dark gray-brown territory, and purple
+unclaimed territory. Yellow or dark gray-brown wins only by claiming 100% of the heap.
+A win flashes the screen and starts a fresh heap. When the sun
+catches a hazard, it flattens
+that hazard without scoring separately. The character never falls from the
 bottom edge; it turns and climbs back into the heap. The match has no finish
 line.
 

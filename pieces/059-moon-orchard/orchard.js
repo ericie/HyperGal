@@ -2,26 +2,39 @@
   'use strict';
   const canvas = document.querySelector('canvas'), ctx = canvas.getContext('2d');
   const C = {
-    black: '#000000', white: '#ffffff', blue: '#1024ff', cyan: '#00a4bc',
-    green: '#00d950', shade: '#00a000', peach: '#ffa65c', earth: '#bf7838',
-    magenta: '#d500c8', window: '#00bce8', yellow: '#dce000', red: '#ff3000', rock: '#8c7100', turret: '#a04018'
+    black:'#25232b',white:'#fff0d3',sky:'#dcc3f5',
+    cyan:'#b7a8c9',blue:'#89769e',distantLight:'#ccbedb',
+    green:'#7fc9ba',shade:'#428e83',middleLight:'#acdccc',
+    peach:'#ffedca',earth:'#8f7565',pipe:'#eee6d5',
+    magenta:'#ed4c95',window:'#a8dcd5',yellow:'#f8ec4e',red:'#f4773b',orange:'#ff792e',rock:'#b9b0a4',turret:'#ae5f3a'
   };
-  const SPEED = 66, GRAVITY = 420, LIFT = 225, ACCELERATION = 54, BUGGY_COUNT = 1, MAX_SAUCERS = 6;
+  const SPEED = 66, GRAVITY = 294, LIFT = 157.5, ACCELERATION = 54, BUGGY_COUNT = 1, MAX_SAUCERS = 6;
   const CITY_SCALE = .9;
   const SHOT_SPEED = 320, MAX_BURSTS = 3, FIRE_GAP = .22;
   // Vivid warm arcade paints; no perimeter outline.
-  const ROVER_COLORS = ['#ff00b8', '#ff2548', '#d43bff', '#ff5a00'];
+  const ROVER_COLORS = ['#ff792e', '#ed4c95', '#b271e5', '#ed5949'];
   const UFO_TYPES = {
     scout: {speed: 44, hp: 1, payload: 1, interval: 3.8, amplitude: 4, frequency: 3, width: 26, height: 12},
     bomber: {speed: 28, hp: 2, payload: 2, interval: 3.4, amplitude: 3, frequency: 2, width: 32, height: 14},
     dart: {speed: 58, hp: 1, payload: 1, interval: 3.2, amplitude: 10, frequency: 4.4, width: 22, height: 8},
-    carrier: {speed: 24, hp: 3, payload: 2, interval: 4.2, amplitude: 5, frequency: 1.7, width: 36, height: 16}
+    carrier: {speed: 24, hp: 3, payload: 2, interval: 4.2, amplitude: 5, frequency: 1.7, width: 36, height: 16},
+    triad: {speed: 34, hp: 4, payload: 4, interval: 1.1, amplitude: 8, frequency: 2.8, width: 26, height: 20}
   };
   const UFO_WAVES = [
     ['scout','scout','scout'],
     ['bomber','scout','bomber'],
     ['dart','dart','dart','scout'],
-    ['carrier','bomber','dart','scout','scout']
+    ['carrier','triad','dart','scout'],
+    ['triad','bomber','triad']
+  ];
+  // Distances are world beats: close chips share a hop, then landing space
+  // separates the next jump or firing phrase. Gaps between phrases vary.
+  const GROUND_PATTERNS = [
+    {name:'step-hop',beats:[[0,'rock',12,1],[94,'rock',7,1],[212,'pit',26]]},
+    {name:'rattle',beats:[[0,'rock',6,1],[20,'rock',8,1],[126,'rock',14,1],[256,'pit',30]]},
+    {name:'double-hop',beats:[[0,'pit',24],[118,'pit',26],[252,'rock',7,1],[274,'rock',6,1]]},
+    {name:'heavy',beats:[[0,'rock',24,3],[60,'rock',12,1],[162,'pit',32],[290,'rock',8,1],[310,'rock',7,1]]},
+    {name:'offbeat',beats:[[0,'rock',11,1],[42,'rock',12,1],[146,'pit',26],[260,'rock',8,1],[280,'rock',6,1]]}
   ];
   const PARTS = {
     wheel: ['..KKK..','.KKCKK.','KKCCCKK','KCCWCCK','KKCCCKK','.KKCKK.','..KKK..'],
@@ -40,7 +53,7 @@
   let rovers = [], wreck = [], grownBuildings = [];
   let phase = 'driving', cycle = null;
   let waveNumber = 0, waveQueue = [];
-  let depthLayers = [], nextBurstId = 0, turretGroup = 0;
+  let depthLayers = [], nextBurstId = 0, turretGroup = 0, groundPattern = 0;
   const roadSpeed = () => phase === 'driving' ? SPEED : 0;
   function makeRover(id, generation = 0) {
     const color = ROVER_COLORS[generation % ROVER_COLORS.length], tireColor=darkenPaint(color);
@@ -87,8 +100,8 @@
   }
   function makeDepthLayers() {
     depthLayers=[
-      {name:'distant',parallax:.18,scale:.55,ufoScale:.27,body:C.cyan,shade:C.blue,light:C.window,seed:19059},
-      {name:'middle',parallax:.46,scale:.82,ufoScale:.43,body:C.green,shade:C.shade,light:C.yellow,seed:59019}
+      {name:'distant',parallax:.18,scale:.55,ufoScale:.27,body:C.cyan,shade:C.blue,light:C.distantLight,seed:19059},
+      {name:'middle',parallax:.46,scale:.82,ufoScale:.43,body:C.green,shade:C.shade,light:C.middleLight,seed:59019}
     ].map(layer=>({...layer,ufos:[],bombs:[],impacts:[],clock:6,age:0}));
     for(const layer of depthLayers) {
       depthUfo(layer,true);
@@ -121,32 +134,17 @@
       layer.impacts=layer.impacts.filter(p=>p.life>0).slice(-3);
     }
   }
-  function drawSimpleSaucer(x,y,width,height,body,canopy,rim=body) {
-    // A dome and a flat disc, with no engines, windows or ornamental trim.
-    const left=Math.round(x-width/2),top=Math.round(y-height/2);
-    const cap=Math.max(1,Math.floor(height*.3)),edge=Math.max(1,Math.floor(height*.2));
-    const bottom=height>=4 ? Math.max(1,Math.floor(height*.2)) : 0;
-    const band=height-cap-edge-bottom;
-    const tier=(fraction,y,h,color)=>{
-      const span=Math.max(1,Math.round(width*fraction));
-      rect(left+Math.floor((width-span)/2),y,span,h,color);
-    };
-    tier(.36,top,cap,canopy);
-    tier(.72,top+cap,band,body);
-    tier(1,top+cap+band,edge,rim);
-    if(bottom)tier(.54,top+cap+band+edge,bottom,body);
+  function drawSimpleSaucer(x,y,width,height,body,canopy,ink=C.black) {
+    curve(p=>{p.moveTo(x-width*.23,y);p.bezierCurveTo(x-width*.22,y-height*.7,x+width*.19,y-height*.7,x+width*.23,y);p.closePath();},canopy,ink,.65);
+    oval(x,y+height*.05,width*.5,height*.23,body,ink,.7);
+    curve(p=>{p.moveTo(x-width*.46,y);p.quadraticCurveTo(x,y-height*.24,x+width*.46,y);},null,ink,.5);
+    oval(x,y+height*.16,width*.095,height*.075,ink===C.black?C.orange:ink,ink,.4);
   }
   function drawDepthLayer(layer) {
-    const size=layer.name==='distant'?1:2;
-    layer.bombs.forEach(b=>rect(b.x,b.y,size,size+1,layer.body));
-    layer.impacts.forEach(p=>{
-      rect(p.x-size,p.y,size*3,1,layer.shade);
-      rect(p.x,p.y-(p.life>.18?2:1),size,1,layer.body);
-    });
-    for(const u of layer.ufos) {
-      const size=depthUfoSize(layer,u);
-      drawSimpleSaucer(u.x,u.y,size.width,size.height,layer.body,layer.body,layer.shade);
-    }
+    const size=layer.name==='distant'?1:1.4;
+    layer.bombs.forEach(b=>oval(b.x,b.y,size*.65,size,layer.body,layer.shade,.35));
+    layer.impacts.forEach(p=>{line(p.x-size,p.y,p.x+size,p.y,layer.shade,.5);});
+    for(const u of layer.ufos){const size=depthUfoSize(layer,u);drawSimpleSaucer(u.x,u.y,size.width,size.height,layer.body,layer.body,layer.shade);}
   }
 
   function targetPosition(target, kind, ahead = 0) {
@@ -186,8 +184,10 @@
     return Infinity;
   }
   function firingOpportunity() {
+    const r=rovers[0];
     return [...obstacles,...ufos,...bombs,...turretShots]
-      .some(target=>!target.dead && target.kind!=='pit' && target.x>=0 && target.x<=w);
+      .some(target=>!target.dead && target.kind!=='pit' && target.x>=0 && target.x<=w
+        && (!['rock','turret'].includes(target.kind) || (target.x>r.x && r.jump+10<=target.size+1)));
   }
   function fireWeapons(r, dt) {
     r.shotClock=Math.max(0,r.shotClock-dt);r.shotFlash=Math.max(0,r.shotFlash-dt);
@@ -217,7 +217,12 @@
       if (o.kind === 'pit') {
         if(pitDepth(o)<=3)continue;
         if (lift < 3 + margin && [-10, 12].some(wheel => Math.abs(x + wheel - ox) < o.size / 2 - 1 + margin)) return o;
-      } else if (Math.abs(x - ox) < 16 + o.size * .6 + margin && lift < o.size - 2 + margin) return o;
+      } else {
+        // Lower hops clear tall rocks closely; retain wider reaction margins
+        // for pits, projectiles and the smaller rhythmic ground hazards.
+        const clearance=o.kind==='rock'&&o.size>18?Math.min(margin,2):margin;
+        if(Math.abs(x-ox)<16+o.size*.6+clearance && lift<o.size-2+clearance)return o;
+      }
     }
     for (const shot of turretShots) {
       if (shot.dead) continue;
@@ -245,6 +250,19 @@
       const newThreat=bombs.some(b=>!b.dead && !plan.seen.has(b) && Number.isFinite(incomingTime(r,b,'bomb')))
         || turretShots.some(s=>!s.dead && !plan.seen.has(s) && Number.isFinite(incomingTime(r,s,'turret-shot')));
       if(time>plan.until || (plan.launched && r.jump===0) || plan.focus?.dead || newThreat)r.maneuver=null;
+      else if(plan.launched && r.jump>0 && plan.speed>12) {
+        // A phrase may need a short boost, not a sprint all the way through
+        // touchdown. Rehearse easing back once the whole landing stays clear.
+        const preferred=Math.max(-10,Math.min(12,(cruiseX(time+.35)-r.x)*.5));
+        const remaining=(r.velocity+Math.sqrt(r.velocity*r.velocity+2*GRAVITY*r.jump))/GRAVITY;
+        let x=r.x,vx=r.vx,lift=r.jump,vy=r.velocity,safe=true;
+        for(let t=.04;t<=remaining+.36;t+=.04) {
+          vx=approach(vx,preferred,ACCELERATION*.04);x=patrolX(x+vx*.04);
+          lift=Math.max(0,lift+vy*.04-GRAVITY*.04*.04/2);vy=lift?vy-GRAVITY*.04:0;
+          if(collision(x,lift,t,7)){safe=false;break;}
+        }
+        if(safe)plan.speed=preferred;
+      }
     }
     if(r.generation===0) {
       // The beginner reacts to nearby hazards, but does not rehearse landings
@@ -410,8 +428,11 @@
   function resize() {
     const oldW = w, oldGround = ground, oldBases=depthLayers.map(depthBase);
     w = Math.min(480, innerWidth); h = Math.round(innerHeight * w / innerWidth);
-    canvas.width = w; canvas.height = h; ground = Math.round(h * .84);
-    ctx.imageSmoothingEnabled = false;
+    const ratio=Math.min(2,globalThis.devicePixelRatio||1);
+    canvas.width=Math.round(innerWidth*ratio);canvas.height=Math.round(innerHeight*ratio);
+    ctx.setTransform(canvas.width/w,0,0,canvas.height/h,0,0);
+    ctx.lineCap='round';ctx.lineJoin='round';ctx.imageSmoothingEnabled=true;
+    ground = Math.round(h * .84);
     if (oldW) {
       const scale = w / oldW, shift = ground - oldGround;
       rovers.forEach(r => {r.x = boundX(r.x * scale); r.vx *= scale;});
@@ -514,7 +535,7 @@
       x: x ?? (direction < 0 ? w+25 : -25),
       y: Math.max(22, ground*(.23 + slot%3*.13)),
       vx: direction*(spec.speed+rank*1.25), phase: slot*1.25,
-      drop: .8 + slot*.24, payload: spec.payload});
+      drop: (type==='triad'?.55:.8) + slot*.24, payload: spec.payload});
     return true;
   }
   function beginWave(initial = false) {
@@ -537,6 +558,13 @@
       ufoClock -= dt;
       if (ufoClock <= 0) beginWave();
     }
+  }
+  function spawnGroundPattern(index=groundPattern++) {
+    const pattern=GROUND_PATTERNS[mod(index,GROUND_PATTERNS.length)];
+    for(const [offset,kind,size,hp]of pattern.beats) {
+      obstacles.push({x:w+35+offset,kind,size,hp,chip:kind==='rock'&&size<10,pattern:pattern.name,beat:offset});
+    }
+    return (pattern.beats[pattern.beats.length-1][0]+rand(198,264))/SPEED;
   }
   function spawnTurret(x = w+35) {
     if (obstacles.filter(o => !o.dead && o.kind === 'turret').length >= 3) return null;
@@ -596,11 +624,7 @@
       }
     }
     if (phase === 'driving') obstacleClock -= dt;
-    if (obstacleClock <= 0) {
-      obstacleClock = rand(4.8, 8.2);
-      const pit = Math.random() < .25, big = Math.random() < .3;
-      obstacles.push({x: w + 35, kind: pit ? 'pit' : 'rock', size: pit ? rand(26, 38) : big ? rand(23, 27) : rand(11, 14), hp: big ? 3 : 1});
-    }
+    if (phase==='driving' && obstacleClock<=0)obstacleClock=spawnGroundPattern();
     updateTurrets(dt);
     updateWaves(dt);
     if(phase==='driving')bombClock-=dt;
@@ -608,10 +632,10 @@
       const spec = UFO_TYPES[u.type] || UFO_TYPES.scout;
       u.x += dt*u.vx; u.drop -= dt; u.hit = Math.max(0, u.hit-dt);
       if (u.prevY !== undefined && dt>0) u.estimatedVy=(ufoY(u)-u.prevY)/dt;
-      if (phase === 'driving' && bombClock<=0 && u.drop <= 0 && u.payload > 0 && u.x > r.x+65 && u.x < w-22 && bombs.length < 3) {
-        u.drop = spec.interval;bombClock=rand(2.8,4.4);
-        const y=ufoY(u)+8;
-        bombs.push({x:u.x,y,vx:0,vy:32,type:u.type});u.payload--;
+      if (phase === 'driving' && (u.type==='triad'||bombClock<=0) && u.drop <= 0 && u.payload > 0 && u.x > r.x+65 && u.x < w-22 && bombs.length < 3) {
+        u.drop = spec.interval;bombClock=u.type==='triad'?Math.max(bombClock,.8):rand(2.8,4.4);
+        const y=ufoY(u)+(u.type==='triad'?14:8);
+        bombs.push({x:u.x,y,vx:0,vy:u.type==='triad'?50:32,type:u.type});u.payload--;
       }
     });
     bombs.forEach(b => {
@@ -653,283 +677,291 @@
     updateCycle(dt);
     grownBuildings = grownBuildings.filter(b => b.x > -100);
   }
-  function rect(x, y, width, height, color = C.white) {
-    ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), Math.ceil(width), Math.ceil(height));
+  // Draw in the existing physics coordinates, at the display's full resolution.
+  function rect(x,y,width,height,color=C.white) {ctx.fillStyle=color;ctx.fillRect(x,y,width,height);}
+  function inkPath(points,fill,stroke=C.black,lineWidth=.75,close=true) {
+    ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
+    if(close)ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}
+    if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lineWidth;ctx.stroke();}
   }
-  // Scan-convert silhouettes into whole pixels so even diagonal facets remain crisp.
-  function shape(points, color, step = 1) {
-    const top = Math.floor(Math.min(...points.map(p => p[1])) / step) * step;
-    const bottom = Math.ceil(Math.max(...points.map(p => p[1])));
-    for (let y = top; y < bottom; y += step) {
-      const hits = [], mid = y + step / 2;
-      for (let i = 0; i < points.length; i++) {
-        const a = points[i], b = points[(i + 1) % points.length];
-        if ((a[1] <= mid && b[1] > mid) || (b[1] <= mid && a[1] > mid)) hits.push(a[0] + (mid - a[1]) / (b[1] - a[1]) * (b[0] - a[0]));
+  function curve(draw,fill,stroke=C.black,lineWidth=.75) {
+    ctx.beginPath();draw(ctx);if(fill){ctx.fillStyle=fill;ctx.fill();}
+    if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lineWidth;ctx.stroke();}
+  }
+  function oval(x,y,rx,ry,fill,stroke=C.black,lineWidth=.7) {
+    curve(p=>p.ellipse(x,y,Math.max(.1,rx),Math.max(.1,ry),0,0,Math.PI*2),fill,stroke,lineWidth);
+  }
+  function line(x,y,x2,y2,color=C.black,width=.65) {inkPath([[x,y],[x2,y2]],null,color,width,false);}
+  function box(x,y,width,height,fill,stroke=C.black,radius=1,lineWidth=.65) {
+    curve(p=>p.roundRect(x,y,Math.max(.1,width),Math.max(.1,height),Math.max(0,Math.min(radius,width/2,height/2))),fill,stroke,lineWidth);
+  }
+  function tint(color,amount=.28) {
+    return '#'+[1,3,5].map(i=>Math.round(parseInt(color.slice(i,i+2),16)*(1-amount)+parseInt(C.white.slice(i,i+2),16)*amount).toString(16).padStart(2,'0')).join('');
+  }
+  function shape(points,color,step=1) {inkPath(points,color,null);}
+  function alienWindow(x,y,width,height,variant,paint) {
+    const ink=paint.ink||C.black,rim=paint.light||tint(paint.body,.48);
+    ctx.save();ctx.translate(x,y);
+    const aperture=q=>{
+      if(variant%3===0) {
+        // An asymmetrical kidney aperture, with a tight inset rim.
+        q.moveTo(-width*.34,-height*.5);
+        q.bezierCurveTo(width*.32,-height*.7,width*.64,-height*.22,width*.25,height*.03);
+        q.bezierCurveTo(-width*.05,height*.15,width*.24,height*.58,-width*.23,height*.5);
+        q.bezierCurveTo(-width*.58,height*.38,-width*.57,-height*.25,-width*.34,-height*.5);
+      }else if(variant%3===1) {
+        q.moveTo(-width*.4,-height*.3);q.quadraticCurveTo(-width*.14,-height*.57,width*.35,-height*.5);
+        q.lineTo(width*.47,height*.31);q.quadraticCurveTo(width*.14,height*.56,-width*.24,height*.45);q.closePath();
+      }else{
+        q.moveTo(-width*.42,height*.45);q.lineTo(-width*.29,-height*.32);
+        q.bezierCurveTo(-width*.1,-height*.66,width*.4,-height*.55,width*.42,-height*.07);
+        q.lineTo(width*.32,height*.43);q.closePath();
       }
-      hits.sort((a, b) => a - b);
-      for (let i = 0; i + 1 < hits.length; i += 2) rect(Math.floor(hits[i] / step) * step, y, Math.max(step, Math.ceil((hits[i + 1] - hits[i]) / step) * step), step, color);
-    }
-  }
-  function distantCity(x, base, height, variant) {
-    // Compact blue/cyan skylines sit in mountain valleys, behind the hills.
-    height*=CITY_SCALE;
-    const theme=mod(variant,7),count=4+theme%3;
-    for (let i = 0; i < count; i++) {
-      const bx = x + i*(10+theme%3)*CITY_SCALE, width = (8 + (i+theme)%3*2)*CITY_SCALE;
-      const tall = height * (.48 + mod(i * 3 + variant, 5) * .13);
-      const roof=mod(i+theme,3);
-      if(roof===0)rect(bx+2,base-tall-4,width-4,4,C.cyan);
-      else if(roof===1)rect(bx+width*.5,base-tall-6,2,6,C.blue);
-      rect(bx, base - tall, width, tall, C.blue);
-      rect(bx + 2, base - tall + 2, width - 2, tall - 2, C.cyan);
-      if (i % 3 === 0) rect(bx + 4, base - tall - 12, 1, 8, C.window);
-      for (let y = base - tall + 6; y < base - 3; y += 7) {
-        for (let wx = 3; wx < width - 1; wx += 4) rect(bx + wx, y, 2, 2, C.blue);
-      }
-    }
-    rect(x-3,base-4,(count*(10+theme%3)+3)*CITY_SCALE,5,C.blue);
-  }
-  function cityTower(x, base, height, width, tiers, paint = null, style = 0) {
-    const body = paint?.body ?? C.green, edge = paint?.edge ?? C.yellow, shadow = paint?.shadow ?? C.shade;
-    const windows=(left,top,span,tall,gap=7)=>{
-      for(let y=top+6;y<top+tall-3;y+=gap)for(let px=left+3;px<left+span-3;px+=6)rect(px,y,2,2,C.black);
     };
-    if(style!==0) {
-      if(style===1) {
-        // Terraces step inward rather than repeating round balconies.
-        for(let i=0;i<4;i++) {
-          const span=width*(1-i*.19),tall=height*(.27+i*.22),left=x-span*.5;
-          rect(left,base-tall,span,tall,body);
-          windows(left,base-tall,span,height*.2,8);
+    curve(aperture,ink,ink,1.6);curve(aperture,ink,rim,.75);
+    if(variant%3===2){line(-width*.02,-height*.37,width*.07,height*.42,rim,.65);line(width*.05,-height*.04,width*.34,-height*.12,rim,.55);}
+    ctx.restore();
+  }
+  function cityTower(x,base,height,width,tiers,paint=null,style=0) {
+    const p=paint||{body:C.green,ink:C.shade,shade:C.shade,light:C.middleLight,mono:true};
+    const body=p.body,ink=p.ink||C.black,shadow=p.shade||darkenPaint(body),light=p.light||tint(body,.45);
+    let podIndex=0;
+    const pod=(cx,cy,span,tall)=>{
+      if(!p.mono)tall=Math.min(tall,span*.42);
+      curve(q=>{q.moveTo(cx-span*.5,cy+tall*.12);q.bezierCurveTo(cx-span*.58,cy-tall*.6,cx-span*.27,cy-tall*.9,cx+span*.03,cy-tall*.9);q.bezierCurveTo(cx+span*.46,cy-tall*.95,cx+span*.6,cy-tall*.24,cx+span*.46,cy+tall*.18);q.bezierCurveTo(cx+span*.25,cy+tall*.54,cx-span*.3,cy+tall*.52,cx-span*.5,cy+tall*.12);q.closePath();},body,ink,.7);
+      if(p.mono) {
+        const count=Math.max(2,Math.min(5,Math.floor(span/7)));
+        for(let i=0;i<count;i++)oval(cx+(i-(count-1)/2)*span*.65/count,cy-tall*.27,Math.max(.4,span*.018),Math.max(.6,tall*.07),ink,null);
+      }else{
+        const count=span>32?3:2,variant=style+podIndex++;
+        for(let i=0;i<count;i++) {
+          const offset=(i-(count-1)/2)*span*.23;
+          const wh=tall*(i===0?.62:i===1?.82:.45);
+          alienWindow(cx+offset,cy-tall*(i===1?.22:.3),Math.max(2.3,span*(i===0?.105:.13)),Math.max(2.8,wh),variant+i,{...p,ink,light});
         }
-      } else if(style===2) {
-        // Unequal twin spires share a short elevated bridge.
-        const span=width*.3;
-        rect(x-width*.46,base-height*.82,span,height*.82,body);
-        rect(x+width*.14,base-height,span,height,body);
-        rect(x-width*.3,base-height*.4,width*.6,height*.07,body);
-        windows(x-width*.46,base-height*.82,span,height*.82);
-        windows(x+width*.14,base-height,span,height);
-      } else if(style===3) {
-        // A broad stepped dome on a narrow column.
-        rect(x-width*.14,base-height*.72,width*.28,height*.72,body);
-        const dome=[[x-width*.5,base-height*.58],[x-width*.5,base-height*.78],
-          [x-width*.34,base-height*.94],[x-width*.1,base-height],[x+width*.2,base-height],
-          [x+width*.45,base-height*.86],[x+width*.5,base-height*.64],[x+width*.3,base-height*.53],[x-width*.3,base-height*.53]];
-        shape(dome,body,2);windows(x-width*.42,base-height*.9,width*.84,height*.3);
-        rect(x-width*.22,base-height*.65,width*.44,2,shadow);
-      } else {
-        // Narrow offset stacks, with ledges at different heights.
-        rect(x-width*.2,base-height,width*.4,height,body);
-        for(let i=0;i<3;i++) {
-          const left=x-width*(i%2?.48:.12),top=base-height*(.25+i*.28);
-          rect(left,top,width*.6,height*.13,body);windows(left,top,width*.6,height*.13,6);
-        }
+        // Short offset seams suggest assembled chambers, rather than mouths.
+        if(variant%2===0)inkPath([[cx+span*.29,cy],[cx+span*.32,cy+tall*.2],[cx+span*.22,cy+tall*.3]],null,ink,.4,false);
       }
-      rect(x-width*.45,base-7,width,8,body);
-      return;
+    };
+    const stem=(cx,top,span=width*.24)=>{
+      if(!p.mono)span*=1.3;
+      curve(q=>{q.moveTo(cx-span*.7,base);q.bezierCurveTo(cx-span*1.2,base-height*.23,cx-span*.2,base-height*.34,cx-span*.68,base-height*.46);q.bezierCurveTo(cx-span*.95,base-height*.59,cx-span*.28,top+8,cx-span*.5,top);q.lineTo(cx+span*.45,top);q.bezierCurveTo(cx+span*.24,top+10,cx+span*.96,base-height*.56,cx+span*.65,base-height*.43);q.bezierCurveTo(cx+span*.25,base-height*.29,cx+span*.9,base-height*.15,cx+span*.7,base);if(!p.mono)q.closePath();},body,ink,.7);
+    };
+    if(style===2) {
+      stem(x-width*.26,base-height*.72,width*.22);stem(x+width*.25,base-height*.9,width*.22);
+      pod(x-width*.26,base-height*.66,width*.48,height*.12);pod(x+width*.25,base-height*.83,width*.53,height*.13);
+      box(x-width*.17,base-height*.42,width*.4,height*.045,body,ink,1,.55);
+    } else if(style===3) {
+      stem(x,base-height*.72,width*.3);pod(x,base-height*.68,width,height*.24);
+
+    } else if(style===1) {
+      stem(x,base-height*.82,width*.45);
+      for(let i=0;i<3;i++)pod(x+(i%2?width*.12:-width*.1),base-height*(.23+i*.25),width*(.98-i*.17),height*.12);
+    } else if(style===4) {
+      stem(x,base-height*.9,width*.23);
+      for(let i=0;i<3;i++)pod(x+(i%2?-width*.2:width*.13),base-height*(.2+i*.28),width*(.68+i*.08),height*.1);
+    } else {
+      stem(x,base-height*.86,width*.28);
+      for(let i=0;i<tiers;i++)pod(x+Math.sin(i*2.3)*width*.08,base-height*(.2+i*(.64/Math.max(1,tiers-1))),width*(1-i*.12),height*.115);
     }
-    rect(x - 3, base - height, 8, height, edge);
-    rect(x - 4, base - height, 6, height, body);
-    rect(x, base - height - 10, 2, 12, edge);
-    for (let i = 0; i < tiers; i++) {
-      const y = base - height * (.24 + i * .3);
-      const radius = width * (.5 - i * .055), half = Math.max(6, height * .105);
-      const pod = [[-radius,-half*.25],[-radius*.72,-half*.8],[-radius*.28,-half],
-        [radius*.35,-half],[radius*.8,-half*.6],[radius,-half*.1],
-        [radius,half*.35],[radius*.65,half*.8],[-radius*.6,half*.8],[-radius,half*.3]];
-      shape(pod.map(([px,py]) => [x + px + 3, y + py + 1]), edge, 2);
-      shape(pod.map(([px,py]) => [x + px, y + py]), body, 2);
-      rect(x - radius*.7, y + half*.45, radius*1.25, 2, shadow);
-      for (let wx = -radius*.65; wx < radius*.7; wx += 5) rect(x + wx, y - 2, 3, 2, C.black);
-      if (half > 7) for (let wx = -radius*.45; wx < radius*.5; wx += 5) rect(x + wx, y + 3, 2, 2, C.black);
+    // Bent antennae, asymmetric balconies and pipe loops stay architectural.
+    if(style%2===0){line(x+width*.12,base-height*.92,x+width*.15,base-height-4,ink,.65);if(!p.mono)line(x+width*.15,base-height-4,x+width*.22,base-height-6,ink,.55);}
+    if(!p.mono && style===1) {
+      const y=base-height*.4;
+      curve(q=>{q.moveTo(x+width*.25,y);q.bezierCurveTo(x+width*.7,y-8,x+width*.69,y+9,x+width*.35,y+8);},null,ink,.7);
+      box(x+width*.18,y+5,width*.39,3,light,ink,1,.6);
+      for(let i=0;i<4;i++)line(x+width*(.22+i*.09),y+1,x+width*(.22+i*.09),y+5,ink,.4);
     }
-    rect(x - width*.45, base - 7, width, 8, body);
+    if(!p.mono && style===2) {
+      box(x-width*.17,base-height*.45,width*.34,height*.08,body,ink,.7,.5);
+      alienWindow(x,base-height*.41,width*.16,height*.055,2,{...p,ink,light});
+    }
+    if(!p.mono && style===4)for(let i=0;i<3;i++)for(let j=0;j<3;j++)box(x-width*.16+i*3,base-height*.32+j*3,3,3,(i+j)%2?body:light,ink,0,.35);
+    curve(q=>{q.moveTo(x-width*.47,base);q.quadraticCurveTo(x,base-8,x+width*.52,base);q.closePath();},body,p.mono?null:ink,.7);
   }
-  function hillCity(x, base, height, variant) {
-    const theme=mod(variant,7),scale=CITY_SCALE;
-    height*=scale;
-    cityTower(x,base,height*(.64+theme%3*.08),(24+theme%2*5)*scale,2,null,theme%5);
-    cityTower(x+(28+theme%3*3)*scale,base,height*(.48+theme%4*.09),32*scale,3,null,(theme+2)%5);
-    cityTower(x+(58+theme%2*7)*scale,base,height*(.82+theme%2*.15),27*scale,3,null,(theme+4)%5);
-    if(theme%2===0) {
-      rect(x-6*scale,base-height*.2,70*scale,3,C.shade);
-      rect(x-6*scale,base-height*.2,70*scale,2,C.green);
-    }
+  function distantCity(x,base,height,variant) {
+    const theme=mod(variant,7),p={body:C.cyan,ink:C.blue,shade:C.blue,light:C.distantLight,mono:true};
+    for(let i=0;i<4;i++)cityTower(x+i*12,base,height*CITY_SCALE*(.55+mod(theme+i*3,5)*.1),12*CITY_SCALE,2,p,mod(theme+i,5));
   }
-  const buildingExit = b => b.x+b.width*(b.spawn ? .5 : .55);
+  function hillCity(x,base,height,variant) {
+    const theme=mod(variant,7),p={body:C.green,ink:C.shade,shade:C.shade,light:C.middleLight,mono:true};
+    for(let i=0;i<3;i++)cityTower(x+i*26*CITY_SCALE,base,height*CITY_SCALE*(.65+mod(theme+i,4)*.1),(25+i%2*6)*CITY_SCALE,2+i%2,p,mod(theme+i*2,5));
+  }
+  const buildingExit=b=>b.x+b.width*(b.spawn ? .5 : .55);
   function alienBuilding(b) {
     if(b.growth<=0)return;
     const g=1-(1-b.growth)**3,height=b.height*g,width=b.width*(.35+.65*g);
-    const floor=b.spawn ? b.base+(ground-b.deck-b.base)*g : b.base;
+    const floor=b.spawn?b.base+(ground-b.deck-b.base)*g:b.base;
     if(b.spawn) {
-      // A low, compact garage: 44px wide instead of the former 60px facade.
-      const x=b.x,right=x+width*.5;
-      shape([[x-width*.5,floor],[x-width*.5,floor-25*g],[x-width*.32,floor-height],
-        [x+width*.28,floor-height],[right,floor-27*g],[right,floor]],b.color);
-      rect(x-width*.29,floor-height+4*g,width*.58,2*g,C.black);
-      rect(right-26*g,floor-29*g,24*g,29*g,C.black);
-      rect(x-width*.5-2,floor,width+4,2,b.color);
-      for(const post of [x-width*.5+2,right-2])rect(post,floor+2,2,Math.max(0,ground-floor-2),b.color);
-      rect(right-26*g,floor-29*g,24*g,29*g*(1-b.door),b.color);
+      const x=b.x,right=x+width*.5,top=floor-height;
+      curve(q=>{q.moveTo(x-width*.5,floor);q.lineTo(x-width*.5,top+9*g);q.quadraticCurveTo(x-width*.4,top-1,x-width*.17,top);q.lineTo(x+width*.24,top);q.quadraticCurveTo(right,top+2,right,top+10*g);q.lineTo(right,floor);q.closePath();},b.color);
+      const bayX=right-26*g,bayY=floor-29*g;
+      box(bayX,bayY,24*g,29*g,C.black,C.black,4*g);
       const shutter=29*g*(1-b.door);
-      for(let y=floor-29*g+3;y<floor-29*g+shutter-1;y+=4)rect(right-24*g,y,20*g,1,C.black);
+      if(shutter>.1){box(bayX,bayY,24*g,shutter,tint(b.color),C.black,1);for(let y=bayY+3;y<bayY+shutter-1;y+=4)line(bayX+1,y,bayX+23*g,y,C.black,.55);}
+      line(x-width*.5-2,floor+1,right+2,floor+1,C.black,.8);
+      for(const post of [x-width*.5+2,right-2])line(post,floor+2,post,ground,b.color,2);
+      alienWindow(x-width*.31,top+height*.43,Math.max(1,4*g),Math.max(1,10*g),2,{body:b.color,ink:C.black,light:tint(b.color,.5)});
       return;
     }
-    cityTower(b.x,floor,height,width,b.tiers,{body:b.color,edge:C.black,shadow:C.black},b.style);
-    // The other wreck fragments retain their large windowed towers.
-    rect(b.x-width*.45,floor-28*g,width,28*g+Math.max(0,b.base-floor),b.color);
-    for(let x=b.x-width*.35;x<b.x+width*.45;x+=9)rect(x,floor-22*g,3,3,C.black);
-    if(b.source.kind==='wheel' && g>.35)wreckPart({...b.source,x:b.x,y:floor-height*.54,angle:0});
+    cityTower(b.x,floor,height,width,b.tiers,{body:b.color,ink:C.black,shade:darkenPaint(b.color),light:tint(b.color,.48)},b.style);
+    if(b.source.kind==='wheel' && g>.35)wreckPart({...b.source,x:b.x,y:floor-height*.49,angle:0});
   }
   function landscape() {
-    const height = Math.min(h * .48, 174), base = ground + 2;
-    const nearHeight = Math.min(h * .25, 85);
-    const peaks = [[-20,.76],[7,.42],[23,.5],[39,.68],[58,.61],[76,.28],[88,.05],[101,.18],[110,.12],[120,.46],[140,.62],[159,.69],[177,.54],[194,.31],[207,.18],[220,.43],[238,.53],[251,.81],[269,.72],[283,.41],[299,.6],[319,.63],[340,.78]];
-    const offset = mod(scroll * .18, 340);
-    for (let tile = -1; tile * 340 - offset < w; tile++) {
-      const x = tile * 340 - offset;
-      const at = p => [x + p[0], base - height * (1 - p[1])];
-      shape([...peaks.map(at), [x + 340, base], [x - 20, base]], C.cyan, 2);
-      for (const [px, py, foot] of [[88,.05,140],[207,.18,250],[283,.41,322],[7,.42,45]]) {
-        shape([[x+px,base-height*(1-py)],[x+px+8,base-height*(1-py)+12],[x+px+3,base-height*.48],[x+foot,base-height*.23],[x+px+14,base-height*.29],[x+px-4,base-height*.47]], C.blue, 2);
-      }
-      for (let i = 0; i < 24; i++) {
-        const px = (i * 47 + 11) % 330, py = base - height * (.12 + (i % 4) * .055);
-        rect(x + px, py, 3 + i % 4, 2, C.blue);
-      }
-      distantCity(x + 236, ground - nearHeight*.22, Math.min(54, h*.16), tile + Math.floor(scroll*.18/340));
+    const height=Math.min(h*.48,174),base=ground+2,nearHeight=Math.min(h*.25,85);
+    // One continuous silhouette: deliberate shoulders, not sampled edge noise.
+    // Matching endpoints keep the repeating range free of tile seams.
+    const peaks=[[0,.56],[16,.63],[35,.77],[55,.72],[70,.55],[80,.3],[88,.05],[98,.17],[109,.13],[118,.4],[135,.59],[157,.68],[175,.57],[193,.34],[207,.18],[222,.42],[238,.53],[252,.78],[269,.69],[283,.41],[300,.59],[321,.66],[340,.56]];
+    const offset=mod(scroll*.18,340);
+    const ridge=[];
+    for(let tile=-1;tile*340-offset<w;tile++){
+      const x=tile*340-offset;
+      for(const [px,py]of peaks.slice(0,-1))ridge.push([x+px,base-height*(1-py)]);
+    }
+    inkPath([...ridge,[ridge.at(-1)[0]+20,ground+3],[ridge[0][0],ground+3]],C.cyan,null);
+    inkPath(ridge,null,C.blue,.65,false);
+    for(let tile=-1;tile*340-offset<w;tile++){
+      const x=tile*340-offset;
+      const fold=points=>inkPath(points.map(([px,py])=>[x+px,base-height*(1-py)]),null,C.blue,.55,false);
+      // Each fold starts at its summit; short branches meet real shoulders.
+      fold([[88,.05],[91,.33],[87,.48],[104,.62],[125,.7]]);
+      fold([[91,.33],[109,.13]]);
+      fold([[207,.18],[203,.4],[213,.55],[232,.65]]);
+      fold([[203,.4],[193,.34]]);
+      fold([[283,.41],[280,.59],[294,.69]]);
+      distantCity(x+236,ground-nearHeight*.22,Math.min(54,h*.16),tile+Math.floor(scroll*.18/340));
     }
     drawDepthLayer(depthLayers[0]);
-    const nearOffset = mod(scroll * .46, 290);
-    for (let tile = -1; tile * 290 - nearOffset < w; tile++) {
-      const x = tile * 290 - nearOffset;
-      const worldTile = tile + Math.floor(scroll*.46/290);
-      // Draw before the hill silhouette so foothills conceal the foundations.
-      if (mod(worldTile, 2) === 0) hillCity(x + 132, ground + 4, Math.min(98, h*.29), worldTile);
-      const hills = [[-12,0],[23,.23],[61,.78],[76,.87],[95,.62],[126,.46],[145,.07],[180,.24],[214,.59],[229,.68],[255,.3],[290,0]];
-      shape([...hills.map(([px, py]) => [x + px, ground - nearHeight * py]), [x+290, ground+8], [x-12,ground+8]], C.green, 2);
-      shape([[x+76,ground-nearHeight*.87],[x+126,ground-nearHeight*.46],[x+96,ground-nearHeight*.44],[x+104,ground-nearHeight*.52]], C.shade, 2);
-      shape([[x+229,ground-nearHeight*.68],[x+276,ground-nearHeight*.13],[x+245,ground-nearHeight*.22],[x+252,ground-nearHeight*.29]], C.shade, 2);
-      for (let i = 0; i < 7; i++) rect(x + 27 + i * 9, ground - nearHeight * (.2 + i * .07), 7 + i % 3 * 2, 2, C.shade);
-    }
+    // Middle-plane activity is occluded by the nearer hill silhouettes.
     drawDepthLayer(depthLayers[1]);
+    const nearOffset=mod(scroll*.46,290);
+    for(let tile=-1;tile*290-nearOffset<w;tile++){
+      const x=tile*290-nearOffset,world=tile+Math.floor(scroll*.46/290);
+      if(mod(world,2)===0)hillCity(x+132,ground+3,Math.min(98,h*.29),world);
+      curve(q=>{q.moveTo(x-12,ground+3);q.bezierCurveTo(x+10,ground-nearHeight*.1,x+33,ground-nearHeight*.8,x+76,ground-nearHeight*.86);q.bezierCurveTo(x+95,ground-nearHeight*.72,x+120,ground-nearHeight*.38,x+145,ground-nearHeight*.07);q.bezierCurveTo(x+172,ground-nearHeight*.12,x+194,ground-nearHeight*.69,x+229,ground-nearHeight*.67);q.bezierCurveTo(x+252,ground-nearHeight*.51,x+265,ground-nearHeight*.11,x+290,ground+3);q.closePath();},C.green,C.shade,.65);
+      curve(q=>{q.moveTo(x+76,ground-nearHeight*.8);q.quadraticCurveTo(x+98,ground-nearHeight*.57,x+115,ground-nearHeight*.51);},null,C.shade,.55);
+    }
   }
   function road() {
-    rect(0, ground, w, h - ground, C.peach);
-    // A broken pixel lip moves at terrain speed, ahead of both mountain layers.
-    for (let x = -8; x <= w + 8; x += 4) {
-      const cell = Math.floor((x + scroll) / 4);
-      const lip = mod(cell * 7 + Math.floor(cell / 3), 4);
-      rect(x, ground - 2, 4, lip, C.green);
+    rect(0,ground,w,h-ground,C.peach);
+    const lip=[];for(let x=-8;x<w+8;x+=8)lip.push([x,ground+Math.sin((x+scroll)*.17)*.55]);
+    inkPath(lip,null,C.black,.7,false);
+    const offset=mod(scroll,110);
+    for(let x=-110-offset;x<w;x+=110){
+      inkPath([[x+10,ground+12],[x+15,ground+10],[x+22,ground+11],[x+18,ground+13],[x+10,ground+12]],C.peach,C.earth,.5);
+      inkPath([[x+54,ground+(h-ground)*.56],[x+63,ground+(h-ground)*.56-2],[x+68,ground+(h-ground)*.56-1],[x+78,ground+(h-ground)*.56-4]],null,C.earth,.55,false);
     }
-    obstacles.forEach(o => {
-      const x = Math.round(o.x), size = Math.round(o.size);
-      if (o.kind === 'pit') {
-        const edge = pitProfile(o);
-        shape(edge.map(([px,py]) => [px,py+2]), C.earth, 2);
-        shape(edge, C.green, 2);
-      } else if (o.kind === 'turret') {
-        drawTurret(o);
-      } else {
-        shape([[x-size*.65,ground],[x-size*.5,ground-size*.6],[x-size*.16,ground-size],[x+size*.3,ground-size*.82],[x+size*.6,ground-size*.35],[x+size*.65,ground]], C.rock, 2);
-        rect(x-size*.23,ground-size*.73,4,3,C.earth);
-        rect(x+size*.1,ground-size*.48,4,3,C.black);
-        rect(x-size*.3,ground-5,5,2,C.black);
+    obstacles.forEach(o=>{
+      if(o.kind==='pit'){
+        const edge=pitProfile(o);
+        inkPath(edge,C.green,null);
+        inkPath(edge,null,C.black,.75,false);
+        inkPath(edge.map(([x,y])=>[x,y+1.5]),null,C.earth,.6,false);
+      }else if(o.kind==='turret')drawTurret(o);
+      else{
+        const x=o.x,s=o.size;
+        if(o.chip) {
+          inkPath([[x-s*.75,ground],[x-s*.4,ground-s*.45],[x-s*.12,ground-s],[x+s*.28,ground-s*.7],[x+s*.78,ground]],C.rock,C.black,.65);
+          line(x-s*.12,ground-s,x+s*.12,ground-s*.24,C.black,.4);
+        }else{
+          inkPath([[x-s*.65,ground],[x-s*.5,ground-s*.6],[x-s*.16,ground-s],[x+s*.3,ground-s*.82],[x+s*.6,ground-s*.35],[x+s*.65,ground]],C.rock,C.black,.8);
+          line(x-s*.16,ground-s,x+s*.06,ground-s*.48,C.black,.5);
+          line(x+s*.06,ground-s*.48,x+s*.47,ground-s*.25,C.black,.5);
+        }
       }
     });
   }
   function drawTurret(t) {
-    const x = Math.round(t.x), body = t.hit>0 ? C.white : C.turret, pivotY = ground-11;
-    // A crude fixed pedestal and pipe, with no tank hull, tracks or sensors.
-    shape([[x-10,ground],[x-8,ground-5],[x-4,ground-8],[x+5,ground-8],[x+9,ground-3],[x+10,ground]],body);
-    rect(x-4,ground-10,8,7,body);rect(x-3,ground-14,6,5,body);
-    const length = t.flash>0 ? 11 : 14, cx = Math.cos(t.aim), sy = Math.sin(t.aim);
-    for (let d=1;d<=length;d++) rect(x+cx*d-1,pivotY+sy*d-1,3,3,body);
-    rect(x-1,pivotY-1,2,2,C.black);
-    if (t.flash>0) {
-      rect(x+cx*16-1,pivotY+sy*16-1,3,3,C.yellow);
-      rect(x+cx*18,pivotY+sy*18,2,2,C.red);
-    }
+    const x=t.x,body=t.hit>0?C.white:C.turret,pivotY=ground-11;
+    curve(q=>{q.moveTo(x-10,ground);q.quadraticCurveTo(x-5,ground-2,x-4,ground-9);q.quadraticCurveTo(x-3,ground-15,x+2,ground-14);q.quadraticCurveTo(x+6,ground-12,x+5,ground-6);q.lineTo(x+10,ground);q.closePath();},body);
+    ctx.save();ctx.translate(x,pivotY);ctx.rotate(t.aim);
+    const length=t.flash>0?11:14;
+    box(1,-1.8,length,3.6,C.pipe,C.black,.8);
+    for(let d=4;d<length;d+=4)line(d,-1.6,d,1.6,C.black,.45);
+    oval(length,0,.8,1.8,C.black,C.black,.4);ctx.restore();
+    oval(x,pivotY,1.7,1.7,body,C.black,.5);
+    if(t.flash>0){const cx=Math.cos(t.aim),sy=Math.sin(t.aim);oval(x+cx*17,pivotY+sy*17,1.5,1.5,C.yellow,C.black,.5);}
   }
   function rover(r) {
-    ctx.save(); ctx.translate(Math.round(r.x), Math.round(ground - r.jump));
-    // Compact original sprite, drawn on whole pixels rather than scaled paths.
-    const hull = [[-16,-5],[-16,-10],[-12,-12],[-5,-12],[-1,-16],[6,-16],[12,-12],[17,-11],[18,-7],[14,-5]];
-    shape(hull,r.color);
-    rect(0,-15,6,1,r.windowColor); rect(-2,-14,10,1,r.windowColor);
-    rect(9,-11,6,4,C.black);
+    ctx.save();ctx.translate(r.x,ground-r.jump);
+    curve(q=>{q.moveTo(-16,-5);q.lineTo(-17,-10);q.quadraticCurveTo(-17,-12,-13,-12);q.lineTo(-5,-12);q.lineTo(-1,-17);q.quadraticCurveTo(2,-18,7,-16);q.lineTo(12,-12);q.lineTo(17,-11);q.quadraticCurveTo(20,-9,17,-6);q.lineTo(13,-5);q.closePath();},r.color);
+    inkPath([[-1,-15.5],[5,-15.5],[9,-12],[-3,-12]],r.windowColor,C.black,.65);
+    line(2,-15,4,-12,C.pipe,.65);
+    for(let x=-12;x<-6;x+=2)line(x,-9,x,-6.5,C.black,.45);
+    curve(q=>{q.moveTo(-12,-3);q.quadraticCurveTo(1,1,13,-3);},null,C.black,1.8);
+    curve(q=>{q.moveTo(-12,-3);q.quadraticCurveTo(1,1,13,-3);},null,C.pipe,.9);
     drawRoverGuns(r);
-    rect(-11,-11,4,1,C.black); rect(-16,-8,3,1,r.color);
-    for (const [i,x] of [-10,0,12].entries()) {
-      shape([[x-3,-5],[x-1,-7],[x+2,-7],[x+4,-4],[x+3,0],[x-2,0],[x-4,-2]], r.tireColors[i]);
-      rect(x-1,-5,3,3,C.black);
-      rect(x,-4,1,1,r.color);
-      if ((Math.floor((scroll + r.wheelTravel) / 4) + r.id) % 2) rect(x-3,-4,1,2,C.black);
-      else rect(x+1,-6,2,1,C.black);
+    for(const [i,x]of[-10,0,12].entries()){
+      ctx.save();ctx.translate(x,-3);ctx.rotate((scroll+r.wheelTravel)/4.4);
+      oval(0,0,4.4,4.2,r.tireColors[i],C.black,.8);
+      for(let j=0;j<8;j++){const a=j*Math.PI/4;line(Math.cos(a)*3.3,Math.sin(a)*3.2,Math.cos(a)*4,Math.sin(a)*3.8,C.black,.5);}
+      oval(0,0,2.1,2.1,C.black,C.black,.5);oval(0,0,.9,.9,r.color,null);ctx.restore();
     }
     ctx.restore();
   }
   function drawRoverGuns(r) {
-    rect(12,-11,13,3,r.color);
-    rect(-5,-28,3,13,r.color);
-    if(r.shotFlash>0) {
-      rect(26,-11,3,3,C.white);
-      rect(-5,-31,3,3,C.white);
-    }
+    // Flared roots merge into the chassis; both openings stay on their axes.
+    const paint=r.color;
+    curve(q=>{q.moveTo(10,-12.1);q.quadraticCurveTo(14,-12.3,18,-12.2);q.lineTo(25,-12.2);q.lineTo(25,-7.8);q.lineTo(17,-7.8);q.quadraticCurveTo(13,-7.6,10,-6.7);},paint,C.black,.65);
+    line(21,-12,21,-8,C.black,.4);
+    oval(25,-10,.9,2.25,C.black,C.black,.55);
+    curve(q=>{q.moveTo(-8,-12.1);q.quadraticCurveTo(-6.6,-16,-6.3,-20);q.lineTo(-6.3,-28);q.lineTo(-1.7,-28);q.lineTo(-1.7,-20);q.quadraticCurveTo(-1.5,-16,-.2,-14);},paint,C.black,.65);
+    line(-6.1,-24,-1.9,-24,C.black,.4);
+    oval(-4,-28,2.3,.85,C.black,C.black,.55);
+    if(r.shotFlash>0){line(27,-10,29,-10,C.yellow,1.8);line(-4,-30,-4,-32,C.yellow,1.8);}
   }
   function wreckPart(p) {
-    const sprite = PARTS[p.kind], quarter = mod(Math.round(p.angle / (Math.PI / 2)), 4);
-    const [width, height] = partBounds(p);
-    const left = Math.round(p.x - width / 2), top = Math.round(p.y - height / 2);
-    for (let y = 0; y < sprite.length; y++) for (let x = 0; x < sprite[y].length; x++) {
-      const color = (p.palette || PART_COLORS)[sprite[y][x]];
-      if (!color) continue;
-      let dx = x, dy = y;
-      if (quarter === 1) {dx = sprite.length - 1 - y; dy = x;}
-      else if (quarter === 2) {dx = sprite[0].length - 1 - x; dy = sprite.length - 1 - y;}
-      else if (quarter === 3) {dx = y; dy = sprite[0].length - 1 - x;}
-      rect(left + dx, top + dy, 1, 1, color);
+    const [width,height]=partBounds(p);
+    ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle);
+    if(p.kind==='wheel'){
+      oval(0,0,3.25,3.25,p.color,C.black,.65);oval(0,0,1.45,1.45,C.black,null);oval(0,0,.6,.6,p.color,null);
+      for(let i=0;i<6;i++){const a=i*Math.PI/3;line(Math.cos(a)*2.4,Math.sin(a)*2.4,Math.cos(a)*3,Math.sin(a)*3,C.black,.4);}
+    }else if(p.kind==='cannon'||p.kind==='mast'){
+      box(-width*.45,-height*.4,width*.9,Math.max(1,height*.8),p.color,C.black,.5,.55);
+      line(-width*.2,-height*.4,-width*.2,height*.4,C.black,.4);
+    }else{
+      inkPath([[-width*.5,-height*.4],[width*.25,-height*.5],[width*.5,height*.1],[width*.25,height*.5],[-width*.4,height*.4]],p.color,C.black,.55);
+      if(p.kind==='cockpit')box(-width*.18,-height*.2,width*.4,height*.38,C.black,C.black,.5,.35);
     }
+    ctx.restore();
   }
   function drawUfo(u) {
-    const spec=UFO_TYPES[u.type] || UFO_TYPES.scout;
-    const paint={scout:C.yellow,bomber:C.red,dart:C.window,carrier:C.magenta};
-    drawSimpleSaucer(u.x,ufoY(u),spec.width,spec.height,u.hit>0 ? C.white : paint[u.type] || C.yellow,C.cyan);
+    const spec=UFO_TYPES[u.type]||UFO_TYPES.scout;
+    if(u.type==='triad') {
+      const y=ufoY(u),body=u.hit>0?C.white:C.window;
+      const nodes=[[0,-4.5],[-6,4.5],[6,4.5]];
+      inkPath(nodes.map(([dx,dy])=>[u.x+dx,y+dy]),null,C.black,1.2);
+      for(const [dx,dy]of nodes) {
+        oval(u.x+dx,y+dy,5.4,5.4,body,C.black,.75);
+        oval(u.x+dx,y+dy,1.15,1.15,C.orange,C.black,.4);
+        curve(p=>{p.moveTo(u.x+dx+1.7,y+dy-3.3);p.quadraticCurveTo(u.x+dx+3.8,y+dy-1.8,u.x+dx+3.6,y+dy+.8);},null,C.black,.4);
+      }
+      return;
+    }
+    const paint={scout:C.yellow,bomber:C.orange,dart:C.pipe,carrier:C.magenta};
+    const body=u.hit>0?C.white:paint[u.type]||C.yellow;
+    drawSimpleSaucer(u.x,ufoY(u),spec.width,spec.height,body,tint(body,.3),C.black);
   }
   function drawBomb(b) {
-    if (b.type === 'dart') {
-      rect(b.x-1,b.y-7,2,9,C.window);rect(b.x-3,b.y-4,6,3,C.magenta);
-    } else if (b.type === 'bomber' || b.type === 'carrier') {
-      const color = b.type === 'carrier' ? C.magenta : C.red;
-      rect(b.x-1,b.y-8,2,4,C.yellow);rect(b.x-3,b.y-4,6,7,color);
-      rect(b.x-1,b.y-2,2,3,C.white);rect(b.x-2,b.y+3,4,2,color);
-    } else {
-      rect(b.x-1,b.y-7,2,9,C.red);rect(b.x-4,b.y-7,2,3,C.magenta);rect(b.x+3,b.y-7,2,3,C.magenta);
-    }
+    oval(b.x,b.y,2.6,4.4,C.pipe,C.black,.7);
+    box(b.x-.9,b.y-6,1.8,2,C.black,C.black,.2,.5);
+    rect(b.x-2.4,b.y-.8,4.8,1.8,b.type==='carrier'?C.magenta:C.yellow);
+    line(b.x-2.4,b.y-.9,b.x+2.4,b.y-.9,C.black,.4);line(b.x-2.4,b.y+1,b.x+2.4,b.y+1,C.black,.4);
   }
   function draw() {
-    rect(0, 0, w, h, C.black);
-    landscape(); road();
-    grownBuildings.filter(b => !b.spawn && b.source.kind !== 'wheel').forEach(alienBuilding);
-    grownBuildings.filter(b => !b.spawn && b.source.kind === 'wheel').forEach(alienBuilding);
-    grownBuildings.filter(b => b.spawn).forEach(alienBuilding);
-    ufos.forEach(drawUfo);
-    bombs.forEach(drawBomb);
-    turretShots.forEach(s => {rect(s.x-3,s.y-2,7,4,C.red);rect(s.x-1,s.y-1,3,2,C.yellow);});
-    shots.forEach(s => {
-      const length=Math.hypot(s.vx,s.vy)||1;
-      for(let d=0;d<5;d++)rect(s.x-s.vx/length*d,s.y-s.vy/length*d,1,1);
+    rect(0,0,w,h,C.sky);landscape();road();
+    grownBuildings.filter(b=>!b.spawn&&b.source.kind!=='wheel').forEach(alienBuilding);
+    grownBuildings.filter(b=>!b.spawn&&b.source.kind==='wheel').forEach(alienBuilding);
+    grownBuildings.filter(b=>b.spawn).forEach(alienBuilding);
+    ufos.forEach(drawUfo);bombs.forEach(drawBomb);
+    turretShots.forEach(s=>{oval(s.x,s.y,2.5,1.2,C.orange,C.black,.5);});
+    shots.forEach(s=>{const length=Math.hypot(s.vx,s.vy)||1;line(s.x-s.vx/length*4,s.y-s.vy/length*4,s.x,s.y,C.black,1.55);line(s.x-s.vx/length*4,s.y-s.vy/length*4,s.x,s.y,C.yellow,.8);});
+    rovers.forEach(r=>{
+      if(r.crashTime||(phase==='emerging'&&cycle.origin.door<1))return;
+      if(phase==='emerging'){ctx.save();ctx.beginPath();ctx.rect(buildingExit(cycle.origin)-26,0,w,h);ctx.clip();rover(r);ctx.restore();}else rover(r);
     });
-    rovers.forEach(r => {
-      if (r.crashTime || (phase === 'emerging' && cycle.origin.door<1)) return;
-      if (phase === 'emerging') {
-        ctx.save(); ctx.beginPath(); ctx.rect(buildingExit(cycle.origin)-26, 0, w, h); ctx.clip();
-        rover(r); ctx.restore();
-      } else rover(r);
-    });
-    wreck.forEach(p => {if (!p.building || p.building.growth < .18) wreckPart(p);});
-    sparks.forEach(p => rect(p.x,p.y,2,2,p.color));
+    wreck.forEach(p=>{if(!p.building||p.building.growth<.18)wreckPart(p);});
+    sparks.forEach(p=>{const l=Math.hypot(p.vx,p.vy)||1;line(p.x,p.y,p.x-p.vx/l*2.5,p.y-p.vy/l*2.5,C.black,1.1);line(p.x,p.y,p.x-p.vx/l*2.5,p.y-p.vy/l*2.5,p.color,.7);});
     // Machine-readable diagnostics never appear over the artwork.
     canvas.dataset.buggyX = rovers[0].x.toFixed(2);
     canvas.dataset.buggies = rovers.length;

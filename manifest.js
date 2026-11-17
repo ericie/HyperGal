@@ -323,8 +323,8 @@ window.HMC_MANIFEST = {
       "type": "generative",
       "rating": 45,
       "thumbnail": "thumbnail.jpg",
-      "description": "A bright ball and frequent waves of spring-snakes fight for a twenty-storey cube pyramid, painting every landing yellow or green. The scoreboard tracks Yellow, Green, and unclaimed territory; the first side to claim 100% wins.",
-      "updated": "2026-08-19"
+      "description": "A bouncing yellow sun and spring-mounted skulls, daggers, guns, whiskey bottles, and cigarettes repaint a cube pyramid beneath a smiley flag. Yellow, dark gray-brown, and purple percentages track claimed and unclaimed territory.",
+      "updated": "2026-11-16"
     },
     {
       "slug": "027-camouflage",
@@ -479,7 +479,7 @@ window.HMC_MANIFEST = {
       "type": "interactive",
       "rating": 30,
       "thumbnail": "thumbnail.png",
-      "description": "A continuous stream of frogs crosses a pale highway. Survivors grow, deepen their pigment paths, and change departure columns after each pass.",
+      "description": "Frogs attempt a single broad lane of traffic with cars of varying sizes and speeds. Simple X marks record deaths; successful frogs leave through the far side.",
       "updated": "2026-10-19"
     },
     {
@@ -726,7 +726,7 @@ window.HMC_MANIFEST = {
     {
       "slug": "058-micro-tetris",
       "wip": false,
-      "title": "Micro Tetris",
+      "title": "Bitsy Blocks",
       "year": 2026,
       "date": "2026-10-05",
       "category": "games",
@@ -744,7 +744,7 @@ window.HMC_MANIFEST = {
       "category": "games",
       "type": "interactive",
       "thumbnail": "thumbnail.png",
-      "description": "A self-playing lunar patrol with fixed paired fire limited to three airborne bursts. Darker tires match the buggy’s body hue. Tiny UFOs hover and drop occasional bombs over static parallax cities. Wreckage grows into large towers, and a replacement buggy emerges from a compact garage. Click or Space pauses; S saves a picture.",
+      "description": "A self-playing illustrated lunar patrol with fixed paired fire limited to three airborne bursts. Darker tires match the buggy’s body hue. Tiny UFOs hover and drop occasional bombs over static parallax cities. Wreckage grows into large towers, and a replacement buggy emerges from a compact garage. Click or Space pauses; S saves a picture.",
       "updated": "2026-11-15"
     },
     {

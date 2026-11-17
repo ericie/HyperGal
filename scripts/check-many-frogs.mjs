@@ -13,9 +13,10 @@ function simulation(file = target, reduced = false) {
   let frameId = 0, surfaces = 0, clock = 0, textDraws = 0;
   const noop = () => {};
   const paints = [];
+  const counter = { textContent: '' };
   const context = new Proxy({globalAlpha: 1}, {
-    get: (o, k) => o[k] ?? (k === 'fillText' ? () => textDraws++ : ['fill', 'fillRect'].includes(k)
-      ? () => paints.push({kind: k, color: o.fillStyle, alpha: o.globalAlpha}) : noop),
+    get: (o, k) => o[k] ?? (k === 'fillText' ? () => textDraws++ : ['fill', 'fillRect', 'stroke', 'strokeRect'].includes(k)
+      ? () => paints.push({kind: k, color: k.startsWith('stroke') ? o.strokeStyle : o.fillStyle, alpha: o.globalAlpha, width: o.lineWidth}) : noop),
     set: (o, k, v) => (o[k] = v, true)
   });
   const canvas = () => { surfaces++; return { getContext: () => context, style: {} }; };
@@ -24,21 +25,22 @@ function simulation(file = target, reduced = false) {
     Date: class extends Date { static now() { return 1000000; } },
     window: { innerWidth: 1126, innerHeight: 1056, devicePixelRatio: 1,
       matchMedia: () => ({ matches: reduced }), addEventListener: (name, fn) => events[name] = fn },
-    document: { querySelector: canvas, createElement: canvas, hidden: false,
+    document: { querySelector: selector => selector === '#remaining-frogs' ? counter : canvas(), createElement: canvas, hidden: false,
       addEventListener: (name, fn) => events[name] = fn },
     requestAnimationFrame: fn => { frames.set(++frameId, fn); return frameId; },
     cancelAnimationFrame: id => frames.delete(id)
   };
   vm.createContext(env);
   vm.runInContext(source.replace('window.__manyFrogs = {', `window.__test = {
-    update, draw, getLane, laneObjectsAt, laneDanger, hitsVehicleAt, addBloodStain,
-    updateBloodStains, completeCrossing, turnaroundX, shoreApproachScore, spawnFrogBrood, admitFrog,
-    ageFrog, recordFrogPath, killFrog, beginHop, frogBodyScale, drawFrogPaths, drawVehicle,
-    get paths() { return frogPaths; },
-    get frogs() { return frogs; }, get stains() { return bloodStains; },
+    update, draw, getLane, laneObjectsAt, laneDanger, hitsVehicleAt, addDeathMark,
+    updateDeathMarks, completeCrossing, crossingX, destinationY, movementTarget, positionDanger, shoreApproachScore,
+    worldToScreenY, screenToWorldY, hopY, steeringTarget, vehicleSteeringAt,
+    get moves() { return moveOptions; },
+    ageFrog, killFrog, beginHop, frogBodyScale, drawVehicle, drawDeathMarks,
+    get frogs() { return frogs; }, get marks() { return deathMarks; },
     get rows() { return ROWS; }, get cols() { return COLS; }
   }; window.__manyFrogs = {`), env);
-  return { env, events, frames, paints, api: env.window.__manyFrogs, test: env.window.__test,
+  return { env, events, frames, paints, counter, api: env.window.__manyFrogs, test: env.window.__test,
     get surfaces() { return surfaces; }, get textDraws() { return textDraws; },
     frame(dt = 1000 / 60) {
       clock += dt;
@@ -48,263 +50,234 @@ function simulation(file = target, reduced = false) {
 }
 
 const sim = simulation();
-const COLS = sim.test.cols, ROWS = sim.test.rows;
 const state0 = sim.api.getState();
-
-// The board is one fixed screen: field, road band, field.
-assert.equal(state0.fieldRows * 2 + state0.roadRows, ROWS, 'the three bands fill the board');
-assert.equal(state0.roadHeightFraction, .8, 'the road band holds exactly 80% of screen height');
-for (let row = 0; row < ROWS; row++) {
-  const expected = row >= state0.fieldRows && row < state0.fieldRows + state0.roadRows ? 'road' : 'grass';
-  assert.equal(sim.test.getLane(row).type, expected, `row ${row} is ${expected}`);
+assert.equal(state0.rows, 5);
+assert.equal(state0.roadRows, 1, 'exactly one traffic lane is visible');
+assert.ok(Math.abs(state0.roadHeightFraction-0.78)<1e-12);
+assert.ok(state0.initialFrogs>=24,'the whole group is already present on load');
+assert.equal(state0.live,state0.initialFrogs);assert.equal(Number(sim.counter.textContent),state0.initialFrogs);
+for(const heading of [1,-1]) {
+  const group=state0.frogs.filter(frog=>frog.heading===heading);
+  assert.equal(group.length,state0.initialFrogs/2,'each bank starts with exactly half the frogs');
+  assert.ok(group.every(frog=>heading>0 ? sim.test.worldToScreenY(frog.y)>1056*.89 : sim.test.worldToScreenY(frog.y)<1056*.11));
 }
-
-let samples = 0;
-for (let row = 0; row < ROWS; row++) {
-  const lane = sim.test.getLane(row);
-  if (lane.type === 'grass') continue;
-  for (let i = 0; i < 120; i++) {
-    const x = (i * 1.71371) % COLS, at = i * .91331;
-    const objects = sim.test.laneObjectsAt(lane, at);
-    const radius = .24;
-    const expected = objects.some(o => x > o.x - radius && x < o.x + o.length + radius);
-    assert.equal(sim.test.hitsVehicleAt(lane, x, at), expected);
-    // Dense temporal oracle: the analytic landing window must never miss a hit.
-    const duration = .19;
-    const dangerous = Array.from({ length: 25 }, (_, n) => at + n * duration / 24).some(t =>
-      sim.test.laneObjectsAt(lane, t).some(o => x > o.x - radius && x < o.x + o.length + radius));
-    if (dangerous) assert.equal(sim.test.laneDanger(lane, x, at, duration), 100);
-    samples++;
+const road = sim.test.getLane(state0.fieldRows);
+for (let row=0;row<state0.rows;row++) {
+  assert.equal(sim.test.getLane(row).type, row===state0.fieldRows?'road':'grass');
+}
+assert.equal(road.direction, 1, 'traffic has one consistent direction');
+let samples=0;
+for(let i=0;i<300;i++) {
+  const x=(i*1.71371)%sim.test.cols, at=i*.11331, duration=.32;
+  const expected=sim.test.laneObjectsAt(road,at).some(car=>x>car.x-.16&&x<car.x+car.length+.16);
+  assert.equal(sim.test.hitsVehicleAt(road,x,at),expected);
+  const swept=Array.from({length:33},(_,n)=>at+n*duration/32).some(t=>
+    sim.test.laneObjectsAt(road,t).some(car=>x>car.x-.16&&x<car.x+car.length+.16));
+  if(swept) assert.equal(sim.test.laneDanger(road,x,at,duration),100);
+  samples++;
+}
+// Individual dimensions and speeds vary; followers remain behind leaders.
+const profiles=new Map();
+for(let i=0;i<240;i++) {
+  const at=i*.137;
+  const cars=sim.test.laneObjectsAt(road,at);
+  cars.forEach(car=>profiles.set(car.id,car));
+  const visible=cars.filter(car=>car.x<sim.test.cols&&car.x+car.length>0).sort((a,b)=>a.x-b.x);
+  for(let n=1;n<visible.length;n++) {
+    assert.ok(visible[n-1].x+visible[n-1].length<=visible[n].x-.35+1e-8,
+      'different speeds never let a follower overlap a leader inside the view');
   }
 }
-
-// Static surfaces and dry pigment reuse raster impressions between frames.
-sim.test.draw();
-const terrainSurfaces = sim.surfaces;
-sim.test.draw();
-assert.equal(sim.surfaces, terrainSurfaces);
-sim.test.addBloodStain(sim.test.frogs[0], 'traffic');
-sim.test.draw();
-const stainSurfaces = sim.surfaces;
-sim.test.draw();
-assert.equal(sim.surfaces, stainSurfaces, 'stationary pigment is not repainted');
-
-// Survival strengthens the complete route and body, then freezes that history
-// at death. Offspring inherit a hue, but start with their own young pigment.
-const history = simulation();
-const painter = history.test.frogs[0];
-history.test.recordFrogPath(painter);
-painter.y = 1;
-history.test.recordFrogPath(painter);
-const route = painter.path;
-const firstColor = painter.color;
-history.test.ageFrog(painter, 30);
-assert.ok(route.strength > 0.6, 'the entire existing path deepens with survival');
-assert.notEqual(painter.color, firstColor, 'a survivor becomes more vivid');
-assert.equal(route.pigment.frog, painter.color, 'body and history keep one pigment identity');
-history.test.addBloodStain({...painter, maturity: 0}, 'grass');
-history.test.addBloodStain(painter, 'grass');
-assert.ok(history.test.stains[1].scale > history.test.stains[0].scale * 2.5,
-  'a veteran leaves a substantially larger death splash');
-history.test.spawnFrogBrood(painter, {row: 1, x: painter.x, y: 1, id: 'age-test', seed: 12});
-assert.ok(history.test.frogs.slice(-3).every(child => child.age === 0 && child.color === painter.basePigment.frog),
-  'newborns start young in their parent’s original hue');
-history.test.killFrog(painter, 'grass');
-const frozenStrength = route.strength;
-history.test.update(1);
-assert.equal(route.strength, frozenStrength, 'a dead frog’s path stops strengthening');
-assert.equal(route.alive, false);
-history.api.eliminateAll();
-for (let i = 0; i < 140; i++) history.test.update(1 / 60);
-assert.ok(history.test.paths.includes(route), 'history survives continuing arrivals');
-const oldX = route.points[0].x;
-history.env.window.innerWidth = 390;
-history.events.resize();
-assert.ok(route.points[0].x < oldX, 'saved routes rebase onto a narrower board');
-assert.ok(route.points.every(point => Number.isFinite(point.x) && Number.isFinite(point.y)));
-
-// Young routes begin nearly invisible, then visibly deepen in the renderer.
-const ink = simulation();
-const author = ink.test.frogs[0];
-ink.test.recordFrogPath(author);
-author.y = 1;
-ink.test.recordFrogPath(author);
-ink.test.drawFrogPaths();
-const faint = Math.max(...ink.paints.map(paint => paint.alpha));
-assert.ok(faint < 0.02, 'new paths start as faint pigment deposits');
-ink.paints.length = 0;
-ink.test.ageFrog(author, 60);
-ink.test.update(0.11);
-ink.test.drawFrogPaths();
-const strong = Math.max(...ink.paints.map(paint => paint.alpha));
-assert.ok(strong > 0.25 && strong > faint * 10, 'survival builds a much stronger painted route');
-assert.equal(ink.test.frogBodyScale(author), ink.test.frogBodyScale({crossings: 0}),
-  'survival alone changes color and paths, not frog size');
-
-// Passing traffic in either direction leaves pigment stationary and stays pale.
-for (const direction of [-1, 1]) {
-  const paint = simulation();
-  const lane = Array.from({length: paint.test.rows}, (_, row) => paint.test.getLane(row))
-    .find(lane => lane.type === 'road' && lane.direction === direction);
-  const car = paint.test.laneObjectsAt(lane, 0).find(item => item.x > 2 && item.x + item.length < paint.test.cols - 2);
-  paint.test.drawVehicle(lane, car, 0);
-  const neutral = paint.paints.map(item => item.color);
-  paint.paints.length = 0;
-  const frog = paint.test.frogs[0];
-  frog.x = car.x + car.length / 2;
-  frog.y = lane.row;
-  paint.test.ageFrog(frog, 60);
-  paint.test.killFrog(frog, 'traffic');
-  const stain = paint.test.stains[0];
-  const before = JSON.stringify(stain);
-  for (let i = 0; i < 300; i++) paint.test.update(1 / 60);
-  assert.equal(JSON.stringify(stain), before, 'cars leave death impressions in place without smearing or dilution');
-  paint.test.drawVehicle(lane, car, 0);
-  assert.deepEqual(paint.paints.map(item => item.color), neutral, 'a car stays pale after striking a frog and passing its paint');
+const lengths=[...profiles.values()].map(car=>car.length), speeds=[...profiles.values()].map(car=>car.speed);
+assert.ok(Math.max(...lengths)/Math.min(...lengths)>1.5,'cars visibly vary in length');
+assert.ok(Math.max(...speeds)/Math.min(...speeds)>1.4,'cars visibly vary in travel speed');
+assert.ok(new Set([...profiles.values()].map(car=>car.height.toFixed(3))).size>5,'body widths vary too');
+const oldCars=sim.test.laneObjectsAt(road,0).map(car=>({id:car.id,x:car.x,speed:car.speed}));
+sim.test.laneObjectsAt(road,1000);
+assert.ok(road.profiles.size<=256,'traffic history has a bounded profile cache');
+assert.deepEqual(sim.test.laneObjectsAt(road,0).map(car=>({id:car.id,x:car.x,speed:car.speed})),oldCars,
+  'forecast and render queries reproduce identical trajectories');
+const screenAtTop=sim.test.worldToScreenY(2.5),screenAtBottom=sim.test.worldToScreenY(1.5);
+assert.ok(Math.abs((screenAtBottom-screenAtTop)/1056-.78)<1e-12,'road occupies 78% of screen height');
+for(const y of [-.35,.5,1.5,1.8,2.5,3.5,state0.exitY]) {
+  assert.ok(Math.abs(sim.test.screenToWorldY(sim.test.worldToScreenY(y))-y)<1e-10);
 }
+const halfway=sim.test.hopY(1.2,2.1,.5);
+assert.ok(Math.abs(sim.test.worldToScreenY(halfway)-(sim.test.worldToScreenY(1.2)+sim.test.worldToScreenY(2.1))/2)<1e-8,
+  'hops travel smoothly across the stretched road and narrow banks');
 
-// Arrivals continue on a clock while the first frog is still crossing.
-const flow = simulation();
-const first = flow.test.frogs[0];
-for (let i = 0; i < 360; i++) flow.test.update(1 / 60);
-assert.ok(flow.api.getState().streamArrivals >= 7, 'new frogs enter before a win or cohort extinction');
-assert.equal(first.crossings, 0, 'the first frog has not needed to win to admit others');
-assert.ok(flow.test.frogs.some(frog => frog.age < first.age), 'young arrivals coexist with older survivors');
-assert.equal(new Set(flow.test.frogs.map(frog => frog.id)).size, flow.test.frogs.length, 'stream identities stay unique');
-const arrivalsBeforeDeaths = flow.api.getState().streamArrivals;
+// Drivers choose the clear side; rendered displacement and collision geometry agree.
+const dodge=simulation(), dodgeLane=dodge.test.getLane(2);
+const dodgeCar=dodge.test.laneObjectsAt(dodgeLane,0).find(car=>car.id===0);
+assert.ok(dodge.test.steeringTarget(dodgeCar,[{offset:.35,time:.7}],0)<0,'dodge upward around a lower frog');
+assert.ok(dodge.test.steeringTarget(dodgeCar,[{offset:-.35,time:.7}],0)>0,'dodge downward around an upper frog');
+assert.equal(dodge.test.steeringTarget(dodgeCar,[],0),0,'empty roads need no swerve');
+dodgeLane.steering.set(dodgeCar.id,{offset:.4,target:.9,atTime:0});
+const steeringBefore=JSON.stringify([...dodgeLane.steering]);
+for(let i=0;i<160;i++) {
+  const x=(i*1.371)%dodge.test.cols,offset=-1.9+(i*1.119)%3.8,at=.23;
+  const expected=dodge.test.laneObjectsAt(dodgeLane,at).some(car=>{
+    const dx=x-car.x-car.length/2,dy=offset-car.offset;
+    const along=dx*Math.cos(car.angle)+dy*Math.sin(car.angle);
+    const across=-dx*Math.sin(car.angle)+dy*Math.cos(car.angle);
+    return Math.hypot(Math.max(0,Math.abs(along)-car.length/2),Math.max(0,Math.abs(across)-car.height/2))<.16;
+  });
+  const y=dodge.test.screenToWorldY(dodge.test.worldToScreenY(2)+offset*1056/5);
+  assert.equal(dodge.test.positionDanger(x,y,at,0)===100,expected,'collisions follow the translated, rotated car');
+}
+assert.equal(JSON.stringify([...dodgeLane.steering]),steeringBefore,'forecast queries never change steering');
+sim.test.draw();const surfaces=sim.surfaces;sim.test.draw();assert.equal(sim.surfaces,surfaces);
+assert.equal(sim.textDraws,0,'the canvas has no text overlays');
+
+// Success is recorded once, then the frog walks away without a return or death.
+const finish=simulation();
+for(const heading of [1,-1]) {
+  const winner=finish.test.frogs.find(frog=>frog.heading===heading);
+  winner.y=finish.test.destinationY(winner);
+  finish.test.completeCrossing(winner);finish.test.completeCrossing(winner);
+  assert.equal(winner.crossings,1);assert.equal(winner.heading,heading);assert.equal(winner.crossed,true);
+  assert.equal(finish.test.marks.length,0,'success does not create a death mark');
+  winner.y=heading>0?finish.api.getState().exitY:finish.api.getState().bottomExitY;
+  finish.test.completeCrossing(winner);
+  assert.equal(winner.alive,false);assert.equal(winner.finished,true);
+}
+assert.equal(finish.api.getState().totalCrossings,2);
+assert.equal(finish.api.getState().totalExited,2);assert.equal(finish.api.getState().totalDeaths,0);
+
+// A fixed group starts together; only traffic deaths reduce the counter.
+const flow=simulation(), first=flow.test.frogs[0];first.nextMoveAt=Infinity;
+const initial=flow.api.getState().initialFrogs;
+for(let i=0;i<360;i++)flow.test.update(1/60);
+assert.equal(first.crossings,0);
+assert.equal(flow.api.getState().totalFrogs,initial,'no additional frogs arrive');
+assert.equal(new Set(flow.test.frogs.map(frog=>frog.id)).size,flow.test.frogs.length);
+const beforeHit=flow.api.getState().remaining;
+flow.test.killFrog(first,'traffic');assert.equal(Number(flow.counter.textContent),beforeHit-1);
+flow.test.killFrog(first,'traffic');assert.equal(Number(flow.counter.textContent),beforeHit-1,'a hit is counted once');
 flow.api.eliminateAll();
-for (let i = 0; i < 60; i++) flow.test.update(1 / 60);
-assert.ok(flow.api.getState().streamArrivals > arrivalsBeforeDeaths, 'admission resumes on its cadence after extinction');
-assert.ok(flow.test.frogs.every(frog => frog.alive), 'dead simulation bodies are retired while their marks remain');
-const crowded = simulation();
-for (let i = 0; i < 100; i++) crowded.test.admitFrog();
-assert.ok(crowded.api.getState().live <= crowded.api.getState().populationLimit, 'stream admission has a bounded live population');
-assert.equal(crowded.test.admitFrog(), false, 'a full entrance waits for space without overlapping births');
+for(let i=0;i<90;i++)flow.test.update(1/60);
+assert.equal(flow.api.getState().live,0,'no frogs replenish after the group is gone');
+assert.equal(flow.api.getState().totalFrogs,initial);
+assert.equal(flow.api.getState().remaining,flow.api.getState().totalExited,'successful frogs remain counted');
+const empty=simulation();empty.api.eliminateAll();
+assert.equal(empty.counter.textContent,'0');empty.api.restart();
+assert.equal(Number(empty.counter.textContent),empty.api.getState().initialFrogs,'restart restores the group');
+assert.equal(empty.api.getState().totalDeaths,0);
+assert.equal(Number(finish.counter.textContent),finish.api.getState().initialFrogs,'success and exit never reduce the counter');
 
-// Any column can complete a crossing. Each return also grows the frog once,
-// and each win chooses a substantially different safe-bank departure column.
-const contacts = simulation();
-const frog = contacts.test.frogs[0];
-const newbornSize = contacts.test.frogBodyScale(frog);
-contacts.test.completeCrossing(frog);
-assert.equal(frog.crossings, 0, 'initial spawning is not a return trip');
-frog.y = contacts.test.rows - 1;
-contacts.test.completeCrossing(frog);
-contacts.test.completeCrossing(frog);
-assert.equal(frog.crossings, 1, 'an arrival increments exactly once at any column');
-const firstWinSize = contacts.test.frogBodyScale(frog);
-assert.ok(newbornSize < 0.3 && firstWinSize > newbornSize, 'a small newborn grows after its first winning pass');
-assert.equal(frog.heading, -1);
-assert.ok(frog.repositioning);
-assert.ok(Math.abs(contacts.test.turnaroundX(frog) - frog.x) >= contacts.test.cols * 0.24,
-  'a survivor targets a distinctly different departure column');
-const step = Math.sign(contacts.test.turnaroundX(frog) - frog.x);
-assert.ok(contacts.test.shoreApproachScore(frog, frog.x, frog.y, frog.x + step, frog.y) >
-  contacts.test.shoreApproachScore(frog, frog.x, frog.y, frog.x, frog.y - 1),
-  'route scoring favors shifting along the bank before returning to traffic');
-frog.y = 0;
-contacts.test.completeCrossing(frog);
-contacts.test.completeCrossing(frog);
-assert.equal(frog.crossings, 2);
-assert.ok(contacts.test.frogBodyScale(frog) > firstWinSize, 'the successful return grows the frog again');
-const returnSize = contacts.test.frogBodyScale(frog);
-contacts.test.completeCrossing(frog);
-assert.equal(contacts.test.frogBodyScale(frog), returnSize, 'resting at an end cannot repeatedly grow a frog');
-const beforeBrood = contacts.test.frogs.length;
-contacts.test.spawnFrogBrood(frog, {row: 1, x: frog.x, y: 1, id: 'test', seed: 12});
-assert.equal(contacts.test.frogs.length, beforeBrood + 3);
-assert.ok(contacts.test.frogs.slice(-3).every(child => child.crossings === 0), 'offspring start with no wins');
+// Frogs may occupy and traverse the same space without blocking each other.
+const crowd=simulation();
+const neighbors=crowd.test.frogs.slice(0,2);
+for(const frog of neighbors) {
+  frog.x=frog.fromX=frog.toX=1;frog.y=frog.fromY=frog.toY=.25;
+  crowd.test.beginHop(frog,'up',{x:1,y:.75});
+  assert.equal(frog.hop,0,'overlapping frogs can start the same hop');
+}
+crowd.test.update(.12);
+assert.ok(neighbors.every(frog=>frog.alive&&frog.y>.25),'overlapping frogs can move together');
+assert.equal(neighbors[0].y,neighbors[1].y);
 
-// Resizing during a hop preserves growth and normalized departure targets.
-const resizeRun = simulation();
-const moving = resizeRun.test.frogs[0];
-moving.hop = 0.4; moving.nextMoveAt = Infinity;
-moving.crossings = 3;
-moving.turnaroundU = 0.8;
-resizeRun.env.window.innerWidth = 390; resizeRun.env.window.innerHeight = 844;
-resizeRun.events.resize();
-assert.ok(Number.isFinite(moving.nextMoveAt), 'a resized hop resumes planning');
-assert.equal(moving.crossings, 3);
-assert.equal(moving.turnaroundU, 0.8);
-assert.equal(resizeRun.api.getState().roadHeightFraction, .8);
-resizeRun.env.window.innerWidth = 844; resizeRun.env.window.innerHeight = 390;
-resizeRun.events.resize();
-assert.equal(resizeRun.api.getState().roadHeightFraction, .8, 'short landscape view uses actual screen height');
-assert.equal(sim.textDraws, 0, 'the sketch renders no counters or other visible text');
+// Every candidate and actual hop stays on a horizontal or vertical axis.
+const free=simulation(), explorer=free.test.frogs[0];
+assert.ok(free.test.moves.every(move=>move.dx===0||move.dy===0),'diagonal choices are absent');
+for(const move of free.test.moves) {
+  const landing=free.test.movementTarget(explorer,explorer.x,2,move);
+  if(move.dx===0)assert.equal(landing.x,explorer.x,'vertical hops have no horizontal drift');
+  if(move.dy===0)assert.equal(landing.y,2,'horizontal hops have no vertical drift');
+}
+const up=free.test.moves.find(move=>move.direction==='up');
+const traveler={...explorer,y:1.5,decision:0};
+let crossingHops=0;
+while(traveler.y<2.5 && crossingHops<20) {
+  const landing=free.test.movementTarget(traveler,traveler.x,traveler.y,up);
+  traveler.y=landing.y;traveler.decision++;crossingHops++;
+}
+assert.ok(crossingHops>=9&&crossingHops<=13,'crossing the road takes multiple short hops');
+const down=free.test.moves.find(move=>move.direction==='down');
+const descending={...explorer,heading:-1,y:2.5,decision:0};
+let downwardHops=0;
+while(descending.y>1.5&&downwardHops<20) {
+  const landing=free.test.movementTarget(descending,descending.x,descending.y,down);
+  assert.equal(landing.x,descending.x);assert.ok(landing.y<descending.y);
+  descending.y=landing.y;descending.decision++;downwardHops++;
+}
+assert.ok(downwardHops>=9&&downwardHops<=13,'downward crossings use the same short cardinal hops');
+const hop=free.test.movementTarget(explorer,explorer.x,explorer.y,up);
+assert.ok(hop.y>explorer.y);assert.equal(hop.x,explorer.x);
+free.test.beginHop(explorer,up.direction,hop);
+assert.equal(explorer.toX,hop.x);assert.equal(explorer.toY,hop.y);assert.ok(Number.isFinite(explorer.facingAngle));
+const car=free.test.laneObjectsAt(road,0).find(car=>car.x>0);
+assert.equal(free.test.positionDanger(car.x+.4,road.row,0,0),100);
 
-sim.frame();
-sim.env.document.hidden = true; sim.events.visibilitychange();
-assert.equal(sim.frames.size, 0, 'hidden page stops its RAF');
-const before = JSON.stringify(sim.api.getState());
-sim.frame(5000);
-assert.equal(JSON.stringify(sim.api.getState()), before, 'hidden page does not advance');
-sim.env.document.hidden = false; sim.events.visibilitychange();
-assert.equal(sim.frames.size, 1, 'visibility resumes one RAF');
-sim.frame();
-assert.equal(sim.frames.size, 1, 'no duplicate RAF loop');
+// Frogs grow more vibrant with age; death marks remain simple, uniform strokes.
+const ink=simulation(), author=ink.test.frogs[0];
+const youngColor=author.color;ink.test.ageFrog(author,60);assert.notEqual(author.color,youngColor);
+const young={...author,age:0,maturity:0}, old={...author,age:120,maturity:1};
+ink.test.addDeathMark(young,'traffic');ink.test.addDeathMark(old,'traffic');
+ink.paints.length=0;ink.test.drawDeathMarks();
+assert.equal(ink.paints.length,2);assert.ok(ink.paints.every(mark=>mark.kind==='stroke'));
+assert.equal(ink.paints[0].width,ink.paints[1].width,'age does not enlarge a death mark');
 
-for (const reduced of [false, true]) {
-  const run = simulation(target, reduced);
-  const rows = run.test.rows;
-  let reachedTop = false, turnedBack = false, mostCrossings = 0, offBoard = false, shiftedDeparture = false;
-  const wonAt = new Map();
-  for (let i = 0; i < 6000; i++) {
-    run.test.update(1 / 60);
-    const live = run.api.getState().frogs.filter(f => f.alive);
-    if (live.some(f => f.y >= rows - 1)) reachedTop = true;
-    if (reachedTop && live.some(f => f.heading < 0)) turnedBack = true;
-    if (live.some(f => f.y < 0 || f.y > rows - 1)) offBoard = true;
-    live.forEach(frog => {
-      if (frog.repositioning && !wonAt.has(frog.id)) wonAt.set(frog.id, frog.x);
-      if (wonAt.has(frog.id) && Math.abs(frog.x - wonAt.get(frog.id)) >= run.test.cols * 0.2) shiftedDeparture = true;
-    });
-    mostCrossings = Math.max(mostCrossings, ...live.map(f => f.crossings));
+// Cars are outline-only, stay neutral, and never smear an existing death mark.
+const paint=simulation(), victim=paint.test.frogs[0];
+const drawnCar={...car,x:1};
+paint.paints.length=0;paint.test.drawVehicle(road,drawnCar,0);
+assert.ok(paint.paints.length>0&&paint.paints.every(mark=>mark.kind.startsWith('stroke')),'transparent cars draw only outlines');
+const neutral=paint.paints.map(mark=>mark.color);paint.paints.length=0;
+victim.x=car.x+car.length/2;victim.y=road.row;paint.test.killFrog(victim,'traffic');
+const stain=paint.test.marks[0], before=JSON.stringify(stain);
+for(let i=0;i<120;i++)paint.test.update(1/60);
+assert.equal(JSON.stringify(stain),before);
+paint.test.drawVehicle(road,drawnCar,0);assert.deepEqual(paint.paints.map(mark=>mark.color),neutral);
+
+// Hidden tabs pause the round, then resume one animation loop.
+sim.frame();sim.env.document.hidden=true;sim.events.visibilitychange();
+assert.equal(sim.frames.size,0);const hidden=JSON.stringify(sim.api.getState());sim.frame(5000);
+assert.equal(JSON.stringify(sim.api.getState()),hidden);
+sim.env.document.hidden=false;sim.events.visibilitychange();assert.equal(sim.frames.size,1);
+sim.frame();assert.equal(sim.frames.size,1);
+
+for(const reduced of [false,true]) {
+  const run=simulation(target,reduced);
+  const startingGroup=[...run.test.frogs], originalHeadings=startingGroup.map(frog=>frog.heading);
+  let swerves=0;
+  for(let i=0;i<3600;i++) {
+    run.test.update(1/60);
+    if(i%10===0) for(const car of run.test.laneObjectsAt(run.test.getLane(2),(i+1)/60)) {
+      const halfHeight=(car.height*Math.cos(car.angle)+car.length*Math.abs(Math.sin(car.angle)))/2;
+      assert.ok(Math.abs(car.offset)+halfHeight<=3.9/2,'steering keeps every corner on the road');
+      assert.ok(Math.abs(car.angle)<=.18+1e-8,'steering remains bounded');
+      if(Math.abs(car.offset)>.05)swerves++;
+    }
   }
-  const state = run.api.getState();
-  assert.ok(reachedTop, 'a frog reaches the top field');
-  assert.ok(turnedBack, 'reaching the top field turns a frog around');
-  assert.ok(state.frogs.every(f => Number.isFinite(f.x) && Number.isFinite(f.y)));
-  assert.ok(!offBoard, 'frogs stay on the board');
-  assert.ok(mostCrossings >= 2, `a frog completes a round trip (saw ${mostCrossings} turns)`);
-  assert.ok(shiftedDeparture, 'survivors actually relocate horizontally between passes');
-  assert.ok(state.streamArrivals > 20, 'new frogs continue entering during survivor crossings');
-  const arrivals = state.streamArrivals;
-  run.api.eliminateAll();
-  assert.equal(run.api.getState().live, 0);
-  for (let i = 0; i < 120; i++) run.test.update(1 / 60);
-  assert.ok(run.api.getState().streamArrivals > arrivals, 'the clock continues admitting after the last death');
-  assert.ok(run.api.getState().live > 0, 'the stream remains active');
-  run.env.window.innerWidth = 390; run.env.window.innerHeight = 844; run.events.resize();
-  assert.ok(run.api.getState().frogs.every(f => f.x <= run.api.getState().columns - 0.25),
-    'a resize keeps every frog on the narrower board');
-  run.test.draw();
-  assert.equal(run.api.getState().roadHeightFraction, .8, 'mobile keeps the 80% road');
-  assert.equal(run.textDraws, 0, 'normal and reduced-motion views remain wordless');
-  for (let i = 0; i < 120; i++) run.test.update(1 / 60);
+  assert.ok(swerves>0,'drivers react to actual crossing frogs');
+  const state=run.api.getState();
+  assert.equal(state.totalFrogs,state.initialFrogs,'the group remains finite');
+  assert.equal(state.remaining,state.initialFrogs-state.totalDeaths);
+  assert.equal(Number(run.counter.textContent),state.remaining);
+  assert.equal(state.live+state.totalExited+state.totalDeaths,state.initialFrogs);
+  assert.ok(state.totalCrossings>0,'some attempts make it across');
+  assert.ok(state.totalExited>0,'successful frogs actually leave the view');
+  assert.ok(state.totalDeaths>0,'traffic still catches some attempts');
+  assert.ok(startingGroup.every((frog,i)=>frog.heading===originalHeadings[i]&&frog.crossings<=1),'each frog keeps its crossing direction');
+  for(const heading of [1,-1])assert.ok(startingGroup.some(frog=>frog.heading===heading&&frog.finished),'frogs exit successfully in both directions');
+  assert.ok(state.frogs.every(frog=>Number.isFinite(frog.x)&&frog.y>=state.bottomExitY&&frog.y<=state.exitY));
+  assert.ok(state.live<=state.initialFrogs);
+  for(const [width,height] of [[390,844],[844,390],[1440,900]]) {
+    run.env.window.innerWidth=width;run.env.window.innerHeight=height;run.events.resize();run.test.draw();
+    const resized=run.api.getState();assert.equal(resized.roadRows,1);assert.equal(resized.rows,5);
+    assert.ok(Math.abs(resized.roadHeightFraction-.78)<1e-12);assert.equal(run.textDraws,0);
+    assert.equal(resized.initialFrogs,state.initialFrogs,'resize never adds frogs or resets the counter');
+    assert.equal(resized.remaining,state.remaining);
+    assert.ok(resized.frogs.every(frog=>frog.x>=.25&&frog.x<=resized.columns-.25));
+  }
 }
 
-// Long-running accumulation has a finite memory budget.
-const accumulation = simulation();
-for (let i = 0; i < 660; i++) accumulation.test.addBloodStain(accumulation.test.frogs[0], 'traffic');
-accumulation.test.update(1 / 60);
-assert.equal(accumulation.test.stains.length, 640);
-const archive = simulation();
-for (let i = 0; i < 160; i++) {
-  const frog = {...archive.test.frogs[0], id: i, path: null, x: 3, y: archive.api.getState().fieldRows};
-  archive.test.recordFrogPath(frog);
-  frog.x += 1;
-  archive.test.recordFrogPath(frog);
-  frog.path.alive = false;
-}
-assert.equal(archive.test.paths.length, 128, 'old completed paths have a bounded archive');
-const looping = archive.test.frogs[0];
-archive.test.recordFrogPath(looping);
-for (let i = 0; i < 1100; i++) {
-  looping.x += i % 2 ? -1 : 1;
-  archive.test.recordFrogPath(looping);
-}
-assert.ok(looping.path.points.length <= 1024, 'an exceptionally long life has bounded route geometry');
-console.log(`Passed ${samples} collision samples, lifetime pigment and splash growth, persistent paths, newborn color reset, growth per winning pass, faint-to-strong route rendering, stationary paint under traffic, pale cars, 80% road layout, continuous arrivals before wins, changing departure columns, no visible text, caches, visibility, normal/reduced-motion lifecycle, resize, and bounded stain/path history.`);
+// Death marks remain bounded even without movement history.
+const history=simulation();
+for(let i=0;i<660;i++)history.test.addDeathMark(history.test.frogs[0],'traffic');
+history.test.update(1/60);assert.equal(history.test.marks.length,640);
+console.log(`Passed ${samples} collision/swept-window samples, ${crossingHops}-hop road crossing, 78% one-lane layout, per-car size/speed variation, following gaps, finite starting group and death-only counter, single-pass success and exit in both directions, traffic deaths, cardinal-only hops without drift, neutral cars, stationary X marks, retained death marks, hidden-tab pause, responsive resize, counter-only visible text, and normal/reduced-motion lifecycle.`);
 
 if (process.argv.includes('--benchmark')) {
   const files = [target];

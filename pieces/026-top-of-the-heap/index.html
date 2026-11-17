@@ -8,7 +8,7 @@
     />
     <meta
       name="description"
-      content="A bright, legged ball defends a twenty-storey cube pyramid from waves of wide spring-snakes."
+      content="A bouncing yellow sun defends a cube pyramid and its smiley flag from spring-mounted skulls, daggers, guns, whiskey bottles, and cigarettes."
     />
     <title>Top of the Heap · Hypermedia Club</title>
     <style>
@@ -69,7 +69,7 @@
       id="stage"
       tabindex="0"
       role="img"
-      aria-label="Top of the Heap. A tall pyramid of equal-size cubes fills the portrait screen. A bright ball character paints cubes yellow while waves of spring-shaped snakes paint every cube they land on green. The score shows the percentage of the heap that is yellow, green, or unclaimed. The hunter chases and squashes whichever snake is closest to the top. Yellow or Green wins by claiming the entire pyramid. Press R to restart the match."
+      aria-label="Top of the Heap. A tall pyramid of equal-size cubes fills the portrait screen. A bouncing yellow sun with a smiling face and golden rays paints cubes yellow while waves of skulls, daggers, guns, whiskey bottles, and cigarettes on little springs paint cubes dark gray-brown. A yellow flag with eyes and a smiling mouth flies on the summit. The three percentages are yellow territory, dark gray-brown territory, and purple unclaimed territory. The hunter chases and squashes whichever hazard is closest to the top. Yellow or dark gray-brown wins by claiming the entire pyramid. Press R to restart the match."
     ></canvas>
     <p id="status" class="status" aria-live="polite"></p>
 
@@ -84,9 +84,11 @@
         const TAU = Math.PI * 2;
         const TERRITORY = {
           yellow: { hue: 52, saturation: 94, lightness: 58 },
-          green: { hue: 136, saturation: 72, lightness: 48 },
+          shadow: { hue: 30, saturation: 12, lightness: 34 },
         };
         const MAX_SNAKES = 6;
+        const HAZARD_ICONS = ['skull', 'dagger', 'gun', 'whiskey', 'cigarette'];
+        let nextHazardIcon = 0;
 
         const palettes = [
           {
@@ -102,37 +104,37 @@
             bg: '#071d34',
             aura: '#074966',
             ink: '#e9fff8',
-            inactive: { h: 202, s: 64, l: 25 },
+            inactive: { h: 257, s: 58, l: 27 },
             on: 163,
-            ball: '#ff734d',
-            ballShade: '#b92b68',
+            ball: '#fff15b',
+            ballShade: '#ff6b3d',
           },
           {
             bg: '#2a0c22',
             aura: '#6b163b',
             ink: '#fff7df',
-            inactive: { h: 336, s: 54, l: 26 },
+            inactive: { h: 257, s: 58, l: 27 },
             on: 57,
-            ball: '#63ecff',
-            ballShade: '#4055f4',
+            ball: '#fff15b',
+            ballShade: '#ff6b3d',
           },
           {
             bg: '#102417',
             aura: '#1f5a39',
             ink: '#f6ffe2',
-            inactive: { h: 143, s: 43, l: 25 },
+            inactive: { h: 257, s: 58, l: 27 },
             on: 83,
-            ball: '#ffda43',
-            ballShade: '#f14273',
+            ball: '#fff15b',
+            ballShade: '#ff6b3d',
           },
           {
             bg: '#241308',
             aura: '#6c3512',
             ink: '#fff4d4',
-            inactive: { h: 24, s: 55, l: 25 },
+            inactive: { h: 257, s: 58, l: 27 },
             on: 194,
-            ball: '#9cff5d',
-            ballShade: '#12a8a0',
+            ball: '#fff15b',
+            ballShade: '#ff6b3d',
           },
         ];
 
@@ -154,7 +156,7 @@
         let ball = null;
         let level = 1;
         let yellowCount = 0;
-        let greenCount = 0;
+        let shadowCount = 0;
         let totalCubes = 0;
         let paletteIndex = 0;
         let palette = palettes[0];
@@ -164,7 +166,7 @@
         let nextWaveAt = 0;
         let waveRemaining = 0;
         let waveIndex = 0;
-        let waveHue = 112;
+        let waveHue = 30;
         let phase = 'play';
         let blinkStartedAt = 0;
         let roundWinner = 'yellow';
@@ -215,9 +217,11 @@
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
           rows = width / height < 0.72 ? 20 : width < 760 ? 18 : 15;
+          const headerSpace = clamp(height * 0.16, 110, 150);
+          const bottomSpace = Math.max(34, height * 0.065);
           halfW = Math.min(
             (width - Math.max(22, width * 0.06)) / (rows * 2),
-            (height - 150) / (rows * 2.08)
+            (height - headerSpace - bottomSpace) / (rows * 2.05)
           );
           halfW = Math.max(5.5, halfW);
           halfH = halfW * 0.39;
@@ -225,13 +229,7 @@
           stepY = halfH + sideH;
           topX = width * 0.5;
 
-          const boardHeight = (rows - 1) * stepY + halfH + sideH;
-          const headerSpace = clamp(height * 0.12, 78, 118);
-          topY = clamp(
-            headerSpace + halfH,
-            78 + halfH,
-            Math.max(86 + halfH, (height - boardHeight) * 0.42)
-          );
+          topY = headerSpace + halfH;
 
           makeStars();
           if (cubes.length) resetLevel(false);
@@ -254,7 +252,7 @@
 
           cubes = [];
           yellowCount = 0;
-          greenCount = 0;
+          shadowCount = 0;
           totalCubes = (rows * (rows + 1)) / 2;
           for (let row = 0; row < rows; row += 1) {
             const line = [];
@@ -272,6 +270,7 @@
           nextWaveAt = 0.75;
           waveRemaining = 0;
           waveIndex = 0;
+          nextHazardIcon = 0;
           phase = 'play';
           ball = makeBall();
           updateRootColor();
@@ -315,6 +314,7 @@
           players.push({
             id: `${matchTime}-${random()}`,
             hue: waveHue + (random() - 0.5) * 9,
+            icon: HAZARD_ICONS[nextHazardIcon++ % HAZARD_ICONS.length],
             row: rows,
             column,
             from: {
@@ -328,17 +328,17 @@
             waiting: false,
             nextColumn: column,
             dead: false,
-            springPhase: random() * TAU,
+            driftPhase: random() * TAU,
           });
           return true;
         }
 
         function beginWave() {
           waveIndex += 1;
-          waveHue = 98 + random() * 38;
+          waveHue = 24 + random() * 12;
           waveRemaining = 3 + Math.floor(random() * 3);
           nextSpawnAt = matchTime;
-          status.textContent = `Spring wave ${waveIndex}: ${waveRemaining} snakes.`;
+          status.textContent = `Wave ${waveIndex}: ${waveRemaining} hazards.`;
         }
 
         function frame(now) {
@@ -418,70 +418,71 @@
           ball.nextRow = next.row;
           ball.nextColumn = next.column;
           ball.startedAt = matchTime;
-          ball.duration = reducedMotion ? 1.08 : 0.38 + random() * 0.1;
+          ball.duration = reducedMotion ? 1.08 : 0.35 + random() * 0.08;
           ball.mode = 'bounce';
         }
 
         function chooseBallNextNode() {
-          const candidates = ballNeighbors(ball.row, ball.column);
+          let candidates = ballNeighbors(ball.row, ball.column);
           const livePlayers = players.filter((player) => !player.dead);
 
           if (livePlayers.length) {
-            const ballPoint = nodePoint(ball.row, ball.column);
+            const rainHop = reducedMotion ? 1.18 : 0.62;
+            const sunHop = reducedMotion ? 1.08 : 0.43;
             const threats = livePlayers.map((player) => {
-              const progress = clamp(
-                (matchTime - player.startedAt) / player.duration,
-                0,
-                1
-              );
-              const jumpsFromTop = player.entering
-                ? rows
-                : player.waiting
-                  ? player.row
-                  : Math.max(0, player.row - progress);
-              const point = playerPosition(player);
-              const distance =
-                Math.abs(point.x - ballPoint.x) +
-                Math.abs(point.y - ballPoint.y) * 0.22;
-              return { player, jumpsFromTop, distance };
-            });
-            threats.sort((a, b) =>
-              a.jumpsFromTop - b.jumpsFromTop || a.distance - b.distance
-            );
-            const target = threats[0].player;
-            ball.targetId = target.id;
+              const progress = clamp((matchTime - player.startedAt) / player.duration, 0, 1);
+              const destination = {
+                row: player.entering ? rows - 1 : player.waiting ? player.row : player.row - 1,
+                column: player.waiting ? player.column : player.nextColumn,
+              };
+              const arrival = (1 - progress) * player.duration + destination.row * rainHop;
+              return { player, destination, arrival };
+            }).sort((a, b) => a.arrival - b.arrival);
+            const threat = threats[0];
+            ball.targetId = threat.player.id;
 
-            const targetPoint = playerPosition(target);
+            // Keep enough time to climb back by ordinary, adjacent-cube hops.
+            const safe = candidates.filter(
+              (node) => (node.row + 1) * sunHop + 0.2 < threat.arrival
+            );
+            if (safe.length) candidates = safe;
+            else candidates = candidates.filter((node) => node.row < ball.row);
+            if (!candidates.length) return { row: ball.row, column: ball.column };
+
             const scored = candidates.map((candidate) => {
-              const point = nodePoint(candidate.row, candidate.column);
-              const distance =
-                Math.abs(point.x - targetPoint.x) +
-                Math.abs(point.y - targetPoint.y) * 0.42;
-              const yellowBonus = cubes[candidate.row][candidate.column].owner === 'yellow'
-                ? 0
-                : halfW * 0.82;
-              const reversal =
-                candidate.row === ball.previousRow &&
-                candidate.column === ball.previousColumn
-                  ? halfW * 0.55
-                  : 0;
-              return { ...candidate, score: distance - yellowBonus + reversal };
-            });
-            scored.sort((a, b) => a.score - b.score);
-            if (scored.length === 1) return scored[0];
-            if (Math.abs(scored[0].score - scored[1].score) < halfW * 0.18) {
-              return random() < 0.5 ? scored[0] : scored[1];
-            }
+              const distance = cubeDistance(candidate, threat.destination);
+              const reversal = candidate.row === ball.previousRow &&
+                candidate.column === ball.previousColumn ? 0.85 : 0;
+              return { ...candidate, score: distance * 8 - claimOpportunity(candidate) + reversal };
+            }).sort((a, b) => a.score - b.score);
             return scored[0];
           }
 
+          ball.targetId = null;
           return nextStepTowardYellowClaim(candidates) || candidates[Math.floor(random() * candidates.length)];
+        }
+
+        function cubeDistance(a, b) {
+          return Math.abs(a.column - b.column) +
+            Math.abs((a.row - a.column) - (b.row - b.column));
+        }
+
+        function claimOpportunity(node) {
+          if (cubes[node.row][node.column].owner === 'yellow') return 0;
+          // Prefer fresh territory that also opens a useful next landing.
+          const onward = ballNeighbors(node.row, node.column).filter(
+            (next) => cubes[next.row][next.column].owner !== 'yellow'
+          ).length;
+          return 1.6 + onward * 0.24;
         }
 
         function nextStepTowardYellowClaim(initialSteps) {
           const queue = [];
           const visited = new Set([`${ball.row}:${ball.column}`]);
-          for (const step of initialSteps) {
+          const orderedSteps = [...initialSteps].sort(
+            (a, b) => claimOpportunity(b) - claimOpportunity(a)
+          );
+          for (const step of orderedSteps) {
             const key = `${step.row}:${step.column}`;
             visited.add(key);
             queue.push({ row: step.row, column: step.column, first: step });
@@ -529,12 +530,12 @@
             player.column = player.nextColumn;
           }
 
-          claimCube(player.row, player.column, 'green');
+          claimCube(player.row, player.column, 'shadow');
           if (phase === 'blink') return;
 
           if (player.row <= 0) {
             player.dead = true;
-            status.textContent = 'Spring-snake crossed the summit. The territory race continues.';
+            status.textContent = 'Hazard crossed the summit. The territory race continues.';
             return;
           }
 
@@ -602,19 +603,19 @@
           if (!cube) return;
           if (cube.owner !== owner) {
             if (cube.owner === 'yellow') yellowCount -= 1;
-            if (cube.owner === 'green') greenCount -= 1;
+            if (cube.owner === 'shadow') shadowCount -= 1;
             cube.owner = owner;
             if (owner === 'yellow') yellowCount += 1;
-            if (owner === 'green') greenCount += 1;
+            if (owner === 'shadow') shadowCount += 1;
             cube.pulse = 1;
             makeSparks(nodePoint(row, column), TERRITORY[owner].hue, row === 0 ? 12 : 5);
           } else {
             cube.pulse = Math.max(cube.pulse, 0.32);
           }
 
-          if (yellowCount === totalCubes || greenCount === totalCubes) {
-            const winner = yellowCount === totalCubes ? 'yellow' : 'green';
-            status.textContent = `${winner === 'yellow' ? 'Yellow' : 'Green'} claimed the whole pyramid.`;
+          if (yellowCount === totalCubes || shadowCount === totalCubes) {
+            const winner = yellowCount === totalCubes ? 'yellow' : 'shadow';
+            status.textContent = `${winner === 'yellow' ? 'Yellow' : 'Shadow'} claimed the whole pyramid.`;
             beginBlink(winner);
           }
         }
@@ -635,7 +636,7 @@
             if (ball.targetId === player.id) ball.targetId = null;
             splats.push({ x: pp.x, y: pp.y + halfW * 0.25, hue: player.hue, at: matchTime });
             makeSparks(pp, player.hue, 11);
-            status.textContent = 'Spring-snake crushed. The territory race continues.';
+            status.textContent = 'Hazard flattened. The territory race continues.';
           }
         }
 
@@ -666,13 +667,19 @@
         }
 
         function playerPosition(player) {
+          const ground = playerGroundPosition(player);
+          const raw = clamp((matchTime - player.startedAt) / player.duration, 0, 1);
+          const jumpHeight = player.waiting ? 0.55 : player.entering ? 1.25 : 2.35;
+          const lift = reducedMotion ? 0 : Math.sin(Math.PI * raw) * halfW * jumpHeight;
+          return { x: ground.x, y: ground.y - lift };
+        }
+
+        function playerGroundPosition(player) {
           const raw = clamp((matchTime - player.startedAt) / player.duration, 0, 1);
           const t = smooth(raw);
-          const jumpHeight = player.entering ? 1.35 : 2.65;
-          const lift = reducedMotion ? 0 : Math.sin(Math.PI * raw) * halfW * jumpHeight;
           return {
             x: lerp(player.from.x, player.to.x, t),
-            y: lerp(player.from.y, player.to.y, t) - lift - halfW * 0.28,
+            y: lerp(player.from.y, player.to.y, t) - halfW * 0.28,
           };
         }
 
@@ -724,6 +731,7 @@
             }
           }
 
+          drawSummitFlag();
           drawSplats();
           const actors = players
             .filter((player) => !player.dead)
@@ -767,37 +775,27 @@
 
         function drawScoreboard() {
           const scoreSize = clamp(width * 0.056, 18, 31);
-          const labelSize = clamp(width * 0.026, 10, 13);
           const top = Math.max(24, envSafeTop() + 17);
           const scores = territoryPercentages();
-          const columns = [width * 0.18, width * 0.5, width * 0.82];
+          const left = clamp(width * 0.04, 18, 32);
+          const lineHeight = scoreSize * 1.28;
 
           ctx.textBaseline = 'top';
           ctx.font = `900 ${scoreSize}px Arial, Helvetica, sans-serif`;
-          ctx.textAlign = 'center';
+          ctx.textAlign = 'left';
           ctx.fillStyle = `hsl(${TERRITORY.yellow.hue} ${TERRITORY.yellow.saturation}% 66%)`;
-          ctx.fillText(`${scores.yellow}%`, columns[0], top);
-          ctx.fillStyle = `hsl(${TERRITORY.green.hue} ${TERRITORY.green.saturation}% 61%)`;
-          ctx.fillText(`${scores.green}%`, columns[1], top);
-          ctx.fillStyle = palette.ink;
-          ctx.fillText(`${scores.none}%`, columns[2], top);
-
-          ctx.globalAlpha = 0.82;
-          ctx.font = `800 ${labelSize}px Arial, Helvetica, sans-serif`;
-          ctx.letterSpacing = '0.05em';
-          ctx.textAlign = 'center';
-          ctx.fillText('YELLOW', columns[0], top + scoreSize + 1);
-          ctx.fillText('GREEN', columns[1], top + scoreSize + 1);
-          ctx.fillText('NONE', columns[2], top + scoreSize + 1);
-          ctx.globalAlpha = 1;
-          ctx.letterSpacing = '0px';
+          ctx.fillText(`${scores.yellow}%`, left, top);
+          ctx.fillStyle = `hsl(${TERRITORY.shadow.hue} ${TERRITORY.shadow.saturation}% 65%)`;
+          ctx.fillText(`${scores.shadow}%`, left, top + lineHeight);
+          ctx.fillStyle = '#bd91ff';
+          ctx.fillText(`${scores.none}%`, left, top + lineHeight * 2);
         }
 
         function territoryPercentages() {
           const counts = {
             yellow: yellowCount,
-            green: greenCount,
-            none: totalCubes - yellowCount - greenCount,
+            shadow: shadowCount,
+            none: totalCubes - yellowCount - shadowCount,
           };
           const entries = Object.entries(counts).map(([name, count]) => {
             const exact = totalCubes ? count * 100 / totalCubes : 0;
@@ -807,6 +805,49 @@
           entries.sort((a, b) => b.remainder - a.remainder);
           for (let index = 0; index < remaining; index += 1) entries[index].value += 1;
           return Object.fromEntries(entries.map((entry) => [entry.name, entry.value]));
+        }
+
+        function drawSummitFlag() {
+          const poleHeight = clamp(halfW * 1.5, 31, 42);
+          const flagWidth = poleHeight * 0.9;
+          const flagHeight = poleHeight * 0.6;
+          const x = topX;
+          const y = topY;
+          const flutter = reducedMotion ? 0 : Math.sin(matchTime * 3.1) * flagHeight * 0.06;
+          ctx.save();
+          ctx.translate(x, y - poleHeight);
+          ctx.lineWidth = Math.max(1.3, halfW * 0.075);
+          ctx.strokeStyle = '#d4c5f5';
+          ctx.beginPath();
+          ctx.moveTo(0, poleHeight);
+          ctx.lineTo(0, -2);
+          ctx.stroke();
+
+          ctx.fillStyle = '#fff15b';
+          ctx.strokeStyle = '#b1a11a';
+          ctx.beginPath();
+          ctx.moveTo(1, 0);
+          ctx.bezierCurveTo(flagWidth * 0.4, -flagHeight * 0.12, flagWidth * 0.65, flagHeight * 0.16 + flutter, flagWidth, flutter);
+          ctx.lineTo(flagWidth, flagHeight + flutter);
+          ctx.bezierCurveTo(flagWidth * 0.65, flagHeight * 1.16 + flutter, flagWidth * 0.4, flagHeight * 0.88, 1, flagHeight);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.translate(flagWidth * 0.52, flagHeight * 0.5 + flutter * 0.45);
+          const faceSize = flagHeight * 0.4;
+          ctx.fillStyle = '#362b24';
+          ctx.strokeStyle = '#362b24';
+          ctx.lineWidth = Math.max(1, faceSize * 0.14);
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.arc(-faceSize * 0.4, -faceSize * 0.25, faceSize * 0.1, 0, TAU);
+          ctx.arc(faceSize * 0.4, -faceSize * 0.25, faceSize * 0.1, 0, TAU);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(0, faceSize * 0.02, faceSize * 0.6, Math.PI * 0.12, Math.PI * 0.88);
+          ctx.stroke();
+          ctx.restore();
         }
 
         function drawBoardShadow() {
@@ -911,34 +952,25 @@
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
 
-          const legLength = radius * (0.62 + (1 - hop) * 0.5);
-          const stride = Math.sin(raw * TAU) * radius * 0.28;
-          const hipY = radius * 0.5;
-          const footY = hipY + legLength;
-          const legColor = palette.ballShade;
-
-          ctx.strokeStyle = 'rgba(8, 5, 27, .8)';
-          ctx.lineWidth = Math.max(2.6, radius * 0.36);
-          drawBallLeg(-radius * 0.32, hipY, -radius * 0.36 - stride, footY);
-          drawBallLeg(radius * 0.32, hipY, radius * 0.36 + stride, footY);
-          ctx.strokeStyle = legColor;
-          ctx.lineWidth = Math.max(1.35, radius * 0.18);
-          drawBallLeg(-radius * 0.32, hipY, -radius * 0.36 - stride, footY);
-          drawBallLeg(radius * 0.32, hipY, radius * 0.36 + stride, footY);
-
-          ctx.fillStyle = 'rgba(8, 5, 27, .82)';
-          ctx.beginPath();
-          ctx.ellipse(-radius * 0.43 - stride, footY, radius * 0.36, radius * 0.18, -0.08, 0, TAU);
-          ctx.ellipse(radius * 0.43 + stride, footY, radius * 0.36, radius * 0.18, 0.08, 0, TAU);
-          ctx.fill();
-          ctx.fillStyle = legColor;
-          ctx.beginPath();
-          ctx.ellipse(-radius * 0.43 - stride, footY - radius * 0.04, radius * 0.26, radius * 0.1, -0.08, 0, TAU);
-          ctx.ellipse(radius * 0.43 + stride, footY - radius * 0.04, radius * 0.26, radius * 0.1, 0.08, 0, TAU);
-          ctx.fill();
-
           ctx.save();
           ctx.scale(1 + landing * 0.16, 1 - landing * 0.12);
+          ctx.beginPath();
+          const rayLength = radius * (1.4 + hop * 0.06);
+          for (let point = 0; point < 24; point += 1) {
+            const angle = point / 24 * TAU - Math.PI * 0.5;
+            const reach = point % 2 === 0 ? rayLength : radius * 0.95;
+            const x = Math.cos(angle) * reach;
+            const y = Math.sin(angle) * reach;
+            if (point === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.closePath();
+          ctx.fillStyle = '#ffd34e';
+          ctx.strokeStyle = 'rgba(8, 5, 27, .78)';
+          ctx.lineWidth = Math.max(0.8, halfW * 0.06);
+          ctx.fill();
+          ctx.stroke();
+
           const shine = ctx.createRadialGradient(
             -radius * 0.36,
             -radius * 0.42,
@@ -947,7 +979,7 @@
             0,
             radius
           );
-          shine.addColorStop(0, '#ffffff');
+          shine.addColorStop(0, '#fff8c9');
           shine.addColorStop(0.16, palette.ball);
           shine.addColorStop(0.76, palette.ball);
           shine.addColorStop(1, palette.ballShade);
@@ -980,61 +1012,109 @@
           ctx.restore();
         }
 
-        function drawBallLeg(startX, startY, endX, endY) {
-          const bend = (endX - startX) * 0.55;
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          ctx.quadraticCurveTo(startX - bend, (startY + endY) * 0.5, endX, endY);
-          ctx.stroke();
-        }
-
         function drawPlayer(player) {
           const p = playerPosition(player);
-          const size = Math.max(4.5, halfW * 0.61);
+          const ground = playerGroundPosition(player);
+          const size = Math.max(4.5, halfW * 0.78);
+          const raw = clamp((matchTime - player.startedAt) / player.duration, 0, 1);
+          const hop = reducedMotion ? 0 : Math.sin(Math.PI * raw);
+          const landing = reducedMotion ? 0 : Math.pow(Math.abs(Math.cos(Math.PI * raw)), 7);
+          const springHeight = size * (0.78 + hop * 0.36 - landing * 0.12);
           ctx.save();
+          ctx.fillStyle = `rgba(0,0,0,${0.3 - hop * 0.1})`;
+          ctx.beginPath();
+          ctx.ellipse(ground.x, ground.y + size * 0.45, size * (0.66 - hop * 0.18), size * 0.16, 0, 0, TAU);
+          ctx.fill();
+
           ctx.translate(p.x, p.y);
-          ctx.strokeStyle = `hsl(${player.hue} 88% 64%)`;
-          ctx.fillStyle = `hsl(${player.hue} 92% 61%)`;
-          ctx.lineWidth = Math.max(1.2, halfW * 0.13);
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
-
-          ctx.fillStyle = 'rgba(0,0,0,.3)';
           ctx.beginPath();
-          ctx.ellipse(0, size * 1.05, size * 0.72, size * 0.2, 0, 0, TAU);
-          ctx.fill();
-          ctx.fillStyle = `hsl(${player.hue} 92% 61%)`;
-
-          const raw = clamp((matchTime - player.startedAt) / player.duration, 0, 1);
-          const bounce = reducedMotion ? 0 : Math.sin(Math.PI * raw);
-          const stretch = 1 + bounce * 0.48;
-          const squeeze = 1 - bounce * 0.1;
-          ctx.scale(squeeze, stretch);
-
-          ctx.strokeStyle = 'rgba(7, 5, 22, .76)';
-          ctx.lineWidth = Math.max(2.9, halfW * 0.3);
-          ctx.beginPath();
-          for (let coil = 0; coil <= 16; coil += 1) {
-            const t = coil / 16;
-            const x = Math.sin(t * TAU * 4 + player.springPhase) * size * 0.72;
-            const y = size * 0.75 - t * size * 1.82;
-            if (coil === 0) ctx.moveTo(x, y);
+          for (let point = 0; point <= 36; point += 1) {
+            const t = point / 36;
+            const x = Math.sin(t * TAU * 3) * size * 0.44;
+            const y = size * 0.45 - t * springHeight;
+            if (point === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
           }
+          ctx.strokeStyle = '#2c2724';
+          ctx.lineWidth = Math.max(2.8, size * 0.24);
+          ctx.stroke();
+          ctx.strokeStyle = '#b2a18e';
+          ctx.lineWidth = Math.max(1, size * 0.1);
           ctx.stroke();
 
-          ctx.strokeStyle = `hsl(${player.hue} 88% 64%)`;
-          ctx.lineWidth = Math.max(1.45, halfW * 0.14);
-          ctx.stroke();
-
-          ctx.beginPath();
-          ctx.ellipse(0, -size * 1.22, size * 0.62, size * 0.34, 0, 0, TAU);
-          ctx.fill();
-          ctx.fillStyle = palette.bg;
-          const eye = Math.max(1, size * 0.1);
-          ctx.fillRect(-size * 0.24, -size * 1.35, eye, eye);
-          ctx.fillRect(size * 0.15, -size * 1.35, eye, eye);
+          ctx.translate(0, size * 0.45 - springHeight - size * 0.65);
+          ctx.rotate(reducedMotion ? 0 : Math.sin(raw * TAU + player.driftPhase) * 0.08);
+          ctx.scale(size, size);
+          drawHazardIcon(player.icon || 'skull');
           ctx.restore();
+        }
+
+        function drawHazardIcon(icon) {
+          ctx.fillStyle = '#65594e';
+          ctx.strokeStyle = '#c4b5a2';
+          ctx.lineWidth = 0.1;
+          const shape = (points) => {
+            ctx.beginPath();
+            points.forEach(([x, y], index) => index ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          };
+          if (icon === 'skull') {
+            ctx.beginPath();
+            ctx.moveTo(-0.42, 0.65);
+            ctx.lineTo(0.42, 0.65);
+            ctx.lineTo(0.48, 0.25);
+            ctx.bezierCurveTo(1.05, -0.05, 0.9, -0.95, 0, -0.95);
+            ctx.bezierCurveTo(-0.9, -0.95, -1.05, -0.05, -0.48, 0.25);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#1d1917';
+            ctx.beginPath();
+            ctx.ellipse(-0.32, -0.17, 0.22, 0.25, -0.15, 0, TAU);
+            ctx.ellipse(0.32, -0.17, 0.22, 0.25, 0.15, 0, TAU);
+            ctx.fill();
+            shape([[-0.1, 0.3], [0, 0.1], [0.1, 0.3]]);
+            ctx.strokeStyle = '#1d1917';
+            ctx.beginPath();
+            ctx.moveTo(-0.16, 0.43); ctx.lineTo(-0.16, 0.65);
+            ctx.moveTo(0.16, 0.43); ctx.lineTo(0.16, 0.65);
+            ctx.stroke();
+          } else if (icon === 'dagger') {
+            ctx.save();
+            ctx.rotate(0.3);
+            shape([[0, -1.2], [0.26, -0.5], [0.17, 0.3], [-0.17, 0.3], [-0.26, -0.5]]);
+            ctx.beginPath(); ctx.moveTo(0, -0.86); ctx.lineTo(0, 0.26); ctx.stroke();
+            ctx.fillStyle = '#3c332c';
+            shape([[-0.46, 0.23], [0.46, 0.23], [0.46, 0.4], [0.13, 0.4], [0.13, 0.91], [-0.13, 0.91], [-0.13, 0.4], [-0.46, 0.4]]);
+            ctx.restore();
+          } else if (icon === 'gun') {
+            shape([[-1.05, -0.5], [0.92, -0.5], [0.92, -0.12], [0.35, -0.12], [0.06, 0.77], [-0.48, 0.77], [-0.26, 0.02], [-1.05, 0.02]]);
+            ctx.beginPath();
+            ctx.moveTo(0.35, -0.02); ctx.lineTo(0.65, -0.02);
+            ctx.quadraticCurveTo(0.66, 0.49, 0.18, 0.41);
+            ctx.moveTo(0.42, 0.04); ctx.lineTo(0.37, 0.24);
+            ctx.stroke();
+          } else if (icon === 'whiskey') {
+            shape([[-0.22, -1.07], [0.22, -1.07], [0.22, -0.57], [0.55, -0.3], [0.55, 0.85], [-0.55, 0.85], [-0.55, -0.3], [-0.22, -0.57]]);
+            ctx.fillStyle = '#b6a286';
+            ctx.fillRect(-0.36, -0.01, 0.72, 0.48);
+            ctx.fillStyle = '#39312b';
+            ctx.fillRect(-0.26, -1.13, 0.52, 0.2);
+          } else if (icon === 'cigarette') {
+            ctx.save();
+            ctx.rotate(-0.3);
+            ctx.fillStyle = '#bbb1a1';
+            shape([[-1.04, -0.23], [1.04, -0.23], [1.04, 0.23], [-1.04, 0.23]]);
+            ctx.fillStyle = '#65503b';
+            ctx.fillRect(-1.04, -0.23, 0.6, 0.46);
+            ctx.fillStyle = '#322c28';
+            ctx.fillRect(0.83, -0.23, 0.21, 0.46);
+            ctx.restore();
+          }
         }
 
         function drawSplats() {
@@ -1042,7 +1122,7 @@
             const age = clamp((matchTime - splat.at) / 0.7, 0, 1);
             const spread = halfW * (0.35 + age * 0.8);
             ctx.globalAlpha = 1 - age;
-            ctx.fillStyle = `hsl(${splat.hue} 90% 58%)`;
+            ctx.fillStyle = `hsl(${splat.hue} 12% 34%)`;
             ctx.beginPath();
             ctx.ellipse(splat.x, splat.y, spread, spread * 0.24, 0, 0, TAU);
             ctx.fill();
@@ -1057,7 +1137,7 @@
             const x = spark.x + spark.vx * age;
             const y = spark.y + spark.vy * age + halfW * 3 * age * age;
             ctx.globalAlpha = 1 - t;
-            ctx.fillStyle = `hsl(${spark.hue} 94% 70%)`;
+            ctx.fillStyle = `hsl(${spark.hue} ${spark.hue === TERRITORY.yellow.hue ? 94 : 12}% ${spark.hue === TERRITORY.yellow.hue ? 70 : 55}%)`;
             const size = Math.max(1, halfW * 0.13 * (1 - t));
             ctx.fillRect(x - size * 0.5, y - size * 0.5, size, size);
           }
@@ -1069,15 +1149,9 @@
           const on = reducedMotion || Math.floor(elapsed / 0.12) % 2 === 0;
           if (!on) return;
           ctx.globalAlpha = reducedMotion ? 0.22 : 0.66;
-          ctx.fillStyle = palette.ink;
+          ctx.fillStyle = `hsl(${TERRITORY[roundWinner].hue} ${TERRITORY[roundWinner].saturation}% 65%)`;
           ctx.fillRect(0, 0, width, height);
           ctx.globalAlpha = 1;
-
-          ctx.fillStyle = palette.bg;
-          ctx.font = `900 ${clamp(width * 0.082, 26, 46)}px Arial, Helvetica, sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(roundWinner === 'yellow' ? 'YELLOW WINS!' : 'GREEN WINS!', width * 0.5, height * 0.5);
         }
 
         function envSafeTop() {
