@@ -80,7 +80,7 @@ parameters for static hosting. After changing these assets, run
 `node scripts/version-arcade-assets.mjs` before publishing. It updates both
 Arcade views, all four attract studies, and the landing's generated image URLs.
 `node scripts/version-arcade-assets.mjs --check` checks for stale versions without
-writing. These helpers use only Python and Node standard libraries; viewing the
+writing. Run `node scripts/check-arcade-paths.mjs` before publishing to check local HTML/CSS references against exact Git filename casing, including case collisions hidden by macOS. The canonical issue directory is `Issues/`; lowercase aliases must not be added. These helpers use only Python and Node standard libraries; viewing the
 gallery still requires neither a server nor a build step.
 
 ## Linking gallery states

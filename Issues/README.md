@@ -763,3 +763,7 @@ link-based. New issues and compositions start with `"wip": true`; absent status
 fields also mean WIP. Only an explicit user decision promotes a work, represented
 by `"wip": false`. Preserve explicit `"rejected": true`, which takes precedence.
 Completion, quality, ratings, import, and local visits do not infer promotion.
+
+## Published path casing
+
+The canonical tracked directory is `Issues/`, including `Issues/arcade.css` and `Issues/arcade.js`. The former lowercase `issues/` CSS/JS entries and duplicate lowercase index caused the published page to lose styling and scripts on a case-sensitive server. Case-only moves require a temporary path on macOS. `node scripts/check-arcade-paths.mjs` validates 230 local HTML/CSS references against Git and rejects case collisions before publication.
